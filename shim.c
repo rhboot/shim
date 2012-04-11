@@ -77,6 +77,10 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		fileinfo = AllocatePool(buffersize);
+		if (!fileinfo) {
+			Print(L"Unable to allocate info buffer\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
 		efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub,
 					       &file_info_id, &buffersize,
 					       fileinfo);
@@ -89,6 +93,11 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 
 	buffersize = fileinfo->FileSize;
 	*grubdata = AllocatePool(buffersize);
+
+	if (!*grubdata) {
+		Print(L"Unable to allocate file buffer\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
 
 	efi_status = uefi_call_wrapper(grub->Read, 3, grub, &buffersize,
 				       *grubdata);
@@ -257,7 +266,7 @@ EFI_STATUS handle_grub (void *grubdata, int grubsize)
 	char *buffer;
 	int i, size;
 	EFI_IMAGE_SECTION_HEADER *Section;
-	char *base, *end, *maxend = 0;
+	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	
 	efi_status = read_header(grubdata, &context);
@@ -267,6 +276,11 @@ EFI_STATUS handle_grub (void *grubdata, int grubsize)
 	}
 
 	buffer = AllocatePool(context.ImageSize);
+
+	if (!buffer) {
+		Print(L"Failed to allocate image buffer\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
 
 	CopyMem(buffer, grubdata, context.SizeOfHeaders);
 
@@ -285,9 +299,6 @@ EFI_STATUS handle_grub (void *grubdata, int grubsize)
 			return EFI_UNSUPPORTED;
 		}
 
-		if (end > maxend)
-			maxend = end;
-
 		if (Section->SizeOfRawData > 0)
 			CopyMem(base, grubdata + Section->PointerToRawData, size);
 
@@ -304,7 +315,11 @@ EFI_STATUS handle_grub (void *grubdata, int grubsize)
 		return efi_status;
 	}
 
-	entry_point = (void *)(context.EntryPoint + (UINT64)buffer);
+	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
+	if (!entry_point) {
+		Print(L"Invalid entry point\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	return EFI_SUCCESS;
 }
