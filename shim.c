@@ -23,8 +23,10 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 	EFI_FILE *root, *grub;
 	FILEPATH_DEVICE_PATH *FilePath;	
 	CHAR16 *PathName;
+	CHAR16 *Dir;
 	EFI_HANDLE device;
 	unsigned int buffersize = 0;
+	int i;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, &li);
@@ -36,16 +38,6 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 	    DevicePathSubType(li->FilePath) != MEDIA_FILEPATH_DP)
 		return EFI_NOT_FOUND;
 
-	FilePath = (FILEPATH_DEVICE_PATH *)li->FilePath;
-
-	PathName = AllocatePool(StrLen(FilePath->PathName) + StrLen(L"grub.efi"));
-
-	if (!PathName)
-		return EFI_LOAD_ERROR;
-
-	StrCpy(PathName, FilePath->PathName);
-
-	StrCat(PathName, L"grub.efi");
 
 	device = li->DeviceHandle;
 
@@ -64,11 +56,70 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 		return efi_status;
 	}
 
+	FilePath = (FILEPATH_DEVICE_PATH *)li->FilePath;
+
+	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub,
+				       FilePath->PathName, EFI_FILE_MODE_READ,
+				       0);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to open %s - %lx\n", FilePath->PathName, efi_status);
+		return efi_status;
+	}
+
+	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &file_info_id,
+				       &buffersize, fileinfo);
+
+	if (efi_status == EFI_BUFFER_TOO_SMALL) {
+		fileinfo = AllocatePool(buffersize);
+		if (!fileinfo) {
+			Print(L"Unable to allocate info buffer\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub,
+					       &file_info_id, &buffersize,
+					       fileinfo);
+	}
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to get file info\n");
+		return efi_status;
+	}
+
+	efi_status = uefi_call_wrapper(grub->Close, 1, grub);
+
+	if (fileinfo->Attribute & EFI_FILE_DIRECTORY) {
+		Dir = FilePath->PathName;
+	} else {
+		for (i=StrLen(FilePath->PathName); i > 0; i--) {
+			if (FilePath->PathName[i] == '\\')
+				break;
+		}
+
+		if (i) {
+			Dir = AllocatePool(i * 2);
+			CopyMem(Dir, FilePath->PathName, i * 2);
+			Dir[i] = '\0';
+		} else {
+			Dir = AllocatePool(2);
+			Dir[0] = '\0';
+		}
+	}
+
+	PathName = AllocatePool(StrLen(Dir) + StrLen(L"grub.efi"));
+
+	if (!PathName)
+		return EFI_LOAD_ERROR;
+
+	StrCpy(PathName, Dir);
+
+	StrCat(PathName, L"\\grub.efi");
+
 	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub, PathName,
 				       EFI_FILE_MODE_READ, 0);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to open grub\n");
+		Print(L"Failed to open %s - %lx\n", PathName, efi_status);
 		return efi_status;
 	}
 
