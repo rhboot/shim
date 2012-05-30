@@ -1,17 +1,15 @@
-/* Read path */
-/* Load real bootloader */
-/* Check signature */
-/* Relocate real bootloader */
-/* Jump to real bootloader */
-
 #include <efi.h>
 #include <efilib.h>
+#include <Library/BaseCryptLib.h>
 #include "PeImage.h"
 
-EFI_SYSTEM_TABLE *systab;
-EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
+static EFI_SYSTEM_TABLE *systab;
+static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
 
-EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
+#include "cert.h"
+
+static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata,
+			     int *grubsize)
 {
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
@@ -25,7 +23,7 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 	CHAR16 *PathName;
 	CHAR16 *Dir;
 	EFI_HANDLE device;
-	unsigned int buffersize = 0;
+	unsigned int buffersize = sizeof(EFI_FILE_INFO);
 	int i;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
@@ -37,7 +35,6 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 	if (DevicePathType(li->FilePath) != MEDIA_DEVICE_PATH ||
 	    DevicePathSubType(li->FilePath) != MEDIA_FILEPATH_DP)
 		return EFI_NOT_FOUND;
-
 
 	device = li->DeviceHandle;
 
@@ -63,8 +60,16 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 				       0);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to open %s - %lx\n", FilePath->PathName, efi_status);
+		Print(L"Failed to open %s - %lx\n", FilePath->PathName,
+		      efi_status);
 		return efi_status;
+	}
+
+	fileinfo = AllocatePool(buffersize);
+
+	if (!fileinfo) {
+		Print(L"Unable to allocate info buffer\n");
+		return EFI_OUT_OF_RESOURCES;
 	}
 
 	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &file_info_id,
@@ -113,7 +118,7 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 
 	StrCpy(PathName, Dir);
 
-	StrCat(PathName, L"\\grub.efi");
+	StrCat(PathName, L"grub.efi");
 
 	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub, PathName,
 				       EFI_FILE_MODE_READ, 0);
@@ -154,7 +159,7 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 				       *grubdata);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unexpected return from initial read\n");
+		Print(L"Unexpected return from initial read: %x, buffersize %x\n", efi_status, buffersize);
 		return efi_status;
 	}
 
@@ -168,7 +173,7 @@ EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata, int *grubsize)
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS read_header(void *grubdata, PE_COFF_LOADER_IMAGE_CONTEXT *context)
+static EFI_STATUS read_header(void *grubdata, PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = grubdata;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = grubdata;
@@ -191,8 +196,8 @@ EFI_STATUS read_header(void *grubdata, PE_COFF_LOADER_IMAGE_CONTEXT *context)
 		return EFI_UNSUPPORTED;
 	}
 
+	context->PEHdr = PEHdr;
 	context->ImageAddress = PEHdr->Pe32Plus.OptionalHeader.ImageBase;
-	PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)grubdata;
 	context->ImageSize = (UINT64)PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
 	context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
 	context->EntryPoint = PEHdr->Pe32Plus.OptionalHeader.AddressOfEntryPoint;
@@ -200,19 +205,196 @@ EFI_STATUS read_header(void *grubdata, PE_COFF_LOADER_IMAGE_CONTEXT *context)
 	context->NumberOfRvaAndSizes = PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes;
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
+	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
+
+	if (context->SecDir->VirtualAddress >= context->ImageSize) {
+		Print(L"Malformed security header\n");
+		return EFI_INVALID_PARAMETER;
+	}
+
+	if (context->SecDir->Size == 0) {
+		Print(L"Empty security header\n");
+		return EFI_INVALID_PARAMETER;
+	}
 
 	return EFI_SUCCESS;
 }
 
-void *ImageAddress (void *image, int size, unsigned int address)
+static void *ImageAddress (void *image, int size, unsigned int address)
 {
 	if (address > size)
-		return 0;
+		return NULL;
 
 	return image + address;
 }
 
-EFI_STATUS relocate_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context, void *grubdata)
+static EFI_STATUS verify_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context, char *grubdata, int grubsize)
+{
+	unsigned int size = grubsize;
+	unsigned int ctxsize;
+	void *ctx;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	EFI_STATUS status = EFI_ACCESS_DENIED;
+	char *hashbase;
+	unsigned int hashsize;
+	WIN_CERTIFICATE_EFI_PKCS *cer;
+	unsigned int SumOfBytesHashed, SumOfSectionBytes;
+	unsigned int index, pos;
+	EFI_IMAGE_SECTION_HEADER  *Section;
+	EFI_IMAGE_SECTION_HEADER  *SectionHeader;
+	EFI_IMAGE_SECTION_HEADER  *SectionCache;
+
+	cert = ImageAddress (grubdata, size, context->SecDir->VirtualAddress);
+
+	if (cer->Hdr.wCertificateType != WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
+		Print(L"Unsupported certificate type %x\n",
+		      cert->Hdr.wCertificateType);
+		return EFI_UNSUPPORTED;
+	}
+
+	/* Check which kind of hash */
+
+	ctxsize = Sha256GetContextSize();
+	ctx = AllocatePool(ctxsize);
+
+	if (!ctx) {
+		Print(L"Unable to allocate memory for hash context\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	if (!Sha256Init(ctx)) {
+		Print(L"Unable to initialise hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	/* Hash start to checksum */
+	hashbase = grubdata;
+	hashsize = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum -
+		hashbase;
+
+	if (!(Sha256Update(ctx, hashbase, hashsize))) {
+		Print(L"Unable to generate hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	/* Hash post-checksum to start of certificate table */
+	hashbase = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum +
+		sizeof (int);
+	hashsize = (char *)context->SecDir - hashbase;
+
+	if (!(Sha256Update(ctx, hashbase, hashsize))) {
+		Print(L"Unable to generate hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	/* Hash end of certificate table to end of image header */
+	hashbase = (char *) &context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
+	hashsize = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders -
+		(int) ((char *) (&context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - grubdata);
+	if (!(Sha256Update(ctx, hashbase, hashsize))) {
+		Print(L"Unable to generate hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	/* Sort sections and hash SizeOfRawData of each section */
+	SumOfBytesHashed = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
+
+	Section = (EFI_IMAGE_SECTION_HEADER *) (
+		(char *)context->PEHdr + sizeof (UINT32) +
+		sizeof (EFI_IMAGE_FILE_HEADER) +
+		context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader
+		);
+
+	SectionCache = Section;
+
+	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++, SectionCache++) {
+		SumOfSectionBytes += SectionCache->SizeOfRawData;
+	}
+
+	if (SumOfSectionBytes >= grubsize) {
+		Print(L"Malformed binary: %x %x\n", SumOfSectionBytes, size);
+		status = EFI_INVALID_PARAMETER;
+		goto done;
+	}
+
+	SectionHeader = (EFI_IMAGE_SECTION_HEADER *) AllocateZeroPool (sizeof (EFI_IMAGE_SECTION_HEADER) * context->PEHdr->Pe32.FileHeader.NumberOfSections);
+	if (SectionHeader == NULL) {
+		Print(L"Unable to allocate section header\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	/* Sort the section headers */
+	for (index = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
+		pos = index;
+		while ((pos > 0) && (Section->PointerToRawData < SectionHeader[pos - 1].PointerToRawData)) {
+			CopyMem (&SectionHeader[pos], &SectionHeader[pos - 1], sizeof (EFI_IMAGE_SECTION_HEADER));
+			pos--;
+		}
+		CopyMem (&SectionHeader[pos], Section, sizeof (EFI_IMAGE_SECTION_HEADER));
+		Section += 1;
+	}
+
+	/* Hash the sections */
+	for (index = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
+		Section = &SectionHeader[index];
+		if (Section->SizeOfRawData == 0) {
+			continue;
+		}
+		hashbase  = ImageAddress(grubdata, size, Section->PointerToRawData);
+		hashsize  = (unsigned int) Section->SizeOfRawData;
+
+		if (!(Sha256Update(ctx, hashbase, hashsize))) {
+			Print(L"Unable to generate hash\n");
+			status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+		SumOfBytesHashed += Section->SizeOfRawData;
+	}
+
+	/* Hash all remaining data */
+	if (size > SumOfBytesHashed) {
+		hashbase = grubdata + SumOfBytesHashed;
+		hashsize = (unsigned int)(
+			size -
+			context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
+			SumOfBytesHashed);
+
+		if (!(Sha256Update(ctx, hashbase, hashsize))) {
+			Print(L"Unable to generate hash\n");
+			status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+	}
+
+	if (!(Sha256Final(ctx, hash))) {
+		Print(L"Unable to finalise hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	if (!AuthenticodeVerify(WinCertificate->CertData,
+		          context->SecDir->Size - sizeof(WinCertificate->Hdr),
+			  cert, sizeof(cert), hash,
+			  SHA256_DIGEST_SIZE)) {
+		Print(L"Invalid signature\n");
+		status = EFI_ACCESS_DENIED;
+	} else {
+		status = EFI_SUCCESS;
+	}
+
+done:
+	if (ctx)
+		FreePool(ctx);
+
+	return status;
+}
+
+static EFI_STATUS relocate_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context, void *grubdata)
 {
 	EFI_IMAGE_BASE_RELOCATION *RelocBase, *RelocBaseEnd;
 	UINT64 Adjust;
@@ -223,6 +405,8 @@ EFI_STATUS relocate_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context, void *grubdata)
 	UINT64 *Fixup64;
 	int size = context->ImageSize;
 	void *ImageEnd = (char *)grubdata + size;
+
+	context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)grubdata;
 
 	if (context->NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
 		Print(L"Image has no relocation entry\n");
@@ -311,7 +495,7 @@ EFI_STATUS relocate_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context, void *grubdata)
 
 }
 
-EFI_STATUS handle_grub (void *grubdata, int grubsize)
+static EFI_STATUS handle_grub (void *grubdata, int grubsize)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -319,10 +503,17 @@ EFI_STATUS handle_grub (void *grubdata, int grubsize)
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
-	
+
 	efi_status = read_header(grubdata, &context);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to read header\n");
+		return efi_status;
+	}
+
+	efi_status = verify_grub(&context, grubdata, grubsize);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Verification failed\n");
 		return efi_status;
 	}
 
@@ -387,8 +578,10 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	efi_status = load_grub(image_handle, &grubdata, &grubsize);
 
-	if (efi_status != EFI_SUCCESS)
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to load grub\n");
 		return efi_status;
+	}
 
 	efi_status = handle_grub(grubdata, grubsize);
 

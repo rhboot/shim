@@ -760,6 +760,21 @@ typedef union {
   EFI_IMAGE_OPTIONAL_HEADER_UNION   *Union;
 } EFI_IMAGE_OPTIONAL_HEADER_PTR_UNION;
 
+typedef struct _WIN_CERTIFICATE {
+	UINT32  dwLength;
+	UINT16  wRevision;
+	UINT16  wCertificateType;
+	//UINT8 bCertificate[ANYSIZE_ARRAY];
+} WIN_CERTIFICATE;
+
+typedef struct {
+	WIN_CERTIFICATE Hdr;
+	UINT8           CertData[1];
+} WIN_CERTIFICATE_EFI_PKCS;
+
+#define SHA256_DIGEST_SIZE  32
+#define WIN_CERT_TYPE_PKCS_SIGNED_DATA 0x0002
+
 typedef struct {
 	UINT64 ImageAddress;
 	UINT64 ImageSize;
@@ -769,7 +784,9 @@ typedef struct {
 	UINT16 NumberOfSections;
 	EFI_IMAGE_SECTION_HEADER *FirstSection;
 	EFI_IMAGE_DATA_DIRECTORY *RelocDir;
+	EFI_IMAGE_DATA_DIRECTORY *SecDir;
 	UINT64 NumberOfRvaAndSizes;
+	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
 } PE_COFF_LOADER_IMAGE_CONTEXT;
 
 #endif
