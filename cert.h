@@ -1,1 +1,1 @@
-static UINT8 cert[] = {0x00};
+static UINT8 vendor_cert[] = {0x00};
