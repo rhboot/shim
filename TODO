@@ -1,0 +1,4 @@
+Fall through if not in user mode
+Check against blacklist
+Attempt to just LoadImage and StartImage?
+Support for netbooting
