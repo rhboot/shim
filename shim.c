@@ -37,6 +37,7 @@
 #include <efilib.h>
 #include <Library/BaseCryptLib.h>
 #include "PeImage.h"
+#include "shim.h"
 
 #define SECOND_STAGE L"grub.efi"
 
@@ -167,8 +168,8 @@ static EFI_STATUS relocate_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 /*
  * Check that the signature is valid and matches the binary
  */
-static EFI_STATUS verify_grub (PE_COFF_LOADER_IMAGE_CONTEXT *context,
-			       char *grubdata, int grubsize)
+static EFI_STATUS verify_grub (char *grubdata, int grubsize,
+			       PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {
 	unsigned int size = grubsize;
 	unsigned int ctxsize;
@@ -413,7 +414,7 @@ static EFI_STATUS handle_grub (void *grubdata, int grubsize)
 		return efi_status;
 	}
 
-	efi_status = verify_grub(&context, grubdata, grubsize);
+	efi_status = verify_grub(grubdata, grubsize, &context);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Verification failed\n");
@@ -637,15 +638,40 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **grubdata,
 	return EFI_SUCCESS;
 }
 
+EFI_STATUS verify_buffer (void *buffer, int size)
+{
+	EFI_STATUS status;
+	PE_COFF_LOADER_IMAGE_CONTEXT context;
+
+	status = read_header(buffer, &context);
+
+	if (status != EFI_SUCCESS)
+		return status;
+
+	status = verify_grub(buffer, size, &context);
+
+	return status;
+}
+
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	void *grubdata;
 	int grubsize;
+	static SHIM_LOCK shim_lock_interface;
+	EFI_HANDLE handle = NULL;
+
+	shim_lock_interface.Verify = verify_buffer;
 
 	systab = passed_systab;
 
 	InitializeLib(image_handle, systab);
+
+	efi_status = uefi_call_wrapper(BS->InstallProtocolInterface, 4,
+				       &handle, &shim_lock_guid,
+				       EFI_NATIVE_INTERFACE,
+				       &shim_lock_interface);
 
 	efi_status = load_grub(image_handle, &grubdata, &grubsize);
 
