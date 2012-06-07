@@ -39,7 +39,7 @@
 #include "PeImage.h"
 #include "shim.h"
 
-#define SECOND_STAGE L"grub.efi"
+#define SECOND_STAGE L"\\grub.efi"
 
 static EFI_SYSTEM_TABLE *systab;
 static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
@@ -182,7 +182,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
 	unsigned int index, pos;
 	EFI_IMAGE_SECTION_HEADER  *Section;
-	EFI_IMAGE_SECTION_HEADER  *SectionHeader;
+	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
 
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
@@ -240,6 +240,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	hashbase = (char *) &context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
 	hashsize = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders -
 		(int) ((char *) (&context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - data);
+
 	if (!(Sha256Update(ctx, hashbase, hashsize))) {
 		Print(L"Unable to generate hash\n");
 		status = EFI_OUT_OF_RESOURCES;
@@ -339,6 +340,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	}
 
 done:
+	if (SectionHeader)
+		FreePool(SectionHeader);
 	if (ctx)
 		FreePool(ctx);
 
@@ -458,12 +461,14 @@ static EFI_STATUS handle_grub (void *data, int datasize)
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Relocation failed\n");
+		FreePool(buffer);
 		return efi_status;
 	}
 
 	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!entry_point) {
 		Print(L"Invalid entry point\n");
+		FreePool(buffer);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -480,16 +485,17 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
 	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	EFI_GUID file_info_id = EFI_FILE_INFO_ID;
 	EFI_STATUS efi_status;
+	EFI_DEVICE_PATH *devpath;
+	EFI_FILE_INFO *fileinfo = NULL;
 	EFI_LOADED_IMAGE *li;
 	EFI_FILE_IO_INTERFACE *drive;
-	EFI_FILE_INFO *fileinfo = NULL;
 	EFI_FILE *root, *grub;
-	FILEPATH_DEVICE_PATH *FilePath;	
-	CHAR16 *PathName;
-	CHAR16 *Dir;
+	FILEPATH_DEVICE_PATH *FilePath;
+	CHAR16 *PathName = NULL;
 	EFI_HANDLE device;
 	unsigned int buffersize = sizeof(EFI_FILE_INFO);
-	int i;
+	unsigned int pathlen = 0;
+	int len;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, &li);
@@ -497,100 +503,107 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
-	if (DevicePathType(li->FilePath) != MEDIA_DEVICE_PATH ||
-	    DevicePathSubType(li->FilePath) != MEDIA_FILEPATH_DP)
-		return EFI_NOT_FOUND;
-
 	device = li->DeviceHandle;
+	devpath = li->FilePath;
+
+	while (!IsDevicePathEnd(devpath) &&
+	       !IsDevicePathEnd(NextDevicePathNode(devpath))) {
+		FilePath = (FILEPATH_DEVICE_PATH *)devpath;
+		len = StrLen(FilePath->PathName);
+
+		pathlen += len;
+
+		if (len == 1 && FilePath->PathName[0] == '\\') {
+			devpath = NextDevicePathNode(devpath);
+			continue;
+		}
+
+		/* If no leading \, need to add one */
+		if (FilePath->PathName[0] != '\\')
+			pathlen++;
+
+		/* If trailing \, need to strip it */
+		if (FilePath->PathName[len-1] == '\\')
+			pathlen--;
+
+		devpath = NextDevicePathNode(devpath);
+	}
+
+	PathName = AllocatePool(pathlen + StrLen(SECOND_STAGE));
+	PathName[0] = '\0';
+
+	if (!PathName) {
+		Print(L"Failed to allocate path buffer\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto error;
+	}
+
+	devpath = li->FilePath;
+
+	while (!IsDevicePathEnd(devpath) &&
+	       !IsDevicePathEnd(NextDevicePathNode(devpath))) {
+		CHAR16 *tmpbuffer;
+		FilePath = (FILEPATH_DEVICE_PATH *)devpath;
+		len = StrLen(FilePath->PathName);
+
+		if (len == 1 && FilePath->PathName[0] == '\\') {
+			devpath = NextDevicePathNode(devpath);
+			continue;
+		}
+
+		tmpbuffer = AllocatePool(len + 1);
+
+		if (!tmpbuffer) {
+			Print(L"Unable to allocate temporary buffer\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+
+		StrCpy(tmpbuffer, FilePath->PathName);
+
+		/* If no leading \, need to add one */
+		if (tmpbuffer[0] != '\\')
+			StrCat(PathName, L"\\");
+
+		/* If trailing \, need to strip it */
+		if (tmpbuffer[len-1] == '\\')
+			tmpbuffer[len=1] = '\0';
+
+		StrCat(PathName, tmpbuffer);
+		FreePool(tmpbuffer);
+		devpath = NextDevicePathNode(devpath);
+	}
+
+	StrCat(PathName, SECOND_STAGE);
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
 				       &simple_file_system_protocol, &drive);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to find fs\n");
-		return efi_status;
+		goto error;
 	}
 
 	efi_status = uefi_call_wrapper(drive->OpenVolume, 2, drive, &root);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to open fs\n");
-		return efi_status;
+		goto error;
 	}
-
-	FilePath = (FILEPATH_DEVICE_PATH *)li->FilePath;
-
-	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub,
-				       FilePath->PathName, EFI_FILE_MODE_READ,
-				       0);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to open %s - %lx\n", FilePath->PathName,
-		      efi_status);
-		return efi_status;
-	}
-
-	fileinfo = AllocatePool(buffersize);
-
-	if (!fileinfo) {
-		Print(L"Unable to allocate info buffer\n");
-		return EFI_OUT_OF_RESOURCES;
-	}
-
-	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &file_info_id,
-				       &buffersize, fileinfo);
-
-	if (efi_status == EFI_BUFFER_TOO_SMALL) {
-		fileinfo = AllocatePool(buffersize);
-		if (!fileinfo) {
-			Print(L"Unable to allocate info buffer\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub,
-					       &file_info_id, &buffersize,
-					       fileinfo);
-	}
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to get file info\n");
-		return efi_status;
-	}
-
-	efi_status = uefi_call_wrapper(grub->Close, 1, grub);
-
-	if (fileinfo->Attribute & EFI_FILE_DIRECTORY) {
-		Dir = FilePath->PathName;
-	} else {
-		for (i=StrLen(FilePath->PathName); i > 0; i--) {
-			if (FilePath->PathName[i] == '\\')
-				break;
-		}
-
-		if (i) {
-			Dir = AllocatePool(i * 2);
-			CopyMem(Dir, FilePath->PathName, i * 2);
-			Dir[i] = '\0';
-		} else {
-			Dir = AllocatePool(2);
-			Dir[0] = '\0';
-		}
-	}
-
-	PathName = AllocatePool(StrLen(Dir) + StrLen(SECOND_STAGE));
-
-	if (!PathName)
-		return EFI_LOAD_ERROR;
-
-	StrCpy(PathName, Dir);
-
-	StrCat(PathName, SECOND_STAGE);
 
 	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub, PathName,
 				       EFI_FILE_MODE_READ, 0);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to open %s - %lx\n", PathName, efi_status);
-		return efi_status;
+		goto error;
+	}
+
+	fileinfo = AllocatePool(buffersize);
+
+	if (!fileinfo) {
+		Print(L"Unable to allocate file info buffer\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto error;
 	}
 
 	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &file_info_id,
@@ -599,8 +612,9 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		fileinfo = AllocatePool(buffersize);
 		if (!fileinfo) {
-			Print(L"Unable to allocate info buffer\n");
-			return EFI_OUT_OF_RESOURCES;
+			Print(L"Unable to allocate file info buffer\n");
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto error;
 		}
 		efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub,
 					       &file_info_id, &buffersize,
@@ -609,33 +623,46 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to get file info\n");
-		return efi_status;
+		goto error;
 	}
 
 	buffersize = fileinfo->FileSize;
+
 	*data = AllocatePool(buffersize);
 
 	if (!*data) {
 		Print(L"Unable to allocate file buffer\n");
-		return EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto error;
 	}
-
 	efi_status = uefi_call_wrapper(grub->Read, 3, grub, &buffersize,
 				       *data);
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unexpected return from initial read: %x, buffersize %x\n", efi_status, buffersize);
-		return efi_status;
+	if (efi_status == EFI_BUFFER_TOO_SMALL) {
+		FreePool(*data);
+		*data = AllocatePool(buffersize);
+		efi_status = uefi_call_wrapper(grub->Read, 3, grub,
+					       &buffersize, *data);
 	}
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to read grub\n");
-		return efi_status;
+		Print(L"Unexpected return from initial read: %x, buffersize %x\n", efi_status, buffersize);
+		goto error;
 	}
 
 	*datasize = buffersize;
 
 	return EFI_SUCCESS;
+error:
+	if (*data) {
+		FreePool(*data);
+		*data = NULL;
+	}
+	if (PathName)
+		FreePool(PathName);
+	if (fileinfo)
+		FreePool(fileinfo);
+	return efi_status;
 }
 
 EFI_STATUS shim_verify (void *buffer, int size)
@@ -657,7 +684,7 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	void *data;
+	void *data = NULL;
 	int datasize;
 	static SHIM_LOCK shim_lock_interface;
 	EFI_HANDLE handle = NULL;
