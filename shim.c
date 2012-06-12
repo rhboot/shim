@@ -50,6 +50,33 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 
 #include "cert.h"
 
+static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
+				unsigned int *size,void **buffer)
+{
+	EFI_STATUS efi_status;
+	UINT32 attributes;
+	char allocate = !!(*size);
+
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
+				       &attributes, size, NULL);
+
+	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate)
+		return efi_status;
+
+	if (allocate)
+		*buffer = AllocatePool(*size);
+
+	if (!*buffer) {
+		Print(L"Unable to allocate variable buffer\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
+				       &attributes, size, *buffer);
+
+	return efi_status;
+}
+
 /*
  * Perform basic bounds checking of the intra-image pointers
  */
@@ -173,17 +200,33 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 {
 	unsigned int size = datasize;
 	unsigned int ctxsize;
-	void *ctx;
+	void *ctx = NULL;
+	UINT8 sb, setupmode;
 	UINT8 hash[SHA256_DIGEST_SIZE];
 	EFI_STATUS status = EFI_ACCESS_DENIED;
 	char *hashbase;
 	unsigned int hashsize;
 	WIN_CERTIFICATE_EFI_PKCS *cert;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
-	unsigned int index, pos;
+	unsigned int index, pos, charsize = sizeof(char);
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
+	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+
+	status = get_variable(L"SecureBoot", global_var, &charsize, (void *)&sb);
+
+	/* FIXME - more paranoia here? */
+	if (status != EFI_SUCCESS || sb != 1) {
+		status = EFI_SUCCESS;
+		goto done;
+	}
+
+	status = get_variable(L"SetupMode", global_var, &charsize, (void *)&setupmode);
+
+	if (status == EFI_SUCCESS && setupmode == 1) {
+		goto done;
+	}
 
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
 
