@@ -218,6 +218,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	/* FIXME - more paranoia here? */
 	if (status != EFI_SUCCESS || sb != 1) {
+		Print(L"Secure boot not enabled\n");
 		status = EFI_SUCCESS;
 		goto done;
 	}
@@ -225,6 +226,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	status = get_variable(L"SetupMode", global_var, &charsize, (void *)&setupmode);
 
 	if (status == EFI_SUCCESS && setupmode == 1) {
+		Print(L"Platform is in setup mode\n");
 		goto done;
 	}
 
@@ -518,33 +520,14 @@ static EFI_STATUS handle_grub (void *data, int datasize)
 	return EFI_SUCCESS;
 }
 
-/*
- * Locate the second stage bootloader and read it into a buffer
- */
-static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
-			     int *datasize)
+static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath, CHAR16 **PathName)
 {
-	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
-	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
-	EFI_GUID file_info_id = EFI_FILE_INFO_ID;
-	EFI_STATUS efi_status;
 	EFI_DEVICE_PATH *devpath;
-	EFI_FILE_INFO *fileinfo = NULL;
-	EFI_LOADED_IMAGE *li;
-	EFI_FILE_IO_INTERFACE *drive;
-	EFI_FILE *root, *grub;
-	FILEPATH_DEVICE_PATH *FilePath;
-	CHAR16 *PathName = NULL;
 	EFI_HANDLE device;
-	unsigned int buffersize = sizeof(EFI_FILE_INFO);
-	unsigned int pathlen = 0;
+	FILEPATH_DEVICE_PATH *FilePath;
 	int len;
-
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, &li);
-
-	if (efi_status != EFI_SUCCESS)
-		return efi_status;
+	unsigned int pathlen = 0;
+	EFI_STATUS efi_status = EFI_SUCCESS;
 
 	device = li->DeviceHandle;
 	devpath = li->FilePath;
@@ -572,10 +555,10 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
 		devpath = NextDevicePathNode(devpath);
 	}
 
-	PathName = AllocatePool(pathlen + StrLen(SECOND_STAGE));
-	PathName[0] = '\0';
+	*PathName = AllocatePool(pathlen + StrLen(SECOND_STAGE));
+	*PathName[0] = '\0';
 
-	if (!PathName) {
+	if (!*PathName) {
 		Print(L"Failed to allocate path buffer\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto error;
@@ -605,21 +588,44 @@ static EFI_STATUS load_grub (EFI_HANDLE image_handle, void **data,
 
 		/* If no leading \, need to add one */
 		if (tmpbuffer[0] != '\\')
-			StrCat(PathName, L"\\");
+			StrCat(*PathName, L"\\");
 
 		/* If trailing \, need to strip it */
 		if (tmpbuffer[len-1] == '\\')
 			tmpbuffer[len=1] = '\0';
 
-		StrCat(PathName, tmpbuffer);
+		StrCat(*PathName, tmpbuffer);
 		FreePool(tmpbuffer);
 		devpath = NextDevicePathNode(devpath);
 	}
 
-	StrCat(PathName, SECOND_STAGE);
+	StrCat(*PathName, SECOND_STAGE);
+
+	*grubpath = FileDevicePath(device, *PathName);
+
+error:
+	return efi_status;
+}
+
+/*
+ * Locate the second stage bootloader and read it into a buffer
+ */
+static EFI_STATUS load_grub (EFI_LOADED_IMAGE *li, void **data,
+			     int *datasize, CHAR16 *PathName)
+{
+	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
+	EFI_GUID file_info_id = EFI_FILE_INFO_ID;
+	EFI_STATUS efi_status;
+	EFI_HANDLE device;
+	EFI_FILE_INFO *fileinfo = NULL;
+	EFI_FILE_IO_INTERFACE *drive;
+	EFI_FILE *root, *grub;
+	unsigned int buffersize = sizeof(EFI_FILE_INFO);
+
+	device = li->DeviceHandle;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &simple_file_system_protocol, &drive);
+				       &simple_file_system_protocol, &drive);	
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to find fs\n");
@@ -708,7 +714,7 @@ error:
 	return efi_status;
 }
 
-EFI_STATUS shim_verify (void *buffer, int size)
+EFI_STATUS shim_verify (void *buffer, UINT32 size)
 {
 	EFI_STATUS status;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
@@ -723,12 +729,68 @@ EFI_STATUS shim_verify (void *buffer, int size)
 	return status;
 }
 
-EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
+EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_HANDLE grub_handle = NULL;
+	EFI_LOADED_IMAGE *li;
+	EFI_DEVICE_PATH *grubpath;
+	CHAR16 *PathName;
+	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	void *data = NULL;
 	int datasize;
+
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
+				       &loaded_image_protocol, &li);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to init protocol\n");
+		return efi_status;
+	}
+
+	efi_status = generate_path(li, &grubpath, &PathName);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to generate grub path\n");
+		goto done;
+	}
+
+	efi_status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image_handle,
+				       grubpath, NULL, 0, &grub_handle);
+
+
+	if (efi_status == EFI_SUCCESS) {
+		/* Image validates - start it */
+		Print(L"Starting file via StartImage\n");
+		efi_status = uefi_call_wrapper(BS->StartImage, 3, grub_handle, NULL,
+					       NULL);
+		uefi_call_wrapper(BS->UnloadImage, 1, grub_handle);
+		goto done;
+	}
+
+	efi_status = load_grub(li, &data, &datasize, PathName);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to load grub\n");
+		goto done;
+	}
+
+	efi_status = handle_grub(data, datasize);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to load grub\n");
+		goto done;
+	}
+
+	efi_status = uefi_call_wrapper(entry_point, 3, image_handle, systab);
+done:
+
+	return efi_status;
+}
+
+EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	static SHIM_LOCK shim_lock_interface;
 	EFI_HANDLE handle = NULL;
 
@@ -738,24 +800,9 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	InitializeLib(image_handle, systab);
 
-	efi_status = uefi_call_wrapper(BS->InstallProtocolInterface, 4,
-				       &handle, &shim_lock_guid,
-				       EFI_NATIVE_INTERFACE,
-				       &shim_lock_interface);
+	uefi_call_wrapper(BS->InstallProtocolInterface, 4, &handle,
+			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
+			  &shim_lock_interface);
 
-	efi_status = load_grub(image_handle, &data, &datasize);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to load grub\n");
-		return efi_status;
-	}
-
-	efi_status = handle_grub(data, datasize);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to load grub\n");
-		return efi_status;
-	}
-
-	return uefi_call_wrapper(entry_point, 3, image_handle, passed_systab);
+	return init_grub(image_handle);
 }
