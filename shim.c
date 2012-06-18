@@ -855,6 +855,7 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	static SHIM_LOCK shim_lock_interface;
 	EFI_HANDLE handle = NULL;
+	EFI_STATUS efi_status;
 
 	shim_lock_interface.Verify = shim_verify;
 
@@ -866,5 +867,10 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
 			  &shim_lock_interface);
 
-	return init_grub(image_handle);
+	efi_status = init_grub(image_handle);
+
+	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
+			  &shim_lock_guid, &shim_lock_interface);
+
+	return efi_status;
 }
