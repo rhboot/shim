@@ -38,6 +38,7 @@
 #include <Library/BaseCryptLib.h>
 #include "PeImage.h"
 #include "shim.h"
+#include "signature.h"
 
 #define SECOND_STAGE L"\\grub.efi"
 
@@ -51,7 +52,7 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 #include "cert.h"
 
 static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
-				unsigned int *size,void **buffer)
+				UINTN *size, void **buffer)
 {
 	EFI_STATUS efi_status;
 	UINT32 attributes;
@@ -192,6 +193,59 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS check_blacklist (UINT8 *cert, UINT8 *hash)
+{
+	EFI_STATUS efi_status;
+	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	EFI_SIGNATURE_LIST *CertList;
+	EFI_SIGNATURE_DATA *Cert;
+	UINTN dbxsize = 0;
+	UINTN CertCount, Index;
+	BOOLEAN IsFound;
+	void *db;
+	unsigned int SignatureSize = SHA256_DIGEST_SIZE;
+	EFI_GUID CertType = EfiCertSha256Guid;
+
+	efi_status = get_variable(L"dbx", global_var, &dbxsize, &db);
+
+	/* If we can't read it then it can't be blacklisted */
+	if (efi_status != EFI_SUCCESS)
+		return EFI_SUCCESS;
+
+	CertList = db;
+
+	while ((dbxsize > 0) && (dbxsize >= CertList->SignatureListSize)) {
+		CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
+		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
+		if ((CertList->SignatureSize == sizeof(EFI_SIGNATURE_DATA) - 1 + SignatureSize) && (CompareGuid(&CertList->SignatureType, &CertType))) {
+			for (Index = 0; Index < CertCount; Index++) {
+				if (CompareMem (Cert->SignatureData, hash, SignatureSize) == 0) {
+					//
+					// Find the signature in database.
+					//
+					IsFound = TRUE;
+					break;
+				}
+
+				Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
+			}
+			if (IsFound) {
+				break;
+			}
+		}
+
+		dbxsize -= CertList->SignatureListSize;
+		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
+	}
+
+	FreePool(db);
+
+	if (IsFound)
+		return EFI_ACCESS_DENIED;
+
+	return EFI_SUCCESS;
+}
+
 /*
  * Check that the signature is valid and matches the binary
  */
@@ -208,7 +262,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	unsigned int hashsize;
 	WIN_CERTIFICATE_EFI_PKCS *cert;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
-	unsigned int index, pos, charsize = sizeof(char);
+	unsigned int index, pos;
+	UINTN charsize = sizeof(char);
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
@@ -371,6 +426,13 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (!(Sha256Final(ctx, hash))) {
 		Print(L"Unable to finalise hash\n");
 		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	status = check_blacklist(vendor_cert, hash);
+
+	if (status != EFI_SUCCESS) {
+		Print(L"Binary is blacklisted\n");
 		goto done;
 	}
 
