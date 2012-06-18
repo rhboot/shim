@@ -6,8 +6,8 @@ INTERFACE_DECL(_SHIM_LOCK);
 typedef
 EFI_STATUS
 (EFIAPI *EFI_SHIM_LOCK_VERIFY) (
-	IN VOID *buffer;
-	IN UINT32 size;
+	IN VOID *buffer,
+	IN UINT32 size
 	);
 
 typedef struct _SHIM_LOCK {
