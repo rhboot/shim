@@ -438,7 +438,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (!AuthenticodeVerify(cert->CertData,
 				context->SecDir->Size - sizeof(cert->Hdr),
-				vendor_cert, sizeof(cert), hash,
+				vendor_cert, sizeof(vendor_cert), hash,
 				SHA256_DIGEST_SIZE)) {
 		Print(L"Invalid signature\n");
 		status = EFI_ACCESS_DENIED;
