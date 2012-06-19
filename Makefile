@@ -25,10 +25,11 @@ LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH
 
 TARGET		= shim.efi
 OBJS		= shim.o shim.so
+SOURCES		= shim.c shim.h signature.h PeImage.h cert.h
 
 all: Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a $(TARGET)
 
-shim.efi: shim.so
+shim.o: $(SOURCES)
 
 shim.so: $(OBJS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
