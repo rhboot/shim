@@ -51,6 +51,12 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 
 #include "cert.h"
 
+typedef enum {
+	DATA_FOUND,
+	DATA_NOT_FOUND,
+	VAR_NOT_FOUND
+} CHECK_STATUS;
+
 static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
 				UINTN *size, void **buffer)
 {
@@ -193,33 +199,81 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS check_blacklist (UINT8 *cert, UINT8 *hash)
+static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
 {
 	EFI_STATUS efi_status;
 	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
-	UINTN dbxsize = 0;
+	UINTN dbsize = 0;
+	UINTN CertCount, Index;
+	BOOLEAN IsFound;
+	void *db;
+	EFI_GUID CertType = EfiCertX509Guid;
+
+	efi_status = get_variable(dbname, global_var, &dbsize, &db);
+
+	if (efi_status != EFI_SUCCESS)
+		return VAR_NOT_FOUND;
+
+	CertList = db;
+
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		if (CompareGuid (&CertList->SignatureType, &CertType)) {
+			CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
+			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
+			for (Index = 0; Index < CertCount; Index++) {
+				IsFound = AuthenticodeVerify (data->CertData,
+							      data->Hdr.dwLength - sizeof(data->Hdr),
+							      Cert->SignatureData,
+							      CertList->SignatureSize,
+							      hash, SHA256_DIGEST_SIZE);
+					}
+			if (IsFound) {
+				break;
+			}
+
+			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
+		}
+
+		dbsize -= CertList->SignatureListSize;
+		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
+	}
+
+	FreePool(db);
+
+	if (IsFound)
+		return DATA_FOUND;
+
+	return DATA_NOT_FOUND;
+}
+
+static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
+{
+	EFI_STATUS efi_status;
+	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	EFI_SIGNATURE_LIST *CertList;
+	EFI_SIGNATURE_DATA *Cert;
+	UINTN dbsize = 0;
 	UINTN CertCount, Index;
 	BOOLEAN IsFound;
 	void *db;
 	unsigned int SignatureSize = SHA256_DIGEST_SIZE;
-	EFI_GUID CertType = EfiCertSha256Guid;
+	EFI_GUID CertType = EfiHashSha256Guid;
 
-	efi_status = get_variable(L"dbx", global_var, &dbxsize, &db);
+	efi_status = get_variable(dbname, global_var, &dbsize, &db);
 
-	/* If we can't read it then it can't be blacklisted */
 	if (efi_status != EFI_SUCCESS)
-		return EFI_SUCCESS;
+		return VAR_NOT_FOUND;
 
 	CertList = db;
 
-	while ((dbxsize > 0) && (dbxsize >= CertList->SignatureListSize)) {
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 		if ((CertList->SignatureSize == sizeof(EFI_SIGNATURE_DATA) - 1 + SignatureSize) && (CompareGuid(&CertList->SignatureType, &CertType))) {
 			for (Index = 0; Index < CertCount; Index++) {
-				if (CompareMem (Cert->SignatureData, hash, SignatureSize) == 0) {
+				if (CompareMem (Cert->SignatureData, data, SignatureSize) == 0) {
 					//
 					// Find the signature in database.
 					//
@@ -234,16 +288,36 @@ static EFI_STATUS check_blacklist (UINT8 *cert, UINT8 *hash)
 			}
 		}
 
-		dbxsize -= CertList->SignatureListSize;
+		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
 	}
 
 	FreePool(db);
 
 	if (IsFound)
+		return DATA_FOUND;
+
+	return DATA_NOT_FOUND;
+}
+
+static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
+{
+	if (check_db_hash(L"dbx", hash) == DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_cert(L"dbx", cert, hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	return EFI_SUCCESS;
+}
+
+static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
+{
+	if (check_db_hash(L"db", hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_cert(L"db", cert, hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+
+	return EFI_ACCESS_DENIED;
 }
 
 /*
@@ -429,10 +503,17 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		goto done;
 	}
 
-	status = check_blacklist(vendor_cert, hash);
+	status = check_blacklist(cert, hash);
 
 	if (status != EFI_SUCCESS) {
 		Print(L"Binary is blacklisted\n");
+		goto done;
+	}
+
+	status = check_whitelist(cert, hash);
+
+	if (status == EFI_SUCCESS) {
+		Print(L"Binary is whitelisted\n");
 		goto done;
 	}
 
