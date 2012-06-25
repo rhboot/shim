@@ -65,7 +65,7 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
 	char allocate = !!(*size);
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       &attributes, size, NULL);
+				       &attributes, size, buffer);
 
 	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate)
 		return efi_status;
