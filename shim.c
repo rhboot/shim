@@ -763,7 +763,7 @@ static EFI_STATUS load_grub (EFI_LOADED_IMAGE *li, void **data,
 	EFI_FILE_INFO *fileinfo = NULL;
 	EFI_FILE_IO_INTERFACE *drive;
 	EFI_FILE *root, *grub;
-	unsigned int buffersize = sizeof(EFI_FILE_INFO);
+	UINTN buffersize = sizeof(EFI_FILE_INFO);
 
 	device = li->DeviceHandle;
 
