@@ -15,8 +15,8 @@ EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(EFI_PATH)/elf_$(ARCH)_efi.lds
 
 
-CFLAGS		= -O2 -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall \
+CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
+		  -Wall -mno-red-zone \
 		  $(EFI_INCLUDES)
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER
@@ -43,8 +43,14 @@ Cryptlib/OpenSSL/libopenssl.a:
 %.efi: %.so
 	objcopy -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym  -j .rel \
-		-j .rela -j .reloc \
+		-j .rela -j .reloc -j .eh_frame \
 		--target=efi-app-$(ARCH) $^ $@
+	objcopy -j .text -j .sdata -j .data \
+		-j .dynamic -j .dynsym  -j .rel \
+		-j .rela -j .reloc -j .eh_frame \
+		-j .debug_info -j .debug_abbrev -j .debug_aranges \
+		-j .debug_line -j .debug_str -j .debug_ranges \
+		--target=efi-app-$(ARCH) $^ shim.efi.debug
 
 clean:
 	$(MAKE) -C Cryptlib clean
