@@ -139,7 +139,7 @@ int a2d_ASN1_OBJECT(unsigned char *out, int olen, const char *buf, int num)
 				ASN1err(ASN1_F_A2D_ASN1_OBJECT,ASN1_R_INVALID_DIGIT);
 				goto err;
 				}
-			if (!use_bn && l > (ULONG_MAX / 10L))
+			if (!use_bn && l >= ((ULONG_MAX - 80) / 10L))
 				{
 				use_bn = 1;
 				if (!bl)
@@ -291,6 +291,17 @@ ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
 	ASN1_OBJECT *ret=NULL;
 	const unsigned char *p;
 	int i;
+	/* Sanity check OID encoding: can't have leading 0x80 in
+	 * subidentifiers, see: X.690 8.19.2
+	 */
+	for (i = 0, p = *pp; i < len; i++, p++)
+		{
+		if (*p == 0x80 && (!i || !(p[-1] & 0x80)))
+			{
+			ASN1err(ASN1_F_C2I_ASN1_OBJECT,ASN1_R_INVALID_OBJECT_ENCODING);
+			return NULL;
+			}
+		}
 
 	/* only the ASN1_OBJECTs from the 'table' will have values
 	 * for ->sn or ->ln */

@@ -396,7 +396,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason,
 	case DLL_THREAD_ATTACH:
 		break;
 	case DLL_THREAD_DETACH:
-		ERR_remove_state(0);
 		break;
 	case DLL_PROCESS_DETACH:
 		break;
@@ -513,7 +512,7 @@ void OPENSSL_showfatal (const char *fmta,...)
 
 #if defined(_WIN32_WINNT) && _WIN32_WINNT>=0x0333
     /* this -------------v--- guards NT-specific calls */
-    if (GetVersion() < 0x80000000 && OPENSSL_isservice())
+    if (GetVersion() < 0x80000000 && OPENSSL_isservice() > 0)
     {	HANDLE h = RegisterEventSource(0,_T("OPENSSL"));
 	const TCHAR *pmsg=buf;
 	ReportEvent(h,EVENTLOG_ERROR_TYPE,0,0,0,1,0,&pmsg,0);

@@ -294,7 +294,8 @@ int	BN_GF2m_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
 	if (a->top < b->top) { at = b; bt = a; }
 	else { at = a; bt = b; }
 
-	bn_wexpand(r, at->top);
+	if(bn_wexpand(r, at->top) == NULL)
+		return 0;
 
 	for (i = 0; i < bt->top; i++)
 		{
@@ -606,6 +607,7 @@ int BN_GF2m_mod_inv(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 		{
 		while (!BN_is_odd(u))
 			{
+			if (BN_is_zero(u)) goto err;
 			if (!BN_rshift1(u, u)) goto err;
 			if (BN_is_odd(b))
 				{
