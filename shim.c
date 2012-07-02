@@ -51,6 +51,8 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 
 #include "cert.h"
 
+#define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
+
 typedef enum {
 	DATA_FOUND,
 	DATA_NOT_FOUND,
@@ -62,13 +64,14 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
 {
 	EFI_STATUS efi_status;
 	UINT32 attributes;
-	char allocate = !!(*size);
+	char allocate = !(*size);
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
 				       &attributes, size, buffer);
 
-	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate)
+	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate) {
 		return efi_status;
+	}
 
 	if (allocate)
 		*buffer = AllocatePool(*size);
@@ -202,16 +205,16 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
 	UINTN CertCount, Index;
-	BOOLEAN IsFound;
+	BOOLEAN IsFound = FALSE;
 	void *db;
 	EFI_GUID CertType = EfiCertX509Guid;
 
-	efi_status = get_variable(dbname, global_var, &dbsize, &db);
+	efi_status = get_variable(dbname, secure_var, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
@@ -219,7 +222,7 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	CertList = db;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		if (CompareGuid (&CertList->SignatureType, &CertType)) {
+		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
 			CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			for (Index = 0; Index < CertCount; Index++) {
@@ -251,27 +254,28 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
 	UINTN CertCount, Index;
-	BOOLEAN IsFound;
+	BOOLEAN IsFound = FALSE;
 	void *db;
 	unsigned int SignatureSize = SHA256_DIGEST_SIZE;
 	EFI_GUID CertType = EfiHashSha256Guid;
 
-	efi_status = get_variable(dbname, global_var, &dbsize, &db);
+	efi_status = get_variable(dbname, secure_var, &dbsize, &db);
 
-	if (efi_status != EFI_SUCCESS)
+	if (efi_status != EFI_SUCCESS) {
 		return VAR_NOT_FOUND;
+	}
 
 	CertList = db;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
-		if ((CertList->SignatureSize == sizeof(EFI_SIGNATURE_DATA) - 1 + SignatureSize) && (CompareGuid(&CertList->SignatureType, &CertType))) {
+		if (CompareGuid(&CertList->SignatureType, &CertType) == 0) {
 			for (Index = 0; Index < CertCount; Index++) {
 				if (CompareMem (Cert->SignatureData, data, SignatureSize) == 0) {
 					//
