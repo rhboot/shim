@@ -310,16 +310,6 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
-{
-	if (check_db_hash(L"db", hash) == DATA_FOUND)
-		return EFI_SUCCESS;
-	if (check_db_cert(L"db", cert, hash) == DATA_FOUND)
-		return EFI_SUCCESS;
-
-	return EFI_ACCESS_DENIED;
-}
-
 /*
  * Check that the signature is valid and matches the binary
  */
@@ -507,13 +497,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (status != EFI_SUCCESS) {
 		Print(L"Binary is blacklisted\n");
-		goto done;
-	}
-
-	status = check_whitelist(cert, hash);
-
-	if (status == EFI_SUCCESS) {
-		Print(L"Binary is whitelisted\n");
 		goto done;
 	}
 
