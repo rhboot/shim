@@ -314,6 +314,16 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
+{
+	if (check_db_hash(L"db", hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_cert(L"db", cert, hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+
+	return EFI_ACCESS_DENIED;
+}
+
 /*
  * Check whether we're in Secure Boot and user mode
  */
@@ -347,7 +357,7 @@ static BOOLEAN secure_mode (void)
  * Check that the signature is valid and matches the binary
  */
 static EFI_STATUS verify_buffer (char *data, int datasize,
-				 PE_COFF_LOADER_IMAGE_CONTEXT *context)
+			 PE_COFF_LOADER_IMAGE_CONTEXT *context, int whitelist)
 {
 	unsigned int size = datasize;
 	unsigned int ctxsize;
@@ -514,6 +524,15 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		goto done;
 	}
 
+	if (whitelist) {
+		status = check_whitelist(cert, hash);
+
+		if (status == EFI_SUCCESS) {
+			Print(L"Binary is whitelisted\n");
+			goto done;
+		}
+	}
+
 	if (!AuthenticodeVerify(cert->CertData,
 				context->SecDir->Size - sizeof(cert->Hdr),
 				vendor_cert, sizeof(vendor_cert), hash,
@@ -603,7 +622,7 @@ static EFI_STATUS handle_grub (void *data, int datasize)
 	}
 
 	if (secure_mode ()) {
-		efi_status = verify_buffer(data, datasize, &context);
+		efi_status = verify_buffer(data, datasize, &context, 0);
 
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Verification failed\n");
@@ -869,7 +888,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (status != EFI_SUCCESS)
 		return status;
 
-	status = verify_buffer(buffer, size, &context);
+	status = verify_buffer(buffer, size, &context, 1);
 
 	return status;
 }
