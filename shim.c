@@ -315,6 +315,35 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
 }
 
 /*
+ * Check whether we're in Secure Boot and user mode
+ */
+
+static BOOLEAN secure_mode (void)
+{
+	EFI_STATUS status;
+	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	UINTN charsize = sizeof(char);
+	UINT8 sb, setupmode;
+
+	status = get_variable(L"SecureBoot", global_var, &charsize, (void *)&sb);
+
+	/* FIXME - more paranoia here? */
+	if (status != EFI_SUCCESS || sb != 1) {
+		Print(L"Secure boot not enabled\n");
+		return FALSE;
+	}
+
+	status = get_variable(L"SetupMode", global_var, &charsize, (void *)&setupmode);
+
+	if (status == EFI_SUCCESS && setupmode == 1) {
+		Print(L"Platform is in setup mode\n");
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/*
  * Check that the signature is valid and matches the binary
  */
 static EFI_STATUS verify_buffer (char *data, int datasize,
@@ -323,7 +352,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	unsigned int size = datasize;
 	unsigned int ctxsize;
 	void *ctx = NULL;
-	UINT8 sb, setupmode;
 	UINT8 hash[SHA256_DIGEST_SIZE];
 	EFI_STATUS status = EFI_ACCESS_DENIED;
 	char *hashbase;
@@ -331,27 +359,9 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	WIN_CERTIFICATE_EFI_PKCS *cert;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
 	unsigned int index, pos;
-	UINTN charsize = sizeof(char);
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
-	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
-
-	status = get_variable(L"SecureBoot", global_var, &charsize, (void *)&sb);
-
-	/* FIXME - more paranoia here? */
-	if (status != EFI_SUCCESS || sb != 1) {
-		Print(L"Secure boot not enabled\n");
-		status = EFI_SUCCESS;
-		goto done;
-	}
-
-	status = get_variable(L"SetupMode", global_var, &charsize, (void *)&setupmode);
-
-	if (status == EFI_SUCCESS && setupmode == 1) {
-		Print(L"Platform is in setup mode\n");
-		goto done;
-	}
 
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
 
@@ -592,11 +602,13 @@ static EFI_STATUS handle_grub (void *data, int datasize)
 		return efi_status;
 	}
 
-	efi_status = verify_buffer(data, datasize, &context);
+	if (secure_mode ()) {
+		efi_status = verify_buffer(data, datasize, &context);
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Verification failed\n");
-		return efi_status;
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Verification failed\n");
+			return efi_status;
+		}
 	}
 
 	buffer = AllocatePool(context.ImageSize);
@@ -848,6 +860,9 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 {
 	EFI_STATUS status;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
+
+	if (!secure_mode())
+		return EFI_SUCCESS;
 
 	status = read_header(buffer, &context);
 
