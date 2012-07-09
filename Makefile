@@ -27,11 +27,11 @@ TARGET		= shim.efi
 OBJS		= shim.o shim.so
 SOURCES		= shim.c shim.h signature.h PeImage.h cert.h
 
-all: Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a $(TARGET)
+all: $(TARGET)
 
 shim.o: $(SOURCES)
 
-shim.so: $(OBJS)
+shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 Cryptlib/libcryptlib.a:
