@@ -32,7 +32,7 @@ void *realloc (void *ptr, size_t size)
   // BUG: hardcode OldSize == size! We have no any knowledge about
   // memory size of original pointer ptr.
   //
-  return ReallocatePool (ptr, (UINTN)size, (UINTN)size);
+	return ReallocatePool (ptr, (UINTN)size, (UINTN)size);
 }
 
 /* De-allocates or frees a memory block */

@@ -21,8 +21,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Library/DebugLib.h>
 #include <Library/BaseCryptLib.h>
 
-#define CONST const
-
 //
 // Environment Setting for OpenSSL-based UEFI Crypto Library.
 //

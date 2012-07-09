@@ -22,3 +22,5 @@ cp $DIR/Pem/CryptPem.c Pem/CryptPem.c
 cp $DIR/SysCall/CrtWrapper.c SysCall/CrtWrapper.c
 cp $DIR/SysCall/TimerWrapper.c SysCall/TimerWrapper.c
 cp $DIR/SysCall/BaseMemAllocation.c SysCall/BaseMemAllocation.c
+
+patch -p2 <Cryptlib.diff
