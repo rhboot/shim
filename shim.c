@@ -688,39 +688,26 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath
 {
 	EFI_DEVICE_PATH *devpath;
 	EFI_HANDLE device;
-	FILEPATH_DEVICE_PATH *FilePath;
-	int len;
+	int i;
 	unsigned int pathlen = 0;
 	EFI_STATUS efi_status = EFI_SUCCESS;
+	CHAR16 *bootpath;
 
 	device = li->DeviceHandle;
 	devpath = li->FilePath;
 
-	while (!IsDevicePathEnd(devpath) &&
-	       !IsDevicePathEnd(NextDevicePathNode(devpath))) {
-		FilePath = (FILEPATH_DEVICE_PATH *)devpath;
-		len = StrLen(FilePath->PathName);
+	bootpath = DevicePathToStr(devpath);
 
-		pathlen += len;
+	pathlen = StrLen(bootpath);
 
-		if (len == 1 && FilePath->PathName[0] == '\\') {
-			devpath = NextDevicePathNode(devpath);
-			continue;
-		}
-
-		/* If no leading \, need to add one */
-		if (FilePath->PathName[0] != '\\')
-			pathlen++;
-
-		/* If trailing \, need to strip it */
-		if (FilePath->PathName[len-1] == '\\')
-			pathlen--;
-
-		devpath = NextDevicePathNode(devpath);
+	for (i=pathlen; i>0; i--) {
+		if (bootpath[i] == '\\')
+			break;
 	}
 
-	*PathName = AllocatePool(pathlen + StrLen(SECOND_STAGE));
-	*PathName[0] = '\0';
+	bootpath[i+1] = '\0';
+
+	*PathName = AllocatePool(StrSize(bootpath) + StrSize(SECOND_STAGE));
 
 	if (!*PathName) {
 		Print(L"Failed to allocate path buffer\n");
@@ -728,41 +715,8 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath
 		goto error;
 	}
 
-	devpath = li->FilePath;
-
-	while (!IsDevicePathEnd(devpath) &&
-	       !IsDevicePathEnd(NextDevicePathNode(devpath))) {
-		CHAR16 *tmpbuffer;
-		FilePath = (FILEPATH_DEVICE_PATH *)devpath;
-		len = StrLen(FilePath->PathName);
-
-		if (len == 1 && FilePath->PathName[0] == '\\') {
-			devpath = NextDevicePathNode(devpath);
-			continue;
-		}
-
-		tmpbuffer = AllocatePool(len + 1);
-
-		if (!tmpbuffer) {
-			Print(L"Unable to allocate temporary buffer\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-
-		StrCpy(tmpbuffer, FilePath->PathName);
-
-		/* If no leading \, need to add one */
-		if (tmpbuffer[0] != '\\')
-			StrCat(*PathName, L"\\");
-
-		/* If trailing \, need to strip it */
-		if (tmpbuffer[len-1] == '\\')
-			tmpbuffer[len=1] = '\0';
-
-		StrCat(*PathName, tmpbuffer);
-		FreePool(tmpbuffer);
-		devpath = NextDevicePathNode(devpath);
-	}
-
+	*PathName[0] = '\0';
+	StrCat(*PathName, bootpath);
 	StrCat(*PathName, SECOND_STAGE);
 
 	*grubpath = FileDevicePath(device, *PathName);
