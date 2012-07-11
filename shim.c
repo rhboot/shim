@@ -606,7 +606,7 @@ static EFI_STATUS read_header(void *data,
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
-static EFI_STATUS handle_grub (void *data, int datasize)
+static EFI_STATUS handle_grub (void *data, int datasize, EFI_LOADED_IMAGE *li)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -672,6 +672,9 @@ static EFI_STATUS handle_grub (void *data, int datasize)
 	}
 
 	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
+	li->ImageBase = buffer;
+	li->ImageSize = context.ImageSize;
+
 	if (!entry_point) {
 		Print(L"Invalid entry point\n");
 		FreePool(buffer);
@@ -897,7 +900,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE grub_handle = NULL;
-	EFI_LOADED_IMAGE *li;
+	EFI_LOADED_IMAGE *li, li_bak;
 	EFI_DEVICE_PATH *grubpath;
 	CHAR16 *PathName;
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
@@ -939,14 +942,19 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		goto done;
 	}
 
-	efi_status = handle_grub(data, datasize);
+	CopyMem(&li_bak, li, sizeof(li_bak));
+
+	efi_status = handle_grub(data, datasize, li);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to load grub\n");
+		CopyMem(li, &li_bak, sizeof(li_bak));
 		goto done;
 	}
 
 	efi_status = uefi_call_wrapper(entry_point, 3, image_handle, systab);
+
+	CopyMem(li, &li_bak, sizeof(li_bak));
 done:
 
 	return efi_status;
