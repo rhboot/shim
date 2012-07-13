@@ -707,6 +707,9 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath
 
 	bootpath[i+1] = '\0';
 
+	if (bootpath[i-i] == '\\')
+		bootpath[i] = '\0';
+
 	*PathName = AllocatePool(StrSize(bootpath) + StrSize(SECOND_STAGE));
 
 	if (!*PathName) {
