@@ -48,8 +48,8 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 /*
  * The vendor certificate used for validating the second stage loader
  */
-
-#include "cert.h"
+extern UINT8 vendor_cert[];
+extern UINT32 vendor_cert_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
@@ -535,7 +535,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (!AuthenticodeVerify(cert->CertData,
 				context->SecDir->Size - sizeof(cert->Hdr),
-				vendor_cert, sizeof(vendor_cert), hash,
+				vendor_cert, vendor_cert_size, hash,
 				SHA256_DIGEST_SIZE)) {
 		Print(L"Invalid signature\n");
 		status = EFI_ACCESS_DENIED;
