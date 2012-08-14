@@ -555,7 +555,7 @@ done:
 /*
  * Read the binary header and grab appropriate information from it
  */
-static EFI_STATUS read_header(void *data,
+static EFI_STATUS read_header(void *data, unsigned int datasize,
 			      PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
@@ -590,7 +590,7 @@ static EFI_STATUS read_header(void *data,
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
 
-	if (context->SecDir->VirtualAddress >= context->ImageSize) {
+	if (context->SecDir->VirtualAddress >= datasize) {
 		Print(L"Malformed security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
@@ -606,7 +606,8 @@ static EFI_STATUS read_header(void *data,
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
-static EFI_STATUS handle_grub (void *data, int datasize, EFI_LOADED_IMAGE *li)
+static EFI_STATUS handle_grub (void *data, unsigned int datasize,
+			       EFI_LOADED_IMAGE *li)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -615,7 +616,7 @@ static EFI_STATUS handle_grub (void *data, int datasize, EFI_LOADED_IMAGE *li)
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 
-	efi_status = read_header(data, &context);
+	efi_status = read_header(data, datasize, &context);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to read header\n");
 		return efi_status;
@@ -843,7 +844,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (!secure_mode())
 		return EFI_SUCCESS;
 
-	status = read_header(buffer, &context);
+	status = read_header(buffer, size, &context);
 
 	if (status != EFI_SUCCESS)
 		return status;
