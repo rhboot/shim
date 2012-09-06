@@ -231,9 +231,8 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 							      Cert->SignatureData,
 							      CertList->SignatureSize,
 							      hash, SHA256_DIGEST_SIZE);
-					}
-			if (IsFound) {
-				break;
+				if (IsFound)
+					break;
 			}
 
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
