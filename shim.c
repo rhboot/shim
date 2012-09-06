@@ -52,6 +52,9 @@ extern UINT8 vendor_cert[];
 extern UINT32 vendor_cert_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
+#define SHIM_SECURITY_DATABASE_GUID { 0x9af6ba10, 0xa6b6, 0x47a3, { 0x81, 0xbc, 0x2e, 0x9e, 0x47, 0x4b, 0x87, 0x0f }}
+
+#define EFI_VARIABLE_APPEND_WRITE       0x0000000000000040
 
 typedef enum {
 	DATA_FOUND,
@@ -202,10 +205,23 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+static EFI_STATUS add_db_cert(EFI_GUID dbguid, CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	UINT32 attributes = EFI_VARIABLE_NON_VOLATILE | 
+			    EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			    EFI_VARIABLE_APPEND_WRITE;
+
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, dbname, dbguid,
+				       attributes, data,
+				       data->Hdr.dwLength + sizeof(data->Hdr));
+
+	return efi_status;
+}
+
+static CHECK_STATUS db_has_cert(EFI_GUID dbguid, CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data)
+{
+	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
@@ -214,7 +230,56 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	void *db;
 	EFI_GUID CertType = EfiCertX509Guid;
 
-	efi_status = get_variable(dbname, secure_var, &dbsize, &db);
+	efi_status = get_variable(dbname, dbguid, &dbsize, &db);
+
+	if (efi_status != EFI_SUCCESS)
+		return VAR_NOT_FOUND;
+
+	CertList = db;
+
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
+			CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
+			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
+			for (Index = 0; Index < CertCount; Index++) {
+				if (data->Hdr.dwLength - sizeof(data->Hdr) !=
+						CertList->SignatureSize)
+					continue;
+
+				IsFound = !CompareMem(data->CertData, 
+						      Cert->SignatureData,
+						      CertList->SignatureSize);
+				if (IsFound)
+					break;
+			}
+
+			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
+		}
+
+		dbsize -= CertList->SignatureListSize;
+		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
+	}
+
+	FreePool(db);
+
+	if (IsFound)
+		return DATA_FOUND;
+
+	return DATA_NOT_FOUND;
+}
+
+static CHECK_STATUS check_db_cert(EFI_GUID dbguid, CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+{
+	EFI_STATUS efi_status;
+	EFI_SIGNATURE_LIST *CertList;
+	EFI_SIGNATURE_DATA *Cert;
+	UINTN dbsize = 0;
+	UINTN CertCount, Index;
+	BOOLEAN IsFound = FALSE;
+	void *db;
+	EFI_GUID CertType = EfiCertX509Guid;
+
+	efi_status = get_variable(dbname, dbguid, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
@@ -250,10 +315,9 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
+static CHECK_STATUS check_db_hash(EFI_GUID dbguid, CHAR16 *dbname, UINT8 *data)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
@@ -263,7 +327,7 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
 	unsigned int SignatureSize = SHA256_DIGEST_SIZE;
 	EFI_GUID CertType = EfiHashSha256Guid;
 
-	efi_status = get_variable(dbname, secure_var, &dbsize, &db);
+	efi_status = get_variable(dbname, dbguid, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS) {
 		return VAR_NOT_FOUND;
@@ -305,9 +369,10 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
 
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
 {
-	if (check_db_hash(L"dbx", hash) == DATA_FOUND)
+	EFI_GUID dbguid = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	if (check_db_hash(dbguid, L"dbx", hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_cert(L"dbx", cert, hash) == DATA_FOUND)
+	if (check_db_cert(dbguid, L"dbx", cert, hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	return EFI_SUCCESS;
@@ -315,9 +380,16 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
 
 static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
 {
-	if (check_db_hash(L"db", hash) == DATA_FOUND)
+	EFI_GUID dbguid = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	if (check_db_hash(dbguid, L"db", hash) == DATA_FOUND)
 		return EFI_SUCCESS;
-	if (check_db_cert(L"db", cert, hash) == DATA_FOUND)
+	if (check_db_cert(dbguid, L"db", cert, hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+
+	EFI_GUID shimguid = SHIM_SECURITY_DATABASE_GUID;
+	if (check_db_hash(shimguid, L"db", hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_cert(shimguid, L"db", cert, hash) == DATA_FOUND)
 		return EFI_SUCCESS;
 
 	return EFI_ACCESS_DENIED;
@@ -853,6 +925,47 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	return status;
 }
 
+EFI_STATUS init_shim_keyring(void)
+{
+	EFI_STATUS efi_status;
+	UINTN dbsize = 0;
+	void *db;
+	EFI_GUID dbguid = SHIM_SECURITY_DATABASE_GUID;
+
+	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
+	/* Minus one because CertData is "UINT8 CertData[1]" */
+	UINTN cert_size = sizeof (*cert) + vendor_cert_size - 1;
+
+	cert = AllocatePool(cert_size);
+	if (!cert)
+		return EFI_OUT_OF_RESOURCES;
+
+	cert->Hdr.dwLength = vendor_cert_size + sizeof(cert->Hdr);
+	cert->Hdr.wRevision = WIN_CERT_REVISION_2_0;
+	cert->Hdr.wCertificateType = WIN_CERT_TYPE_PKCS_SIGNED_DATA;
+	CopyMem(cert->CertData, vendor_cert, vendor_cert_size);
+
+	efi_status = get_variable(L"db", dbguid, &dbsize, &db);
+	if (efi_status != EFI_SUCCESS) {
+		efi_status = add_db_cert(dbguid, L"db", cert);
+		if (efi_status != EFI_SUCCESS) {
+			FreePool(cert);
+			return efi_status;
+		}
+	}
+
+	if (db_has_cert(dbguid, L"db", cert) != DATA_FOUND) {
+		efi_status = add_db_cert(dbguid, L"db", cert);
+		if (efi_status != EFI_SUCCESS) {
+			FreePool(cert);
+			return efi_status;
+		}
+	}
+
+	FreePool(cert);
+	return EFI_SUCCESS;
+}
+
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
@@ -933,6 +1046,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	uefi_call_wrapper(BS->InstallProtocolInterface, 4, &handle,
 			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
 			  &shim_lock_interface);
+
+	efi_status = init_shim_keyring();
 
 	efi_status = init_grub(image_handle);
 

@@ -775,6 +775,8 @@ typedef struct {
 #define SHA256_DIGEST_SIZE  32
 #define WIN_CERT_TYPE_PKCS_SIGNED_DATA 0x0002
 
+#define WIN_CERT_REVISION_2_0   0x0200
+
 typedef struct {
 	UINT64 ImageAddress;
 	UINT64 ImageSize;
