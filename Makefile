@@ -14,24 +14,32 @@ EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(EFI_PATH)/elf_$(ARCH)_efi.lds
 
-
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
 		  -Wall -mno-red-zone \
 		  $(EFI_INCLUDES)
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER
 endif
+ifneq ($(origin VENDOR_CERT_FILE), undefined)
+	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
+endif
+
 LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS)
 
-TARGET		= shim.efi
-OBJS		= shim.o shim.so
-SOURCES		= shim.c shim.h signature.h PeImage.h cert.h
+VERSION		= 0.1
+
+TARGET	= shim.efi
+OBJS	= shim.o cert.o
+SOURCES	= shim.c shim.h signature.h PeImage.h
 
 all: $(TARGET)
 
 shim.o: $(SOURCES)
 
-shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
+cert.o : cert.S
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a cert.o
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 Cryptlib/libcryptlib.a:
@@ -56,3 +64,25 @@ clean:
 	$(MAKE) -C Cryptlib clean
 	$(MAKE) -C Cryptlib/OpenSSL clean
 	rm -f $(TARGET) $(OBJS)
+
+GITTAG = $(VERSION)
+
+test-archive:
+	@rm -rf /tmp/shim-$(VERSION) /tmp/shim-$(VERSION)-tmp
+	@mkdir -p /tmp/shim-$(VERSION)-tmp
+	@git archive --format=tar $(shell git branch | awk '/^*/ { print $$2 }') | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
+	@git diff | ( cd /tmp/shim-$(VERSION)-tmp/ ; patch -s -p1 -b -z .gitdiff )
+	@mv /tmp/shim-$(VERSION)-tmp/ /tmp/shim-$(VERSION)/
+	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
+	@rm -rf /tmp/shim-$(VERSION)
+	@echo "The archive is in shim-$(VERSION).tar.bz2"
+
+archive:
+	git tag $(GITTAG) refs/heads/master
+	@rm -rf /tmp/shim-$(VERSION) /tmp/shim-$(VERSION)-tmp
+	@mkdir -p /tmp/shim-$(VERSION)-tmp
+	@git archive --format=tar $(GITTAG) | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
+	@mv /tmp/shim-$(VERSION)-tmp/ /tmp/shim-$(VERSION)/
+	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
+	@rm -rf /tmp/shim-$(VERSION)
+	@echo "The archive is in shim-$(VERSION).tar.bz2"

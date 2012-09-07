@@ -49,8 +49,8 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 /*
  * The vendor certificate used for validating the second stage loader
  */
-
-#include "cert.h"
+extern UINT8 vendor_cert[];
+extern UINT32 vendor_cert_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
@@ -232,9 +232,8 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 							      Cert->SignatureData,
 							      CertList->SignatureSize,
 							      hash, SHA256_DIGEST_SIZE);
-					}
-			if (IsFound) {
-				break;
+				if (IsFound)
+					break;
 			}
 
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
@@ -536,7 +535,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (!AuthenticodeVerify(cert->CertData,
 				context->SecDir->Size - sizeof(cert->Hdr),
-				vendor_cert, sizeof(vendor_cert), hash,
+				vendor_cert, vendor_cert_size, hash,
 				SHA256_DIGEST_SIZE)) {
 		Print(L"Invalid signature\n");
 		status = EFI_ACCESS_DENIED;
@@ -556,7 +555,7 @@ done:
 /*
  * Read the binary header and grab appropriate information from it
  */
-static EFI_STATUS read_header(void *data,
+static EFI_STATUS read_header(void *data, unsigned int datasize,
 			      PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
@@ -591,7 +590,7 @@ static EFI_STATUS read_header(void *data,
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
 
-	if (context->SecDir->VirtualAddress >= context->ImageSize) {
+	if (context->SecDir->VirtualAddress >= datasize) {
 		Print(L"Malformed security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
@@ -607,7 +606,8 @@ static EFI_STATUS read_header(void *data,
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
-static EFI_STATUS handle_image (void *data, int datasize, EFI_LOADED_IMAGE *li)
+static EFI_STATUS handle_image (void *data, unsigned int datasize,
+				EFI_LOADED_IMAGE *li)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -616,7 +616,7 @@ static EFI_STATUS handle_image (void *data, int datasize, EFI_LOADED_IMAGE *li)
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 
-	efi_status = read_header(data, &context);
+	efi_status = read_header(data, datasize, &context);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to read header\n");
 		return efi_status;
@@ -845,7 +845,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (!secure_mode())
 		return EFI_SUCCESS;
 
-	status = read_header(buffer, &context);
+	status = read_header(buffer, size, &context);
 
 	if (status != EFI_SUCCESS)
 		return status;
