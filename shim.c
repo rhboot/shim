@@ -41,6 +41,7 @@
 #include "signature.h"
 
 #define SECOND_STAGE L"\\grub.efi"
+#define MOK_MANAGER L"\\MokManager.efi"
 
 static EFI_SYSTEM_TABLE *systab;
 static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
@@ -933,6 +934,42 @@ done:
 	return efi_status;
 }
 
+EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE *li;
+	EFI_DEVICE_PATH *mokpath;
+	CHAR16 *PathName;
+	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
+
+	/* TODO Check whether there is a request */
+
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
+				       &loaded_image_protocol, &li);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to init protocol\n");
+		return efi_status;
+	}
+
+	efi_status = generate_path(li, MOK_MANAGER, &mokpath, &PathName);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to generate MokManager path\n");
+		goto done;
+	}
+
+	efi_status = start_image(image_handle, li, PathName);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to start MokManager\n");
+		goto done;
+	}
+done:
+
+	return efi_status;
+}
+
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -945,6 +982,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	systab = passed_systab;
 
 	InitializeLib(image_handle, systab);
+
+	efi_status = check_mok_request(image_handle);
 
 	uefi_call_wrapper(BS->InstallProtocolInterface, 4, &handle,
 			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
