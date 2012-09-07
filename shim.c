@@ -606,7 +606,7 @@ static EFI_STATUS read_header(void *data,
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
-static EFI_STATUS handle_grub (void *data, int datasize, EFI_LOADED_IMAGE *li)
+static EFI_STATUS handle_image (void *data, int datasize, EFI_LOADED_IMAGE *li)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -684,7 +684,8 @@ static EFI_STATUS handle_grub (void *data, int datasize, EFI_LOADED_IMAGE *li)
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath, CHAR16 **PathName)
+static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
+				EFI_DEVICE_PATH **grubpath, CHAR16 **PathName)
 {
 	EFI_DEVICE_PATH *devpath;
 	EFI_HANDLE device;
@@ -710,7 +711,7 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath
 	if (bootpath[i-i] == '\\')
 		bootpath[i] = '\0';
 
-	*PathName = AllocatePool(StrSize(bootpath) + StrSize(SECOND_STAGE));
+	*PathName = AllocatePool(StrSize(bootpath) + StrSize(ImagePath));
 
 	if (!*PathName) {
 		Print(L"Failed to allocate path buffer\n");
@@ -720,7 +721,7 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **grubpath
 
 	*PathName[0] = '\0';
 	StrCat(*PathName, bootpath);
-	StrCat(*PathName, SECOND_STAGE);
+	StrCat(*PathName, ImagePath);
 
 	*grubpath = FileDevicePath(device, *PathName);
 
@@ -731,8 +732,8 @@ error:
 /*
  * Locate the second stage bootloader and read it into a buffer
  */
-static EFI_STATUS load_grub (EFI_LOADED_IMAGE *li, void **data,
-			     int *datasize, CHAR16 *PathName)
+static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
+			      int *datasize, CHAR16 *PathName)
 {
 	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	EFI_GUID file_info_id = EFI_FILE_INFO_ID;
@@ -853,16 +854,45 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	return status;
 }
 
+EFI_STATUS start_image(EFI_HANDLE image_handle, EFI_LOADED_IMAGE *li, CHAR16 *PathName)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE li_bak;
+	void *data = NULL;
+	int datasize;
+
+	efi_status = load_image(li, &data, &datasize, PathName);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to load image\n");
+		goto done;
+	}
+
+	CopyMem(&li_bak, li, sizeof(li_bak));
+
+	efi_status = handle_image(data, datasize, li);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to load image\n");
+		CopyMem(li, &li_bak, sizeof(li_bak));
+		goto done;
+	}
+
+	efi_status = uefi_call_wrapper(entry_point, 3, image_handle, systab);
+
+	CopyMem(li, &li_bak, sizeof(li_bak));
+done:
+	return efi_status;
+}
+
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE grub_handle = NULL;
-	EFI_LOADED_IMAGE *li, li_bak;
+	EFI_LOADED_IMAGE *li;
 	EFI_DEVICE_PATH *grubpath;
 	CHAR16 *PathName;
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
-	void *data = NULL;
-	int datasize;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, &li);
@@ -872,7 +902,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		return efi_status;
 	}
 
-	efi_status = generate_path(li, &grubpath, &PathName);
+	efi_status = generate_path(li, SECOND_STAGE, &grubpath, &PathName);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to generate grub path\n");
@@ -892,26 +922,12 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		goto done;
 	}
 
-	efi_status = load_grub(li, &data, &datasize, PathName);
+	efi_status = start_image(image_handle, li, PathName);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to load grub\n");
+		Print(L"Failed to start grub\n");
 		goto done;
 	}
-
-	CopyMem(&li_bak, li, sizeof(li_bak));
-
-	efi_status = handle_grub(data, datasize, li);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to load grub\n");
-		CopyMem(li, &li_bak, sizeof(li_bak));
-		goto done;
-	}
-
-	efi_status = uefi_call_wrapper(entry_point, 3, image_handle, systab);
-
-	CopyMem(li, &li_bak, sizeof(li_bak));
 done:
 
 	return efi_status;
