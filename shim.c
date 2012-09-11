@@ -869,12 +869,43 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	return status;
 }
 
-EFI_STATUS start_image(EFI_HANDLE image_handle, EFI_LOADED_IMAGE *li, CHAR16 *PathName)
+EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 {
+	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE li_bak;
+	EFI_LOADED_IMAGE *li, li_bak;
+	EFI_HANDLE handle = NULL;
+	EFI_DEVICE_PATH *path;
+	CHAR16 *PathName;
 	void *data = NULL;
 	int datasize;
+
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
+				       &loaded_image_protocol, &li);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to init protocol\n");
+		return efi_status;
+	}
+
+	efi_status = generate_path(li, ImagePath, &path, &PathName);
+
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Unable to generate path: %s\n", ImagePath);
+		goto done;
+	}
+
+	efi_status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image_handle,
+				       path, NULL, 0, &handle);
+
+	if (efi_status == EFI_SUCCESS) {
+		/* Image validates - start it */
+		Print(L"Starting file via StartImage\n");
+		efi_status = uefi_call_wrapper(BS->StartImage, 3, handle, NULL,
+					       NULL);
+		uefi_call_wrapper(BS->UnloadImage, 1, handle);
+		goto done;
+	}
 
 	efi_status = load_image(li, &data, &datasize, PathName);
 
@@ -903,41 +934,8 @@ done:
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
-	EFI_HANDLE grub_handle = NULL;
-	EFI_LOADED_IMAGE *li;
-	EFI_DEVICE_PATH *grubpath;
-	CHAR16 *PathName;
-	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, &li);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to init protocol\n");
-		return efi_status;
-	}
-
-	efi_status = generate_path(li, SECOND_STAGE, &grubpath, &PathName);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to generate grub path\n");
-		goto done;
-	}
-
-	efi_status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image_handle,
-				       grubpath, NULL, 0, &grub_handle);
-
-
-	if (efi_status == EFI_SUCCESS) {
-		/* Image validates - start it */
-		Print(L"Starting file via StartImage\n");
-		efi_status = uefi_call_wrapper(BS->StartImage, 3, grub_handle, NULL,
-					       NULL);
-		uefi_call_wrapper(BS->UnloadImage, 1, grub_handle);
-		goto done;
-	}
-
-	efi_status = start_image(image_handle, li, PathName);
+	efi_status = start_image(image_handle, SECOND_STAGE);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to start grub\n");
@@ -952,10 +950,6 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE *li;
-	EFI_DEVICE_PATH *mokpath;
-	CHAR16 *PathName;
-	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	UINTN uint8size = sizeof(UINT8);
 	UINT8 MokMgmt = 0;
 	UINT32 attributes;
@@ -969,22 +963,7 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	if (efi_status != EFI_SUCCESS || MokMgmt == 0)
 		goto done;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, &li);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to init protocol\n");
-		return efi_status;
-	}
-
-	efi_status = generate_path(li, MOK_MANAGER, &mokpath, &PathName);
-
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to generate MokManager path\n");
-		goto done;
-	}
-
-	efi_status = start_image(image_handle, li, PathName);
+	efi_status = start_image(image_handle, MOK_MANAGER);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to start MokManager\n");
