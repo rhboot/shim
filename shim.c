@@ -1032,6 +1032,34 @@ done:
 	return efi_status;
 }
 
+EFI_STATUS mirror_mok_list()
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINT32 attributes;
+	void *Data = NULL;
+	UINTN DataSize = 0;
+
+	efi_status = get_variable(L"MokList", shim_lock_guid, &attributes,
+				  &DataSize, &Data);
+
+	if (efi_status != EFI_SUCCESS) {
+		goto done;
+	}
+
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
+				       &shim_lock_guid,
+				       EFI_VARIABLE_BOOTSERVICE_ACCESS
+				       | EFI_VARIABLE_RUNTIME_ACCESS,
+				       DataSize, Data);
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Failed to set MokListRT %d\n", efi_status);
+	}
+
+done:
+	return efi_status;
+}
+
 EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1079,6 +1107,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	InitializeLib(image_handle, systab);
 
 	efi_status = check_mok_request(image_handle);
+
+	efi_status = mirror_mok_list();
 
 	uefi_call_wrapper(BS->InstallProtocolInterface, 4, &handle,
 			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
