@@ -87,6 +87,16 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 	return efi_status;
 }
 
+static EFI_STATUS delete_variable (CHAR16 *name, EFI_GUID guid)
+{
+	EFI_STATUS efi_status;
+
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, name, &guid,
+				       0, 0, (UINT8 *)NULL);
+
+	return efi_status;
+}
+
 /*
  * Perform basic bounds checking of the intra-image pointers
  */
@@ -940,13 +950,24 @@ done:
 
 EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li;
 	EFI_DEVICE_PATH *mokpath;
 	CHAR16 *PathName;
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
+	UINTN uint8size = sizeof(UINT8);
+	UINT8 MokMgmt = 0;
+	UINT32 attributes;
 
-	/* TODO Check whether there is a request */
+	if (!secure_mode())
+		return EFI_SUCCESS;
+
+	efi_status = get_variable(L"MokMgmt", shim_lock_guid, &attributes,
+				  &uint8size, (void *)&MokMgmt);
+
+	if (efi_status != EFI_SUCCESS || MokMgmt == 0)
+		goto done;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, &li);
@@ -970,6 +991,11 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		goto done;
 	}
 done:
+	if (MokMgmt == 1) {
+		if (delete_variable(L"MokMgmt", shim_lock_guid) != EFI_SUCCESS) {
+                        Print(L"Failed to delete MokMgmt\n");
+                }
+	}
 
 	return efi_status;
 }
