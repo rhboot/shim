@@ -60,6 +60,11 @@ typedef enum {
 	VAR_NOT_FOUND
 } CHECK_STATUS;
 
+typedef struct {
+	UINT32 MokSize;
+	UINT8 *Mok;
+} MokListNode;
+
 static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 				UINTN *size, void **buffer)
 {
@@ -95,6 +100,37 @@ static EFI_STATUS delete_variable (CHAR16 *name, EFI_GUID guid)
 				       0, 0, (UINT8 *)NULL);
 
 	return efi_status;
+}
+
+static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
+	MokListNode *list;
+	int i, remain = DataSize;
+	void *ptr;
+
+	list = AllocatePool(sizeof(MokListNode) * num);
+
+	if (!list) {
+		Print(L"Unable to allocate MOK list\n");
+		return NULL;
+	}
+
+	ptr = Data;
+	for (i = 0; i < num; i++) {
+		if (remain < 0) {
+			Print(L"MOK list was corrupted\n");
+			FreePool(list);
+			return NULL;
+		}
+
+		CopyMem(&list[i].MokSize, ptr, sizeof(UINT32));
+		ptr += sizeof(UINT32);
+		list[i].Mok = ptr;
+		ptr += list[i].MokSize;
+
+		remain -= sizeof(UINT32) + list[i].MokSize;
+	}
+
+	return list;
 }
 
 /*
@@ -373,6 +409,7 @@ static BOOLEAN secure_mode (void)
 static EFI_STATUS verify_buffer (char *data, int datasize,
 			 PE_COFF_LOADER_IMAGE_CONTEXT *context, int whitelist)
 {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	unsigned int size = datasize;
 	unsigned int ctxsize;
 	void *ctx = NULL;
@@ -386,6 +423,11 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
+	unsigned int i;
+	void *MokListData = NULL;
+	UINTN MokListDataSize = 0;
+	UINT32 MokNum, attributes;
+	MokListNode *list = NULL;
 
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
 
@@ -547,15 +589,59 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		}
 	}
 
-	if (!AuthenticodeVerify(cert->CertData,
-				context->SecDir->Size - sizeof(cert->Hdr),
-				vendor_cert, vendor_cert_size, hash,
-				SHA256_DIGEST_SIZE)) {
-		Print(L"Invalid signature\n");
-		status = EFI_ACCESS_DENIED;
-	} else {
+	if (AuthenticodeVerify(cert->CertData,
+			       context->SecDir->Size - sizeof(cert->Hdr),
+			       vendor_cert, vendor_cert_size, hash,
+			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
+		Print(L"Binary is verified by the vendor certificate\n");
+		goto done;
 	}
+
+	status = get_variable(L"MokList", shim_lock_guid, &attributes,
+			      &MokListDataSize, &MokListData);
+
+	if (status != EFI_SUCCESS) {
+		status = EFI_ACCESS_DENIED;
+		Print(L"Invalid signature\n");
+		goto done;
+	}
+
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+		Print(L"MokList is compromised!\nErase all keys in MokList!\n");
+		if (delete_variable(L"MokList", shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to erase MokList\n");
+		}
+		status = EFI_ACCESS_DENIED;
+		goto done;
+	}
+
+	CopyMem(&MokNum, MokListData, sizeof(UINT32));
+	if (MokNum == 0)
+		goto done;
+
+	list = build_mok_list(MokNum,
+			      (void *)MokListData + sizeof(UINT32),
+			      MokListDataSize - sizeof(UINT32));
+
+	if (!list) {
+		Print(L"Failed to construct MOK list\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	for (i = 0; i < MokNum; i++) {
+		if (AuthenticodeVerify(cert->CertData,
+				       context->SecDir->Size - sizeof(cert->Hdr),
+				       list[i].Mok, list[i].MokSize, hash,
+				       SHA256_DIGEST_SIZE)) {
+			status = EFI_SUCCESS;
+			Print(L"Binary is verified by the machine owner key\n");
+			goto done;
+		}
+	}
+	Print(L"Invalid signature\n");
+	status = EFI_ACCESS_DENIED;
 
 done:
 	if (SectionHeader)
