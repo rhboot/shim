@@ -60,15 +60,14 @@ typedef enum {
 	VAR_NOT_FOUND
 } CHECK_STATUS;
 
-static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
+static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 				UINTN *size, void **buffer)
 {
 	EFI_STATUS efi_status;
-	UINT32 attributes;
 	char allocate = !(*size);
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       &attributes, size, buffer);
+				       attributes, size, buffer);
 
 	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate) {
 		return efi_status;
@@ -83,7 +82,7 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid,
 	}
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       &attributes, size, *buffer);
+				       attributes, size, *buffer);
 
 	return efi_status;
 }
@@ -211,11 +210,12 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
 	UINTN CertCount, Index;
+	UINT32 attributes;
 	BOOLEAN IsFound = FALSE;
 	void *db;
 	EFI_GUID CertType = EfiCertX509Guid;
 
-	efi_status = get_variable(dbname, secure_var, &dbsize, &db);
+	efi_status = get_variable(dbname, secure_var, &attributes, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
@@ -259,12 +259,13 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
 	UINTN CertCount, Index;
+	UINT32 attributes;
 	BOOLEAN IsFound = FALSE;
 	void *db;
 	unsigned int SignatureSize = SHA256_DIGEST_SIZE;
 	EFI_GUID CertType = EfiHashSha256Guid;
 
-	efi_status = get_variable(dbname, secure_var, &dbsize, &db);
+	efi_status = get_variable(dbname, secure_var, &attributes, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS) {
 		return VAR_NOT_FOUND;
@@ -334,8 +335,10 @@ static BOOLEAN secure_mode (void)
 	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
 	UINTN charsize = sizeof(char);
 	UINT8 sb, setupmode;
+	UINT32 attributes;
 
-	status = get_variable(L"SecureBoot", global_var, &charsize, (void *)&sb);
+	status = get_variable(L"SecureBoot", global_var, &attributes, &charsize,
+			      (void *)&sb);
 
 	/* FIXME - more paranoia here? */
 	if (status != EFI_SUCCESS || sb != 1) {
@@ -343,7 +346,8 @@ static BOOLEAN secure_mode (void)
 		return FALSE;
 	}
 
-	status = get_variable(L"SetupMode", global_var, &charsize, (void *)&setupmode);
+	status = get_variable(L"SetupMode", global_var, &attributes, &charsize,
+			      (void *)&setupmode);
 
 	if (status == EFI_SUCCESS && setupmode == 1) {
 		Print(L"Platform is in setup mode\n");
