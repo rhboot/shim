@@ -1064,17 +1064,18 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
-	UINTN uint8size = sizeof(UINT8);
-	UINT8 MokMgmt = 0;
+	UINTN size = sizeof(UINT32);
+	UINT32 MokNew;
 	UINT32 attributes;
 
 	if (!secure_mode())
 		return EFI_SUCCESS;
 
-	efi_status = get_variable(L"MokMgmt", shim_lock_guid, &attributes,
-				  &uint8size, (void *)&MokMgmt);
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokNew",
+				       &shim_lock_guid, &attributes,
+				       &size, (void *)&MokNew);
 
-	if (efi_status != EFI_SUCCESS || MokMgmt == 0)
+	if (efi_status != EFI_SUCCESS && efi_status != EFI_BUFFER_TOO_SMALL)
 		goto done;
 
 	efi_status = start_image(image_handle, MOK_MANAGER);
@@ -1083,13 +1084,8 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		Print(L"Failed to start MokManager\n");
 		goto done;
 	}
-done:
-	if (MokMgmt == 1) {
-		if (delete_variable(L"MokMgmt", shim_lock_guid) != EFI_SUCCESS) {
-                        Print(L"Failed to delete MokMgmt\n");
-                }
-	}
 
+done:
 	return efi_status;
 }
 
