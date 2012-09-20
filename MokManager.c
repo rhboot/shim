@@ -285,8 +285,6 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 	if (!Mok || MokSize == 0)
 		return;
 
-Print(L"size: %d\n", MokSize);
-
 	efi_status = get_sha256sum(Mok, MokSize, hash);
 
 	if (efi_status != EFI_SUCCESS) {
