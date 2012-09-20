@@ -127,13 +127,13 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	return list;
 }
 
-static void print_x509_name (X509_NAME *X509Name, char *name)
+static void print_x509_name (X509_NAME *X509Name, CHAR16 *name)
 {
 	char *str;
 
 	str = X509_NAME_oneline(X509Name, NULL, 0);
 	if (str) {
-		APrint((CHAR8 *)"%a: %a\n", name, str);
+		Print(L"  %s:\n    %a\n", name, str);
 		OPENSSL_free(str);
 	}
 }
@@ -143,7 +143,8 @@ static const char *mon[12]= {
 "Jul","Aug","Sep","Oct","Nov","Dec"
 };
 
-static void print_x509_GENERALIZEDTIME_time (ASN1_TIME *time, char *name) {
+static void print_x509_GENERALIZEDTIME_time (ASN1_TIME *time, CHAR16 *time_string)
+{
 	char *v;
 	int gmt = 0;
 	int i;
@@ -184,18 +185,19 @@ static void print_x509_GENERALIZEDTIME_time (ASN1_TIME *time, char *name) {
 			int l = time->length;
 			f = &v[14];	/* The decimal point. */
 			f_len = 1;
-			while (14 + f_len < l && f[f_len] >= '0' && f[f_len] <= '9')
+			while (14 + f_len < l && f[f_len] >= '0' &&
+			       f[f_len] <= '9')
 				++f_len;
 		}
 	}
 
-	APrint((CHAR8 *)"%a: %a %2d %02d:%02d:%02d%.*a %d%a",
-	       name, mon[M-1],d,h,m,s,f_len,f,y,(gmt)?" GMT":"");
+	SPrint(time_string, 0, L"%a %2d %02d:%02d:%02d%.*a %d%a",
+	       mon[M-1], d, h, m, s, f_len, f, y, (gmt)?" GMT":"");
 error:
 	return;
 }
 
-static void print_x509_UTCTIME_time (ASN1_TIME *time, char *name)
+static void print_x509_UTCTIME_time (ASN1_TIME *time, CHAR16 *time_string)
 {
 	char *v;
 	int gmt=0;
@@ -234,44 +236,63 @@ static void print_x509_UTCTIME_time (ASN1_TIME *time, char *name)
 	    (v[11] >= '0') && (v[11] <= '9'))
 		s = (v[10]-'0')*10+(v[11]-'0');
 
-	APrint((CHAR8 *)"%a: %a %2d %02d:%02d:%02d %d%a\n",
-	       name, mon[M-1],d,h,m,s,y+1900,(gmt)?" GMT":"");
+	SPrint(time_string, 0, L"%a %2d %02d:%02d:%02d %d%a",
+	       mon[M-1], d, h, m, s, y+1900, (gmt)?" GMT":"");
 error:
 	return;
 }
 
-static void print_x509_time (ASN1_TIME *time, char *name)
+static void print_x509_time (ASN1_TIME *time, CHAR16 *name)
 {
+	CHAR16 time_string[30];
+
 	if(time->type == V_ASN1_UTCTIME)
-		print_x509_UTCTIME_time(time, name);
+		print_x509_UTCTIME_time(time, time_string);
 
 	if(time->type == V_ASN1_GENERALIZEDTIME)
-		print_x509_GENERALIZEDTIME_time(time, name);
+		print_x509_GENERALIZEDTIME_time(time, time_string);
+
+	Print(L"  %s:\n    %s\n", name, time_string);
 }
 
 static void show_x509_info (X509 *X509Cert)
 {
+	ASN1_INTEGER *serial;
+	BIGNUM *bnser;
+	unsigned char hexbuf[30];
 	X509_NAME *X509Name;
 	ASN1_TIME *time;
 
+	serial = X509_get_serialNumber(X509Cert);
+	if (serial) {
+		int i, n;
+		bnser = ASN1_INTEGER_to_BN(serial, NULL);
+		n = BN_bn2bin(bnser, hexbuf);
+		Print(L"  Serial Number:\n    ");
+		for (i = 0; i < n-1; i++) {
+			Print(L"%02x:", hexbuf[i]);
+		}
+		Print(L"%02x\n", hexbuf[n-1]);
+	}
+
 	X509Name = X509_get_issuer_name(X509Cert);
 	if (X509Name) {
-		print_x509_name(X509Name, "Issuer");
+		print_x509_name(X509Name, L"Issuer");
 	}
 
 	X509Name = X509_get_subject_name(X509Cert);
 	if (X509Name) {
-		print_x509_name(X509Name, "Subject");
+		print_x509_name(X509Name, L"Subject");
 	}
 
 	time = X509_get_notBefore(X509Cert);
 	if (time) {
-		print_x509_time(time, "Not Before");
+		print_x509_time(time, L"Validity from");
 	}
 
 	time = X509_get_notAfter(X509Cert);
 	if (time) {
-		print_x509_time(time, "Not After");
+		print_x509_time(time, L"Validity till");
 	}
 }
 
@@ -285,6 +306,15 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 	if (!Mok || MokSize == 0)
 		return;
 
+	if (X509ConstructCertificate(Mok, MokSize, (UINT8 **) &X509Cert) &&
+	    X509Cert != NULL) {
+		show_x509_info(X509Cert);
+		X509_free(X509Cert);
+	} else {
+		Print(L"  Not a valid X509 certificate\n\n");
+		return;
+	}
+
 	efi_status = get_sha256sum(Mok, MokSize, hash);
 
 	if (efi_status != EFI_SUCCESS) {
@@ -292,18 +322,13 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		return;
 	}
 
-	if (X509ConstructCertificate(Mok, MokSize, (UINT8 **) &X509Cert) &&
-	    X509Cert != NULL) {
-		show_x509_info(X509Cert);
-		X509_free(X509Cert);
-	}
-
-	Print(L"Fingerprint (SHA256):\n");
+	Print(L"  Fingerprint (SHA256):\n    ");
 	for (i = 0; i < SHA256_DIGEST_SIZE; i++) {
 		Print(L" %02x", hash[i]);
 		if (i % 16 == 15)
-			Print(L"\n");
+			Print(L"\n    ");
 	}
+	Print(L"\n");
 }
 
 static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
@@ -329,9 +354,8 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 
 	Print(L"New machine owner key(s):\n\n");
 	for (i = 0; i < MokNum; i++) {
-		Print(L"Key %d:\n", i);
+		Print(L"[Key %d]\n", i+1);
 		show_mok_info(keys[i].Mok, keys[i].MokSize);
-		Print(L"\n");
 	}
 
 	ret = 1;
@@ -350,7 +374,7 @@ static UINT8 mok_enrollment_prompt (void *MokNew, UINTN MokNewSize)
 		return 0;
 	}
 
-	Print(L"\nEnroll the key(s)? (y/N): ");
+	Print(L"Enroll the key(s)? (y/N): ");
 
 	key = get_keystroke();
 	Print(L"%c\n", key.UnicodeChar);
