@@ -333,11 +333,50 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 	Print(L"\n");
 }
 
+static INTN get_number ()
+{
+	EFI_INPUT_KEY input_key;
+	CHAR16 input[10];
+	int count = 0;
+
+	do {
+		input_key = get_keystroke();
+
+		if ((input_key.UnicodeChar < '0' ||
+		     input_key.UnicodeChar > '9' ||
+		     count >= 10) &&
+		    input_key.UnicodeChar != CHAR_BACKSPACE) {
+			continue;
+		}
+
+		if (count == 0 && input_key.UnicodeChar == CHAR_BACKSPACE)
+			continue;
+
+		Print(L"%c", input_key.UnicodeChar);
+
+		if (input_key.UnicodeChar == CHAR_BACKSPACE) {
+			input[--count] = '\0';
+			continue;
+		}
+
+		input[count++] = input_key.UnicodeChar;
+	} while (input_key.UnicodeChar != CHAR_CARRIAGE_RETURN);
+
+	if (count == 0)
+		return -1;
+
+	input[count] = '\0';
+
+	return (INTN)Atoi(input);
+}
+
 static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 {
 	UINT32 MokNum;
 	MokListNode *keys = NULL;
-	int i, ret = 0;
+	INTN key_num = 0;
+	UINT8 initial = 1;
+	int ret = 0;
 
 	CopyMem(&MokNum, MokNew, sizeof(UINT32));
 	if (MokNum == 0) {
@@ -354,11 +393,30 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 		goto error;
 	}
 
-	Print(L"New machine owner key(s):\n\n");
-	for (i = 0; i < MokNum; i++) {
-		Print(L"[Key %d]\n", i+1);
-		show_mok_info(keys[i].Mok, keys[i].MokSize);
-	}
+	do {
+		uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+		Print(L"Input the key number to show the details of the key or\n"
+		      L"type \'0\' to continue\n\n");
+		Print(L"%d key(s) in the new key list\n\n", MokNum);
+
+		if (key_num > MokNum) {
+			Print(L"No such key\n\n");
+		} else if (initial != 1){
+			Print(L"[Key %d]\n", key_num);
+			show_mok_info(keys[key_num-1].Mok, keys[key_num-1].MokSize);
+		}
+
+		Print(L"Key Number: ");
+
+		key_num = get_number();
+
+		Print(L"\n\n");
+
+		if (key_num == -1)
+			continue;
+
+		initial = 0;
+	} while (key_num != 0);
 
 	ret = 1;
 error:
