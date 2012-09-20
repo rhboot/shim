@@ -246,11 +246,13 @@ static void print_x509_time (ASN1_TIME *time, CHAR16 *name)
 {
 	CHAR16 time_string[30];
 
-	if(time->type == V_ASN1_UTCTIME)
+	if (time->type == V_ASN1_UTCTIME) {
 		print_x509_UTCTIME_time(time, time_string);
-
-	if(time->type == V_ASN1_GENERALIZEDTIME)
+	} else if (time->type == V_ASN1_GENERALIZEDTIME) {
 		print_x509_GENERALIZEDTIME_time(time, time_string);
+	} else {
+		time_string[0] = '\0';
+	}
 
 	Print(L"  %s:\n    %s\n", name, time_string);
 }
