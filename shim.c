@@ -116,18 +116,18 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 
 	ptr = Data;
 	for (i = 0; i < num; i++) {
+		CopyMem(&list[i].MokSize, ptr, sizeof(UINT32));
+		remain -= sizeof(UINT32) + list[i].MokSize;
+
 		if (remain < 0) {
 			Print(L"MOK list was corrupted\n");
 			FreePool(list);
 			return NULL;
 		}
 
-		CopyMem(&list[i].MokSize, ptr, sizeof(UINT32));
 		ptr += sizeof(UINT32);
 		list[i].Mok = ptr;
 		ptr += list[i].MokSize;
-
-		remain -= sizeof(UINT32) + list[i].MokSize;
 	}
 
 	return list;
