@@ -101,6 +101,9 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	int i;
 	void *ptr;
 
+	if (DataSize < sizeof(UINT32))
+		return NULL;
+
 	list = AllocatePool(sizeof(MokListNode) * num);
 
 	if (!list) {
@@ -478,7 +481,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	efi_status = get_variable(L"MokNew", shim_lock_guid, &attributes,
 				  &MokNewSize, &MokNew);
 
-	if (efi_status != EFI_SUCCESS) {
+	if (efi_status != EFI_SUCCESS || MokNewSize < sizeof(UINT32)) {
 		goto error;
 	}
 

@@ -107,6 +107,9 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	int i, remain = DataSize;
 	void *ptr;
 
+	if (DataSize < sizeof(UINT32))
+		return NULL;
+
 	list = AllocatePool(sizeof(MokListNode) * num);
 
 	if (!list) {
@@ -601,7 +604,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	status = get_variable(L"MokList", shim_lock_guid, &attributes,
 			      &MokListDataSize, &MokListData);
 
-	if (status != EFI_SUCCESS) {
+	if (status != EFI_SUCCESS || MokListDataSize < sizeof(UINT32)) {
 		status = EFI_ACCESS_DENIED;
 		Print(L"Invalid signature\n");
 		goto done;
