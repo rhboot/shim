@@ -617,8 +617,10 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	}
 
 	CopyMem(&MokNum, MokListData, sizeof(UINT32));
-	if (MokNum == 0)
+	if (MokNum == 0) {
+		status = EFI_ACCESS_DENIED;
 		goto done;
+	}
 
 	list = build_mok_list(MokNum,
 			      (void *)MokListData + sizeof(UINT32),
