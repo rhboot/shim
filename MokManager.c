@@ -376,12 +376,11 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 	MokListNode *keys = NULL;
 	INTN key_num = 0;
 	UINT8 initial = 1;
-	int ret = 0;
 
 	CopyMem(&MokNum, MokNew, sizeof(UINT32));
 	if (MokNum == 0) {
 		Print(L"No key exists\n");
-		goto error;
+		return 0;
 	}
 
 	keys = build_mok_list(MokNum,
@@ -390,7 +389,7 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 
 	if (!keys) {
 		Print(L"Failed to construct key list in MokNew\n");
-		goto error;
+		return 0;
 	}
 
 	do {
@@ -418,30 +417,29 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 		initial = 0;
 	} while (key_num != 0);
 
-	ret = 1;
-error:
-	if (keys)
-		FreePool(keys);
+	FreePool(keys);
 
-	return ret;
+	return 1;
 }
 
 static UINT8 mok_enrollment_prompt (void *MokNew, UINTN MokNewSize)
 {
 	EFI_INPUT_KEY key;
 
-	if (!list_keys(MokNew, MokNewSize)) {
-		return 0;
-	}
+	do {
+		if (!list_keys(MokNew, MokNewSize)) {
+			return 0;
+		}
 
-	Print(L"Enroll the key(s)? (y/N): ");
+		Print(L"Enroll the key(s) or list the key(s) again? (y/n/l): ");
 
-	key = get_keystroke();
-	Print(L"%c\n", key.UnicodeChar);
+		key = get_keystroke();
+		Print(L"%c\n", key.UnicodeChar);
 
-	if (key.UnicodeChar == 'Y' || key.UnicodeChar == 'y') {
-		return 1;
-	}
+		if (key.UnicodeChar == 'Y' || key.UnicodeChar == 'y') {
+			return 1;
+		}
+	} while (key.UnicodeChar == 'L' || key.UnicodeChar == 'l');
 
 	Print(L"Abort\n");
 
