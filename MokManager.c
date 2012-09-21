@@ -466,10 +466,144 @@ static UINT8 mok_deletion_prompt () {
 	return 0;
 }
 
+static UINT8 get_password (UINT32 *length, CHAR16 *password)
+{
+	EFI_INPUT_KEY key;
+	CHAR16 input[16];
+	int count = 0;
+
+	do {
+		key = get_keystroke();
+
+		if ((count >= 16 && key.UnicodeChar != CHAR_BACKSPACE) ||
+		    key.UnicodeChar == CHAR_NULL ||
+		    key.UnicodeChar == CHAR_TAB  ||
+		    key.UnicodeChar == CHAR_LINEFEED) {
+			continue;
+		}
+
+		if (count == 0 && key.UnicodeChar == CHAR_BACKSPACE) {
+			continue;
+		} else if (key.UnicodeChar == CHAR_BACKSPACE) {
+			Print(L"%c", CHAR_BACKSPACE);
+			input[--count] = '\0';
+			continue;
+		}
+
+		input[count++] = key.UnicodeChar;
+	} while (key.UnicodeChar != CHAR_CARRIAGE_RETURN);
+	Print(L"\n");
+
+	*length = count;
+	CopyMem(password, input, count * sizeof(CHAR16));
+
+	return 1;
+}
+
+static EFI_STATUS compute_pw_hash (void *MokNew, UINTN MokNewSize, CHAR16 *password,
+			     UINT32 pw_length, UINT8 *hash)
+{
+	EFI_STATUS status;
+	unsigned int ctxsize;
+	void *ctx = NULL;
+
+	ctxsize = Sha256GetContextSize();
+	ctx = AllocatePool(ctxsize);
+
+	if (!ctx) {
+		Print(L"Unable to allocate memory for hash context\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	if (!Sha256Init(ctx)) {
+		Print(L"Unable to initialise hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	if (!(Sha256Update(ctx, MokNew, MokNewSize))) {
+		Print(L"Unable to generate hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	if (!(Sha256Update(ctx, password, pw_length * sizeof(CHAR16)))) {
+		Print(L"Unable to generate hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	if (!(Sha256Final(ctx, hash))) {
+		Print(L"Unable to finalise hash\n");
+		status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	status = EFI_SUCCESS;
+done:
+	return status;
+}
+
+static UINT8 compare_hash (UINT8 *hash1, UINT8 *hash2, UINT32 size)
+{
+	int i;
+
+	for (i = 0; i < size; i++) {
+		if (hash1[i] != hash2[i]) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT8 auth[SHA256_DIGEST_SIZE];
+	UINTN auth_size;
+	UINT32 attributes;
+	CHAR16 password[16];
+	UINT32 pw_length;
+	UINT8 fail_count = 0;
+
+	auth_size = SHA256_DIGEST_SIZE;
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
+				       &shim_lock_guid,
+				       &attributes, &auth_size, auth);
+
+
+	if (efi_status != EFI_SUCCESS || auth_size != SHA256_DIGEST_SIZE) {
+		Print(L"Failed to get MokAuth %d\n", efi_status);
+		return efi_status;
+	}
+
+	while (fail_count < 3) {
+		Print(L"Password: ");
+		get_password(&pw_length, password);
+
+		if (pw_length < 8) {
+			Print(L"At 8 characters for the password\n");
+		}
+
+		efi_status = compute_pw_hash(MokNew, MokNewSize, password,
+					     pw_length, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			return efi_status;
+		}
+
+		if (!compare_hash(auth, hash, SHA256_DIGEST_SIZE)) {
+			fail_count++;
+		} else {
+			break;
+		}
+	}
+
+	if (fail_count >= 3)
+		return EFI_ACCESS_DENIED;
 
 	/* Write new MOK */
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
@@ -534,6 +668,7 @@ error:
 		}
 		FreePool (MokNew);
 	}
+	delete_variable(L"MokAuth", shim_lock_guid);
 
 	return EFI_SUCCESS;
 }
