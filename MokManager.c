@@ -449,7 +449,24 @@ static UINT8 mok_enrollment_prompt (void *MokNew, UINTN MokNewSize)
 	return 0;
 }
 
-static EFI_STATUS enroll_mok (void *MokNew, UINT32 MokNewSize)
+static UINT8 mok_deletion_prompt () {
+	EFI_INPUT_KEY key;
+
+	Print(L"Erase all stored keys? (y/N): ");
+
+	key = get_keystroke();
+	Print(L"%c\n", key.UnicodeChar);
+
+	if (key.UnicodeChar == 'Y' || key.UnicodeChar == 'y') {
+		return 1;
+	}
+
+	Print(L"Abort\n");
+
+	return 0;
+}
+
+static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
@@ -462,11 +479,10 @@ static EFI_STATUS enroll_mok (void *MokNew, UINT32 MokNewSize)
 				       MokNewSize, MokNew);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to set variable %d\n", efi_status);
-		goto error;
+		return efi_status;
 	}
 
-error:
-	return efi_status;
+	return EFI_SUCCESS;
 }
 
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
@@ -475,7 +491,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	UINTN MokNewSize = 0;
 	void *MokNew = NULL;
-	UINT32 attributes;
+	UINT32 attributes, MokNum;
 	UINT8 confirmed;
 
 	efi_status = get_variable(L"MokNew", shim_lock_guid, &attributes,
@@ -485,18 +501,32 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		goto error;
 	}
 
-	confirmed = mok_enrollment_prompt(MokNew, MokNewSize);
+	CopyMem(&MokNum, MokNew, sizeof(UINT32));
+	if (MokNum == 0) {
+		confirmed = mok_deletion_prompt();
 
-	if (!confirmed)
-		goto error;
+		if (!confirmed)
+			goto error;
 
-	efi_status = enroll_mok(MokNew, MokNewSize);
+		efi_status = store_keys(MokNew, sizeof(UINT32));
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to enroll MOK\n");
-		goto error;
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to erase keys\n");
+			goto error;
+		}
+	} else {
+		confirmed = mok_enrollment_prompt(MokNew, MokNewSize);
+
+		if (!confirmed)
+			goto error;
+
+		efi_status = store_keys(MokNew, MokNewSize);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to enroll MOK\n");
+			goto error;
+		}
 	}
-
 error:
 	if (MokNew) {
 		if (delete_variable(L"MokNew", shim_lock_guid) != EFI_SUCCESS) {
