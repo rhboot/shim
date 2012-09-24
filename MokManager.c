@@ -4,6 +4,8 @@
 #include <openssl/x509.h>
 #include "shim.h"
 
+#define PASSWORD_LENGTH 16
+
 typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
@@ -469,13 +471,14 @@ static UINT8 mok_deletion_prompt () {
 static UINT8 get_password (UINT32 *length, CHAR16 *password)
 {
 	EFI_INPUT_KEY key;
-	CHAR16 input[16];
+	CHAR16 input[PASSWORD_LENGTH];
 	int count = 0;
 
 	do {
 		key = get_keystroke();
 
-		if ((count >= 16 && key.UnicodeChar != CHAR_BACKSPACE) ||
+		if ((count >= PASSWORD_LENGTH &&
+		     key.UnicodeChar != CHAR_BACKSPACE) ||
 		    key.UnicodeChar == CHAR_NULL ||
 		    key.UnicodeChar == CHAR_TAB  ||
 		    key.UnicodeChar == CHAR_LINEFEED) {
@@ -565,7 +568,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	UINT8 auth[SHA256_DIGEST_SIZE];
 	UINTN auth_size;
 	UINT32 attributes;
-	CHAR16 password[16];
+	CHAR16 password[PASSWORD_LENGTH];
 	UINT32 pw_length;
 	UINT8 fail_count = 0;
 
