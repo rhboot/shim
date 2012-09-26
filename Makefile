@@ -65,7 +65,7 @@ Cryptlib/OpenSSL/libopenssl.a:
 		-j .rela -j .reloc -j .eh_frame \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
-		--target=efi-app-$(ARCH) $^ shim.efi.debug
+		--target=efi-app-$(ARCH) $^ $@.debug
 
 clean:
 	$(MAKE) -C Cryptlib clean
