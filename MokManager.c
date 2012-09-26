@@ -588,7 +588,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 		get_password(&pw_length, password);
 
 		if (pw_length < 8) {
-			Print(L"At 8 characters for the password\n");
+			Print(L"At least 8 characters for the password\n");
 		}
 
 		efi_status = compute_pw_hash(MokNew, MokNewSize, password,
