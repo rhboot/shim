@@ -481,7 +481,8 @@ static UINT8 get_password (UINT32 *length, CHAR16 *password)
 		     key.UnicodeChar != CHAR_BACKSPACE) ||
 		    key.UnicodeChar == CHAR_NULL ||
 		    key.UnicodeChar == CHAR_TAB  ||
-		    key.UnicodeChar == CHAR_LINEFEED) {
+		    key.UnicodeChar == CHAR_LINEFEED ||
+		    key.UnicodeChar == CHAR_CARRIAGE_RETURN) {
 			continue;
 		}
 
