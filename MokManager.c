@@ -4,7 +4,8 @@
 #include <openssl/x509.h>
 #include "shim.h"
 
-#define PASSWORD_LENGTH 16
+#define PASSWORD_MAX 16
+#define PASSWORD_MIN 8
 
 typedef struct {
 	UINT32 MokSize;
@@ -471,13 +472,13 @@ static UINT8 mok_deletion_prompt () {
 static UINT8 get_password (UINT32 *length, CHAR16 *password)
 {
 	EFI_INPUT_KEY key;
-	CHAR16 input[PASSWORD_LENGTH];
+	CHAR16 input[PASSWORD_MAX];
 	int count = 0;
 
 	do {
 		key = get_keystroke();
 
-		if ((count >= PASSWORD_LENGTH &&
+		if ((count >= PASSWORD_MAX &&
 		     key.UnicodeChar != CHAR_BACKSPACE) ||
 		    key.UnicodeChar == CHAR_NULL ||
 		    key.UnicodeChar == CHAR_TAB  ||
@@ -569,7 +570,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	UINT8 auth[SHA256_DIGEST_SIZE];
 	UINTN auth_size;
 	UINT32 attributes;
-	CHAR16 password[PASSWORD_LENGTH];
+	CHAR16 password[PASSWORD_MAX];
 	UINT32 pw_length;
 	UINT8 fail_count = 0;
 
@@ -585,11 +586,13 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	}
 
 	while (fail_count < 3) {
-		Print(L"Password: ");
+		Print(L"Password(%d-%d characters): ",
+		      PASSWORD_MIN, PASSWORD_MAX);
 		get_password(&pw_length, password);
 
 		if (pw_length < 8) {
-			Print(L"At least 8 characters for the password\n");
+			Print(L"At least %d characters for the password\n",
+			      PASSWORD_MIN);
 		}
 
 		efi_status = compute_pw_hash(MokNew, MokNewSize, password,
@@ -600,6 +603,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 		}
 
 		if (!compare_hash(auth, hash, SHA256_DIGEST_SIZE)) {
+			Print(L"Password doesn't match\n");
 			fail_count++;
 		} else {
 			break;
