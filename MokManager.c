@@ -24,13 +24,13 @@ static EFI_INPUT_KEY get_keystroke (void)
 	return key;
 }
 
-static EFI_STATUS get_sha256sum (void *Data, int DataSize, UINT8 *hash)
+static EFI_STATUS get_sha1sum (void *Data, int DataSize, UINT8 *hash)
 {
 	EFI_STATUS status;
 	unsigned int ctxsize;
 	void *ctx = NULL;
 
-	ctxsize = Sha256GetContextSize();
+	ctxsize = Sha1GetContextSize();
 	ctx = AllocatePool(ctxsize);
 
 	if (!ctx) {
@@ -38,19 +38,19 @@ static EFI_STATUS get_sha256sum (void *Data, int DataSize, UINT8 *hash)
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	if (!Sha256Init(ctx)) {
+	if (!Sha1Init(ctx)) {
 		Print(L"Unable to initialise hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
-	if (!(Sha256Update(ctx, Data, DataSize))) {
+	if (!(Sha1Update(ctx, Data, DataSize))) {
 		Print(L"Unable to generate hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
-	if (!(Sha256Final(ctx, hash))) {
+	if (!(Sha1Final(ctx, hash))) {
 		Print(L"Unable to finalise hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -270,7 +270,7 @@ static void show_x509_info (X509 *X509Cert)
 static void show_mok_info (void *Mok, UINTN MokSize)
 {
 	EFI_STATUS efi_status;
-	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT8 hash[SHA1_DIGEST_SIZE];
 	unsigned int i;
 	X509 *X509Cert;
 
@@ -286,17 +286,17 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		return;
 	}
 
-	efi_status = get_sha256sum(Mok, MokSize, hash);
+	efi_status = get_sha1sum(Mok, MokSize, hash);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to compute MOK fingerprint\n");
 		return;
 	}
 
-	Print(L"  Fingerprint (SHA256):\n    ");
-	for (i = 0; i < SHA256_DIGEST_SIZE; i++) {
+	Print(L"  Fingerprint (SHA1):\n    ");
+	for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
 		Print(L" %02x", hash[i]);
-		if (i % 16 == 15)
+		if (i % 10 == 9)
 			Print(L"\n    ");
 	}
 	Print(L"\n");
