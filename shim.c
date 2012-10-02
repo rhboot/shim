@@ -92,16 +92,6 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 	return efi_status;
 }
 
-static EFI_STATUS delete_variable (CHAR16 *name, EFI_GUID guid)
-{
-	EFI_STATUS efi_status;
-
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, name, &guid,
-				       0, 0, (UINT8 *)NULL);
-
-	return efi_status;
-}
-
 static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	MokListNode *list;
 	int i, remain = DataSize;
@@ -612,7 +602,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		Print(L"MokList is compromised!\nErase all keys in MokList!\n");
-		if (delete_variable(L"MokList", shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokList", &shim_lock_guid) != EFI_SUCCESS) {
 			Print(L"Failed to erase MokList\n");
 		}
 		status = EFI_ACCESS_DENIED;

@@ -39,16 +39,6 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 	return efi_status;
 }
 
-static EFI_STATUS delete_variable (CHAR16 *name, EFI_GUID guid)
-{
-	EFI_STATUS efi_status;
-
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, name, &guid,
-				       0, 0, (UINT8 *)NULL);
-
-	return efi_status;
-}
-
 static EFI_INPUT_KEY get_keystroke (void)
 {
 	EFI_INPUT_KEY key;
@@ -671,12 +661,12 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 error:
 	if (MokNew) {
-		if (delete_variable(L"MokNew", shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
 			Print(L"Failed to delete MokNew\n");
 		}
 		FreePool (MokNew);
 	}
-	delete_variable(L"MokAuth", shim_lock_guid);
+	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 
 	return EFI_SUCCESS;
 }
