@@ -12,33 +12,6 @@ typedef struct {
 	UINT8 *Mok;
 } MokListNode;
 
-static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
-				UINTN *size, void **buffer)
-{
-	EFI_STATUS efi_status;
-	char allocate = !(*size);
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       attributes, size, buffer);
-
-	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate) {
-		return efi_status;
-	}
-
-	if (allocate)
-		*buffer = AllocatePool(*size);
-
-	if (!*buffer) {
-		Print(L"Unable to allocate variable buffer\n");
-		return EFI_OUT_OF_RESOURCES;
-	}
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       attributes, size, *buffer);
-
-	return efi_status;
-}
-
 static EFI_INPUT_KEY get_keystroke (void)
 {
 	EFI_INPUT_KEY key;
@@ -539,19 +512,6 @@ done:
 	return status;
 }
 
-static UINT8 compare_hash (UINT8 *hash1, UINT8 *hash2, UINT32 size)
-{
-	int i;
-
-	for (i = 0; i < size; i++) {
-		if (hash1[i] != hash2[i]) {
-			return 0;
-		}
-	}
-
-	return 1;
-}
-
 static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -592,7 +552,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 			return efi_status;
 		}
 
-		if (!compare_hash(auth, hash, SHA256_DIGEST_SIZE)) {
+		if (CompareMem(auth, hash, SHA256_DIGEST_SIZE) != 0) {
 			Print(L"Password doesn't match\n");
 			fail_count++;
 		} else {
@@ -623,13 +583,12 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	UINTN MokNewSize = 0;
 	void *MokNew = NULL;
-	UINT32 attributes, MokNum;
+	UINT32 MokNum;
 	UINT8 confirmed;
 
-	efi_status = get_variable(L"MokNew", shim_lock_guid, &attributes,
-				  &MokNewSize, &MokNew);
+	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
-	if (efi_status != EFI_SUCCESS || MokNewSize < sizeof(UINT32)) {
+	if (MokNew == NULL || MokNewSize < sizeof(UINT32)) {
 		goto error;
 	}
 
