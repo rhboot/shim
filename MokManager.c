@@ -453,7 +453,6 @@ static UINT8 get_password (UINT32 *length, CHAR16 *password)
 		if (count == 0 && key.UnicodeChar == CHAR_BACKSPACE) {
 			continue;
 		} else if (key.UnicodeChar == CHAR_BACKSPACE) {
-			Print(L"%c", CHAR_BACKSPACE);
 			input[--count] = '\0';
 			continue;
 		}
