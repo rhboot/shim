@@ -392,57 +392,15 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 	return 1;
 }
 
-static UINT8 mok_enrollment_prompt (void *MokNew, UINTN MokNewSize)
+static UINT8 get_line (UINT32 *length, CHAR16 *line, UINT32 line_max, UINT8 show)
 {
 	EFI_INPUT_KEY key;
-
-	do {
-		if (!list_keys(MokNew, MokNewSize)) {
-			return 0;
-		}
-
-		Print(L"Enroll the key(s) or list the key(s) again? (y/n/l): ");
-
-		key = get_keystroke();
-		Print(L"%c\n", key.UnicodeChar);
-
-		if (key.UnicodeChar == 'Y' || key.UnicodeChar == 'y') {
-			return 1;
-		}
-	} while (key.UnicodeChar == 'L' || key.UnicodeChar == 'l');
-
-	Print(L"Abort\n");
-
-	return 0;
-}
-
-static UINT8 mok_deletion_prompt () {
-	EFI_INPUT_KEY key;
-
-	Print(L"Erase all stored keys? (y/N): ");
-
-	key = get_keystroke();
-	Print(L"%c\n", key.UnicodeChar);
-
-	if (key.UnicodeChar == 'Y' || key.UnicodeChar == 'y') {
-		return 1;
-	}
-
-	Print(L"Abort\n");
-
-	return 0;
-}
-
-static UINT8 get_password (UINT32 *length, CHAR16 *password)
-{
-	EFI_INPUT_KEY key;
-	CHAR16 input[PASSWORD_MAX];
 	int count = 0;
 
 	do {
 		key = get_keystroke();
 
-		if ((count >= PASSWORD_MAX &&
+		if ((count >= line_max &&
 		     key.UnicodeChar != CHAR_BACKSPACE) ||
 		    key.UnicodeChar == CHAR_NULL ||
 		    key.UnicodeChar == CHAR_TAB  ||
@@ -454,18 +412,65 @@ static UINT8 get_password (UINT32 *length, CHAR16 *password)
 		if (count == 0 && key.UnicodeChar == CHAR_BACKSPACE) {
 			continue;
 		} else if (key.UnicodeChar == CHAR_BACKSPACE) {
-			input[--count] = '\0';
+			if (show) {
+				Print(L"\b");
+			}
+			line[--count] = '\0';
 			continue;
 		}
 
-		input[count++] = key.UnicodeChar;
+		if (show) {
+			Print(L"%c", key.UnicodeChar);
+		}
+
+		line[count++] = key.UnicodeChar;
 	} while (key.UnicodeChar != CHAR_CARRIAGE_RETURN);
 	Print(L"\n");
 
 	*length = count;
-	CopyMem(password, input, count * sizeof(CHAR16));
 
 	return 1;
+}
+
+static UINT8 mok_enrollment_prompt (void *MokNew, UINTN MokNewSize)
+{
+	CHAR16 line[1];
+	UINT32 length;
+
+	do {
+		if (!list_keys(MokNew, MokNewSize)) {
+			return 0;
+		}
+
+		Print(L"Enroll the key(s)? (y/n): ");
+
+		get_line (&length, line, 1, 1);
+
+		if (line[0] == 'Y' || line[0] == 'y') {
+			return 1;
+		}
+	} while (line[0] != 'N' && line[0] != 'n');
+
+	Print(L"Abort\n");
+
+	return 0;
+}
+
+static UINT8 mok_deletion_prompt () {
+	CHAR16 line[1];
+	UINT32 length;
+
+	Print(L"Erase all stored keys? (y/N): ");
+
+	get_line (&length, line, 1, 1);
+
+	if (line[0] == 'Y' || line[0] == 'y') {
+		return 1;
+	}
+
+	Print(L"Abort\n");
+
+	return 0;
 }
 
 static EFI_STATUS compute_pw_hash (void *MokNew, UINTN MokNewSize, CHAR16 *password,
@@ -538,7 +543,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	while (fail_count < 3) {
 		Print(L"Password(%d-%d characters): ",
 		      PASSWORD_MIN, PASSWORD_MAX);
-		get_password(&pw_length, password);
+		get_line(&pw_length, password, PASSWORD_MAX, 0);
 
 		if (pw_length < 8) {
 			Print(L"At least %d characters for the password\n",
