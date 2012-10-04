@@ -368,6 +368,7 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 		Print(L"%d key(s) in the new key list\n\n", MokNum);
 
 		if (key_num > MokNum) {
+			Print(L"[Key %d]\n", key_num);
 			Print(L"No such key\n\n");
 		} else if (initial != 1){
 			Print(L"[Key %d]\n", key_num);
