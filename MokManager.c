@@ -370,7 +370,7 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 		if (key_num > MokNum) {
 			Print(L"[Key %d]\n", key_num);
 			Print(L"No such key\n\n");
-		} else if (initial != 1){
+		} else if (initial != 1 && key_num > 0){
 			Print(L"[Key %d]\n", key_num);
 			show_mok_info(keys[key_num-1].Mok, keys[key_num-1].MokSize);
 		}
