@@ -7,6 +7,14 @@
 #define PASSWORD_MAX 16
 #define PASSWORD_MIN 8
 
+struct menu_item {
+	CHAR16 *text;
+	UINTN (* callback)(void *data, void *data2);
+	void *data;
+	void *data2;
+	UINTN colour;
+};
+
 typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
@@ -282,7 +290,8 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		show_x509_info(X509Cert);
 		X509_free(X509Cert);
 	} else {
-		Print(L"  Not a valid X509 certificate\n\n");
+		Print(L"  Not a valid X509 certificate: %x\n\n",
+		      ((UINT32 *)Mok)[0]);
 		return;
 	}
 
@@ -432,47 +441,6 @@ static UINT8 get_line (UINT32 *length, CHAR16 *line, UINT32 line_max, UINT8 show
 	return 1;
 }
 
-static UINT8 mok_enrollment_prompt (void *MokNew, UINTN MokNewSize)
-{
-	CHAR16 line[1];
-	UINT32 length;
-
-	do {
-		if (!list_keys(MokNew, MokNewSize)) {
-			return 0;
-		}
-
-		Print(L"Enroll the key(s)? (y/n): ");
-
-		get_line (&length, line, 1, 1);
-
-		if (line[0] == 'Y' || line[0] == 'y') {
-			return 1;
-		}
-	} while (line[0] != 'N' && line[0] != 'n');
-
-	Print(L"Abort\n");
-
-	return 0;
-}
-
-static UINT8 mok_deletion_prompt () {
-	CHAR16 line[1];
-	UINT32 length;
-
-	Print(L"Erase all stored keys? (y/N): ");
-
-	get_line (&length, line, 1, 1);
-
-	if (line[0] == 'Y' || line[0] == 'y') {
-		return 1;
-	}
-
-	Print(L"Abort\n");
-
-	return 0;
-}
-
 static EFI_STATUS compute_pw_hash (void *MokNew, UINTN MokNewSize, CHAR16 *password,
 			     UINT32 pw_length, UINT8 *hash)
 {
@@ -582,14 +550,482 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	return EFI_SUCCESS;
 }
 
+static UINTN mok_enrollment_prompt (void *MokNew, void *data2) {
+	CHAR16 line[1];
+	UINT32 length;
+	UINTN MokNewSize = (UINTN)data2;
+	EFI_STATUS efi_status;
+
+	do {
+		if (!list_keys(MokNew, MokNewSize)) {
+			return 0;
+		}
+
+		Print(L"Enroll the key(s)? (y/n): ");
+
+		get_line (&length, line, 1, 1);
+
+		if (line[0] == 'Y' || line[0] == 'y') {
+			efi_status = store_keys(MokNew, MokNewSize);
+
+			if (efi_status != EFI_SUCCESS) {
+				Print(L"Failed to enroll keys\n");
+				return -1;
+			}
+			return 0;
+		}
+	} while (line[0] != 'N' && line[0] != 'n');
+	return -1;
+}
+
+static UINTN mok_deletion_prompt (void *MokNew, void *data2) {
+	CHAR16 line[1];
+	UINT32 length;
+	EFI_STATUS efi_status;
+
+	Print(L"Erase all stored keys? (y/N): ");
+
+	get_line (&length, line, 1, 1);
+
+	if (line[0] == 'Y' || line[0] == 'y') {
+		efi_status = store_keys(MokNew, sizeof(UINT32));
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to erase keys\n");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+void draw_menu (struct menu_item *items, UINTN count) {
+	UINTN i;
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	for (i = 0; i < count; i++) {
+		uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+				  items[i].colour | EFI_BACKGROUND_BLACK);
+		Print(L"  %s\n", items[i].text);
+	}
+
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 0);
+	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, TRUE);
+}
+
+void run_menu (struct menu_item *items, UINTN count) {
+	UINTN index, pos = 0;
+	EFI_INPUT_KEY key;
+
+	draw_menu (items, count);
+
+	while (1) {
+		uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
+				  0, pos);
+		uefi_call_wrapper(BS->WaitForEvent, 3, 1,
+				  &ST->ConIn->WaitForKey, &index);
+		uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn,
+				  &key);
+
+		switch(key.ScanCode) {
+		case SCAN_UP:
+			if (pos == 0)
+				continue;
+			pos--;
+			continue;
+			break;
+		case SCAN_DOWN:
+			if (pos == (count - 1))
+				continue;
+			pos++;
+			continue;
+			break;
+		}
+
+		switch(key.UnicodeChar) {
+		case CHAR_LINEFEED:
+		case CHAR_CARRIAGE_RETURN:
+			if (items[pos].callback == NULL)
+				return;
+
+			items[pos].callback(items[pos].data, items[pos].data2);
+			draw_menu (items, count);
+			pos = 0;
+			break;
+		}
+	}
+}
+
+UINTN file_callback (void *data, void *data2) {
+	EFI_FILE_INFO *buffer = NULL;
+	UINTN buffersize = 0, readsize;
+	EFI_STATUS status;
+	EFI_FILE *file;
+	CHAR16 *filename = data;
+	EFI_FILE *parent = data2;
+	EFI_GUID file_info_guid = EFI_FILE_INFO_ID;
+	void *mokbuffer = NULL;
+	void *filebuffer;
+
+	status = uefi_call_wrapper(parent->Open, 5, parent, &file, filename,
+				   EFI_FILE_MODE_READ, 0);
+
+	if (status != EFI_SUCCESS)
+		return 1;
+
+	status = uefi_call_wrapper(file->GetInfo, 4, file, &file_info_guid,
+				   &buffersize, buffer);
+
+	if (status == EFI_BUFFER_TOO_SMALL) {
+		buffer = AllocatePool(buffersize);
+		status = uefi_call_wrapper(file->GetInfo, 4, file,
+					   &file_info_guid, &buffersize,
+					   buffer);
+	}
+
+	if (!buffer)
+		return 0;
+
+	readsize = buffer->FileSize;
+
+	mokbuffer = AllocateZeroPool(readsize + (2 * sizeof(UINT32)));
+	if (!mokbuffer)
+		goto out;
+
+	((UINT32 *)mokbuffer)[0] = 1;
+	((UINT32 *)mokbuffer)[1] = readsize;
+	filebuffer = (UINT32 *)mokbuffer + 2;
+
+	status = uefi_call_wrapper(file->Read, 3, file, &readsize, filebuffer);
+
+	if (status != EFI_SUCCESS)
+		goto out;
+
+	mok_enrollment_prompt(mokbuffer,
+			      (void *)buffer->FileSize + (2 * sizeof(UINT32)));
+out:
+	if (buffer)
+		FreePool(buffer);
+
+	if (mokbuffer)
+		FreePool(mokbuffer);
+
+	return 0;
+}
+
+UINTN directory_callback (void *data, void *data2) {
+	EFI_FILE_INFO *buffer = NULL;
+	UINTN buffersize = 0;
+	EFI_STATUS status;
+	UINTN dircount = 0, i = 0;
+	struct menu_item *dircontent;
+	EFI_FILE *dir;
+	CHAR16 *filename = data;
+	EFI_FILE *root = data2;
+
+	status = uefi_call_wrapper(root->Open, 5, root, &dir, filename,
+				   EFI_FILE_MODE_READ, 0);
+
+	if (status != EFI_SUCCESS)
+		return 1;
+
+	while (1) {
+		status = uefi_call_wrapper(dir->Read, 3, dir, &buffersize,
+					   buffer);
+
+		if (status == EFI_BUFFER_TOO_SMALL) {
+			buffer = AllocatePool(buffersize);
+			status = uefi_call_wrapper(dir->Read, 3, dir,
+						   &buffersize, buffer);
+		}
+
+		if (status != EFI_SUCCESS)
+			return 1;
+
+		if (!buffersize)
+			break;
+
+		if ((StrCmp(buffer->FileName, L".") == 0) ||
+		    (StrCmp(buffer->FileName, L"..") == 0))
+			continue;
+
+		dircount++;
+
+		FreePool(buffer);
+		buffersize = 0;
+	}
+
+	dircount++;
+
+	dircontent = AllocatePool(sizeof(struct menu_item) * dircount);
+
+	dircontent[0].text = StrDuplicate(L"..");
+	dircontent[0].callback = NULL;
+	dircontent[0].colour = EFI_YELLOW;
+	i++;
+
+	uefi_call_wrapper(dir->SetPosition, 2, dir, 0);
+
+	while (1) {
+		status = uefi_call_wrapper(dir->Read, 3, dir, &buffersize,
+					   buffer);
+
+		if (status == EFI_BUFFER_TOO_SMALL) {
+			buffer = AllocatePool(buffersize);
+			status = uefi_call_wrapper(dir->Read, 3, dir,
+						   &buffersize, buffer);
+		}
+
+		if (status != EFI_SUCCESS)
+			return 1;
+
+		if (!buffersize)
+			break;
+
+		if ((StrCmp(buffer->FileName, L".") == 0) ||
+		    (StrCmp(buffer->FileName, L"..") == 0))
+			continue;
+
+		if (buffer->Attribute & EFI_FILE_DIRECTORY) {
+			dircontent[i].text = StrDuplicate(buffer->FileName);
+			dircontent[i].callback = directory_callback;
+			dircontent[i].data = dircontent[i].text;
+			dircontent[i].data2 = dir;
+			dircontent[i].colour = EFI_YELLOW;
+		} else {
+			dircontent[i].text = StrDuplicate(buffer->FileName);
+			dircontent[i].callback = file_callback;
+			dircontent[i].data = dircontent[i].text;
+			dircontent[i].data2 = dir;
+			dircontent[i].colour = EFI_WHITE;
+		}
+
+		i++;
+		FreePool(buffer);
+		buffersize = 0;
+		buffer = NULL;
+	}
+
+	run_menu(dircontent, dircount);
+
+	return 0;
+}
+
+UINTN filesystem_callback (void *data, void *data2) {
+	EFI_FILE_INFO *buffer = NULL;
+	UINTN buffersize = 0;
+	EFI_STATUS status;
+	UINTN dircount = 0, i = 0;
+	struct menu_item *dircontent;
+	EFI_FILE *root = data;
+	EFI_FILE *parent = data2;
+
+	uefi_call_wrapper(root->SetPosition, 2, root, 0);
+
+	while (1) {
+		status = uefi_call_wrapper(root->Read, 3, root, &buffersize,
+					   buffer);
+
+		if (status == EFI_BUFFER_TOO_SMALL) {
+			buffer = AllocatePool(buffersize);
+			status = uefi_call_wrapper(root->Read, 3, root,
+						   &buffersize, buffer);
+		}
+
+		if (status != EFI_SUCCESS)
+			return 1;
+
+		if (!buffersize)
+			break;
+
+		if ((StrCmp(buffer->FileName, L".") == 0) ||
+		    (StrCmp(buffer->FileName, L"..") == 0))
+			continue;
+
+		dircount++;
+
+		FreePool(buffer);
+		buffersize = 0;
+	}
+
+	if (parent)
+		dircount++;
+
+	dircontent = AllocatePool(sizeof(struct menu_item) * dircount);
+
+	dircontent[0].text = StrDuplicate(L"Return to filesystem list");
+	dircontent[0].callback = NULL;
+	dircontent[0].colour = EFI_YELLOW;
+	i++;
+
+	uefi_call_wrapper(root->SetPosition, 2, root, 0);
+
+	while (1) {
+		status = uefi_call_wrapper(root->Read, 3, root, &buffersize,
+					   buffer);
+
+		if (status == EFI_BUFFER_TOO_SMALL) {
+			buffer = AllocatePool(buffersize);
+			status = uefi_call_wrapper(root->Read, 3, root,
+						   &buffersize, buffer);
+		}
+
+		if (status != EFI_SUCCESS)
+			return 1;
+
+		if (!buffersize)
+			break;
+
+		if ((StrCmp(buffer->FileName, L".") == 0) ||
+		    (StrCmp(buffer->FileName, L"..") == 0))
+			continue;
+
+		if (buffer->Attribute & EFI_FILE_DIRECTORY) {
+			dircontent[i].text = StrDuplicate(buffer->FileName);
+			dircontent[i].callback = directory_callback;
+			dircontent[i].data = dircontent[i].text;
+			dircontent[i].data2 = root;
+			dircontent[i].colour = EFI_YELLOW;
+		} else {
+			dircontent[i].text = StrDuplicate(buffer->FileName);
+			dircontent[i].callback = file_callback;
+			dircontent[i].data = dircontent[i].text;
+			dircontent[i].data2 = root;
+			dircontent[i].colour = EFI_WHITE;
+		}
+
+		i++;
+		FreePool(buffer);
+		buffer = NULL;
+		buffersize = 0;
+	}
+
+	run_menu(dircontent, dircount);
+
+	return 0;
+}
+
+UINTN find_fs (void *data, void *data2) {
+	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
+	UINTN count, i;
+	EFI_HANDLE **filesystem_handles;
+	struct menu_item *filesystems;
+
+	uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &fs_guid,
+			  NULL, &count, &filesystem_handles);
+
+	if (!count || !filesystem_handles) {
+		Print(L"No filesystems?\n");
+		return 1;
+	}
+
+	count++;
+
+	filesystems = AllocatePool(sizeof(struct menu_item) * count);
+
+	filesystems[0].text = StrDuplicate(L"Exit");
+	filesystems[0].callback = NULL;
+	filesystems[0].colour = EFI_YELLOW;
+
+	for (i=1; i<count; i++) {
+		EFI_HANDLE *fs = filesystem_handles[i-1];
+		EFI_FILE_IO_INTERFACE *fs_interface;
+		EFI_DEVICE_PATH *path;
+		EFI_FILE *root;
+		EFI_STATUS status;
+		CHAR16 *VolumeLabel = NULL;
+		EFI_FILE_SYSTEM_INFO *buffer = NULL;
+		UINTN buffersize = 0;
+		EFI_GUID file_info_guid = EFI_FILE_INFO_ID;
+
+		status = uefi_call_wrapper(BS->HandleProtocol, 3, fs, &fs_guid,
+					   &fs_interface);
+
+		if (status != EFI_SUCCESS || !fs_interface)
+			continue;
+
+		path = DevicePathFromHandle(fs);
+
+		status = uefi_call_wrapper(fs_interface->OpenVolume, 2,
+					   fs_interface, &root);
+
+		if (status != EFI_SUCCESS || !root)
+			continue;
+
+		status = uefi_call_wrapper(root->GetInfo, 4, root,
+					   &file_info_guid, &buffersize,
+					   buffer);
+
+		if (status == EFI_BUFFER_TOO_SMALL) {
+			buffer = AllocatePool(buffersize);
+			status = uefi_call_wrapper(root->GetInfo, 4, root,
+						   &file_info_guid,
+						   &buffersize, buffer);
+		}
+
+		if (status == EFI_SUCCESS)
+			VolumeLabel = buffer->VolumeLabel;
+
+		if (path)
+			filesystems[i].text = DevicePathToStr(path);
+		else
+			filesystems[i].text = StrDuplicate(L"Unknown device\n");
+		if (VolumeLabel)
+			StrCat(filesystems[i].text, VolumeLabel);
+
+		if (buffersize)
+			FreePool(buffer);
+
+		filesystems[i].data = root;
+		filesystems[i].data2 = NULL;
+		filesystems[i].callback = filesystem_callback;
+		filesystems[i].colour = EFI_YELLOW;
+	}
+
+	uefi_call_wrapper(BS->FreePool, 1, filesystem_handles);
+
+	run_menu(filesystems, count);
+
+	return 0;
+}
+
+static int enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
+{
+	struct menu_item menu_item[3];
+	UINT32 MokNum;
+
+	menu_item[0].text = StrDuplicate(L"Continue boot");
+	menu_item[0].colour = EFI_WHITE;
+	menu_item[0].callback = NULL;
+
+	CopyMem(&MokNum, MokNew, sizeof(UINT32));
+	if (MokNum == 0) {
+		menu_item[1].text = StrDuplicate(L"Delete MOK");
+		menu_item[1].colour = EFI_WHITE;
+		menu_item[1].data = MokNew;
+		menu_item[1].callback = mok_deletion_prompt;
+	} else {
+		menu_item[1].text = StrDuplicate(L"Enroll MOK\n");
+		menu_item[1].colour = EFI_WHITE;
+		menu_item[1].data = MokNew;
+		menu_item[1].callback = mok_enrollment_prompt;
+	}
+
+	menu_item[2].text = StrDuplicate(L"Enroll key from disk");
+	menu_item[2].colour = EFI_WHITE;
+	menu_item[2].callback = find_fs;
+
+	run_menu(menu_item, 3);
+
+	return 0;
+}
+
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	EFI_STATUS efi_status;
 	UINTN MokNewSize = 0;
 	void *MokNew = NULL;
-	UINT32 MokNum;
-	UINT8 confirmed;
 
 	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
@@ -597,32 +1033,8 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		goto error;
 	}
 
-	CopyMem(&MokNum, MokNew, sizeof(UINT32));
-	if (MokNum == 0) {
-		confirmed = mok_deletion_prompt();
+	enter_mok_menu(image_handle, MokNew);
 
-		if (!confirmed)
-			goto error;
-
-		efi_status = store_keys(MokNew, sizeof(UINT32));
-
-		if (efi_status != EFI_SUCCESS) {
-			Print(L"Failed to erase keys\n");
-			goto error;
-		}
-	} else {
-		confirmed = mok_enrollment_prompt(MokNew, MokNewSize);
-
-		if (!confirmed)
-			goto error;
-
-		efi_status = store_keys(MokNew, MokNewSize);
-
-		if (efi_status != EFI_SUCCESS) {
-			Print(L"Failed to enroll MOK\n");
-			goto error;
-		}
-	}
 error:
 	if (MokNew) {
 		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
