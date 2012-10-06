@@ -599,7 +599,7 @@ static UINTN mok_deletion_prompt (void *MokNew, void *data2) {
 	return 0;
 }
 
-void draw_menu (struct menu_item *items, UINTN count) {
+static void draw_menu (struct menu_item *items, UINTN count) {
 	UINTN i;
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
@@ -614,7 +614,18 @@ void draw_menu (struct menu_item *items, UINTN count) {
 	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, TRUE);
 }
 
-void run_menu (struct menu_item *items, UINTN count) {
+static void free_menu (struct menu_item *items, UINTN count) {
+	UINTN i;
+
+	for (i=0; i<count; i++) {
+		if (items[i].text)
+			FreePool(items[i].text);
+	}
+
+	FreePool(items);
+}
+
+static void run_menu (struct menu_item *items, UINTN count) {
 	UINTN index, pos = 0;
 	EFI_INPUT_KEY key;
 
@@ -646,8 +657,10 @@ void run_menu (struct menu_item *items, UINTN count) {
 		switch(key.UnicodeChar) {
 		case CHAR_LINEFEED:
 		case CHAR_CARRIAGE_RETURN:
-			if (items[pos].callback == NULL)
+			if (items[pos].callback == NULL) {
+				free_menu(items, count);
 				return;
+			}
 
 			items[pos].callback(items[pos].data, items[pos].data2);
 			draw_menu (items, count);
@@ -657,7 +670,7 @@ void run_menu (struct menu_item *items, UINTN count) {
 	}
 }
 
-UINTN file_callback (void *data, void *data2) {
+static UINTN file_callback (void *data, void *data2) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0, readsize;
 	EFI_STATUS status;
@@ -714,7 +727,7 @@ out:
 	return 0;
 }
 
-UINTN directory_callback (void *data, void *data2) {
+static UINTN directory_callback (void *data, void *data2) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0;
 	EFI_STATUS status;
@@ -812,7 +825,7 @@ UINTN directory_callback (void *data, void *data2) {
 	return 0;
 }
 
-UINTN filesystem_callback (void *data, void *data2) {
+static UINTN filesystem_callback (void *data, void *data2) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0;
 	EFI_STATUS status;
@@ -906,7 +919,7 @@ UINTN filesystem_callback (void *data, void *data2) {
 	return 0;
 }
 
-UINTN find_fs (void *data, void *data2) {
+static UINTN find_fs (void *data, void *data2) {
 	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	UINTN count, i;
 	EFI_HANDLE **filesystem_handles;
@@ -997,9 +1010,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
 	UINTN menucount = 0;
 
 	if (MokNew)
-		menu_item = AllocatePool(sizeof(struct menu_item) * 3);
+		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 3);
 	else
-		menu_item = AllocatePool(sizeof(struct menu_item) * 2);
+		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 2);
 
 	if (!menu_item)
 		return EFI_OUT_OF_RESOURCES;
