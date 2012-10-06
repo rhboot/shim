@@ -990,33 +990,47 @@ UINTN find_fs (void *data, void *data2) {
 	return 0;
 }
 
-static int enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
+static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
 {
-	struct menu_item menu_item[3];
+	struct menu_item *menu_item;
 	UINT32 MokNum;
+	UINTN menucount = 0;
+
+	if (MokNew)
+		menu_item = AllocatePool(sizeof(struct menu_item) * 3);
+	else
+		menu_item = AllocatePool(sizeof(struct menu_item) * 2);
+
+	if (!menu_item)
+		return EFI_OUT_OF_RESOURCES;
 
 	menu_item[0].text = StrDuplicate(L"Continue boot");
 	menu_item[0].colour = EFI_WHITE;
 	menu_item[0].callback = NULL;
 
-	CopyMem(&MokNum, MokNew, sizeof(UINT32));
-	if (MokNum == 0) {
-		menu_item[1].text = StrDuplicate(L"Delete MOK");
-		menu_item[1].colour = EFI_WHITE;
-		menu_item[1].data = MokNew;
-		menu_item[1].callback = mok_deletion_prompt;
-	} else {
-		menu_item[1].text = StrDuplicate(L"Enroll MOK\n");
-		menu_item[1].colour = EFI_WHITE;
-		menu_item[1].data = MokNew;
-		menu_item[1].callback = mok_enrollment_prompt;
+	menucount++;
+
+	if (MokNew) {
+		CopyMem(&MokNum, MokNew, sizeof(UINT32));
+		if (MokNum == 0) {
+			menu_item[1].text = StrDuplicate(L"Delete MOK");
+			menu_item[1].colour = EFI_WHITE;
+			menu_item[1].data = MokNew;
+			menu_item[1].callback = mok_deletion_prompt;
+		} else {
+			menu_item[1].text = StrDuplicate(L"Enroll MOK\n");
+			menu_item[1].colour = EFI_WHITE;
+			menu_item[1].data = MokNew;
+			menu_item[1].callback = mok_enrollment_prompt;
+		}
+		menucount++;
 	}
 
-	menu_item[2].text = StrDuplicate(L"Enroll key from disk");
-	menu_item[2].colour = EFI_WHITE;
-	menu_item[2].callback = find_fs;
+	menu_item[menucount].text = StrDuplicate(L"Enroll key from disk");
+	menu_item[menucount].colour = EFI_WHITE;
+	menu_item[menucount].callback = find_fs;
 
-	run_menu(menu_item, 3);
+	run_menu(menu_item, menucount);
 
 	return 0;
 }
