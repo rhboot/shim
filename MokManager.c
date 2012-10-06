@@ -617,12 +617,14 @@ static void draw_menu (struct menu_item *items, UINTN count) {
 static void free_menu (struct menu_item *items, UINTN count) {
 	UINTN i;
 
+#if 0
 	for (i=0; i<count; i++) {
 		if (items[i].text)
 			FreePool(items[i].text);
 	}
 
 	FreePool(items);
+#endif
 }
 
 static void run_menu (struct menu_item *items, UINTN count) {
