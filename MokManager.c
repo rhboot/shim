@@ -1043,6 +1043,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
 	menu_item[menucount].colour = EFI_WHITE;
 	menu_item[menucount].callback = find_fs;
 
+	menucount++;
+
 	run_menu(menu_item, menucount);
 
 	return 0;
