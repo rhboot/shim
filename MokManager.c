@@ -1029,13 +1029,8 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
-	if (MokNew == NULL || MokNewSize < sizeof(UINT32)) {
-		goto error;
-	}
-
 	enter_mok_menu(image_handle, MokNew);
 
-error:
 	if (MokNew) {
 		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
 			Print(L"Failed to delete MokNew\n");
