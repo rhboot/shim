@@ -1019,8 +1019,10 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	efi_status = start_image(image_handle, SECOND_STAGE);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to start grub\n");
-		goto done;
+		if (efi_status == EFI_ACCESS_DENIED)
+			efi_status = start_image(image_handle, MOK_MANAGER);
+		else
+			Print(L"Failed to start grub\n");
 	}
 done:
 
