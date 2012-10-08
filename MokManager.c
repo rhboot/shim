@@ -678,6 +678,7 @@ static void run_menu (struct menu_item *items, UINTN count) {
 }
 
 static UINTN file_callback (void *data, void *data2) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0, readsize;
 	EFI_STATUS status;
@@ -685,8 +686,12 @@ static UINTN file_callback (void *data, void *data2) {
 	CHAR16 *filename = data;
 	EFI_FILE *parent = data2;
 	EFI_GUID file_info_guid = EFI_FILE_INFO_ID;
-	void *mokbuffer = NULL;
-	void *filebuffer;
+	void *mokbuffer = NULL, *mok;
+	UINTN MokSize = 0, MokNewSize;
+	MokListNode *MokNew;
+	int i;
+
+	mok = LibGetVariableAndSize(L"MokList", &shim_lock_guid, &MokSize);
 
 	status = uefi_call_wrapper(parent->Open, 5, parent, &file, filename,
 				   EFI_FILE_MODE_READ, 0);
@@ -709,21 +714,34 @@ static UINTN file_callback (void *data, void *data2) {
 
 	readsize = buffer->FileSize;
 
-	mokbuffer = AllocateZeroPool(readsize + (2 * sizeof(UINT32)));
-	if (!mokbuffer)
-		goto out;
+	if (mok) {
+		MokNewSize = MokSize + readsize + sizeof(UINT32);
+		mokbuffer = AllocateZeroPool(MokNewSize);					     
 
-	((UINT32 *)mokbuffer)[0] = 1;
-	((UINT32 *)mokbuffer)[1] = readsize;
-	filebuffer = (UINT32 *)mokbuffer + 2;
+		if (!mokbuffer)
+			goto out;
 
-	status = uefi_call_wrapper(file->Read, 3, file, &readsize, filebuffer);
+		CopyMem(mokbuffer, mok, MokSize);
+		((UINT32 *)mokbuffer)[0]++;
+		MokNew = (MokListNode *)(((char *)mokbuffer) + MokSize);
+	} else {
+		MokNewSize = readsize + (2 * sizeof(UINT32));
+		mokbuffer = AllocateZeroPool(MokNewSize);
+
+		if (!mokbuffer)
+			goto out;
+		((UINT32 *)mokbuffer)[0]=1;
+		MokNew = (MokListNode *)(((UINT32 *)mokbuffer) + 1);
+	}
+
+	MokNew->MokSize = readsize;
+
+	status = uefi_call_wrapper(file->Read, 3, file, &readsize, &MokNew->Mok);
 
 	if (status != EFI_SUCCESS)
 		goto out;
 
-	mok_enrollment_prompt(mokbuffer,
-			      (void *)buffer->FileSize + (2 * sizeof(UINT32)));
+	mok_enrollment_prompt(mokbuffer, MokNewSize, FALSE);
 out:
 	if (buffer)
 		FreePool(buffer);
