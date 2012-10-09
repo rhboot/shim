@@ -9,7 +9,7 @@
 
 struct menu_item {
 	CHAR16 *text;
-	UINTN (* callback)(void *data, void *data2);
+	INTN (* callback)(void *data, void *data2);
 	void *data;
 	void *data2;
 	UINTN colour;
@@ -579,11 +579,11 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 	return -1;
 }
 
-static UINTN mok_enrollment_prompt_callback (void *MokNew, void *data2) {
+static INTN mok_enrollment_prompt_callback (void *MokNew, void *data2) {
 	return mok_enrollment_prompt(MokNew, (UINTN)data2, TRUE);
 }
 
-static UINTN mok_deletion_prompt (void *MokNew, void *data2) {
+static INTN mok_deletion_prompt (void *MokNew, void *data2) {
 	CHAR16 line[1];
 	UINT32 length;
 	EFI_STATUS efi_status;
@@ -677,7 +677,7 @@ static void run_menu (struct menu_item *items, UINTN count) {
 	}
 }
 
-static UINTN file_callback (void *data, void *data2) {
+static INTN file_callback (void *data, void *data2) {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0, readsize;
@@ -751,7 +751,7 @@ out:
 	return 0;
 }
 
-static UINTN directory_callback (void *data, void *data2) {
+static INTN directory_callback (void *data, void *data2) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0;
 	EFI_STATUS status;
@@ -849,7 +849,7 @@ static UINTN directory_callback (void *data, void *data2) {
 	return 0;
 }
 
-static UINTN filesystem_callback (void *data, void *data2) {
+static INTN filesystem_callback (void *data, void *data2) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0;
 	EFI_STATUS status;
@@ -941,7 +941,7 @@ static UINTN filesystem_callback (void *data, void *data2) {
 	return 0;
 }
 
-static UINTN find_fs (void *data, void *data2) {
+static INTN find_fs (void *data, void *data2) {
 	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	UINTN count, i;
 	EFI_HANDLE **filesystem_handles;
