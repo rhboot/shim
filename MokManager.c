@@ -689,7 +689,6 @@ static UINTN file_callback (void *data, void *data2) {
 	void *mokbuffer = NULL, *mok;
 	UINTN MokSize = 0, MokNewSize;
 	MokListNode *MokNew;
-	int i;
 
 	mok = LibGetVariableAndSize(L"MokList", &shim_lock_guid, &MokSize);
 
