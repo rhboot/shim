@@ -18,7 +18,7 @@ struct menu_item {
 typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
-} MokListNode;
+} __attribute__ ((packed)) MokListNode;
 
 static EFI_INPUT_KEY get_keystroke (void)
 {
