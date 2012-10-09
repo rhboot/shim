@@ -485,7 +485,7 @@ done:
 	return status;
 }
 
-static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
+static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
@@ -497,44 +497,46 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	UINT32 pw_length;
 	UINT8 fail_count = 0;
 
-	auth_size = SHA256_DIGEST_SIZE;
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
-				       &shim_lock_guid,
-				       &attributes, &auth_size, auth);
+	if (authenticate) {
+		auth_size = SHA256_DIGEST_SIZE;
+		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
+					       &shim_lock_guid,
+					       &attributes, &auth_size, auth);
 
 
-	if (efi_status != EFI_SUCCESS || auth_size != SHA256_DIGEST_SIZE) {
-		Print(L"Failed to get MokAuth %d\n", efi_status);
-		return efi_status;
-	}
-
-	while (fail_count < 3) {
-		Print(L"Password(%d-%d characters): ",
-		      PASSWORD_MIN, PASSWORD_MAX);
-		get_line(&pw_length, password, PASSWORD_MAX, 0);
-
-		if (pw_length < 8) {
-			Print(L"At least %d characters for the password\n",
-			      PASSWORD_MIN);
-		}
-
-		efi_status = compute_pw_hash(MokNew, MokNewSize, password,
-					     pw_length, hash);
-
-		if (efi_status != EFI_SUCCESS) {
+		if (efi_status != EFI_SUCCESS || auth_size != SHA256_DIGEST_SIZE) {
+			Print(L"Failed to get MokAuth %d\n", efi_status);
 			return efi_status;
 		}
 
-		if (CompareMem(auth, hash, SHA256_DIGEST_SIZE) != 0) {
-			Print(L"Password doesn't match\n");
-			fail_count++;
-		} else {
-			break;
-		}
-	}
+		while (fail_count < 3) {
+			Print(L"Password(%d-%d characters): ",
+			      PASSWORD_MIN, PASSWORD_MAX);
+			get_line(&pw_length, password, PASSWORD_MAX, 0);
 
-	if (fail_count >= 3)
-		return EFI_ACCESS_DENIED;
+			if (pw_length < 8) {
+				Print(L"At least %d characters for the password\n",
+				      PASSWORD_MIN);
+			}
+
+			efi_status = compute_pw_hash(MokNew, MokNewSize, password,
+						     pw_length, hash);
+
+			if (efi_status != EFI_SUCCESS) {
+				return efi_status;
+			}
+
+			if (CompareMem(auth, hash, SHA256_DIGEST_SIZE) != 0) {
+				Print(L"Password doesn't match\n");
+				fail_count++;
+			} else {
+				break;
+			}
+		}
+
+		if (fail_count >= 3)
+			return EFI_ACCESS_DENIED;
+	}
 
 	/* Write new MOK */
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
@@ -550,10 +552,9 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize)
 	return EFI_SUCCESS;
 }
 
-static UINTN mok_enrollment_prompt (void *MokNew, void *data2) {
+static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 	CHAR16 line[1];
 	UINT32 length;
-	UINTN MokNewSize = (UINTN)data2;
 	EFI_STATUS efi_status;
 
 	do {
@@ -566,7 +567,7 @@ static UINTN mok_enrollment_prompt (void *MokNew, void *data2) {
 		get_line (&length, line, 1, 1);
 
 		if (line[0] == 'Y' || line[0] == 'y') {
-			efi_status = store_keys(MokNew, MokNewSize);
+			efi_status = store_keys(MokNew, MokNewSize, auth);
 
 			if (efi_status != EFI_SUCCESS) {
 				Print(L"Failed to enroll keys\n");
@@ -576,6 +577,10 @@ static UINTN mok_enrollment_prompt (void *MokNew, void *data2) {
 		}
 	} while (line[0] != 'N' && line[0] != 'n');
 	return -1;
+}
+
+static UINTN mok_enrollment_prompt_callback (void *MokNew, void *data2) {
+	return mok_enrollment_prompt(MokNew, (UINTN)data2, TRUE);
 }
 
 static UINTN mok_deletion_prompt (void *MokNew, void *data2) {
@@ -588,7 +593,7 @@ static UINTN mok_deletion_prompt (void *MokNew, void *data2) {
 	get_line (&length, line, 1, 1);
 
 	if (line[0] == 'Y' || line[0] == 'y') {
-		efi_status = store_keys(MokNew, sizeof(UINT32));
+		efi_status = store_keys(MokNew, sizeof(UINT32), TRUE);
 
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Failed to erase keys\n");
@@ -1036,7 +1041,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
 			menu_item[1].text = StrDuplicate(L"Enroll MOK\n");
 			menu_item[1].colour = EFI_WHITE;
 			menu_item[1].data = MokNew;
-			menu_item[1].callback = mok_enrollment_prompt;
+			menu_item[1].callback = mok_enrollment_prompt_callback;
 		}
 		menucount++;
 	}
