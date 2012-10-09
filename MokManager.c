@@ -857,7 +857,6 @@ static UINTN filesystem_callback (void *data, void *data2) {
 	UINTN dircount = 0, i = 0;
 	struct menu_item *dircontent;
 	EFI_FILE *root = data;
-	EFI_FILE *parent = data2;
 
 	uefi_call_wrapper(root->SetPosition, 2, root, 0);
 
@@ -887,8 +886,7 @@ static UINTN filesystem_callback (void *data, void *data2) {
 		buffersize = 0;
 	}
 
-	if (parent)
-		dircount++;
+	dircount++;
 
 	dircontent = AllocatePool(sizeof(struct menu_item) * dircount);
 
