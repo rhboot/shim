@@ -1104,6 +1104,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 
 	run_menu(menu_item, menucount, 10);
 
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
 	return 0;
 }
 
