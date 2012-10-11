@@ -715,7 +715,7 @@ static INTN file_callback (void *data, void *data2) {
 
 	if (mok) {
 		MokNewSize = MokSize + readsize + sizeof(UINT32);
-		mokbuffer = AllocateZeroPool(MokNewSize);					     
+		mokbuffer = AllocateZeroPool(MokNewSize);
 
 		if (!mokbuffer)
 			goto out;
