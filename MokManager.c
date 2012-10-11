@@ -632,15 +632,48 @@ static void free_menu (struct menu_item *items, UINTN count) {
 #endif
 }
 
-static void run_menu (struct menu_item *items, UINTN count) {
-	UINTN index, pos = 0;
+static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
+	UINTN index, pos = 0, wait = 0;
 	EFI_INPUT_KEY key;
+	EFI_STATUS status;
 
-	draw_menu (items, count);
+	if (timeout)
+		wait = 10000000;
 
 	while (1) {
+		uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+		draw_menu (items, count);
+
+		uefi_call_wrapper(ST->ConOut->SetAttribute, 2,
+				  ST->ConOut,
+				  EFI_WHITE | EFI_BACKGROUND_BLACK);
+
+		if (timeout) {
+			uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3,
+					  ST->ConOut, 0, count + 1);
+			if (timeout > 1)
+				Print(L"Booting in %d seconds\n", timeout);
+			else
+				Print(L"Booting in %d second\n", timeout);
+		}
+
 		uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
 				  0, pos);
+		status = WaitForSingleEvent(ST->ConIn->WaitForKey, wait);
+
+		if (status == EFI_TIMEOUT) {
+			timeout--;
+			if (!timeout) {
+				free_menu(items, count);
+				return;
+			}
+			continue;
+		}
+
+		wait = 0;
+		timeout = 0;
+
 		uefi_call_wrapper(BS->WaitForEvent, 3, 1,
 				  &ST->ConIn->WaitForKey, &index);
 		uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn,
@@ -844,7 +877,7 @@ static INTN directory_callback (void *data, void *data2) {
 		buffer = NULL;
 	}
 
-	run_menu(dircontent, dircount);
+	run_menu(dircontent, dircount, 0);
 
 	return 0;
 }
@@ -936,7 +969,7 @@ static INTN filesystem_callback (void *data, void *data2) {
 		buffersize = 0;
 	}
 
-	run_menu(dircontent, dircount);
+	run_menu(dircontent, dircount, 0);
 
 	return 0;
 }
@@ -1020,7 +1053,7 @@ static INTN find_fs (void *data, void *data2) {
 
 	uefi_call_wrapper(BS->FreePool, 1, filesystem_handles);
 
-	run_menu(filesystems, count);
+	run_menu(filesystems, count, 0);
 
 	return 0;
 }
@@ -1069,7 +1102,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 
 	menucount++;
 
-	run_menu(menu_item, menucount);
+	run_menu(menu_item, menucount, 10);
 
 	return 0;
 }
