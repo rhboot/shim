@@ -1025,7 +1025,8 @@ static INTN find_fs (void *data, void *data2) {
 	return 0;
 }
 
-static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
+static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
+				 UINTN MokNewSize)
 {
 	struct menu_item *menu_item;
 	UINT32 MokNum;
@@ -1056,6 +1057,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew)
 			menu_item[1].text = StrDuplicate(L"Enroll MOK\n");
 			menu_item[1].colour = EFI_WHITE;
 			menu_item[1].data = MokNew;
+			menu_item[1].data2 = (void *)MokNewSize;
 			menu_item[1].callback = mok_enrollment_prompt_callback;
 		}
 		menucount++;
@@ -1080,7 +1082,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
-	enter_mok_menu(image_handle, MokNew);
+	enter_mok_menu(image_handle, MokNew, MokNewSize);
 
 	if (MokNew) {
 		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
