@@ -290,7 +290,8 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
+static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data,
+				  int SignatureSize, EFI_GUID CertType)
 {
 	EFI_STATUS efi_status;
 	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
@@ -301,8 +302,6 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
 	UINT32 attributes;
 	BOOLEAN IsFound = FALSE;
 	void *db;
-	unsigned int SignatureSize = SHA256_DIGEST_SIZE;
-	EFI_GUID CertType = EfiHashSha256Guid;
 
 	efi_status = get_variable(dbname, secure_var, &attributes, &dbsize, &db);
 
@@ -344,21 +343,31 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data)
 	return DATA_NOT_FOUND;
 }
 
-static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
+static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
+				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	if (check_db_hash(L"dbx", hash) == DATA_FOUND)
+	if (check_db_hash(L"db", sha256hash, SHA256_DIGEST_SIZE,
+			  EfiHashSha256Guid) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_cert(L"dbx", cert, hash) == DATA_FOUND)
+	if (check_db_hash(L"db", sha1hash, SHA1_DIGEST_SIZE,
+			  EfiHashSha1Guid) == DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_cert(L"dbx", cert, sha256hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *hash)
+static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
+				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	if (check_db_hash(L"db", hash) == DATA_FOUND)
+	if (check_db_hash(L"db", sha256hash, SHA256_DIGEST_SIZE,
+			  EfiHashSha256Guid) == DATA_FOUND)
 		return EFI_SUCCESS;
-	if (check_db_cert(L"db", cert, hash) == DATA_FOUND)
+	if (check_db_hash(L"db", sha1hash, SHA1_DIGEST_SIZE,
+			  EfiHashSha1Guid) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_cert(L"db", cert, sha256hash) == DATA_FOUND)
 		return EFI_SUCCESS;
 
 	return EFI_ACCESS_DENIED;
@@ -404,9 +413,10 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	unsigned int size = datasize;
-	unsigned int ctxsize;
-	void *ctx = NULL;
-	UINT8 hash[SHA256_DIGEST_SIZE];
+	unsigned int sha256ctxsize, sha1ctxsize;
+	void *sha256ctx = NULL, *sha1ctx = NULL;
+	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	EFI_STATUS status = EFI_ACCESS_DENIED;
 	char *hashbase;
 	unsigned int hashsize;
@@ -437,15 +447,18 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	/* FIXME: Check which kind of hash */
 
-	ctxsize = Sha256GetContextSize();
-	ctx = AllocatePool(ctxsize);
+	sha256ctxsize = Sha256GetContextSize();
+	sha256ctx = AllocatePool(sha256ctxsize);
 
-	if (!ctx) {
+	sha1ctxsize = Sha1GetContextSize();
+	sha1ctx = AllocatePool(sha1ctxsize);
+
+	if (!sha256ctx || !sha1ctx) {
 		Print(L"Unable to allocate memory for hash context\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	if (!Sha256Init(ctx)) {
+	if (!Sha256Init(sha256ctx) || !Sha1Init(sha1ctx)) {
 		Print(L"Unable to initialise hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -456,7 +469,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	hashsize = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum -
 		hashbase;
 
-	if (!(Sha256Update(ctx, hashbase, hashsize))) {
+	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
 		Print(L"Unable to generate hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -467,7 +481,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		sizeof (int);
 	hashsize = (char *)context->SecDir - hashbase;
 
-	if (!(Sha256Update(ctx, hashbase, hashsize))) {
+	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
 		Print(L"Unable to generate hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -478,7 +493,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	hashsize = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders -
 		(int) ((char *) (&context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - data);
 
-	if (!(Sha256Update(ctx, hashbase, hashsize))) {
+	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
 		Print(L"Unable to generate hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -537,7 +553,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			return EFI_INVALID_PARAMETER;
 		}
 
-		if (!(Sha256Update(ctx, hashbase, hashsize))) {
+		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
 			Print(L"Unable to generate hash\n");
 			status = EFI_OUT_OF_RESOURCES;
 			goto done;
@@ -553,20 +570,22 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
 			SumOfBytesHashed);
 
-		if (!(Sha256Update(ctx, hashbase, hashsize))) {
+		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
 			Print(L"Unable to generate hash\n");
 			status = EFI_OUT_OF_RESOURCES;
 			goto done;
 		}
 	}
 
-	if (!(Sha256Final(ctx, hash))) {
+	if (!(Sha256Final(sha256ctx, sha256hash)) ||
+	    !(Sha1Final(sha1ctx, sha1hash))) {
 		Print(L"Unable to finalise hash\n");
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
-	status = check_blacklist(cert, hash);
+	status = check_blacklist(cert, sha256hash, sha1hash);
 
 	if (status != EFI_SUCCESS) {
 		Print(L"Binary is blacklisted\n");
@@ -574,7 +593,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	}
 
 	if (whitelist) {
-		status = check_whitelist(cert, hash);
+		status = check_whitelist(cert, sha256hash, sha1hash);
 
 		if (status == EFI_SUCCESS) {
 			Print(L"Binary is whitelisted\n");
@@ -584,7 +603,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (AuthenticodeVerify(cert->CertData,
 			       context->SecDir->Size - sizeof(cert->Hdr),
-			       vendor_cert, vendor_cert_size, hash,
+			       vendor_cert, vendor_cert_size, sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
 		Print(L"Binary is verified by the vendor certificate\n");
@@ -628,7 +647,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	for (i = 0; i < MokNum; i++) {
 		if (AuthenticodeVerify(cert->CertData,
 				       context->SecDir->Size - sizeof(cert->Hdr),
-				       list[i].Mok, list[i].MokSize, hash,
+				       list[i].Mok, list[i].MokSize, sha256hash,
 				       SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
 			Print(L"Binary is verified by the machine owner key\n");
@@ -641,8 +660,10 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 done:
 	if (SectionHeader)
 		FreePool(SectionHeader);
-	if (ctx)
-		FreePool(ctx);
+	if (sha1ctx)
+		FreePool(sha1ctx);
+	if (sha256ctx)
+		FreePool(sha256ctx);
 
 	return status;
 }
