@@ -13,7 +13,7 @@ typedef struct {
 	/// The format of the signature is defined by the SignatureType.
 	///
 	UINT8             SignatureData[1];
-} EFI_SIGNATURE_DATA;
+} __attribute__ ((packed)) EFI_SIGNATURE_DATA;
 
 typedef struct {
 	///
@@ -40,4 +40,4 @@ typedef struct {
 	/// An array of signatures. Each signature is SignatureSize bytes in length. 
 	/// EFI_SIGNATURE_DATA Signatures[][SignatureSize];
 	///
-} EFI_SIGNATURE_LIST;
+} __attribute__ ((packed)) EFI_SIGNATURE_LIST;

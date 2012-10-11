@@ -92,40 +92,6 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 	return efi_status;
 }
 
-static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
-	MokListNode *list;
-	int i, remain = DataSize;
-	void *ptr;
-
-	if (DataSize < sizeof(UINT32))
-		return NULL;
-
-	list = AllocatePool(sizeof(MokListNode) * num);
-
-	if (!list) {
-		Print(L"Unable to allocate MOK list\n");
-		return NULL;
-	}
-
-	ptr = Data;
-	for (i = 0; i < num; i++) {
-		CopyMem(&list[i].MokSize, ptr, sizeof(UINT32));
-		remain -= sizeof(UINT32) + list[i].MokSize;
-
-		if (remain < 0) {
-			Print(L"MOK list was corrupted\n");
-			FreePool(list);
-			return NULL;
-		}
-
-		ptr += sizeof(UINT32);
-		list[i].Mok = ptr;
-		ptr += list[i].MokSize;
-	}
-
-	return list;
-}
-
 /*
  * Perform basic bounds checking of the intra-image pointers
  */
@@ -241,10 +207,10 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
+				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
@@ -254,7 +220,7 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	void *db;
 	EFI_GUID CertType = EfiCertX509Guid;
 
-	efi_status = get_variable(dbname, secure_var, &attributes, &dbsize, &db);
+	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
@@ -290,11 +256,10 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, WIN_CERTIFICATE_EFI_PKCS *data
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data,
+static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 				  int SignatureSize, EFI_GUID CertType)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
@@ -303,7 +268,7 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data,
 	BOOLEAN IsFound = FALSE;
 	void *db;
 
-	efi_status = get_variable(dbname, secure_var, &attributes, &dbsize, &db);
+	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
 
 	if (efi_status != EFI_SUCCESS) {
 		return VAR_NOT_FOUND;
@@ -346,13 +311,15 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, UINT8 *data,
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	if (check_db_hash(L"db", sha256hash, SHA256_DIGEST_SIZE,
+	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+
+	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EfiHashSha256Guid) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_hash(L"db", sha1hash, SHA1_DIGEST_SIZE,
+	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
 			  EfiHashSha1Guid) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_cert(L"dbx", cert, sha256hash) == DATA_FOUND)
+	if (check_db_cert(L"dbx", secure_var, cert, sha256hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	return EFI_SUCCESS;
@@ -361,13 +328,21 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	if (check_db_hash(L"db", sha256hash, SHA256_DIGEST_SIZE,
+	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	EFI_GUID shim_var = SHIM_LOCK_GUID;
+
+	if (check_db_hash(L"db", secure_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EfiHashSha256Guid) == DATA_FOUND)
 		return EFI_SUCCESS;
-	if (check_db_hash(L"db", sha1hash, SHA1_DIGEST_SIZE,
+	if (check_db_hash(L"db", secure_var, sha1hash, SHA1_DIGEST_SIZE,
 			  EfiHashSha1Guid) == DATA_FOUND)
 		return EFI_SUCCESS;
-	if (check_db_cert(L"db", cert, sha256hash) == DATA_FOUND)
+	if (check_db_hash(L"MokList", shim_var, sha256hash, SHA256_DIGEST_SIZE,
+			  EfiHashSha256Guid) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_cert(L"MokList", shim_var, cert, sha256hash) == DATA_FOUND)
 		return EFI_SUCCESS;
 
 	return EFI_ACCESS_DENIED;
@@ -575,22 +550,38 @@ done:
 	return status;
 }
 
+static EFI_STATUS verify_mok (void) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS status = EFI_SUCCESS;
+	void *MokListData = NULL;
+	UINTN MokListDataSize = 0;
+	UINT32 attributes;
+
+	status = get_variable(L"MokList", shim_lock_guid, &attributes,
+			      &MokListDataSize, &MokListData);
+
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+		Print(L"MokList is compromised!\nErase all keys in MokList!\n");
+		if (LibDeleteVariable(L"MokList", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to erase MokList\n");
+		}
+		status = EFI_ACCESS_DENIED;
+		return status;
+	}
+
+	return EFI_SUCCESS;
+}
+
 /*
  * Check that the signature is valid and matches the binary
  */
 static EFI_STATUS verify_buffer (char *data, int datasize,
-			 PE_COFF_LOADER_IMAGE_CONTEXT *context, int whitelist)
+			 PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	EFI_STATUS status = EFI_ACCESS_DENIED;
 	WIN_CERTIFICATE_EFI_PKCS *cert;
-	void *MokListData = NULL;
-	UINTN MokListDataSize = 0;
-	UINT32 MokNum, attributes;
-	MokListNode *list = NULL;
-	unsigned int i;
 	unsigned int size = datasize;
 
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
@@ -611,6 +602,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (status != EFI_SUCCESS)
 		return status;
 
+	verify_mok();
+
 	status = check_blacklist(cert, sha256hash, sha1hash);
 
 	if (status != EFI_SUCCESS) {
@@ -618,13 +611,11 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		return status;
 	}
 
-	if (whitelist) {
-		status = check_whitelist(cert, sha256hash, sha1hash);
+	status = check_whitelist(cert, sha256hash, sha1hash);
 
-		if (status == EFI_SUCCESS) {
-			Print(L"Binary is whitelisted\n");
-			return status;
-		}
+	if (status == EFI_SUCCESS) {
+		Print(L"Binary is whitelisted\n");
+		return status;
 	}
 
 	if (AuthenticodeVerify(cert->CertData,
@@ -636,50 +627,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		return status;
 	}
 
-	status = get_variable(L"MokList", shim_lock_guid, &attributes,
-			      &MokListDataSize, &MokListData);
-
-	if (status != EFI_SUCCESS || MokListDataSize < sizeof(UINT32)) {
-		status = EFI_ACCESS_DENIED;
-		Print(L"Invalid signature\n");
-		return status;
-	}
-
-	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
-		Print(L"MokList is compromised!\nErase all keys in MokList!\n");
-		if (LibDeleteVariable(L"MokList", &shim_lock_guid) != EFI_SUCCESS) {
-			Print(L"Failed to erase MokList\n");
-		}
-		status = EFI_ACCESS_DENIED;
-		return status;
-	}
-
-	CopyMem(&MokNum, MokListData, sizeof(UINT32));
-	if (MokNum == 0) {
-		status = EFI_ACCESS_DENIED;
-		return status;
-	}
-
-	list = build_mok_list(MokNum,
-			      (void *)MokListData + sizeof(UINT32),
-			      MokListDataSize - sizeof(UINT32));
-
-	if (!list) {
-		Print(L"Failed to construct MOK list\n");
-		status = EFI_OUT_OF_RESOURCES;
-		return status;
-	}
-
-	for (i = 0; i < MokNum; i++) {
-		if (AuthenticodeVerify(cert->CertData,
-				       context->SecDir->Size - sizeof(cert->Hdr),
-				       list[i].Mok, list[i].MokSize, sha256hash,
-				       SHA256_DIGEST_SIZE)) {
-			status = EFI_SUCCESS;
-			Print(L"Binary is verified by the machine owner key\n");
-			return status;
-		}
-	}
 	Print(L"Invalid signature\n");
 	status = EFI_ACCESS_DENIED;
 
@@ -757,7 +704,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	}
 
 	if (secure_mode ()) {
-		efi_status = verify_buffer(data, datasize, &context, 0);
+		efi_status = verify_buffer(data, datasize, &context);
 
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Verification failed\n");
@@ -984,7 +931,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (status != EFI_SUCCESS)
 		return status;
 
-	status = verify_buffer(buffer, size, &context, 1);
+	status = verify_buffer(buffer, size, &context);
 
 	return status;
 }
@@ -1133,6 +1080,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	EFI_STATUS efi_status;
 
 	shim_lock_interface.Verify = shim_verify;
+	shim_lock_interface.Hash = generate_hash;
+	shim_lock_interface.Context = read_header;
 
 	systab = passed_systab;
 

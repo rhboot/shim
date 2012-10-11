@@ -3,6 +3,8 @@
 #include <Library/BaseCryptLib.h>
 #include <openssl/x509.h>
 #include "shim.h"
+#include "signature.h"
+#include "PeImage.h"
 
 #define PASSWORD_MAX 16
 #define PASSWORD_MIN 8
@@ -11,11 +13,14 @@
 #define SHIM_VENDOR L"Shim"
 #endif
 
+#define EFI_VARIABLE_APPEND_WRITE 0x00000040
+
 struct menu_item {
 	CHAR16 *text;
-	INTN (* callback)(void *data, void *data2);
+	INTN (* callback)(void *data, void *data2, void *data3);
 	void *data;
 	void *data2;
+	void *data3;
 	UINTN colour;
 };
 
@@ -75,12 +80,12 @@ done:
 
 static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	MokListNode *list;
-	INT64 remain = DataSize;
-	int i;
-	void *ptr;
-
-	if (DataSize < sizeof(UINT32))
-		return NULL;
+	EFI_SIGNATURE_LIST *CertList = Data;
+	EFI_SIGNATURE_DATA *Cert;
+	EFI_GUID CertType = EfiCertX509Guid;
+	EFI_GUID HashType = EfiHashSha256Guid;
+	UINTN dbsize = DataSize;
+	UINTN count = 0;
 
 	list = AllocatePool(sizeof(MokListNode) * num);
 
@@ -89,20 +94,33 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		return NULL;
 	}
 
-	ptr = Data;
-	for (i = 0; i < num; i++) {
-		CopyMem(&list[i].MokSize, ptr, sizeof(UINT32));
-		remain -= sizeof(UINT32) + list[i].MokSize;
-
-		if (remain < 0) {
-			Print(L"the list was corrupted\n");
-			FreePool(list);
-			return NULL;
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
+		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
+			dbsize -= CertList->SignatureListSize;
+			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
+						  CertList->SignatureSize);
+			continue;
 		}
 
-		ptr += sizeof(UINT32);
-		list[i].Mok = ptr;
-		ptr += list[i].MokSize;
+		if ((CompareGuid (&CertList->SignatureType, &HashType) == 0) &&
+		    (CertList->SignatureSize != 48)) {
+			dbsize -= CertList->SignatureListSize;
+			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
+						  CertList->SignatureSize);
+			continue;
+		}
+
+		Cert = (EFI_SIGNATURE_DATA *) (((UINT8 *) CertList) +
+		  sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
+
+		list[count].MokSize = CertList->SignatureSize;
+		list[count].Mok = (void *)Cert->SignatureData;
+
+		count++;
+		dbsize -= CertList->SignatureListSize;
+		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
+						   CertList->SignatureSize);
 	}
 
 	return list;
@@ -289,16 +307,25 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 	if (!Mok || MokSize == 0)
 		return;
 
-	if (X509ConstructCertificate(Mok, MokSize, (UINT8 **) &X509Cert) &&
-	    X509Cert != NULL) {
-		show_x509_info(X509Cert);
-		X509_free(X509Cert);
+	if (MokSize != 48) {
+		if (X509ConstructCertificate(Mok, MokSize, (UINT8 **) &X509Cert) &&
+		    X509Cert != NULL) {
+			show_x509_info(X509Cert);
+			X509_free(X509Cert);
+		} else {
+			Print(L"  Not a valid X509 certificate: %x\n\n",
+			      ((UINT32 *)Mok)[0]);
+			return;
+		}
 	} else {
-		Print(L"  Not a valid X509 certificate: %x\n\n",
-		      ((UINT32 *)Mok)[0]);
-		return;
+		Print(L"SHA256 hash:\n   ");
+		for (i = 0; i < SHA256_DIGEST_SIZE; i++) {
+			Print(L" %02x", ((UINT8 *)Mok)[i]);
+			if (i % 10 == 9)
+				Print(L"\n   ");
+		}
+		Print(L"\n");
 	}
-
 	efi_status = get_sha1sum(Mok, MokSize, hash);
 
 	if (efi_status != EFI_SUCCESS) {
@@ -354,20 +381,48 @@ static INTN get_number ()
 
 static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 {
-	UINT32 MokNum;
+	UINT32 MokNum = 0;
 	MokListNode *keys = NULL;
 	INTN key_num = 0;
 	UINT8 initial = 1;
+	EFI_SIGNATURE_LIST *CertList = MokNew;
+	EFI_GUID CertType = EfiCertX509Guid;
+	EFI_GUID HashType = EfiHashSha256Guid;
+	UINTN dbsize = MokNewSize;
 
-	CopyMem(&MokNum, MokNew, sizeof(UINT32));
-	if (MokNum == 0) {
-		Print(L"No key exists\n");
+	if (MokNewSize < (sizeof(EFI_SIGNATURE_LIST) +
+			  sizeof(EFI_SIGNATURE_DATA))) {
+		Print(L"No keys\n");
+		Pause();
 		return 0;
 	}
 
-	keys = build_mok_list(MokNum,
-			      (void *)MokNew + sizeof(UINT32),
-			      MokNewSize - sizeof(UINT32));
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
+		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
+			Print(L"Doesn't look like a key or hash\n");
+			dbsize -= CertList->SignatureListSize;
+			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
+						     CertList->SignatureSize);
+			continue;
+		}
+
+		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
+		    (CertList->SignatureSize != 48)) {
+			Print(L"Doesn't look like a valid hash\n");
+			dbsize -= CertList->SignatureListSize;
+			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
+						     CertList->SignatureSize);
+			continue;
+		}
+
+		MokNum++;
+		dbsize -= CertList->SignatureListSize;
+		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
+						   CertList->SignatureSize);
+	}
+
+	keys = build_mok_list(MokNum, MokNew, MokNewSize);
 
 	if (!keys) {
 		Print(L"Failed to construct key list in MokNew\n");
@@ -466,10 +521,12 @@ static EFI_STATUS compute_pw_hash (void *MokNew, UINTN MokNewSize, CHAR16 *passw
 		goto done;
 	}
 
-	if (!(Sha256Update(ctx, MokNew, MokNewSize))) {
-		Print(L"Unable to generate hash\n");
-		status = EFI_OUT_OF_RESOURCES;
-		goto done;
+	if (MokNew && MokNewSize) {
+		if (!(Sha256Update(ctx, MokNew, MokNewSize))) {
+			Print(L"Unable to generate hash\n");
+			status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
 	}
 
 	if (!(Sha256Update(ctx, password, pw_length * sizeof(CHAR16)))) {
@@ -542,12 +599,24 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 			return EFI_ACCESS_DENIED;
 	}
 
-	/* Write new MOK */
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
-				       &shim_lock_guid,
-				       EFI_VARIABLE_NON_VOLATILE
-				       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				       MokNewSize, MokNew);
+	if (!MokNewSize) {
+		/* Delete MOK */
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE
+					       | EFI_VARIABLE_BOOTSERVICE_ACCESS
+					       | EFI_VARIABLE_APPEND_WRITE,
+					       0, NULL);
+	} else {
+		/* Write new MOK */
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE
+					       | EFI_VARIABLE_BOOTSERVICE_ACCESS
+					       | EFI_VARIABLE_APPEND_WRITE,
+					       MokNewSize, MokNew);
+	}
+
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to set variable %d\n", efi_status);
 		return efi_status;
@@ -583,11 +652,12 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 	return -1;
 }
 
-static INTN mok_enrollment_prompt_callback (void *MokNew, void *data2) {
+static INTN mok_enrollment_prompt_callback (void *MokNew, void *data2,
+					    void *data3) {
 	return mok_enrollment_prompt(MokNew, (UINTN)data2, TRUE);
 }
 
-static INTN mok_deletion_prompt (void *MokNew, void *data2) {
+static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
 	CHAR16 line[1];
 	UINT32 length;
 	EFI_STATUS efi_status;
@@ -597,7 +667,7 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2) {
 	get_line (&length, line, 1, 1);
 
 	if (line[0] == 'Y' || line[0] == 'y') {
-		efi_status = store_keys(MokNew, sizeof(UINT32), TRUE);
+		efi_status = store_keys(NULL, 0, TRUE);
 
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Failed to erase keys\n");
@@ -713,7 +783,8 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 				return;
 			}
 
-			items[pos].callback(items[pos].data, items[pos].data2);
+			items[pos].callback(items[pos].data, items[pos].data2,
+					    items[pos].data3);
 			draw_menu (items, count);
 			pos = 0;
 			break;
@@ -721,20 +792,36 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 	}
 }
 
-static INTN file_callback (void *data, void *data2) {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+static UINTN verify_certificate(void *cert, UINTN size)
+{
+	X509 *X509Cert;
+	if (!cert || size == 0)
+		return FALSE;
+
+	if (!(X509ConstructCertificate(cert, size, (UINT8 **) &X509Cert)) ||
+	    X509Cert == NULL) {
+		Print(L"Invalid X509 certificate\n");
+		Pause();
+		return FALSE;
+	}
+
+	X509_free(X509Cert);
+	return TRUE;
+}
+
+static INTN file_callback (void *data, void *data2, void *data3) {
 	EFI_FILE_INFO *buffer = NULL;
-	UINTN buffersize = 0, readsize;
+	UINTN buffersize = 0, mokbuffersize;
 	EFI_STATUS status;
 	EFI_FILE *file;
 	CHAR16 *filename = data;
 	EFI_FILE *parent = data2;
+	BOOLEAN hash = !!data3;
 	EFI_GUID file_info_guid = EFI_FILE_INFO_ID;
-	void *mokbuffer = NULL, *mok;
-	UINTN MokSize = 0, MokNewSize;
-	MokListNode *MokNew;
-
-	mok = LibGetVariableAndSize(L"MokList", &shim_lock_guid, &MokSize);
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_SIGNATURE_LIST *CertList;
+	EFI_SIGNATURE_DATA *CertData;
+	void *mokbuffer = NULL;
 
 	status = uefi_call_wrapper(parent->Open, 5, parent, &file, filename,
 				   EFI_FILE_MODE_READ, 0);
@@ -755,36 +842,84 @@ static INTN file_callback (void *data, void *data2) {
 	if (!buffer)
 		return 0;
 
-	readsize = buffer->FileSize;
+	buffersize = buffer->FileSize;
 
-	if (mok) {
-		MokNewSize = MokSize + readsize + sizeof(UINT32);
-		mokbuffer = AllocateZeroPool(MokNewSize);
+	if (hash) {
+		void *binary;
+		UINT8 sha256[SHA256_DIGEST_SIZE];
+		UINT8 sha1[SHA1_DIGEST_SIZE];
+		SHIM_LOCK *shim_lock;
+		EFI_GUID shim_guid = SHIM_LOCK_GUID;
+		PE_COFF_LOADER_IMAGE_CONTEXT context;
+
+		status = LibLocateProtocol(&shim_guid, (VOID **)&shim_lock);
+
+		if (status != EFI_SUCCESS)
+			goto out;
+
+		mokbuffersize = sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID) +
+			SHA256_DIGEST_SIZE;
+
+		mokbuffer = AllocatePool(mokbuffersize);
 
 		if (!mokbuffer)
 			goto out;
 
-		CopyMem(mokbuffer, mok, MokSize);
-		((UINT32 *)mokbuffer)[0]++;
-		MokNew = (MokListNode *)(((char *)mokbuffer) + MokSize);
+		binary = AllocatePool(buffersize);
+
+		status = uefi_call_wrapper(file->Read, 3, file, &buffersize,
+					   binary);
+
+		if (status != EFI_SUCCESS)
+			goto out;
+
+		status = shim_lock->Context(binary, buffersize, &context);
+
+		if (status != EFI_SUCCESS)
+			goto out;
+
+		status = shim_lock->Hash(binary, buffersize, &context, sha256,
+					 sha1);
+
+		if (status != EFI_SUCCESS)
+			goto out;
+
+		CertList = mokbuffer;
+		CertList->SignatureType = EfiHashSha256Guid;
+		CertList->SignatureSize = 16 + SHA256_DIGEST_SIZE;
+		CertData = (EFI_SIGNATURE_DATA *)(((UINT8 *)mokbuffer) +
+						  sizeof(EFI_SIGNATURE_LIST));
+		CopyMem(CertData->SignatureData, sha256, SHA256_DIGEST_SIZE);
 	} else {
-		MokNewSize = readsize + (2 * sizeof(UINT32));
-		mokbuffer = AllocateZeroPool(MokNewSize);
+		mokbuffersize = buffersize + sizeof(EFI_SIGNATURE_LIST) +
+			sizeof(EFI_GUID);
+		mokbuffer = AllocatePool(mokbuffersize);
 
 		if (!mokbuffer)
 			goto out;
-		((UINT32 *)mokbuffer)[0]=1;
-		MokNew = (MokListNode *)(((UINT32 *)mokbuffer) + 1);
+
+		CertList = mokbuffer;
+		CertList->SignatureType = EfiCertX509Guid;
+		CertList->SignatureSize = 16 + buffersize;
+		status = uefi_call_wrapper(file->Read, 3, file, &buffersize,
+				 mokbuffer + sizeof(EFI_SIGNATURE_LIST) + 16);
+
+		if (status != EFI_SUCCESS)
+			goto out;
+		CertData = (EFI_SIGNATURE_DATA *)(((UINT8 *)mokbuffer) +
+						  sizeof(EFI_SIGNATURE_LIST));
 	}
 
-	MokNew->MokSize = readsize;
+	CertList->SignatureListSize = mokbuffersize;
+	CertList->SignatureHeaderSize = 0;
+	CertData->SignatureOwner = shim_lock_guid;
 
-	status = uefi_call_wrapper(file->Read, 3, file, &readsize, &MokNew->Mok);
+	if (!hash) {
+		if (!verify_certificate(CertData->SignatureData, buffersize))
+			goto out;
+	}
 
-	if (status != EFI_SUCCESS)
-		goto out;
-
-	mok_enrollment_prompt(mokbuffer, MokNewSize, FALSE);
+	mok_enrollment_prompt(mokbuffer, mokbuffersize, FALSE);
 out:
 	if (buffer)
 		FreePool(buffer);
@@ -795,7 +930,7 @@ out:
 	return 0;
 }
 
-static INTN directory_callback (void *data, void *data2) {
+static INTN directory_callback (void *data, void *data2, void *data3) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0;
 	EFI_STATUS status;
@@ -873,12 +1008,14 @@ static INTN directory_callback (void *data, void *data2) {
 			dircontent[i].callback = directory_callback;
 			dircontent[i].data = dircontent[i].text;
 			dircontent[i].data2 = dir;
+			dircontent[i].data3 = data3;
 			dircontent[i].colour = EFI_YELLOW;
 		} else {
 			dircontent[i].text = StrDuplicate(buffer->FileName);
 			dircontent[i].callback = file_callback;
 			dircontent[i].data = dircontent[i].text;
 			dircontent[i].data2 = dir;
+			dircontent[i].data3 = data3;
 			dircontent[i].colour = EFI_WHITE;
 		}
 
@@ -893,7 +1030,7 @@ static INTN directory_callback (void *data, void *data2) {
 	return 0;
 }
 
-static INTN filesystem_callback (void *data, void *data2) {
+static INTN filesystem_callback (void *data, void *data2, void *data3) {
 	EFI_FILE_INFO *buffer = NULL;
 	UINTN buffersize = 0;
 	EFI_STATUS status;
@@ -965,12 +1102,14 @@ static INTN filesystem_callback (void *data, void *data2) {
 			dircontent[i].callback = directory_callback;
 			dircontent[i].data = dircontent[i].text;
 			dircontent[i].data2 = root;
+			dircontent[i].data3 = data3;
 			dircontent[i].colour = EFI_YELLOW;
 		} else {
 			dircontent[i].text = StrDuplicate(buffer->FileName);
 			dircontent[i].callback = file_callback;
 			dircontent[i].data = dircontent[i].text;
 			dircontent[i].data2 = root;
+			dircontent[i].data3 = data3;
 			dircontent[i].colour = EFI_WHITE;
 		}
 
@@ -985,7 +1124,7 @@ static INTN filesystem_callback (void *data, void *data2) {
 	return 0;
 }
 
-static INTN find_fs (void *data, void *data2) {
+static INTN find_fs (void *data, void *data2, void *data3) {
 	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	UINTN count, i;
 	EFI_HANDLE **filesystem_handles;
@@ -1058,6 +1197,7 @@ static INTN find_fs (void *data, void *data2) {
 
 		filesystems[i].data = root;
 		filesystems[i].data2 = NULL;
+		filesystems[i].data3 = data3;
 		filesystems[i].callback = filesystem_callback;
 		filesystems[i].colour = EFI_YELLOW;
 	}
@@ -1073,13 +1213,25 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 				 UINTN MokNewSize)
 {
 	struct menu_item *menu_item;
-	UINT32 MokNum;
+	UINT32 MokAuth = 0;
 	UINTN menucount = 0;
+	EFI_STATUS efi_status;
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	UINT8 auth[SHA256_DIGEST_SIZE];
+	UINTN auth_size = SHA256_DIGEST_SIZE;
+	UINT32 attributes;
 
-	if (MokNew)
-		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 3);
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
+					       &shim_lock_guid,
+					       &attributes, &auth_size, auth);
+
+	if ((efi_status == EFI_SUCCESS) && (auth_size == SHA256_DIGEST_SIZE))
+		MokAuth = 1;
+
+	if (MokNew || MokAuth)
+		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 4);
 	else
-		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 2);
+		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 3);
 
 	if (!menu_item)
 		return EFI_OUT_OF_RESOURCES;
@@ -1090,12 +1242,10 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 
 	menucount++;
 
-	if (MokNew) {
-		CopyMem(&MokNum, MokNew, sizeof(UINT32));
-		if (MokNum == 0) {
+	if (MokNew || MokAuth) {
+		if (!MokNew) {
 			menu_item[1].text = StrDuplicate(L"Delete MOK");
 			menu_item[1].colour = EFI_WHITE;
-			menu_item[1].data = MokNew;
 			menu_item[1].callback = mok_deletion_prompt;
 		} else {
 			menu_item[1].text = StrDuplicate(L"Enroll MOK");
@@ -1110,6 +1260,14 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 	menu_item[menucount].text = StrDuplicate(L"Enroll key from disk");
 	menu_item[menucount].colour = EFI_WHITE;
 	menu_item[menucount].callback = find_fs;
+	menu_item[menucount].data3 = (void *)FALSE;
+
+	menucount++;
+
+	menu_item[menucount].text = StrDuplicate(L"Enroll hash from disk");
+	menu_item[menucount].colour = EFI_WHITE;
+	menu_item[menucount].callback = find_fs;
+	menu_item[menucount].data3 = (void *)TRUE;
 
 	menucount++;
 
