@@ -7,6 +7,10 @@
 #define PASSWORD_MAX 16
 #define PASSWORD_MIN 8
 
+#ifndef SHIM_VENDOR
+#define SHIM_VENDOR L"Shim"
+#endif
+
 struct menu_item {
 	CHAR16 *text;
 	INTN (* callback)(void *data, void *data2);
@@ -604,10 +608,15 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2) {
 	return 0;
 }
 
-static void draw_menu (struct menu_item *items, UINTN count) {
+static UINTN draw_menu (struct menu_item *items, UINTN count) {
 	UINTN i;
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_WHITE | EFI_BACKGROUND_BLACK);
+
+	Print(L"%s UEFI key management\n\n", SHIM_VENDOR);
 
 	for (i = 0; i < count; i++) {
 		uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
@@ -617,6 +626,8 @@ static void draw_menu (struct menu_item *items, UINTN count) {
 
 	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 0);
 	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, TRUE);
+
+	return 2;
 }
 
 static void free_menu (struct menu_item *items, UINTN count) {
@@ -633,7 +644,7 @@ static void free_menu (struct menu_item *items, UINTN count) {
 }
 
 static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
-	UINTN index, pos = 0, wait = 0;
+	UINTN index, pos = 0, wait = 0, offset;
 	EFI_INPUT_KEY key;
 	EFI_STATUS status;
 
@@ -643,7 +654,7 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 	while (1) {
 		uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
-		draw_menu (items, count);
+		offset = draw_menu (items, count);
 
 		uefi_call_wrapper(ST->ConOut->SetAttribute, 2,
 				  ST->ConOut,
@@ -651,7 +662,7 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 
 		if (timeout) {
 			uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3,
-					  ST->ConOut, 0, count + 1);
+					  ST->ConOut, 0, count + 1 + offset);
 			if (timeout > 1)
 				Print(L"Booting in %d seconds\n", timeout);
 			else
@@ -659,7 +670,7 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 		}
 
 		uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
-				  0, pos);
+				  0, pos + offset);
 		status = WaitForSingleEvent(ST->ConIn->WaitForKey, wait);
 
 		if (status == EFI_TIMEOUT) {
