@@ -1054,7 +1054,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 			menu_item[1].data = MokNew;
 			menu_item[1].callback = mok_deletion_prompt;
 		} else {
-			menu_item[1].text = StrDuplicate(L"Enroll MOK\n");
+			menu_item[1].text = StrDuplicate(L"Enroll MOK");
 			menu_item[1].colour = EFI_WHITE;
 			menu_item[1].data = MokNew;
 			menu_item[1].data2 = (void *)MokNewSize;
