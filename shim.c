@@ -406,46 +406,25 @@ static BOOLEAN secure_mode (void)
 }
 
 /*
- * Check that the signature is valid and matches the binary
+ * Calculate the SHA1 and SHA256 hashes of a binary
  */
-static EFI_STATUS verify_buffer (char *data, int datasize,
-			 PE_COFF_LOADER_IMAGE_CONTEXT *context, int whitelist)
+
+static EFI_STATUS generate_hash (char *data, int datasize,
+				 PE_COFF_LOADER_IMAGE_CONTEXT *context,
+				 UINT8 *sha256hash, UINT8 *sha1hash)
+
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	unsigned int size = datasize;
 	unsigned int sha256ctxsize, sha1ctxsize;
+	unsigned int size = datasize;
 	void *sha256ctx = NULL, *sha1ctx = NULL;
-	UINT8 sha256hash[SHA256_DIGEST_SIZE];
-	UINT8 sha1hash[SHA1_DIGEST_SIZE];
-	EFI_STATUS status = EFI_ACCESS_DENIED;
 	char *hashbase;
 	unsigned int hashsize;
-	WIN_CERTIFICATE_EFI_PKCS *cert;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
 	unsigned int index, pos;
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
-	unsigned int i;
-	void *MokListData = NULL;
-	UINTN MokListDataSize = 0;
-	UINT32 MokNum, attributes;
-	MokListNode *list = NULL;
-
-	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
-
-	if (!cert) {
-		Print(L"Certificate located outside the image\n");
-		return EFI_INVALID_PARAMETER;
-	}
-
-	if (cert->Hdr.wCertificateType != WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
-		Print(L"Unsupported certificate type %x\n",
-		      cert->Hdr.wCertificateType);
-		return EFI_UNSUPPORTED;
-	}
-
-	/* FIXME: Check which kind of hash */
+	EFI_STATUS status = EFI_SUCCESS;
 
 	sha256ctxsize = Sha256GetContextSize();
 	sha256ctx = AllocatePool(sha256ctxsize);
@@ -585,11 +564,58 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		goto done;
 	}
 
+done:
+	if (SectionHeader)
+		FreePool(SectionHeader);
+	if (sha1ctx)
+		FreePool(sha1ctx);
+	if (sha256ctx)
+		FreePool(sha256ctx);
+
+	return status;
+}
+
+/*
+ * Check that the signature is valid and matches the binary
+ */
+static EFI_STATUS verify_buffer (char *data, int datasize,
+			 PE_COFF_LOADER_IMAGE_CONTEXT *context, int whitelist)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+	UINT8 sha1hash[SHA1_DIGEST_SIZE];
+	EFI_STATUS status = EFI_ACCESS_DENIED;
+	WIN_CERTIFICATE_EFI_PKCS *cert;
+	void *MokListData = NULL;
+	UINTN MokListDataSize = 0;
+	UINT32 MokNum, attributes;
+	MokListNode *list = NULL;
+	unsigned int i;
+	unsigned int size = datasize;
+
+	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
+
+	if (!cert) {
+		Print(L"Certificate located outside the image\n");
+		return EFI_INVALID_PARAMETER;
+	}
+
+	if (cert->Hdr.wCertificateType != WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
+		Print(L"Unsupported certificate type %x\n",
+		      cert->Hdr.wCertificateType);
+		return EFI_UNSUPPORTED;
+	}
+
+	status = generate_hash(data, datasize, context, sha256hash, sha1hash);
+
+	if (status != EFI_SUCCESS)
+		return status;
+
 	status = check_blacklist(cert, sha256hash, sha1hash);
 
 	if (status != EFI_SUCCESS) {
 		Print(L"Binary is blacklisted\n");
-		goto done;
+		return status;
 	}
 
 	if (whitelist) {
@@ -597,7 +623,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 		if (status == EFI_SUCCESS) {
 			Print(L"Binary is whitelisted\n");
-			goto done;
+			return status;
 		}
 	}
 
@@ -607,7 +633,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
 		Print(L"Binary is verified by the vendor certificate\n");
-		goto done;
+		return status;
 	}
 
 	status = get_variable(L"MokList", shim_lock_guid, &attributes,
@@ -616,7 +642,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (status != EFI_SUCCESS || MokListDataSize < sizeof(UINT32)) {
 		status = EFI_ACCESS_DENIED;
 		Print(L"Invalid signature\n");
-		goto done;
+		return status;
 	}
 
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
@@ -625,13 +651,13 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			Print(L"Failed to erase MokList\n");
 		}
 		status = EFI_ACCESS_DENIED;
-		goto done;
+		return status;
 	}
 
 	CopyMem(&MokNum, MokListData, sizeof(UINT32));
 	if (MokNum == 0) {
 		status = EFI_ACCESS_DENIED;
-		goto done;
+		return status;
 	}
 
 	list = build_mok_list(MokNum,
@@ -641,7 +667,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (!list) {
 		Print(L"Failed to construct MOK list\n");
 		status = EFI_OUT_OF_RESOURCES;
-		goto done;
+		return status;
 	}
 
 	for (i = 0; i < MokNum; i++) {
@@ -651,19 +677,11 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				       SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
 			Print(L"Binary is verified by the machine owner key\n");
-			goto done;
+			return status;
 		}
 	}
 	Print(L"Invalid signature\n");
 	status = EFI_ACCESS_DENIED;
-
-done:
-	if (SectionHeader)
-		FreePool(SectionHeader);
-	if (sha1ctx)
-		FreePool(sha1ctx);
-	if (sha256ctx)
-		FreePool(sha256ctx);
 
 	return status;
 }
