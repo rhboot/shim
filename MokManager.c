@@ -703,14 +703,12 @@ static UINTN draw_menu (struct menu_item *items, UINTN count) {
 static void free_menu (struct menu_item *items, UINTN count) {
 	UINTN i;
 
-#if 0
 	for (i=0; i<count; i++) {
 		if (items[i].text)
 			FreePool(items[i].text);
 	}
 
 	FreePool(items);
-#endif
 }
 
 static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
@@ -1127,6 +1125,7 @@ static INTN filesystem_callback (void *data, void *data2, void *data3) {
 static INTN find_fs (void *data, void *data2, void *data3) {
 	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	UINTN count, i;
+	UINTN OldSize, NewSize;
 	EFI_HANDLE **filesystem_handles;
 	struct menu_item *filesystems;
 
@@ -1189,8 +1188,13 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 			filesystems[i].text = DevicePathToStr(path);
 		else
 			filesystems[i].text = StrDuplicate(L"Unknown device\n");
-		if (VolumeLabel)
+		if (VolumeLabel) {
+			OldSize = (StrLen(filesystems[i].text) + 1) * sizeof(CHAR16);
+			NewSize = OldSize + StrLen(VolumeLabel) * sizeof(CHAR16);
+			filesystems[i].text = ReallocatePool(filesystems[i].text,
+							     OldSize, NewSize);
 			StrCat(filesystems[i].text, VolumeLabel);
+		}
 
 		if (buffersize)
 			FreePool(buffer);
