@@ -941,7 +941,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
-	EFI_HANDLE handle = NULL;
 	EFI_DEVICE_PATH *path;
 	CHAR16 *PathName;
 	void *data = NULL;
@@ -959,18 +958,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to generate path: %s\n", ImagePath);
-		goto done;
-	}
-
-	efi_status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image_handle,
-				       path, NULL, 0, &handle);
-
-	if (efi_status == EFI_SUCCESS) {
-		/* Image validates - start it */
-		Print(L"Starting file via StartImage\n");
-		efi_status = uefi_call_wrapper(BS->StartImage, 3, handle, NULL,
-					       NULL);
-		uefi_call_wrapper(BS->UnloadImage, 1, handle);
 		goto done;
 	}
 
