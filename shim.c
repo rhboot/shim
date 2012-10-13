@@ -39,6 +39,7 @@
 #include "PeImage.h"
 #include "shim.h"
 #include "signature.h"
+#include "netboot.h"
 
 #define SECOND_STAGE L"\\grub.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
@@ -680,7 +681,6 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		Print(L"Empty security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
-
 	return EFI_SUCCESS;
 }
 
@@ -942,7 +942,9 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
 	EFI_DEVICE_PATH *path;
-	CHAR16 *PathName;
+	CHAR16 *PathName = NULL;
+	void *sourcebuffer = NULL;
+	UINTN sourcesize = 0;
 	void *data = NULL;
 	int datasize;
 
@@ -961,11 +963,27 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto done;
 	}
 
-	efi_status = load_image(li, &data, &datasize, PathName);
+	if (findNetboot(image_handle)) {
+		efi_status = parseNetbootinfo(image_handle);
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Netboot parsing failed: %d\n", efi_status);
+			return EFI_PROTOCOL_ERROR;
+		}
+		efi_status = FetchNetbootimage(image_handle, &sourcebuffer,
+					       &sourcesize);
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to fetch TFTP image\n");
+			return efi_status;
+		}
+		data = sourcebuffer;
+		datasize = sourcesize;
+	} else {
+		efi_status = load_image(li, &data, &datasize, PathName);
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to load image\n");
-		goto done;
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to load image\n");
+			goto done;
+		}
 	}
 
 	CopyMem(&li_bak, li, sizeof(li_bak));
