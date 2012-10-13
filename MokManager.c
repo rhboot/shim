@@ -15,6 +15,9 @@
 
 #define EFI_VARIABLE_APPEND_WRITE 0x00000040
 
+#define CERT_STRING L"Select an X509 certificate to enroll:\n\n"
+#define HASH_STRING L"Select a file to trust:\n\n"
+
 struct menu_item {
 	CHAR16 *text;
 	INTN (* callback)(void *data, void *data2, void *data3);
@@ -678,7 +681,8 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
 	return 0;
 }
 
-static UINTN draw_menu (struct menu_item *items, UINTN count) {
+static UINTN draw_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
+			UINTN count) {
 	UINTN i;
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
@@ -687,6 +691,9 @@ static UINTN draw_menu (struct menu_item *items, UINTN count) {
 			  EFI_WHITE | EFI_BACKGROUND_BLACK);
 
 	Print(L"%s UEFI key management\n\n", SHIM_VENDOR);
+
+	if (header)
+		Print(L"%s", header);
 
 	for (i = 0; i < count; i++) {
 		uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
@@ -697,7 +704,7 @@ static UINTN draw_menu (struct menu_item *items, UINTN count) {
 	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 0);
 	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, TRUE);
 
-	return 2;
+	return 2 + lines;
 }
 
 static void free_menu (struct menu_item *items, UINTN count) {
@@ -711,7 +718,8 @@ static void free_menu (struct menu_item *items, UINTN count) {
 	FreePool(items);
 }
 
-static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
+static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
+		      UINTN count, UINTN timeout) {
 	UINTN index, pos = 0, wait = 0, offset;
 	EFI_INPUT_KEY key;
 	EFI_STATUS status;
@@ -722,7 +730,7 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 	while (1) {
 		uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
-		offset = draw_menu (items, count);
+		offset = draw_menu (header, lines, items, count);
 
 		uefi_call_wrapper(ST->ConOut->SetAttribute, 2,
 				  ST->ConOut,
@@ -783,7 +791,7 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 
 			items[pos].callback(items[pos].data, items[pos].data2,
 					    items[pos].data3);
-			draw_menu (items, count);
+			draw_menu (header, lines, items, count);
 			pos = 0;
 			break;
 		}
@@ -937,6 +945,7 @@ static INTN directory_callback (void *data, void *data2, void *data3) {
 	EFI_FILE *dir;
 	CHAR16 *filename = data;
 	EFI_FILE *root = data2;
+	BOOLEAN hash = !!data3;
 
 	status = uefi_call_wrapper(root->Open, 5, root, &dir, filename,
 				   EFI_FILE_MODE_READ, 0);
@@ -1023,7 +1032,10 @@ static INTN directory_callback (void *data, void *data2, void *data3) {
 		buffer = NULL;
 	}
 
-	run_menu(dircontent, dircount, 0);
+	if (hash)
+		run_menu(HASH_STRING, 2, dircontent, dircount, 0);
+	else
+		run_menu(CERT_STRING, 2, dircontent, dircount, 0);
 
 	return 0;
 }
@@ -1035,6 +1047,7 @@ static INTN filesystem_callback (void *data, void *data2, void *data3) {
 	UINTN dircount = 0, i = 0;
 	struct menu_item *dircontent;
 	EFI_FILE *root = data;
+	BOOLEAN hash = !!data3;
 
 	uefi_call_wrapper(root->SetPosition, 2, root, 0);
 
@@ -1117,7 +1130,10 @@ static INTN filesystem_callback (void *data, void *data2, void *data3) {
 		buffersize = 0;
 	}
 
-	run_menu(dircontent, dircount, 0);
+	if (hash)
+		run_menu(HASH_STRING, 2, dircontent, dircount, 0);
+	else
+		run_menu(CERT_STRING, 2, dircontent, dircount, 0);
 
 	return 0;
 }
@@ -1128,6 +1144,7 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 	UINTN OldSize, NewSize;
 	EFI_HANDLE **filesystem_handles;
 	struct menu_item *filesystems;
+	BOOLEAN hash = !!data3;
 
 	uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &fs_guid,
 			  NULL, &count, &filesystem_handles);
@@ -1208,7 +1225,10 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 
 	uefi_call_wrapper(BS->FreePool, 1, filesystem_handles);
 
-	run_menu(filesystems, count, 0);
+	if (hash)
+		run_menu(HASH_STRING, 2, filesystems, count, 0);
+	else
+		run_menu(CERT_STRING, 2, filesystems, count, 0);
 
 	return 0;
 }
@@ -1275,7 +1295,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 
 	menucount++;
 
-	run_menu(menu_item, menucount, 10);
+	run_menu(NULL, 0, menu_item, menucount, 10);
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
