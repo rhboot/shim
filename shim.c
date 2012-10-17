@@ -54,6 +54,8 @@ extern UINT32 vendor_cert_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
+static UINT8 insecure_mode;
+
 typedef enum {
 	DATA_FOUND,
 	DATA_NOT_FOUND,
@@ -359,6 +361,9 @@ static BOOLEAN secure_mode (void)
 	UINTN charsize = sizeof(char);
 	UINT8 sb, setupmode;
 	UINT32 attributes;
+
+	if (insecure_mode)
+		return FALSE;
 
 	status = get_variable(L"SecureBoot", global_var, &attributes, &charsize,
 			      (void *)&sb);
@@ -1038,9 +1043,6 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	UINT32 MokNew;
 	UINT32 attributes;
 
-	if (!secure_mode())
-		return EFI_SUCCESS;
-
 	moknew_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokNew",
 					  &shim_lock_guid, &attributes,
 					  &size, (void *)&MokNew);
@@ -1064,6 +1066,36 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS check_mok_sb (void)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS status = EFI_SUCCESS;
+	void *MokSBState = NULL;
+	UINTN MokSBStateSize = 0;
+	UINT32 attributes;
+
+	status = get_variable(L"MokSBState", shim_lock_guid, &attributes,
+			      &MokSBStateSize, &MokSBState);
+
+	if (status != EFI_SUCCESS)
+		return EFI_ACCESS_DENIED;
+
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+		Print(L"MokSBState is compromised! Clearing it\n");
+		if (LibDeleteVariable(L"MokSBState", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to erase MokSBState\n");
+		}
+		status = EFI_ACCESS_DENIED;
+	} else {
+		if (*(UINT8 *)MokSBState == 1) {
+			insecure_mode = 1;
+		}
+	}
+
+	return status;
+}
+
+
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1078,6 +1110,13 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	systab = passed_systab;
 
 	InitializeLib(image_handle, systab);
+
+	check_mok_sb();
+
+	if (insecure_mode) {
+		Print(L"Booting in insecure mode\n");
+		uefi_call_wrapper(BS->Stall, 1, 2000000);
+	}
 
 	efi_status = check_mok_request(image_handle);
 
