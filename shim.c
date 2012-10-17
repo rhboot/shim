@@ -1033,7 +1033,7 @@ done:
 EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	EFI_STATUS efi_status;
+	EFI_STATUS moknew_status, moksb_status, efi_status;
 	UINTN size = sizeof(UINT32);
 	UINT32 MokNew;
 	UINT32 attributes;
@@ -1041,22 +1041,27 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	if (!secure_mode())
 		return EFI_SUCCESS;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokNew",
-				       &shim_lock_guid, &attributes,
-				       &size, (void *)&MokNew);
+	moknew_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokNew",
+					  &shim_lock_guid, &attributes,
+					  &size, (void *)&MokNew);
 
-	if (efi_status != EFI_SUCCESS && efi_status != EFI_BUFFER_TOO_SMALL)
-		goto done;
+	moksb_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSB",
+					 &shim_lock_guid, &attributes,
+					 &size, (void *)&MokNew);
 
-	efi_status = start_image(image_handle, MOK_MANAGER);
+	if (moknew_status == EFI_SUCCESS ||
+	    moknew_status == EFI_BUFFER_TOO_SMALL ||
+	    moksb_status == EFI_SUCCESS ||
+	    moksb_status == EFI_BUFFER_TOO_SMALL) {
+		efi_status = start_image(image_handle, MOK_MANAGER);
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to start MokManager\n");
-		goto done;
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to start MokManager\n");
+			return efi_status;
+		}
 	}
 
-done:
-	return efi_status;
+	return EFI_SUCCESS;
 }
 
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)

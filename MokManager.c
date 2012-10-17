@@ -8,6 +8,7 @@
 
 #define PASSWORD_MAX 16
 #define PASSWORD_MIN 8
+#define SB_PASSWORD_LEN 8
 
 #ifndef SHIM_VENDOR
 #define SHIM_VENDOR L"Shim"
@@ -31,6 +32,11 @@ typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
 } __attribute__ ((packed)) MokListNode;
+
+typedef struct {
+	UINT32 MokSBState;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+} __attribute__ ((packed)) MokSBvar;
 
 static EFI_INPUT_KEY get_keystroke (void)
 {
@@ -681,6 +687,96 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
 	return 0;
 }
 
+static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINTN MokSBSize = (UINTN)data2;
+	MokSBvar *var = MokSB;
+	CHAR16 password[SB_PASSWORD_LEN];
+	UINT8 fail_count = 0;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT32 length;
+	CHAR16 line[1];
+	UINT8 sbval = 1;
+
+	LibDeleteVariable(L"MokSB", &shim_lock_guid);
+
+	if (MokSBSize != sizeof(MokSBvar)) {
+		Print(L"Invalid MokSB variable contents\n");
+		return -1;
+	}
+
+	while (fail_count < 3) {
+		Print(L"Enter Secure Boot passphrase: ");
+		get_line(&length, password, SB_PASSWORD_LEN, 0);
+
+		if (length != SB_PASSWORD_LEN) {
+			Print(L"Invalid password length\n");
+			fail_count++;
+			continue;
+		}
+
+		efi_status = compute_pw_hash(NULL, 0, password,
+					     SB_PASSWORD_LEN, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to generate password hash\n");
+			fail_count++;
+			continue;
+		}
+
+		if (CompareMem(var->hash, hash, SHA256_DIGEST_SIZE) != 0) {
+			Print(L"Password doesn't match\n");
+			fail_count++;
+			continue;
+		}
+
+		break;
+	}
+
+	if (fail_count >= 3) {
+		Print(L"Password limit reached\n");
+		return -1;
+	}
+
+	if (var->MokSBState == 0) {
+		Print(L"Disable Secure Boot? (y/n): ");
+	} else {
+		Print(L"Enable Secure Boot? (y/n): ");
+	}
+
+	do {
+		get_line (&length, line, 1, 1);
+
+		if (line[0] == 'Y' || line[0] == 'y') {
+			if (var->MokSBState == 0) {
+				efi_status = uefi_call_wrapper(RT->SetVariable,
+							       5, L"MokSBState",
+							       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+							       1, &sbval);
+				if (efi_status != EFI_SUCCESS) {
+					Print(L"Failed to set Secure Boot state\n");
+					return -1;
+				}
+			} else {
+				LibDeleteVariable(L"MokSBState",
+						  &shim_lock_guid);
+			}
+
+			Print(L"Press a key to reboot system\n");
+			Pause();
+			uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+					  EFI_SUCCESS, 0, NULL);
+			Print(L"Failed to reboot\n");
+			return -1;
+		}
+	} while (line[0] != 'N' && line[0] != 'n');
+
+	return -1;
+}
+
 static UINTN draw_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 			UINTN count) {
 	UINTN i;
@@ -1234,11 +1330,12 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 }
 
 static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
-				 UINTN MokNewSize)
+				 UINTN MokNewSize, void *MokSB,
+				 UINTN MokSBSize)
 {
 	struct menu_item *menu_item;
 	UINT32 MokAuth = 0;
-	UINTN menucount = 0;
+	UINTN menucount = 3, i = 0;
 	EFI_STATUS efi_status;
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINT8 auth[SHA256_DIGEST_SIZE];
@@ -1253,47 +1350,59 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 		MokAuth = 1;
 
 	if (MokNew || MokAuth)
-		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 4);
-	else
-		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 3);
+		menucount++;
+
+	if (MokSB)
+		menucount++;
+
+	menu_item = AllocateZeroPool(sizeof(struct menu_item) * menucount);
 
 	if (!menu_item)
 		return EFI_OUT_OF_RESOURCES;
 
-	menu_item[0].text = StrDuplicate(L"Continue boot");
-	menu_item[0].colour = EFI_WHITE;
-	menu_item[0].callback = NULL;
+	menu_item[i].text = StrDuplicate(L"Continue boot");
+	menu_item[i].colour = EFI_WHITE;
+	menu_item[i].callback = NULL;
 
-	menucount++;
+	i++;
 
 	if (MokNew || MokAuth) {
 		if (!MokNew) {
-			menu_item[1].text = StrDuplicate(L"Delete MOK");
-			menu_item[1].colour = EFI_WHITE;
-			menu_item[1].callback = mok_deletion_prompt;
+			menu_item[i].text = StrDuplicate(L"Delete MOK");
+			menu_item[i].colour = EFI_WHITE;
+			menu_item[i].callback = mok_deletion_prompt;
 		} else {
-			menu_item[1].text = StrDuplicate(L"Enroll MOK");
-			menu_item[1].colour = EFI_WHITE;
-			menu_item[1].data = MokNew;
-			menu_item[1].data2 = (void *)MokNewSize;
-			menu_item[1].callback = mok_enrollment_prompt_callback;
+			menu_item[i].text = StrDuplicate(L"Enroll MOK");
+			menu_item[i].colour = EFI_WHITE;
+			menu_item[i].data = MokNew;
+			menu_item[i].data2 = (void *)MokNewSize;
+			menu_item[i].callback = mok_enrollment_prompt_callback;
 		}
-		menucount++;
+		i++;
 	}
 
-	menu_item[menucount].text = StrDuplicate(L"Enroll key from disk");
-	menu_item[menucount].colour = EFI_WHITE;
-	menu_item[menucount].callback = find_fs;
-	menu_item[menucount].data3 = (void *)FALSE;
+	if (MokSB) {
+		menu_item[i].text = StrDuplicate(L"Change Secure Boot state");
+		menu_item[i].colour = EFI_WHITE;
+		menu_item[i].callback = mok_sb_prompt;
+		menu_item[i].data = MokSB;
+		menu_item[i].data2 = (void *)MokSBSize;
+		i++;
+	}
 
-	menucount++;
+	menu_item[i].text = StrDuplicate(L"Enroll key from disk");
+	menu_item[i].colour = EFI_WHITE;
+	menu_item[i].callback = find_fs;
+	menu_item[i].data3 = (void *)FALSE;
 
-	menu_item[menucount].text = StrDuplicate(L"Enroll hash from disk");
-	menu_item[menucount].colour = EFI_WHITE;
-	menu_item[menucount].callback = find_fs;
-	menu_item[menucount].data3 = (void *)TRUE;
+	i++;
 
-	menucount++;
+	menu_item[i].text = StrDuplicate(L"Enroll hash from disk");
+	menu_item[i].colour = EFI_WHITE;
+	menu_item[i].callback = find_fs;
+	menu_item[i].data3 = (void *)TRUE;
+
+	i++;
 
 	run_menu(NULL, 0, menu_item, menucount, 10);
 
@@ -1305,16 +1414,26 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	UINTN MokNewSize = 0;
+	UINTN MokNewSize = 0, MokSBSize = 0;
 	void *MokNew = NULL;
+	void *MokSB = NULL;
 
 	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
-	enter_mok_menu(image_handle, MokNew, MokNewSize);
+	MokSB =  LibGetVariableAndSize(L"MokSB", &shim_lock_guid, &MokSBSize);
+
+	enter_mok_menu(image_handle, MokNew, MokNewSize, MokSB, MokSBSize);
 
 	if (MokNew) {
 		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
 			Print(L"Failed to delete MokNew\n");
+		}
+		FreePool (MokNew);
+	}
+
+	if (MokSB) {
+		if (LibDeleteVariable(L"MokSB", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to delete MokSB\n");
 		}
 		FreePool (MokNew);
 	}
