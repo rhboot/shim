@@ -819,6 +819,7 @@ static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 	UINTN index, pos = 0, wait = 0, offset;
 	EFI_INPUT_KEY key;
 	EFI_STATUS status;
+	INTN ret;
 
 	if (timeout)
 		wait = 10000000;
@@ -885,8 +886,13 @@ static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 				return;
 			}
 
-			items[pos].callback(items[pos].data, items[pos].data2,
-					    items[pos].data3);
+			ret = items[pos].callback(items[pos].data,
+						  items[pos].data2,
+						  items[pos].data3);
+			if (ret < 0) {
+				Print(L"Press a key to continue\n");
+				Pause();
+			}
 			draw_menu (header, lines, items, count);
 			pos = 0;
 			break;
