@@ -777,6 +777,86 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 	return -1;
 }
 
+
+static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINTN MokPWSize = (UINTN)data2;
+	UINT8 fail_count = 0;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	CHAR16 password[PASSWORD_MAX];
+	UINT32 length;
+	CHAR16 line[1];
+
+	if (MokPWSize != SHA256_DIGEST_SIZE) {
+		Print(L"Invalid MokPW variable contents\n");
+		return -1;
+	}
+
+	LibDeleteVariable(L"MokPW", &shim_lock_guid);
+
+	while (fail_count < 3) {
+		Print(L"Confirm MOK passphrase: ");
+		get_line(&length, password, PASSWORD_MAX, 0);
+
+		if ((length < PASSWORD_MIN) || (length > PASSWORD_MAX)) {
+			Print(L"Invalid password length\n");
+			fail_count++;
+			continue;
+		}
+
+		efi_status = compute_pw_hash(NULL, 0, password,
+					     SB_PASSWORD_LEN, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to generate password hash\n");
+			fail_count++;
+			continue;
+		}
+
+		if (CompareMem(MokPW, hash, SHA256_DIGEST_SIZE) != 0) {
+			Print(L"Password doesn't match\n");
+			fail_count++;
+			continue;
+		}
+
+		break;
+	}
+
+	if (fail_count >= 3) {
+		Print(L"Password limit reached\n");
+		return -1;
+	}
+
+	Print(L"Set MOK password? (y/n): ");
+
+	do {
+		get_line (&length, line, 1, 1);
+
+		if (line[0] == 'Y' || line[0] == 'y') {
+			efi_status = uefi_call_wrapper(RT->SetVariable, 5,
+						       L"MokPWStore",
+						       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+						       MokPWSize, MokPW);
+			if (efi_status != EFI_SUCCESS) {
+				Print(L"Failed to set MOK password\n");
+				return -1;
+			}
+
+			Print(L"Press a key to reboot system\n");
+			Pause();
+			uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+					  EFI_SUCCESS, 0, NULL);
+			Print(L"Failed to reboot\n");
+			return -1;
+		}
+	} while (line[0] != 'N' && line[0] != 'n');
+
+	return 0;
+}
+
 static UINTN draw_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 			UINTN count) {
 	UINTN i;
@@ -1335,9 +1415,67 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 	return 0;
 }
 
+static BOOLEAN verify_pw(void)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	CHAR16 password[PASSWORD_MAX];
+	UINT8 fail_count = 0;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT8 pwhash[SHA256_DIGEST_SIZE];
+	UINTN size = SHA256_DIGEST_SIZE;
+	UINT32 length;
+	UINT32 attributes;
+
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokPWStore",
+				       &shim_lock_guid, &attributes, &size,
+				       pwhash);
+
+	/*
+	 * If anything can attack the password it could just set it to a
+	 * known value, so there's no safety advantage in failing to validate
+	 * purely because of a failure to read the variable
+	 */
+	if (efi_status != EFI_SUCCESS)
+		return TRUE;
+
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS)
+		return TRUE;
+
+	while (fail_count < 3) {
+		Print(L"Enter MOK password: ");
+		get_line(&length, password, PASSWORD_MAX, 0);
+
+		if (length < PASSWORD_MIN || length > PASSWORD_MAX) {
+			Print(L"Invalid password length\n");
+			fail_count++;
+			continue;
+		}
+
+		efi_status = compute_pw_hash(NULL, 0, password, length, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to generate password hash\n");
+			fail_count++;
+			continue;
+		}
+
+		if (CompareMem(pwhash, hash, SHA256_DIGEST_SIZE) != 0) {
+			Print(L"Password doesn't match\n");
+			fail_count++;
+			continue;
+		}
+
+		return TRUE;
+	}
+
+	Print(L"Password limit reached\n");
+	return FALSE;
+}
+
 static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 				 UINTN MokNewSize, void *MokSB,
-				 UINTN MokSBSize)
+				 UINTN MokSBSize, void *MokPW, UINTN MokPWSize)
 {
 	struct menu_item *menu_item;
 	UINT32 MokAuth = 0;
@@ -1347,6 +1485,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 	UINT8 auth[SHA256_DIGEST_SIZE];
 	UINTN auth_size = SHA256_DIGEST_SIZE;
 	UINT32 attributes;
+
+	if (verify_pw() == FALSE)
+		return EFI_ACCESS_DENIED;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
 					       &shim_lock_guid,
@@ -1359,6 +1500,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 		menucount++;
 
 	if (MokSB)
+		menucount++;
+
+	if (MokPW)
 		menucount++;
 
 	menu_item = AllocateZeroPool(sizeof(struct menu_item) * menucount);
@@ -1396,6 +1540,15 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 		i++;
 	}
 
+	if (MokPW) {
+		menu_item[i].text = StrDuplicate(L"Set MOK password");
+		menu_item[i].colour = EFI_WHITE;
+		menu_item[i].callback = mok_pw_prompt;
+		menu_item[i].data = MokPW;
+		menu_item[i].data2 = (void *)MokPWSize;
+		i++;
+	}
+
 	menu_item[i].text = StrDuplicate(L"Enroll key from disk");
 	menu_item[i].colour = EFI_WHITE;
 	menu_item[i].callback = find_fs;
@@ -1420,15 +1573,19 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	UINTN MokNewSize = 0, MokSBSize = 0;
+	UINTN MokNewSize = 0, MokSBSize = 0, MokPWSize = 0;
 	void *MokNew = NULL;
 	void *MokSB = NULL;
+	void *MokPW = NULL;
 
 	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
-	MokSB =  LibGetVariableAndSize(L"MokSB", &shim_lock_guid, &MokSBSize);
+	MokSB = LibGetVariableAndSize(L"MokSB", &shim_lock_guid, &MokSBSize);
 
-	enter_mok_menu(image_handle, MokNew, MokNewSize, MokSB, MokSBSize);
+	MokPW = LibGetVariableAndSize(L"MokPW", &shim_lock_guid, &MokPWSize);
+
+	enter_mok_menu(image_handle, MokNew, MokNewSize, MokSB, MokSBSize,
+		       MokPW, MokPWSize);
 
 	if (MokNew) {
 		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
@@ -1443,6 +1600,14 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		}
 		FreePool (MokNew);
 	}
+
+	if (MokPW) {
+		if (LibDeleteVariable(L"MokPW", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to delete MokPW\n");
+		}
+		FreePool (MokNew);
+	}
+
 	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 
 	return EFI_SUCCESS;
