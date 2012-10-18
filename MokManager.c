@@ -708,6 +708,8 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 		return -1;
 	}
 
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
 	while (fail_count < 3) {
 		Print(L"Enter Secure Boot passphrase: ");
 		get_line(&length, password, SB_PASSWORD_LEN, 0);
@@ -796,6 +798,8 @@ static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
 	}
 
 	LibDeleteVariable(L"MokPW", &shim_lock_guid);
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
 	while (fail_count < 3) {
 		Print(L"Confirm MOK passphrase: ");
@@ -1452,6 +1456,8 @@ static BOOLEAN verify_pw(void)
 
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS)
 		return TRUE;
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
 	while (fail_count < 3) {
 		Print(L"Enter MOK password: ");
