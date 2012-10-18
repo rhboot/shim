@@ -317,14 +317,28 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		return;
 
 	if (MokSize != 48) {
-		if (X509ConstructCertificate(Mok, MokSize, (UINT8 **) &X509Cert) &&
-		    X509Cert != NULL) {
+		if (X509ConstructCertificate(Mok, MokSize,
+				 (UINT8 **) &X509Cert) && X509Cert != NULL) {
 			show_x509_info(X509Cert);
 			X509_free(X509Cert);
 		} else {
 			Print(L"  Not a valid X509 certificate: %x\n\n",
 			      ((UINT32 *)Mok)[0]);
 			return;
+		}
+
+		efi_status = get_sha1sum(Mok, MokSize, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to compute MOK fingerprint\n");
+			return;
+		}
+
+		Print(L"  Fingerprint (SHA1):\n    ");
+		for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
+			Print(L" %02x", hash[i]);
+			if (i % 10 == 9)
+				Print(L"\n    ");
 		}
 	} else {
 		Print(L"SHA256 hash:\n   ");
@@ -335,19 +349,7 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		}
 		Print(L"\n");
 	}
-	efi_status = get_sha1sum(Mok, MokSize, hash);
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to compute MOK fingerprint\n");
-		return;
-	}
-
-	Print(L"  Fingerprint (SHA1):\n    ");
-	for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
-		Print(L" %02x", hash[i]);
-		if (i % 10 == 9)
-			Print(L"\n    ");
-	}
 	Print(L"\n");
 }
 
