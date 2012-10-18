@@ -894,6 +894,28 @@ static void free_menu (struct menu_item *items, UINTN count) {
 	FreePool(items);
 }
 
+static void update_time (UINTN position, UINTN timeout)
+{
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0,
+			  position);
+
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_BLACK | EFI_BACKGROUND_BLACK);
+
+	Print(L"                       ", timeout);
+
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0,
+			  position);
+
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_WHITE | EFI_BACKGROUND_BLACK);
+
+	if (timeout > 1)
+		Print(L"Booting in %d seconds\n", timeout);
+	else if (timeout)
+		Print(L"Booting in %d second\n", timeout);
+}
+
 static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 		      UINTN count, UINTN timeout) {
 	UINTN index, pos = 0, wait = 0, offset;
@@ -904,23 +926,10 @@ static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 	if (timeout)
 		wait = 10000000;
 
+	offset = draw_menu (header, lines, items, count);
+
 	while (1) {
-		uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
-
-		offset = draw_menu (header, lines, items, count);
-
-		uefi_call_wrapper(ST->ConOut->SetAttribute, 2,
-				  ST->ConOut,
-				  EFI_WHITE | EFI_BACKGROUND_BLACK);
-
-		if (timeout) {
-			uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3,
-					  ST->ConOut, 0, count + 1 + offset);
-			if (timeout > 1)
-				Print(L"Booting in %d seconds\n", timeout);
-			else
-				Print(L"Booting in %d second\n", timeout);
-		}
+		update_time(count + offset + 1, timeout);
 
 		uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
 				  0, pos + offset);
