@@ -615,8 +615,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
 					       &shim_lock_guid,
 					       EFI_VARIABLE_NON_VOLATILE
-					       | EFI_VARIABLE_BOOTSERVICE_ACCESS
-					       | EFI_VARIABLE_APPEND_WRITE,
+					       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
 	} else {
 		/* Write new MOK */
