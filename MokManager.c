@@ -803,8 +803,7 @@ static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
 			continue;
 		}
 
-		efi_status = compute_pw_hash(NULL, 0, password,
-					     SB_PASSWORD_LEN, hash);
+		efi_status = compute_pw_hash(NULL, 0, password, length, hash);
 
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Unable to generate password hash\n");
