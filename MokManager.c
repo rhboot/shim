@@ -108,7 +108,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
-						  CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
@@ -116,7 +116,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		    (CertList->SignatureSize != 48)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
-						  CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
@@ -129,7 +129,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		count++;
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						   CertList->SignatureSize);
+						  CertList->SignatureListSize);
 	}
 
 	return list;
@@ -414,7 +414,7 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 			Print(L"Doesn't look like a key or hash\n");
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						     CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
@@ -423,14 +423,14 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 			Print(L"Doesn't look like a valid hash\n");
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						     CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
 		MokNum++;
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						   CertList->SignatureSize);
+						  CertList->SignatureListSize);
 	}
 
 	keys = build_mok_list(MokNum, MokNew, MokNewSize);
