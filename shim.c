@@ -1035,32 +1035,30 @@ done:
 	return efi_status;
 }
 
-EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
+static BOOLEAN check_var(CHAR16 *varname)
 {
+	EFI_STATUS efi_status;
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	EFI_STATUS moknew_status, moksb_status, mokpw_status, efi_status;
 	UINTN size = sizeof(UINT32);
 	UINT32 MokVar;
 	UINT32 attributes;
 
-	moknew_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokNew",
-					  &shim_lock_guid, &attributes,
-					  &size, (void *)&MokVar);
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, varname,
+				       &shim_lock_guid, &attributes,
+				       &size, (void *)&MokVar);
 
-	moksb_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSB",
-					 &shim_lock_guid, &attributes,
-					 &size, (void *)&MokVar);
+	if (efi_status == EFI_SUCCESS || efi_status == EFI_BUFFER_TOO_SMALL)
+		return TRUE;
 
-	mokpw_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokPW",
-					 &shim_lock_guid, &attributes,
-					 &size, (void *)&MokVar);
+	return FALSE;
+}
 
-	if (moknew_status == EFI_SUCCESS ||
-	    moknew_status == EFI_BUFFER_TOO_SMALL ||
-	    moksb_status == EFI_SUCCESS ||
-	    moksb_status == EFI_BUFFER_TOO_SMALL ||
-	    mokpw_status == EFI_SUCCESS ||
-	    mokpw_status == EFI_BUFFER_TOO_SMALL) {
+EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
+{
+	EFI_STATUS efi_status;
+
+	if (check_var(L"MokNew") || check_var(L"MokSB") ||
+	    check_var(L"MokPW") || check_var(L"MokAuth")) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (efi_status != EFI_SUCCESS) {
