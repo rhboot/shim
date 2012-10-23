@@ -35,7 +35,8 @@ typedef struct {
 
 typedef struct {
 	UINT32 MokSBState;
-	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT32 PWLen;
+	CHAR16 Password[PASSWORD_MAX];
 } __attribute__ ((packed)) MokSBvar;
 
 static EFI_INPUT_KEY get_keystroke (void)
@@ -693,12 +694,13 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 	EFI_STATUS efi_status;
 	UINTN MokSBSize = (UINTN)data2;
 	MokSBvar *var = MokSB;
-	CHAR16 password[SB_PASSWORD_LEN];
-	UINT8 fail_count = 0;
+	CHAR16 password[1];
+	UINT8 correct = 0, fail_count = 0;
 	UINT8 hash[SHA256_DIGEST_SIZE];
 	UINT32 length;
 	CHAR16 line[1];
 	UINT8 sbval = 1;
+	UINT8 pos;
 
 	LibDeleteVariable(L"MokSB", &shim_lock_guid);
 
@@ -709,32 +711,23 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
-	while (fail_count < 3) {
-		Print(L"Enter Secure Boot passphrase: ");
-		get_line(&length, password, SB_PASSWORD_LEN, 0);
+	while (correct < 3) {
+		RandomBytes (&pos, sizeof(pos));
 
-		if (length != SB_PASSWORD_LEN) {
-			Print(L"Invalid password length\n");
+		pos = pos % var->PWLen;
+
+		Print(L"Enter password character %d: ", pos + 1);
+		get_line(&length, password, 1, 0);
+
+		if (password[0] != var->Password[pos]) {
+			Print(L"Invalid character\n");
 			fail_count++;
-			continue;
+		} else {
+			correct++;
 		}
 
-		efi_status = compute_pw_hash(NULL, 0, password,
-					     SB_PASSWORD_LEN, hash);
-
-		if (efi_status != EFI_SUCCESS) {
-			Print(L"Unable to generate password hash\n");
-			fail_count++;
-			continue;
-		}
-
-		if (CompareMem(var->hash, hash, SHA256_DIGEST_SIZE) != 0) {
-			Print(L"Password doesn't match\n");
-			fail_count++;
-			continue;
-		}
-
-		break;
+		if (fail_count >= 3)
+			break;
 	}
 
 	if (fail_count >= 3) {
@@ -1629,11 +1622,38 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS setup_rand (void)
+{
+	EFI_TIME time;
+	EFI_STATUS efi_status;
+	UINT64 seed;
+	BOOLEAN status;
+
+	efi_status = uefi_call_wrapper(RT->GetTime, 2, &time, NULL);
+
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	seed = ((UINT64)time.Year << 48) | ((UINT64)time.Month << 40) |
+		((UINT64)time.Day << 32) | ((UINT64)time.Hour << 24) |
+		((UINT64)time.Minute << 16) | ((UINT64)time.Second << 8) |
+		((UINT64)time.Daylight);
+
+	status = RandomSeed((UINT8 *)&seed, sizeof(seed));
+
+	if (!status)
+		return EFI_ABORTED;
+
+	return EFI_SUCCESS;
+}
+
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 {
 	EFI_STATUS efi_status;
 
 	InitializeLib(image_handle, systab);
+
+	setup_rand();
 
 	efi_status = check_mok_request(image_handle);
 
