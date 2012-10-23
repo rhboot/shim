@@ -29,7 +29,7 @@ LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH
 VERSION		= 0.1
 
 TARGET	= shim.efi MokManager.efi
-OBJS	= shim.o cert.o
+OBJS	= shim.o cert.o dbx.o
 SOURCES	= shim.c shim.h signature.h PeImage.h
 MOK_OBJS = MokManager.o
 MOK_SOURCES = MokManager.c shim.h
@@ -41,7 +41,10 @@ shim.o: $(SOURCES)
 cert.o : cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a cert.o
+dbx.o : dbx.S
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(SOURCES)

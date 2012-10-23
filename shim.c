@@ -51,6 +51,8 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
  */
 extern UINT8 vendor_cert[];
 extern UINT32 vendor_cert_size;
+extern EFI_SIGNATURE_LIST *vendor_dbx;
+extern UINT32 vendor_dbx_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
@@ -209,25 +211,15 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
-				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
+					 UINTN dbsize,
+					 WIN_CERTIFICATE_EFI_PKCS *data,
+					 UINT8 *hash)
 {
-	EFI_STATUS efi_status;
-	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
-	UINTN dbsize = 0;
 	UINTN CertCount, Index;
-	UINT32 attributes;
 	BOOLEAN IsFound = FALSE;
-	void *db;
 	EFI_GUID CertType = EfiCertX509Guid;
-
-	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
-
-	if (efi_status != EFI_SUCCESS)
-		return VAR_NOT_FOUND;
-
-	CertList = db;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
@@ -250,33 +242,43 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
 	}
 
-	FreePool(db);
-
 	if (IsFound)
 		return DATA_FOUND;
 
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
-				  int SignatureSize, EFI_GUID CertType)
+static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
+				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
 {
+	CHECK_STATUS rc;
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
-	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
-	UINTN CertCount, Index;
 	UINT32 attributes;
-	BOOLEAN IsFound = FALSE;
 	void *db;
 
 	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
 
-	if (efi_status != EFI_SUCCESS) {
+	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
-	}
 
 	CertList = db;
+
+	rc = check_db_cert_in_ram(CertList, dbsize, data, hash);
+
+	FreePool(db);
+
+	return rc;
+}
+
+static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
+					 UINTN dbsize, UINT8 *data,
+					 int SignatureSize, EFI_GUID CertType)
+{
+	EFI_SIGNATURE_DATA *Cert;
+	UINTN CertCount, Index;
+	BOOLEAN IsFound = FALSE;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
@@ -302,18 +304,52 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
 	}
 
-	FreePool(db);
-
 	if (IsFound)
 		return DATA_FOUND;
 
 	return DATA_NOT_FOUND;
 }
 
+static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
+				  int SignatureSize, EFI_GUID CertType)
+{
+	EFI_STATUS efi_status;
+	EFI_SIGNATURE_LIST *CertList;
+	UINT32 attributes;
+	UINTN dbsize = 0;
+	void *db;
+
+	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
+
+	if (efi_status != EFI_SUCCESS) {
+		return VAR_NOT_FOUND;
+	}
+
+	CertList = db;
+
+	CHECK_STATUS rc = check_db_hash_in_ram(CertList, dbsize, data,
+						SignatureSize, CertType);
+	FreePool(db);
+	return rc;
+
+}
+
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+
+	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha256hash,
+				 SHA256_DIGEST_SIZE, EfiHashSha256Guid) ==
+				DATA_NOT_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha1hash,
+				 SHA1_DIGEST_SIZE, EfiHashSha1Guid) ==
+				DATA_NOT_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_cert_in_ram(vendor_dbx, vendor_dbx_size, cert,
+				 sha256hash) == DATA_NOT_FOUND)
+		return EFI_ACCESS_DENIED;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EfiHashSha256Guid) == DATA_FOUND)
