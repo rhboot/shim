@@ -664,7 +664,9 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 }
 
 static INTN mok_enrollment_prompt_callback (void *MokNew, void *data2,
-					    void *data3) {
+					    void *data3)
+{
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 	return mok_enrollment_prompt(MokNew, (UINTN)data2, TRUE);
 }
 
