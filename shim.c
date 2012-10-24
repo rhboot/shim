@@ -625,6 +625,11 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	WIN_CERTIFICATE_EFI_PKCS *cert;
 	unsigned int size = datasize;
 
+	if (context->SecDir->Size == 0) {
+		Print(L"Empty security header\n");
+		return EFI_INVALID_PARAMETER;
+	}
+
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
 
 	if (!cert) {
@@ -734,11 +739,6 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 
 	if (context->SecDir->VirtualAddress >= datasize) {
 		Print(L"Malformed security header\n");
-		return EFI_INVALID_PARAMETER;
-	}
-
-	if (context->SecDir->Size == 0) {
-		Print(L"Empty security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
 
