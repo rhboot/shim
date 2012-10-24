@@ -82,8 +82,7 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 		return efi_status;
 	}
 
-	if (allocate)
-		*buffer = AllocatePool(*size);
+	*buffer = AllocatePool(*size);
 
 	if (!*buffer) {
 		Print(L"Unable to allocate variable buffer\n");
@@ -545,7 +544,8 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 
 		if (!hashbase) {
 			Print(L"Malformed section header\n");
-			return EFI_INVALID_PARAMETER;
+			status = EFI_INVALID_PARAMETER;
+			goto done;
 		}
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
@@ -683,8 +683,18 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 
+	if (datasize < sizeof(EFI_IMAGE_DOS_HEADER)) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
+
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
+
+	if ((((UINT8 *)PEHdr - (UINT8 *)data) + sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION)) > datasize) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	if (PEHdr->Te.Signature != EFI_IMAGE_NT_SIGNATURE) {
 		Print(L"Unsupported image type\n");
@@ -711,6 +721,16 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
+
+	if (context->ImageSize < context->SizeOfHeaders) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	if (((UINT8 *)context->SecDir - (UINT8 *)data) > (datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	if (context->SecDir->VirtualAddress >= datasize) {
 		Print(L"Malformed security header\n");
@@ -831,7 +851,7 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 
 	bootpath[i+1] = '\0';
 
-	if (bootpath[i-i] == '\\')
+	if (i == 0 || bootpath[i-i] == '\\')
 		bootpath[i] = '\0';
 
 	*PathName = AllocatePool(StrSize(bootpath) + StrSize(ImagePath));
@@ -904,6 +924,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 				       &buffersize, fileinfo);
 
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
+		FreePool(fileinfo);
 		fileinfo = AllocatePool(buffersize);
 		if (!fileinfo) {
 			Print(L"Unable to allocate file info buffer\n");
@@ -946,6 +967,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 
 	*datasize = buffersize;
 
+	FreePool(fileinfo);
+
 	return EFI_SUCCESS;
 error:
 	if (*data) {
@@ -983,7 +1006,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
 	EFI_DEVICE_PATH *path;
-	CHAR16 *PathName;
+	CHAR16 *PathName = NULL;
 	void *data = NULL;
 	int datasize;
 
@@ -1019,10 +1042,16 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto done;
 	}
 
-	efi_status = uefi_call_wrapper(entry_point, 3, image_handle, systab);
+	efi_status = uefi_call_wrapper(entry_point, 2, image_handle, systab);
 
 	CopyMem(li, &li_bak, sizeof(li_bak));
 done:
+	if (PathName)
+		FreePool(PathName);
+
+	if (data)
+		FreePool(data);
+
 	return efi_status;
 }
 
