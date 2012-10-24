@@ -696,13 +696,12 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 	EFI_STATUS efi_status;
 	UINTN MokSBSize = (UINTN)data2;
 	MokSBvar *var = MokSB;
-	CHAR16 password[1];
-	UINT8 correct = 0, fail_count = 0;
-	UINT8 hash[SHA256_DIGEST_SIZE];
+	CHAR16 pass1, pass2, pass3;
+	UINT8 fail_count = 0;
 	UINT32 length;
 	CHAR16 line[1];
 	UINT8 sbval = 1;
-	UINT8 pos;
+	UINT8 pos1, pos2, pos3;
 
 	LibDeleteVariable(L"MokSB", &shim_lock_guid);
 
@@ -713,23 +712,37 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
-	while (correct < 3) {
-		RandomBytes (&pos, sizeof(pos));
+	while (fail_count < 3) {
+		RandomBytes (&pos1, sizeof(pos1));
+		pos1 = (pos1 % var->PWLen);
 
-		pos = pos % var->PWLen;
+		do {
+			RandomBytes (&pos2, sizeof(pos2));
+			pos2 = (pos2 % var->PWLen);
+		} while (pos2 == pos1);
 
-		Print(L"Enter password character %d: ", pos + 1);
-		get_line(&length, password, 1, 0);
+		do {
+			RandomBytes (&pos3, sizeof(pos3));
+			pos3 = (pos3 % var->PWLen) ;
+		} while (pos3 == pos2 || pos3 == pos1);
 
-		if (password[0] != var->Password[pos]) {
+		Print(L"Enter password character %d: ", pos1 + 1);
+		get_line(&length, &pass1, 1, 0);
+
+		Print(L"Enter password character %d: ", pos2 + 1);
+		get_line(&length, &pass2, 1, 0);
+
+		Print(L"Enter password character %d: ", pos3 + 1);
+		get_line(&length, &pass3, 1, 0);
+
+		if (pass1 != var->Password[pos1] ||
+		    pass2 != var->Password[pos2] ||
+		    pass3 != var->Password[pos3]) {
 			Print(L"Invalid character\n");
 			fail_count++;
 		} else {
-			correct++;
-		}
-
-		if (fail_count >= 3)
 			break;
+		}
 	}
 
 	if (fail_count >= 3) {
