@@ -703,8 +703,6 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 	UINT8 sbval = 1;
 	UINT8 pos1, pos2, pos3;
 
-	LibDeleteVariable(L"MokSB", &shim_lock_guid);
-
 	if (MokSBSize != sizeof(MokSBvar)) {
 		Print(L"Invalid MokSB variable contents\n");
 		return -1;
@@ -776,6 +774,8 @@ static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
 						  &shim_lock_guid);
 			}
 
+			LibDeleteVariable(L"MokSB", &shim_lock_guid);
+
 			Print(L"Press a key to reboot system\n");
 			Pause();
 			uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
@@ -804,9 +804,24 @@ static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
 		return -1;
 	}
 
-	LibDeleteVariable(L"MokPW", &shim_lock_guid);
-
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	SetMem(hash, SHA256_DIGEST_SIZE, 0);
+
+	if (CompareMem(MokPW, hash, SHA256_DIGEST_SIZE) == 0) {
+		Print(L"Clear MOK password? (y/n): ");
+
+		do {
+			get_line (&length, line, 1, 1);
+
+			if (line[0] == 'Y' || line[0] == 'y') {
+				LibDeleteVariable(L"MokPWStore", &shim_lock_guid);
+				LibDeleteVariable(L"MokPW", &shim_lock_guid);
+			}
+		} while (line[0] != 'N' && line[0] != 'n');
+
+		return 0;
+	}
 
 	while (fail_count < 3) {
 		Print(L"Confirm MOK passphrase: ");
@@ -856,6 +871,8 @@ static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
 				Print(L"Failed to set MOK password\n");
 				return -1;
 			}
+
+			LibDeleteVariable(L"MokPW", &shim_lock_guid);
 
 			Print(L"Press a key to reboot system\n");
 			Pause();
