@@ -340,14 +340,14 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 
 	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha256hash,
 				 SHA256_DIGEST_SIZE, EfiHashSha256Guid) ==
-				DATA_NOT_FOUND)
+				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha1hash,
 				 SHA1_DIGEST_SIZE, EfiHashSha1Guid) ==
-				DATA_NOT_FOUND)
+				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 	if (check_db_cert_in_ram(vendor_dbx, vendor_dbx_size, cert,
-				 sha256hash) == DATA_NOT_FOUND)
+				 sha256hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,

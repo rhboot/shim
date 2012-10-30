@@ -28,5 +28,5 @@ vendor_dbx:
 	.type	vendor_dbx_size, @object
 	.size	vendor_dbx_size, 4
 vendor_dbx_size:
-	.long	1
+	.long	0
 #endif
