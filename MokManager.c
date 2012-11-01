@@ -8,12 +8,16 @@
 
 #define PASSWORD_MAX 16
 #define PASSWORD_MIN 8
+#define SB_PASSWORD_LEN 8
 
 #ifndef SHIM_VENDOR
 #define SHIM_VENDOR L"Shim"
 #endif
 
 #define EFI_VARIABLE_APPEND_WRITE 0x00000040
+
+#define CERT_STRING L"Select an X509 certificate to enroll:\n\n"
+#define HASH_STRING L"Select a file to trust:\n\n"
 
 struct menu_item {
 	CHAR16 *text;
@@ -28,6 +32,12 @@ typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
 } __attribute__ ((packed)) MokListNode;
+
+typedef struct {
+	UINT32 MokSBState;
+	UINT32 PWLen;
+	CHAR16 Password[PASSWORD_MAX];
+} __attribute__ ((packed)) MokSBvar;
 
 static EFI_INPUT_KEY get_keystroke (void)
 {
@@ -99,7 +109,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
-						  CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
@@ -107,7 +117,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		    (CertList->SignatureSize != 48)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
-						  CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
@@ -120,7 +130,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		count++;
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						   CertList->SignatureSize);
+						  CertList->SignatureListSize);
 	}
 
 	return list;
@@ -308,14 +318,28 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		return;
 
 	if (MokSize != 48) {
-		if (X509ConstructCertificate(Mok, MokSize, (UINT8 **) &X509Cert) &&
-		    X509Cert != NULL) {
+		if (X509ConstructCertificate(Mok, MokSize,
+				 (UINT8 **) &X509Cert) && X509Cert != NULL) {
 			show_x509_info(X509Cert);
 			X509_free(X509Cert);
 		} else {
 			Print(L"  Not a valid X509 certificate: %x\n\n",
 			      ((UINT32 *)Mok)[0]);
 			return;
+		}
+
+		efi_status = get_sha1sum(Mok, MokSize, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to compute MOK fingerprint\n");
+			return;
+		}
+
+		Print(L"  Fingerprint (SHA1):\n    ");
+		for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
+			Print(L" %02x", hash[i]);
+			if (i % 10 == 9)
+				Print(L"\n    ");
 		}
 	} else {
 		Print(L"SHA256 hash:\n   ");
@@ -326,19 +350,7 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 		}
 		Print(L"\n");
 	}
-	efi_status = get_sha1sum(Mok, MokSize, hash);
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to compute MOK fingerprint\n");
-		return;
-	}
-
-	Print(L"  Fingerprint (SHA1):\n    ");
-	for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
-		Print(L" %02x", hash[i]);
-		if (i % 10 == 9)
-			Print(L"\n    ");
-	}
 	Print(L"\n");
 }
 
@@ -403,7 +415,7 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 			Print(L"Doesn't look like a key or hash\n");
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						     CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
@@ -412,14 +424,14 @@ static UINT8 list_keys (void *MokNew, UINTN MokNewSize)
 			Print(L"Doesn't look like a valid hash\n");
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						     CertList->SignatureSize);
+						  CertList->SignatureListSize);
 			continue;
 		}
 
 		MokNum++;
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						   CertList->SignatureSize);
+						  CertList->SignatureListSize);
 	}
 
 	keys = build_mok_list(MokNum, MokNew, MokNewSize);
@@ -604,8 +616,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
 					       &shim_lock_guid,
 					       EFI_VARIABLE_NON_VOLATILE
-					       | EFI_VARIABLE_BOOTSERVICE_ACCESS
-					       | EFI_VARIABLE_APPEND_WRITE,
+					       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
 	} else {
 		/* Write new MOK */
@@ -653,7 +664,9 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 }
 
 static INTN mok_enrollment_prompt_callback (void *MokNew, void *data2,
-					    void *data3) {
+					    void *data3)
+{
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 	return mok_enrollment_prompt(MokNew, (UINTN)data2, TRUE);
 }
 
@@ -678,7 +691,203 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
 	return 0;
 }
 
-static UINTN draw_menu (struct menu_item *items, UINTN count) {
+static INTN mok_sb_prompt (void *MokSB, void *data2, void *data3) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINTN MokSBSize = (UINTN)data2;
+	MokSBvar *var = MokSB;
+	CHAR16 pass1, pass2, pass3;
+	UINT8 fail_count = 0;
+	UINT32 length;
+	CHAR16 line[1];
+	UINT8 sbval = 1;
+	UINT8 pos1, pos2, pos3;
+
+	if (MokSBSize != sizeof(MokSBvar)) {
+		Print(L"Invalid MokSB variable contents\n");
+		return -1;
+	}
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	while (fail_count < 3) {
+		RandomBytes (&pos1, sizeof(pos1));
+		pos1 = (pos1 % var->PWLen);
+
+		do {
+			RandomBytes (&pos2, sizeof(pos2));
+			pos2 = (pos2 % var->PWLen);
+		} while (pos2 == pos1);
+
+		do {
+			RandomBytes (&pos3, sizeof(pos3));
+			pos3 = (pos3 % var->PWLen) ;
+		} while (pos3 == pos2 || pos3 == pos1);
+
+		Print(L"Enter password character %d: ", pos1 + 1);
+		get_line(&length, &pass1, 1, 0);
+
+		Print(L"Enter password character %d: ", pos2 + 1);
+		get_line(&length, &pass2, 1, 0);
+
+		Print(L"Enter password character %d: ", pos3 + 1);
+		get_line(&length, &pass3, 1, 0);
+
+		if (pass1 != var->Password[pos1] ||
+		    pass2 != var->Password[pos2] ||
+		    pass3 != var->Password[pos3]) {
+			Print(L"Invalid character\n");
+			fail_count++;
+		} else {
+			break;
+		}
+	}
+
+	if (fail_count >= 3) {
+		Print(L"Password limit reached\n");
+		return -1;
+	}
+
+	if (var->MokSBState == 0) {
+		Print(L"Disable Secure Boot? (y/n): ");
+	} else {
+		Print(L"Enable Secure Boot? (y/n): ");
+	}
+
+	do {
+		get_line (&length, line, 1, 1);
+
+		if (line[0] == 'Y' || line[0] == 'y') {
+			if (var->MokSBState == 0) {
+				efi_status = uefi_call_wrapper(RT->SetVariable,
+							       5, L"MokSBState",
+							       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+							       1, &sbval);
+				if (efi_status != EFI_SUCCESS) {
+					Print(L"Failed to set Secure Boot state\n");
+					return -1;
+				}
+			} else {
+				LibDeleteVariable(L"MokSBState",
+						  &shim_lock_guid);
+			}
+
+			LibDeleteVariable(L"MokSB", &shim_lock_guid);
+
+			Print(L"Press a key to reboot system\n");
+			Pause();
+			uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+					  EFI_SUCCESS, 0, NULL);
+			Print(L"Failed to reboot\n");
+			return -1;
+		}
+	} while (line[0] != 'N' && line[0] != 'n');
+
+	return -1;
+}
+
+
+static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINTN MokPWSize = (UINTN)data2;
+	UINT8 fail_count = 0;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	CHAR16 password[PASSWORD_MAX];
+	UINT32 length;
+	CHAR16 line[1];
+
+	if (MokPWSize != SHA256_DIGEST_SIZE) {
+		Print(L"Invalid MokPW variable contents\n");
+		return -1;
+	}
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	SetMem(hash, SHA256_DIGEST_SIZE, 0);
+
+	if (CompareMem(MokPW, hash, SHA256_DIGEST_SIZE) == 0) {
+		Print(L"Clear MOK password? (y/n): ");
+
+		do {
+			get_line (&length, line, 1, 1);
+
+			if (line[0] == 'Y' || line[0] == 'y') {
+				LibDeleteVariable(L"MokPWStore", &shim_lock_guid);
+				LibDeleteVariable(L"MokPW", &shim_lock_guid);
+			}
+		} while (line[0] != 'N' && line[0] != 'n');
+
+		return 0;
+	}
+
+	while (fail_count < 3) {
+		Print(L"Confirm MOK passphrase: ");
+		get_line(&length, password, PASSWORD_MAX, 0);
+
+		if ((length < PASSWORD_MIN) || (length > PASSWORD_MAX)) {
+			Print(L"Invalid password length\n");
+			fail_count++;
+			continue;
+		}
+
+		efi_status = compute_pw_hash(NULL, 0, password, length, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to generate password hash\n");
+			fail_count++;
+			continue;
+		}
+
+		if (CompareMem(MokPW, hash, SHA256_DIGEST_SIZE) != 0) {
+			Print(L"Password doesn't match\n");
+			fail_count++;
+			continue;
+		}
+
+		break;
+	}
+
+	if (fail_count >= 3) {
+		Print(L"Password limit reached\n");
+		return -1;
+	}
+
+	Print(L"Set MOK password? (y/n): ");
+
+	do {
+		get_line (&length, line, 1, 1);
+
+		if (line[0] == 'Y' || line[0] == 'y') {
+			efi_status = uefi_call_wrapper(RT->SetVariable, 5,
+						       L"MokPWStore",
+						       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+						       MokPWSize, MokPW);
+			if (efi_status != EFI_SUCCESS) {
+				Print(L"Failed to set MOK password\n");
+				return -1;
+			}
+
+			LibDeleteVariable(L"MokPW", &shim_lock_guid);
+
+			Print(L"Press a key to reboot system\n");
+			Pause();
+			uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+					  EFI_SUCCESS, 0, NULL);
+			Print(L"Failed to reboot\n");
+			return -1;
+		}
+	} while (line[0] != 'N' && line[0] != 'n');
+
+	return 0;
+}
+
+static UINTN draw_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
+			UINTN count) {
 	UINTN i;
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
@@ -687,6 +896,9 @@ static UINTN draw_menu (struct menu_item *items, UINTN count) {
 			  EFI_WHITE | EFI_BACKGROUND_BLACK);
 
 	Print(L"%s UEFI key management\n\n", SHIM_VENDOR);
+
+	if (header)
+		Print(L"%s", header);
 
 	for (i = 0; i < count; i++) {
 		uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
@@ -697,7 +909,7 @@ static UINTN draw_menu (struct menu_item *items, UINTN count) {
 	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, 0);
 	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, TRUE);
 
-	return 2;
+	return 2 + lines;
 }
 
 static void free_menu (struct menu_item *items, UINTN count) {
@@ -711,31 +923,42 @@ static void free_menu (struct menu_item *items, UINTN count) {
 	FreePool(items);
 }
 
-static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
+static void update_time (UINTN position, UINTN timeout)
+{
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0,
+			  position);
+
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_BLACK | EFI_BACKGROUND_BLACK);
+
+	Print(L"                       ", timeout);
+
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0,
+			  position);
+
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_WHITE | EFI_BACKGROUND_BLACK);
+
+	if (timeout > 1)
+		Print(L"Booting in %d seconds\n", timeout);
+	else if (timeout)
+		Print(L"Booting in %d second\n", timeout);
+}
+
+static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
+		      UINTN count, UINTN timeout) {
 	UINTN index, pos = 0, wait = 0, offset;
 	EFI_INPUT_KEY key;
 	EFI_STATUS status;
+	INTN ret;
 
 	if (timeout)
 		wait = 10000000;
 
+	offset = draw_menu (header, lines, items, count);
+
 	while (1) {
-		uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
-
-		offset = draw_menu (items, count);
-
-		uefi_call_wrapper(ST->ConOut->SetAttribute, 2,
-				  ST->ConOut,
-				  EFI_WHITE | EFI_BACKGROUND_BLACK);
-
-		if (timeout) {
-			uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3,
-					  ST->ConOut, 0, count + 1 + offset);
-			if (timeout > 1)
-				Print(L"Booting in %d seconds\n", timeout);
-			else
-				Print(L"Booting in %d second\n", timeout);
-		}
+		update_time(count + offset + 1, timeout);
 
 		uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
 				  0, pos + offset);
@@ -781,9 +1004,14 @@ static void run_menu (struct menu_item *items, UINTN count, UINTN timeout) {
 				return;
 			}
 
-			items[pos].callback(items[pos].data, items[pos].data2,
-					    items[pos].data3);
-			draw_menu (items, count);
+			ret = items[pos].callback(items[pos].data,
+						  items[pos].data2,
+						  items[pos].data3);
+			if (ret < 0) {
+				Print(L"Press a key to continue\n");
+				Pause();
+			}
+			draw_menu (header, lines, items, count);
 			pos = 0;
 			break;
 		}
@@ -937,6 +1165,7 @@ static INTN directory_callback (void *data, void *data2, void *data3) {
 	EFI_FILE *dir;
 	CHAR16 *filename = data;
 	EFI_FILE *root = data2;
+	BOOLEAN hash = !!data3;
 
 	status = uefi_call_wrapper(root->Open, 5, root, &dir, filename,
 				   EFI_FILE_MODE_READ, 0);
@@ -1023,7 +1252,10 @@ static INTN directory_callback (void *data, void *data2, void *data3) {
 		buffer = NULL;
 	}
 
-	run_menu(dircontent, dircount, 0);
+	if (hash)
+		run_menu(HASH_STRING, 2, dircontent, dircount, 0);
+	else
+		run_menu(CERT_STRING, 2, dircontent, dircount, 0);
 
 	return 0;
 }
@@ -1035,6 +1267,7 @@ static INTN filesystem_callback (void *data, void *data2, void *data3) {
 	UINTN dircount = 0, i = 0;
 	struct menu_item *dircontent;
 	EFI_FILE *root = data;
+	BOOLEAN hash = !!data3;
 
 	uefi_call_wrapper(root->SetPosition, 2, root, 0);
 
@@ -1117,7 +1350,10 @@ static INTN filesystem_callback (void *data, void *data2, void *data3) {
 		buffersize = 0;
 	}
 
-	run_menu(dircontent, dircount, 0);
+	if (hash)
+		run_menu(HASH_STRING, 2, dircontent, dircount, 0);
+	else
+		run_menu(CERT_STRING, 2, dircontent, dircount, 0);
 
 	return 0;
 }
@@ -1126,8 +1362,9 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	UINTN count, i;
 	UINTN OldSize, NewSize;
-	EFI_HANDLE **filesystem_handles;
+	EFI_HANDLE *filesystem_handles = NULL;
 	struct menu_item *filesystems;
+	BOOLEAN hash = !!data3;
 
 	uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol, &fs_guid,
 			  NULL, &count, &filesystem_handles);
@@ -1146,7 +1383,7 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 	filesystems[0].colour = EFI_YELLOW;
 
 	for (i=1; i<count; i++) {
-		EFI_HANDLE *fs = filesystem_handles[i-1];
+		EFI_HANDLE fs = filesystem_handles[i-1];
 		EFI_FILE_IO_INTERFACE *fs_interface;
 		EFI_DEVICE_PATH *path;
 		EFI_FILE *root;
@@ -1157,7 +1394,7 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 		EFI_GUID file_info_guid = EFI_FILE_INFO_ID;
 
 		status = uefi_call_wrapper(BS->HandleProtocol, 3, fs, &fs_guid,
-					   &fs_interface);
+					   (void **)&fs_interface);
 
 		if (status != EFI_SUCCESS || !fs_interface)
 			continue;
@@ -1208,22 +1445,89 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 
 	uefi_call_wrapper(BS->FreePool, 1, filesystem_handles);
 
-	run_menu(filesystems, count, 0);
+	if (hash)
+		run_menu(HASH_STRING, 2, filesystems, count, 0);
+	else
+		run_menu(CERT_STRING, 2, filesystems, count, 0);
 
 	return 0;
 }
 
+static BOOLEAN verify_pw(void)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	CHAR16 password[PASSWORD_MAX];
+	UINT8 fail_count = 0;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT8 pwhash[SHA256_DIGEST_SIZE];
+	UINTN size = SHA256_DIGEST_SIZE;
+	UINT32 length;
+	UINT32 attributes;
+
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokPWStore",
+				       &shim_lock_guid, &attributes, &size,
+				       pwhash);
+
+	/*
+	 * If anything can attack the password it could just set it to a
+	 * known value, so there's no safety advantage in failing to validate
+	 * purely because of a failure to read the variable
+	 */
+	if (efi_status != EFI_SUCCESS)
+		return TRUE;
+
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS)
+		return TRUE;
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	while (fail_count < 3) {
+		Print(L"Enter MOK password: ");
+		get_line(&length, password, PASSWORD_MAX, 0);
+
+		if (length < PASSWORD_MIN || length > PASSWORD_MAX) {
+			Print(L"Invalid password length\n");
+			fail_count++;
+			continue;
+		}
+
+		efi_status = compute_pw_hash(NULL, 0, password, length, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to generate password hash\n");
+			fail_count++;
+			continue;
+		}
+
+		if (CompareMem(pwhash, hash, SHA256_DIGEST_SIZE) != 0) {
+			Print(L"Password doesn't match\n");
+			fail_count++;
+			continue;
+		}
+
+		return TRUE;
+	}
+
+	Print(L"Password limit reached\n");
+	return FALSE;
+}
+
 static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
-				 UINTN MokNewSize)
+				 UINTN MokNewSize, void *MokSB,
+				 UINTN MokSBSize, void *MokPW, UINTN MokPWSize)
 {
 	struct menu_item *menu_item;
 	UINT32 MokAuth = 0;
-	UINTN menucount = 0;
+	UINTN menucount = 3, i = 0;
 	EFI_STATUS efi_status;
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINT8 auth[SHA256_DIGEST_SIZE];
 	UINTN auth_size = SHA256_DIGEST_SIZE;
 	UINT32 attributes;
+
+	if (verify_pw() == FALSE)
+		return EFI_ACCESS_DENIED;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
 					       &shim_lock_guid,
@@ -1233,49 +1537,73 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 		MokAuth = 1;
 
 	if (MokNew || MokAuth)
-		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 4);
-	else
-		menu_item = AllocateZeroPool(sizeof(struct menu_item) * 3);
+		menucount++;
+
+	if (MokSB)
+		menucount++;
+
+	if (MokPW)
+		menucount++;
+
+	menu_item = AllocateZeroPool(sizeof(struct menu_item) * menucount);
 
 	if (!menu_item)
 		return EFI_OUT_OF_RESOURCES;
 
-	menu_item[0].text = StrDuplicate(L"Continue boot");
-	menu_item[0].colour = EFI_WHITE;
-	menu_item[0].callback = NULL;
+	menu_item[i].text = StrDuplicate(L"Continue boot");
+	menu_item[i].colour = EFI_WHITE;
+	menu_item[i].callback = NULL;
 
-	menucount++;
+	i++;
 
 	if (MokNew || MokAuth) {
 		if (!MokNew) {
-			menu_item[1].text = StrDuplicate(L"Delete MOK");
-			menu_item[1].colour = EFI_WHITE;
-			menu_item[1].callback = mok_deletion_prompt;
+			menu_item[i].text = StrDuplicate(L"Delete MOK");
+			menu_item[i].colour = EFI_WHITE;
+			menu_item[i].callback = mok_deletion_prompt;
 		} else {
-			menu_item[1].text = StrDuplicate(L"Enroll MOK");
-			menu_item[1].colour = EFI_WHITE;
-			menu_item[1].data = MokNew;
-			menu_item[1].data2 = (void *)MokNewSize;
-			menu_item[1].callback = mok_enrollment_prompt_callback;
+			menu_item[i].text = StrDuplicate(L"Enroll MOK");
+			menu_item[i].colour = EFI_WHITE;
+			menu_item[i].data = MokNew;
+			menu_item[i].data2 = (void *)MokNewSize;
+			menu_item[i].callback = mok_enrollment_prompt_callback;
 		}
-		menucount++;
+		i++;
 	}
 
-	menu_item[menucount].text = StrDuplicate(L"Enroll key from disk");
-	menu_item[menucount].colour = EFI_WHITE;
-	menu_item[menucount].callback = find_fs;
-	menu_item[menucount].data3 = (void *)FALSE;
+	if (MokSB) {
+		menu_item[i].text = StrDuplicate(L"Change Secure Boot state");
+		menu_item[i].colour = EFI_WHITE;
+		menu_item[i].callback = mok_sb_prompt;
+		menu_item[i].data = MokSB;
+		menu_item[i].data2 = (void *)MokSBSize;
+		i++;
+	}
 
-	menucount++;
+	if (MokPW) {
+		menu_item[i].text = StrDuplicate(L"Set MOK password");
+		menu_item[i].colour = EFI_WHITE;
+		menu_item[i].callback = mok_pw_prompt;
+		menu_item[i].data = MokPW;
+		menu_item[i].data2 = (void *)MokPWSize;
+		i++;
+	}
 
-	menu_item[menucount].text = StrDuplicate(L"Enroll hash from disk");
-	menu_item[menucount].colour = EFI_WHITE;
-	menu_item[menucount].callback = find_fs;
-	menu_item[menucount].data3 = (void *)TRUE;
+	menu_item[i].text = StrDuplicate(L"Enroll key from disk");
+	menu_item[i].colour = EFI_WHITE;
+	menu_item[i].callback = find_fs;
+	menu_item[i].data3 = (void *)FALSE;
 
-	menucount++;
+	i++;
 
-	run_menu(menu_item, menucount, 10);
+	menu_item[i].text = StrDuplicate(L"Enroll hash from disk");
+	menu_item[i].colour = EFI_WHITE;
+	menu_item[i].callback = find_fs;
+	menu_item[i].data3 = (void *)TRUE;
+
+	i++;
+
+	run_menu(NULL, 0, menu_item, menucount, 10);
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
@@ -1285,12 +1613,19 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	UINTN MokNewSize = 0;
+	UINTN MokNewSize = 0, MokSBSize = 0, MokPWSize = 0;
 	void *MokNew = NULL;
+	void *MokSB = NULL;
+	void *MokPW = NULL;
 
 	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
 
-	enter_mok_menu(image_handle, MokNew, MokNewSize);
+	MokSB = LibGetVariableAndSize(L"MokSB", &shim_lock_guid, &MokSBSize);
+
+	MokPW = LibGetVariableAndSize(L"MokPW", &shim_lock_guid, &MokPWSize);
+
+	enter_mok_menu(image_handle, MokNew, MokNewSize, MokSB, MokSBSize,
+		       MokPW, MokPWSize);
 
 	if (MokNew) {
 		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
@@ -1298,7 +1633,47 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		}
 		FreePool (MokNew);
 	}
+
+	if (MokSB) {
+		if (LibDeleteVariable(L"MokSB", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to delete MokSB\n");
+		}
+		FreePool (MokNew);
+	}
+
+	if (MokPW) {
+		if (LibDeleteVariable(L"MokPW", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to delete MokPW\n");
+		}
+		FreePool (MokNew);
+	}
+
 	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+
+	return EFI_SUCCESS;
+}
+
+static EFI_STATUS setup_rand (void)
+{
+	EFI_TIME time;
+	EFI_STATUS efi_status;
+	UINT64 seed;
+	BOOLEAN status;
+
+	efi_status = uefi_call_wrapper(RT->GetTime, 2, &time, NULL);
+
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	seed = ((UINT64)time.Year << 48) | ((UINT64)time.Month << 40) |
+		((UINT64)time.Day << 32) | ((UINT64)time.Hour << 24) |
+		((UINT64)time.Minute << 16) | ((UINT64)time.Second << 8) |
+		((UINT64)time.Daylight);
+
+	status = RandomSeed((UINT8 *)&seed, sizeof(seed));
+
+	if (!status)
+		return EFI_ABORTED;
 
 	return EFI_SUCCESS;
 }
@@ -1308,6 +1683,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 	EFI_STATUS efi_status;
 
 	InitializeLib(image_handle, systab);
+
+	setup_rand();
 
 	efi_status = check_mok_request(image_handle);
 

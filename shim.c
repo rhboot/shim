@@ -52,8 +52,12 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
  */
 extern UINT8 vendor_cert[];
 extern UINT32 vendor_cert_size;
+extern EFI_SIGNATURE_LIST *vendor_dbx;
+extern UINT32 vendor_dbx_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
+
+static UINT8 insecure_mode;
 
 typedef enum {
 	DATA_FOUND,
@@ -79,8 +83,7 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 		return efi_status;
 	}
 
-	if (allocate)
-		*buffer = AllocatePool(*size);
+	*buffer = AllocatePool(*size);
 
 	if (!*buffer) {
 		Print(L"Unable to allocate variable buffer\n");
@@ -208,25 +211,15 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
-				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
+					 UINTN dbsize,
+					 WIN_CERTIFICATE_EFI_PKCS *data,
+					 UINT8 *hash)
 {
-	EFI_STATUS efi_status;
-	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *Cert;
-	UINTN dbsize = 0;
 	UINTN CertCount, Index;
-	UINT32 attributes;
 	BOOLEAN IsFound = FALSE;
-	void *db;
 	EFI_GUID CertType = EfiCertX509Guid;
-
-	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
-
-	if (efi_status != EFI_SUCCESS)
-		return VAR_NOT_FOUND;
-
-	CertList = db;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
@@ -240,16 +233,18 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 							      hash, SHA256_DIGEST_SIZE);
 				if (IsFound)
 					break;
+
+				Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
 			}
 
-			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
 		}
+
+		if (IsFound)
+			break;
 
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
 	}
-
-	FreePool(db);
 
 	if (IsFound)
 		return DATA_FOUND;
@@ -257,25 +252,37 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
-				  int SignatureSize, EFI_GUID CertType)
+static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
+				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
 {
+	CHECK_STATUS rc;
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
-	EFI_SIGNATURE_DATA *Cert;
 	UINTN dbsize = 0;
-	UINTN CertCount, Index;
 	UINT32 attributes;
-	BOOLEAN IsFound = FALSE;
 	void *db;
 
 	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
 
-	if (efi_status != EFI_SUCCESS) {
+	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
-	}
 
 	CertList = db;
+
+	rc = check_db_cert_in_ram(CertList, dbsize, data, hash);
+
+	FreePool(db);
+
+	return rc;
+}
+
+static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
+					 UINTN dbsize, UINT8 *data,
+					 int SignatureSize, EFI_GUID CertType)
+{
+	EFI_SIGNATURE_DATA *Cert;
+	UINTN CertCount, Index;
+	BOOLEAN IsFound = FALSE;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
@@ -301,18 +308,52 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
 	}
 
-	FreePool(db);
-
 	if (IsFound)
 		return DATA_FOUND;
 
 	return DATA_NOT_FOUND;
 }
 
+static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
+				  int SignatureSize, EFI_GUID CertType)
+{
+	EFI_STATUS efi_status;
+	EFI_SIGNATURE_LIST *CertList;
+	UINT32 attributes;
+	UINTN dbsize = 0;
+	void *db;
+
+	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
+
+	if (efi_status != EFI_SUCCESS) {
+		return VAR_NOT_FOUND;
+	}
+
+	CertList = db;
+
+	CHECK_STATUS rc = check_db_hash_in_ram(CertList, dbsize, data,
+						SignatureSize, CertType);
+	FreePool(db);
+	return rc;
+
+}
+
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+
+	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha256hash,
+				 SHA256_DIGEST_SIZE, EfiHashSha256Guid) ==
+				DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha1hash,
+				 SHA1_DIGEST_SIZE, EfiHashSha1Guid) ==
+				DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_cert_in_ram(vendor_dbx, vendor_dbx_size, cert,
+				 sha256hash) == DATA_FOUND)
+		return EFI_ACCESS_DENIED;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EfiHashSha256Guid) == DATA_FOUND)
@@ -360,6 +401,9 @@ static BOOLEAN secure_mode (void)
 	UINTN charsize = sizeof(char);
 	UINT8 sb, setupmode;
 	UINT32 attributes;
+
+	if (insecure_mode)
+		return FALSE;
 
 	status = get_variable(L"SecureBoot", global_var, &attributes, &charsize,
 			      (void *)&sb);
@@ -505,7 +549,8 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 
 		if (!hashbase) {
 			Print(L"Malformed section header\n");
-			return EFI_INVALID_PARAMETER;
+			status = EFI_INVALID_PARAMETER;
+			goto done;
 		}
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
@@ -585,6 +630,11 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	WIN_CERTIFICATE_EFI_PKCS *cert;
 	unsigned int size = datasize;
 
+	if (context->SecDir->Size == 0) {
+		Print(L"Empty security header\n");
+		return EFI_INVALID_PARAMETER;
+	}
+
 	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
 
 	if (!cert) {
@@ -643,8 +693,18 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 
+	if (datasize < sizeof(EFI_IMAGE_DOS_HEADER)) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
+
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
+
+	if ((((UINT8 *)PEHdr - (UINT8 *)data) + sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION)) > datasize) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	if (PEHdr->Te.Signature != EFI_IMAGE_NT_SIGNATURE) {
 		Print(L"Unsupported image type\n");
@@ -672,13 +732,18 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
 
-	if (context->SecDir->VirtualAddress >= datasize) {
-		Print(L"Malformed security header\n");
-		return EFI_INVALID_PARAMETER;
+	if (context->ImageSize < context->SizeOfHeaders) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
 	}
 
-	if (context->SecDir->Size == 0) {
-		Print(L"Empty security header\n");
+	if (((UINT8 *)context->SecDir - (UINT8 *)data) > (datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
+		Print(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	if (context->SecDir->VirtualAddress >= datasize) {
+		Print(L"Malformed security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
 	return EFI_SUCCESS;
@@ -790,7 +855,7 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 
 	bootpath[i+1] = '\0';
 
-	if (bootpath[i-i] == '\\')
+	if (i == 0 || bootpath[i-i] == '\\')
 		bootpath[i] = '\0';
 
 	*PathName = AllocatePool(StrSize(bootpath) + StrSize(ImagePath));
@@ -829,7 +894,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	device = li->DeviceHandle;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &simple_file_system_protocol, &drive);	
+				       &simple_file_system_protocol,
+				       (void **)&drive);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to find fs\n");
@@ -863,6 +929,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 				       &buffersize, fileinfo);
 
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
+		FreePool(fileinfo);
 		fileinfo = AllocatePool(buffersize);
 		if (!fileinfo) {
 			Print(L"Unable to allocate file info buffer\n");
@@ -905,14 +972,15 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 
 	*datasize = buffersize;
 
+	FreePool(fileinfo);
+
 	return EFI_SUCCESS;
 error:
 	if (*data) {
 		FreePool(*data);
 		*data = NULL;
 	}
-	if (PathName)
-		FreePool(PathName);
+
 	if (fileinfo)
 		FreePool(fileinfo);
 	return efi_status;
@@ -949,7 +1017,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	int datasize;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, &li);
+				       &loaded_image_protocol, (void **)&li);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to init protocol\n");
@@ -996,10 +1064,16 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto done;
 	}
 
-	efi_status = uefi_call_wrapper(entry_point, 3, image_handle, systab);
+	efi_status = uefi_call_wrapper(entry_point, 2, image_handle, systab);
 
 	CopyMem(li, &li_bak, sizeof(li_bak));
 done:
+	if (PathName)
+		FreePool(PathName);
+
+	if (data)
+		FreePool(data);
+
 	return efi_status;
 }
 
@@ -1048,34 +1122,70 @@ done:
 	return efi_status;
 }
 
-EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
+static BOOLEAN check_var(CHAR16 *varname)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINTN size = sizeof(UINT32);
-	UINT32 MokNew;
+	UINT32 MokVar;
 	UINT32 attributes;
 
-	if (!secure_mode())
-		return EFI_SUCCESS;
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokNew",
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, varname,
 				       &shim_lock_guid, &attributes,
-				       &size, (void *)&MokNew);
+				       &size, (void *)&MokVar);
 
-	if (efi_status != EFI_SUCCESS && efi_status != EFI_BUFFER_TOO_SMALL)
-		goto done;
+	if (efi_status == EFI_SUCCESS || efi_status == EFI_BUFFER_TOO_SMALL)
+		return TRUE;
 
-	efi_status = start_image(image_handle, MOK_MANAGER);
+	return FALSE;
+}
 
-	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to start MokManager\n");
-		goto done;
+EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
+{
+	EFI_STATUS efi_status;
+
+	if (check_var(L"MokNew") || check_var(L"MokSB") ||
+	    check_var(L"MokPW") || check_var(L"MokAuth")) {
+		efi_status = start_image(image_handle, MOK_MANAGER);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to start MokManager\n");
+			return efi_status;
+		}
 	}
 
-done:
-	return efi_status;
+	return EFI_SUCCESS;
 }
+
+static EFI_STATUS check_mok_sb (void)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS status = EFI_SUCCESS;
+	void *MokSBState = NULL;
+	UINTN MokSBStateSize = 0;
+	UINT32 attributes;
+
+	status = get_variable(L"MokSBState", shim_lock_guid, &attributes,
+			      &MokSBStateSize, &MokSBState);
+
+	if (status != EFI_SUCCESS)
+		return EFI_ACCESS_DENIED;
+
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+		Print(L"MokSBState is compromised! Clearing it\n");
+		if (LibDeleteVariable(L"MokSBState", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to erase MokSBState\n");
+		}
+		status = EFI_ACCESS_DENIED;
+	} else {
+		if (*(UINT8 *)MokSBState == 1) {
+			insecure_mode = 1;
+		}
+	}
+
+	return status;
+}
+
 
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
@@ -1091,6 +1201,13 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	systab = passed_systab;
 
 	InitializeLib(image_handle, systab);
+
+	check_mok_sb();
+
+	if (insecure_mode) {
+		Print(L"Booting in insecure mode\n");
+		uefi_call_wrapper(BS->Stall, 1, 2000000);
+	}
 
 	efi_status = check_mok_request(image_handle);
 
