@@ -106,6 +106,11 @@ try_again:
 		goto try_again;
 	}
 
+	if (status == EFI_NOT_FOUND) {
+		FreePool(buffer);
+		return FALSE;
+	}
+
 	/*
  	 * We have a list of pxe supporting protocols, lets see if any are
  	 * active
