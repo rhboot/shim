@@ -26,7 +26,7 @@ endif
 
 LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS)
 
-VERSION		= 0.1
+VERSION		= 0.2
 
 TARGET	= shim.efi MokManager.efi
 OBJS	= shim.o netboot.o cert.o dbx.o
