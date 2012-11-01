@@ -232,9 +232,10 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 							      hash, SHA256_DIGEST_SIZE);
 				if (IsFound)
 					break;
+
+				Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
 			}
 
-			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
 		}
 
 		if (IsFound)
