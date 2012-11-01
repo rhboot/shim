@@ -1362,7 +1362,7 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 	EFI_GUID fs_guid = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	UINTN count, i;
 	UINTN OldSize, NewSize;
-	EFI_HANDLE **filesystem_handles;
+	EFI_HANDLE *filesystem_handles = NULL;
 	struct menu_item *filesystems;
 	BOOLEAN hash = !!data3;
 
@@ -1383,7 +1383,7 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 	filesystems[0].colour = EFI_YELLOW;
 
 	for (i=1; i<count; i++) {
-		EFI_HANDLE *fs = filesystem_handles[i-1];
+		EFI_HANDLE fs = filesystem_handles[i-1];
 		EFI_FILE_IO_INTERFACE *fs_interface;
 		EFI_DEVICE_PATH *path;
 		EFI_FILE *root;
@@ -1394,7 +1394,7 @@ static INTN find_fs (void *data, void *data2, void *data3) {
 		EFI_GUID file_info_guid = EFI_FILE_INFO_ID;
 
 		status = uefi_call_wrapper(BS->HandleProtocol, 3, fs, &fs_guid,
-					   &fs_interface);
+					   (void **)&fs_interface);
 
 		if (status != EFI_SUCCESS || !fs_interface)
 			continue;

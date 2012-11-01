@@ -890,7 +890,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	device = li->DeviceHandle;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &simple_file_system_protocol, &drive);	
+				       &simple_file_system_protocol,
+				       (void **)&drive);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to find fs\n");
@@ -1011,7 +1012,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	int datasize;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, &li);
+				       &loaded_image_protocol, (void **)&li);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to init protocol\n");
