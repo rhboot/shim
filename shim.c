@@ -976,8 +976,7 @@ error:
 		FreePool(*data);
 		*data = NULL;
 	}
-	if (PathName)
-		FreePool(PathName);
+
 	if (fileinfo)
 		FreePool(fileinfo);
 	return efi_status;
