@@ -276,6 +276,9 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 	return rc;
 }
 
+/*
+ * Check a hash against an EFI_SIGNATURE_LIST in a buffer
+ */
 static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize, UINT8 *data,
 					 int SignatureSize, EFI_GUID CertType)
@@ -314,6 +317,9 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 	return DATA_NOT_FOUND;
 }
 
+/*
+ * Check a hash against an EFI_SIGNATURE_LIST in a UEFI variable
+ */
 static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 				  int SignatureSize, EFI_GUID CertType)
 {
@@ -338,6 +344,10 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 
 }
 
+/*
+ * Check whether the binary signature or hash are present in dbx or the
+ * built-in blacklist
+ */
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
@@ -367,6 +377,9 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	return EFI_SUCCESS;
 }
 
+/*
+ * Check whether the binary signature or hash are present in db or MokList
+ */
 static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
@@ -596,6 +609,9 @@ done:
 	return status;
 }
 
+/*
+ * Ensure that the MOK database hasn't been set or modified from an OS
+ */
 static EFI_STATUS verify_mok (void) {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
@@ -653,8 +669,14 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (status != EFI_SUCCESS)
 		return status;
 
+	/*
+	 * Check that the MOK database hasn't been modified
+	 */
 	verify_mok();
 
+	/*
+	 * Ensure that the binary isn't blacklisted
+	 */
 	status = check_blacklist(cert, sha256hash, sha1hash);
 
 	if (status != EFI_SUCCESS) {
@@ -662,6 +684,10 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		return status;
 	}
 
+	/*
+	 * Check whether the binary is whitelisted in any of the firmware
+	 * databases
+	 */
 	status = check_whitelist(cert, sha256hash, sha1hash);
 
 	if (status == EFI_SUCCESS) {
@@ -669,6 +695,9 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		return status;
 	}
 
+	/*
+	 * And finally, check against shim's built-in key
+	 */
 	if (AuthenticodeVerify(cert->CertData,
 			       context->SecDir->Size - sizeof(cert->Hdr),
 			       vendor_cert, vendor_cert_size, sha256hash,
@@ -762,12 +791,18 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 
+	/*
+	 * The binary header contains relevant context and section pointers
+	 */
 	efi_status = read_header(data, datasize, &context);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to read header\n");
 		return efi_status;
 	}
 
+	/*
+	 * We only need to verify the binary if we're in secure mode
+	 */
 	if (secure_mode ()) {
 		efi_status = verify_buffer(data, datasize, &context);
 
@@ -786,6 +821,9 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
+	/*
+	 * Copy the executable's sections to their desired offsets
+	 */
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++) {
 		size = Section->Misc.VirtualSize;
@@ -810,6 +848,9 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		Section += 1;
 	}
 
+	/*
+	 * Run the relocation fixups
+	 */
 	efi_status = relocate_coff(&context, buffer);
 
 	if (efi_status != EFI_SUCCESS) {
@@ -819,6 +860,10 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	}
 
 	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
+	/*
+	 * grub needs to know its location and size in memory, so fix up
+	 * the loaded image protocol values
+	 */
 	li->ImageBase = buffer;
 	li->ImageSize = context.ImageSize;
 
@@ -831,6 +876,10 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	return EFI_SUCCESS;
 }
 
+/*
+ * Generate the path of an executable given shim's path and the name
+ * of the executable
+ */
 static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 				EFI_DEVICE_PATH **grubpath, CHAR16 **PathName)
 {
@@ -877,7 +926,7 @@ error:
 }
 
 /*
- * Locate the second stage bootloader and read it into a buffer
+ * Open the second stage bootloader and read it into a buffer
  */
 static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 			      int *datasize, CHAR16 *PathName)
@@ -893,6 +942,9 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 
 	device = li->DeviceHandle;
 
+	/*
+	 * Open the device
+	 */
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
 				       &simple_file_system_protocol,
 				       (void **)&drive);
@@ -909,6 +961,9 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 		goto error;
 	}
 
+	/*
+	 * And then open the file
+	 */
 	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub, PathName,
 				       EFI_FILE_MODE_READ, 0);
 
@@ -925,6 +980,10 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 		goto error;
 	}
 
+	/*
+	 * Find out how big the file is in order to allocate the storage
+	 * buffer
+	 */
 	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &file_info_id,
 				       &buffersize, fileinfo);
 
@@ -955,6 +1014,10 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto error;
 	}
+
+	/*
+	 * Perform the actual read
+	 */
 	efi_status = uefi_call_wrapper(grub->Read, 3, grub, &buffersize,
 				       *data);
 
@@ -986,6 +1049,10 @@ error:
 	return efi_status;
 }
 
+/*
+ * Protocol entry point. If secure boot is enabled, verify that the provided
+ * buffer is signed with a trusted key.
+ */
 EFI_STATUS shim_verify (void *buffer, UINT32 size)
 {
 	EFI_STATUS status;
@@ -1004,6 +1071,9 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	return status;
 }
 
+/*
+ * Load and run an EFI executable
+ */
 EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 {
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
@@ -1016,6 +1086,10 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	void *data = NULL;
 	int datasize;
 
+	/*
+	 * We need to refer to the loaded image protocol on the running
+	 * binary in order to find our path
+	 */
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, (void **)&li);
 
@@ -1024,6 +1098,9 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		return efi_status;
 	}
 
+	/*
+	 * Build a new path from the existing one plus the executable name
+	 */
 	efi_status = generate_path(li, ImagePath, &path, &PathName);
 
 	if (efi_status != EFI_SUCCESS) {
@@ -1046,6 +1123,9 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		data = sourcebuffer;
 		datasize = sourcesize;
 	} else {
+		/*
+		 * Read the new executable off disk
+		 */
 		efi_status = load_image(li, &data, &datasize, PathName);
 
 		if (efi_status != EFI_SUCCESS) {
@@ -1054,8 +1134,15 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 	}
 
+	/*
+	 * We need to modify the loaded image protocol entry before running
+	 * the new binary, so back it up
+	 */
 	CopyMem(&li_bak, li, sizeof(li_bak));
 
+	/*
+	 * Verify and, if appropriate, relocate and execute the executable
+	 */
 	efi_status = handle_image(data, datasize, li);
 
 	if (efi_status != EFI_SUCCESS) {
@@ -1064,8 +1151,14 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto done;
 	}
 
+	/*
+	 * The binary is trusted and relocated. Run it
+	 */
 	efi_status = uefi_call_wrapper(entry_point, 2, image_handle, systab);
 
+	/*
+	 * Restore our original loaded image values
+	 */
 	CopyMem(li, &li_bak, sizeof(li_bak));
 done:
 	if (PathName)
@@ -1077,6 +1170,10 @@ done:
 	return efi_status;
 }
 
+/*
+ * Load and run grub. If that fails because grub isn't trusted, load and
+ * run MokManager.
+ */
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
@@ -1094,6 +1191,10 @@ done:
 	return efi_status;
 }
 
+/*
+ * Copy the boot-services only MokList variable to the runtime-accessible
+ * MokListRT variable. It's not marked NV, so the OS can't modify it.
+ */
 EFI_STATUS mirror_mok_list()
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1122,6 +1223,9 @@ done:
 	return efi_status;
 }
 
+/*
+ * Check if a variable exists
+ */
 static BOOLEAN check_var(CHAR16 *varname)
 {
 	EFI_STATUS efi_status;
@@ -1140,6 +1244,10 @@ static BOOLEAN check_var(CHAR16 *varname)
 	return FALSE;
 }
 
+/*
+ * If the OS has set any of these variables we need to drop into MOK and
+ * handle them appropriately
+ */
 EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
@@ -1157,6 +1265,10 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+/*
+ * Verify that MokSBState is valid, and if appropriate set insecure mode
+ */
+
 static EFI_STATUS check_mok_sb (void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1171,6 +1283,10 @@ static EFI_STATUS check_mok_sb (void)
 	if (status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
 
+	/*
+	 * Delete and ignore the variable if it's been set from or could be
+	 * modified by the OS
+	 */
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		Print(L"MokSBState is compromised! Clearing it\n");
 		if (LibDeleteVariable(L"MokSBState", &shim_lock_guid) != EFI_SUCCESS) {
@@ -1186,7 +1302,6 @@ static EFI_STATUS check_mok_sb (void)
 	return status;
 }
 
-
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1194,31 +1309,62 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	EFI_HANDLE handle = NULL;
 	EFI_STATUS efi_status;
 
+	/*
+	 * Set up the shim lock protocol so that grub and MokManager can
+	 * call back in and use shim functions
+	 */
 	shim_lock_interface.Verify = shim_verify;
 	shim_lock_interface.Hash = generate_hash;
 	shim_lock_interface.Context = read_header;
 
 	systab = passed_systab;
 
+	/*
+	 * Ensure that gnu-efi functions are available
+	 */
 	InitializeLib(image_handle, systab);
 
+	/*
+	 * Check whether the user has configured the system to run in
+	 * insecure mode
+	 */
 	check_mok_sb();
 
+	/*
+	 * Tell the user that we're in insecure mode if necessary
+	 */
 	if (insecure_mode) {
 		Print(L"Booting in insecure mode\n");
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
 	}
 
-	efi_status = check_mok_request(image_handle);
-
-	efi_status = mirror_mok_list();
-
+	/*
+	 * Install the protocol
+	 */
 	uefi_call_wrapper(BS->InstallProtocolInterface, 4, &handle,
 			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
 			  &shim_lock_interface);
 
+	/*
+	 * Enter MokManager if necessary
+	 */
+	efi_status = check_mok_request(image_handle);
+
+	/*
+	 * Copy the MOK list to a runtime variable so the kernel can make
+	 * use of it
+	 */
+	efi_status = mirror_mok_list();
+
+	/*
+	 * Hand over control to the second stage bootloader
+	 */
+
 	efi_status = init_grub(image_handle);
 
+	/*
+	 * If we're back here then clean everything up before exiting
+	 */
 	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
 			  &shim_lock_guid, &shim_lock_interface);
 
