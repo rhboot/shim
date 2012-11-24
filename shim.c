@@ -40,6 +40,7 @@
 #include "shim.h"
 #include "signature.h"
 #include "netboot.h"
+#include "shim_cert.h"
 
 #define SECOND_STAGE L"\\grub.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
@@ -415,6 +416,8 @@ static BOOLEAN secure_mode (void)
 	UINT8 sb, setupmode;
 	UINT32 attributes;
 
+	return TRUE;
+
 	if (insecure_mode)
 		return FALSE;
 
@@ -694,6 +697,19 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		Print(L"Binary is whitelisted\n");
 		return status;
 	}
+
+	/*
+	 * Check against the shim build key
+	 */
+	if (AuthenticodeVerify(cert->CertData,
+			       context->SecDir->Size - sizeof(cert->Hdr),
+			       shim_cert, sizeof(shim_cert), sha256hash,
+			       SHA256_DIGEST_SIZE)) {
+		status = EFI_SUCCESS;
+		Print(L"Binary is verified by the vendor certificate\n");
+		return status;
+	}
+
 
 	/*
 	 * And finally, check against shim's built-in key
@@ -1180,12 +1196,8 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 
 	efi_status = start_image(image_handle, SECOND_STAGE);
 
-	if (efi_status != EFI_SUCCESS) {
-		if (efi_status == EFI_ACCESS_DENIED)
-			efi_status = start_image(image_handle, MOK_MANAGER);
-		else
-			Print(L"Failed to start grub\n");
-	}
+	if (efi_status != EFI_SUCCESS)
+		efi_status = start_image(image_handle, MOK_MANAGER);
 done:
 
 	return efi_status;

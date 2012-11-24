@@ -28,15 +28,33 @@ LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH
 
 VERSION		= 0.2
 
-TARGET	= shim.efi MokManager.efi
+TARGET	= shim.efi MokManager.efi.signed
 OBJS	= shim.o netboot.o cert.o dbx.o
+KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key
 SOURCES	= shim.c shim.h netboot.c signature.h PeImage.h
 MOK_OBJS = MokManager.o
 MOK_SOURCES = MokManager.c shim.h
 
 all: $(TARGET)
 
-shim.o: $(SOURCES)
+shim.crt:
+	./make-certs shim shim@xn--u4h.net all codesign 1.3.6.1.4.1.311.10.3.1 </dev/null
+
+shim.cer: shim.crt
+	openssl x509 -outform der -in $< -out $@
+
+shim_cert.h: shim.cer
+	echo "static UINT8 shim_cert[] = {" > $@
+	hexdump -v -e '1/1 "0x%02x, "' $< >> $@
+	echo "};" >> $@
+
+certdb/secmod.db: shim.crt
+	-mkdir certdb
+	certutil -A -n 'my CA' -d certdb/ -t CT,CT,CT -i ca.crt
+	pk12util -d certdb/ -i shim.p12 -W "" -K ""
+	certutil -d certdb/ -A -i shim.crt -n shim -t u
+
+shim.o: $(SOURCES) shim_cert.h
 
 cert.o : cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -70,10 +88,14 @@ Cryptlib/OpenSSL/libopenssl.a:
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		--target=efi-app-$(ARCH) $^ $@.debug
 
+%.efi.signed: %.efi certdb/secmod.db
+	pesign -n certdb -i $< -c "shim" -s -o $@ -f
+
 clean:
 	$(MAKE) -C Cryptlib clean
 	$(MAKE) -C Cryptlib/OpenSSL clean
-	rm -f $(TARGET) $(OBJS)
+	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(KEYS) certdb
+	rm -f *.debug *.so
 
 GITTAG = $(VERSION)
 

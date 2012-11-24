@@ -1,0 +1,554 @@
+#!/bin/bash -e
+#
+#  Generate a root CA cert for signing, and then a subject cert.
+#  Usage: make-certs.sh hostname [user[@domain]] [more ...]
+#  For testing only, probably still has some bugs in it.
+#
+
+DOMAIN=xn--u4h.net
+DAYS=365
+KEYTYPE=RSA
+KEYSIZE=2048
+DIGEST=SHA256
+CRLHOURS=24
+CRLDAYS=
+
+# Cleanup temporary files at exit.
+touch openssl.cnf
+newcertdir=`mktemp -d`
+cleanup() {
+	test -f openssl.cnf   && rm -f openssl.cnf
+	test -f ca.txt        && rm -f ca.txt
+	test -f ocsp.txt      && rm -f ocsp.txt
+	test -n "$newcertdir" && rm -fr "$newcertdir"
+}
+trap cleanup EXIT
+
+# The first argument is either a common name value or a flag indicating that
+# we're doing something other than issuing a cert.
+commonname="$1"
+refresh_crl=false
+revoke_cert=false
+ocsp_serve=false
+if test "x$commonname" = "x-refresh-crl" ; then
+	refresh_crl=true
+	commonname="$1"
+fi
+if test "x$commonname" = "x-refresh_crl" ; then
+	refresh_crl=true
+	commonname="$1"
+fi
+if test "x$commonname" = "x-revoke" ; then
+	revoke_cert=true
+	shift
+	commonname="$1"
+fi
+if test "x$commonname" = "x-ocsp" ; then
+	ocsp_serve=true
+	commonname="$1"
+fi
+if test "x$commonname" = x ; then
+	echo Usage: `basename $0` 'commonname' user'[@domain]' '[more [...]]'
+	echo Usage: `basename $0` -revoke 'commonname'
+	echo Usage: `basename $0` -ocsp
+	echo Usage: `basename $0` -refresh-crl
+	echo More:
+	echo -e \\tKey usage: "[sign|signing|encrypt|encryption|all]"
+	echo -e \\tAuthority Access Info OCSP responder: "ocsp:URI"
+	echo -e \\tCRL distribution point: "crl:URI"
+	echo -e \\tSubject Alternative Name:
+	echo -e \\t\\tHostname: "*"
+	echo -e \\t\\tIP address: w.x.y.z
+	echo -e \\t\\tEmail address: "*@*.com/edu/net/org/local"
+	echo -e \\t\\tKerberos principal name: "*@*.COM/EDU/NET/ORG/LOCAL"
+	echo -e \\tExtended key usage:
+	echo -e \\t\\t1....
+	echo -e \\t\\t2....
+	echo -e \\t\\tid-kp-server-auth \| tls-server
+	echo -e \\t\\tid-kp-client-auth \| tls-client
+	echo -e \\t\\tid-kp-email-protection \| email
+	echo -e \\t\\tid-ms-kp-sc-logon \| id-ms-sc-logon
+	echo -e \\t\\tid-pkinit-kp-client-auth \| id-pkinit-client
+	echo -e \\t\\tid-pkinit-kp-kdc \| id-pkinit-kdc
+	echo -e \\t\\tca \| CA
+	exit 1
+fi
+
+# Choose a user name part for email attributes.
+GIVENUSER=$2
+test x"$GIVENUSER" = x && GIVENUSER=$USER
+echo "$GIVENUSER" | grep -q @ || GIVENUSER="$GIVENUSER"@$DOMAIN
+DOMAIN=`echo "$GIVENUSER" | cut -f2- -d@`
+
+shift || true
+shift || true
+
+# Done already?
+done=:
+
+keygen() {
+	case "$KEYTYPE" in
+	DSA)
+		openssl dsaparam -out "$1".param $KEYSIZE
+		openssl gendsa "$1".param
+		;;
+	RSA|*)
+		#openssl genrsa $KEYSIZE -passout pass:qweqwe
+		openssl genrsa $KEYSIZE
+		#openssl genrsa $KEYSIZE -nodes
+		;;
+	esac
+}
+
+# Set some defaults.
+CA=FALSE
+if test -s ca.crldp.uri.txt ; then
+	crlval="`cat ca.crldp.uri.txt`"
+	crl="URI:$crlval"
+fi
+if test -s ca.ocsp.uri.txt ; then
+	aiaval="`cat ca.ocsp.uri.txt`"
+	aia="OCSP;URI:$aiaval"
+fi
+if test -s ca.domain.txt ; then
+	domval="`cat ca.domain.txt`"
+	if test -n "$domval" ; then
+		DOMAIN="$domval"
+	fi
+fi
+
+# Parse the arguments which indicate what sort of information we want.
+while test $# -gt 0 ; do
+	type=
+	value="$1"
+	case "$value" in
+	RSA|rsa)
+		KEYTYPE=RSA
+		;;
+	DSA|dsa)
+		KEYTYPE=DSA
+		;;
+	OCSP:*|ocsp:*)
+		aiaval=`echo "$value" | cut -f2- -d:`
+		aia="OCSP;URI:$aiaval"
+		;;
+	CRL:*|crl:*)
+		crlval=`echo "$value" | cut -f2- -d:`
+		crl="URI:$crlval"
+		;;
+	signing|sign)
+		keyusage="${keyusage:+${keyusage},}nonRepudiation,digitalSignature"
+		;;
+	encryption|encrypt)
+		keyusage="${keyusage:+${keyusage},}keyEncipherment,dataEncipherment"
+		;;
+	all)
+		keyusage="digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign,encipherOnly,decipherOnly"
+		;;
+	ca|CA)
+		CA=TRUE
+		keyusage="${keyusage:+${keyusage},}nonRepudiation,digitalSignature,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign"
+		;;
+	1.*|2.*|id-*|tls-*|email|mail|codesign)
+		ekuval=`echo "$value" | tr '[A-Z]' '[a-z]' | sed 's,\-,,g'`
+		case "$ekuval" in
+		idkpserverauth|tlsserver) ekuval=1.3.6.1.5.5.7.3.1;;
+		idkpclientauth|tlsclient) ekuval=1.3.6.1.5.5.7.3.2;;
+		idkpemailprotection|email|mail) ekuval=1.3.6.1.5.5.7.3.4;;
+		idkpcodesign|codesign) ekuval=1.3.6.1.5.5.7.3.3;;
+		idmskpsclogon|idmssclogon) ekuval=1.3.6.1.4.1.311.20.2.2;;
+		idpkinitkpclientauth|idpkinitclient) ekuval=1.3.6.1.5.2.3.4;;
+		idpkinitkpkdc|idpkinitkdc) ekuval=1.3.6.1.5.2.3.5;;
+		esac
+		if test -z "$eku" ; then
+			eku="$ekuval"
+		else
+			eku="$eku,$ekuval"
+		fi
+		;;
+	*@*.COM|*@*.EDU|*@*.NET|*@*.ORG|*@*.LOCAL)
+		luser=`echo "$value" | tr '[A-Z]' '[a-z]'`
+		if test "$luser" = "$value" ; then
+			luser=
+		fi
+		type="otherName:1.3.6.1.5.2.2;SEQUENCE:$value,${luser:+otherName:1.3.6.1.4.1.311.20.2.3;UTF8:${luser},}otherName:1.3.6.1.4.1.311.20.2.3;UTF8"
+		unset luser
+		principals="$principals $value"
+		;;
+	*@*.com|*@*.edu|*@*.net|*@*.org|*@*.local)            type=email;;
+	[0-9]*.[0-9]*.[0-9]*.[0-9]*)                          type=IP;;
+	*)                                                    type=DNS;;
+	esac
+	if test -n "$type" ; then
+		newvalue="${type}:$value"
+		if test -z "$altnames" ; then
+			altnames="${newvalue}"
+		else
+			altnames="${altnames},${newvalue}"
+		fi
+	fi
+	shift
+done
+
+# Build the configuration file, including bits on how to construct the CA
+# certificate, an OCSP responder certificate, and the issued certificate.
+cat > openssl.cnf <<- EOF
+[ca]
+default_ca = issuer
+
+[issuer]
+private_key = `pwd`/ca.key
+certificate = `pwd`/ca.crt
+database = `pwd`/ca.db
+serial = `pwd`/ca.srl
+default_md = $DIGEST
+new_certs_dir = $newcertdir
+policy = no_policy
+
+[no_policy]
+
+[req_oids]
+domainComponent = 0.9.2342.19200300.100.1.25
+
+[req_ca]
+prompt = no
+oid_section = req_oids
+distinguished_name = req_ca_name
+default_md = $DIGEST
+subjectKeyIdentifier=hash
+
+[req_ca_name]
+C=US
+#stateOrProvinceName=SomeState
+localityName=SomeCity
+O=SomeOrg
+EOF
+#echo $DOMAIN | awk 'BEGIN {FS="."}{for(i=NF;i>0;i--){print NF-i ".domainComponent="$i;}}' >> openssl.cnf
+cat >> openssl.cnf <<- EOF
+#commonName = Test Certifying CA
+
+[v3_ca]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always
+#authorityKeyIdentifier=keyid:always,issuer:always
+keyUsage=nonRepudiation,digitalSignature,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign
+basicConstraints=critical,CA:TRUE
+nsComment="Testing CA Certificate"
+EOF
+if test -n "$aia" ; then
+	echo "authorityInfoAccess = ${aia}" >> openssl.cnf
+	echo -n "$aiaval" > ca.ocsp.uri.txt
+fi
+if test -n "$crl" ; then
+	echo "crlDistributionPoints = ${crl}" >> openssl.cnf
+	echo -n "$crlval" > ca.crldp.uri.txt
+fi
+echo "$DOMAIN" > ca.domain.txt
+cat >> openssl.cnf <<- EOF
+
+[req_ocsp]
+prompt = no
+oid_section = req_oids
+distinguished_name = req_ocsp_name
+default_md = $DIGEST
+
+[req_ocsp_name]
+C=US
+#stateOrProvinceName=SomeState
+localityName=SomeOrg
+O=SomeOrg
+EOF
+#echo $DOMAIN | awk 'BEGIN {FS="."}{for(i=NF;i>0;i--){print NF-i ".domainComponent="$i;}}' >> openssl.cnf
+cat >> openssl.cnf <<- EOF
+#commonName = OCSP Signer for Test Certifying CA
+
+[v3_ocsp]
+subjectKeyIdentifier=hash
+#authorityKeyIdentifier=keyid:always,issuer:always
+authorityKeyIdentifier=keyid:always
+keyUsage=digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign
+extendedKeyUsage=1.3.6.1.5.5.7.3.9
+#basicConstraints=CA:FALSE
+basicConstraints=CA:TRUE
+nsComment="Testing OCSP Certificate"
+1.3.6.1.5.5.7.48.1.5=ASN1:NULL
+EOF
+if test -n "$aia" ; then
+	echo "authorityInfoAccess = ${aia}" >> openssl.cnf
+fi
+if test -n "$crl" ; then
+	echo "crlDistributionPoints = ${crl}" >> openssl.cnf
+fi
+cat >> openssl.cnf <<- EOF
+
+[req_issued]
+prompt = no
+oid_section = req_oids
+distinguished_name = req_issued_name
+default_md = $DIGEST
+
+[req_issued_name]
+C=US
+#stateOrProvinceName=SomeState
+localityName=SomeCity
+O=SomeOrg
+EOF
+#echo $DOMAIN | awk 'BEGIN {FS="."}{for(i=NF;i>0;i--){print NF-i ".domainComponent="$i;}}' >> openssl.cnf
+#mail = $GIVENUSER
+cat >> openssl.cnf <<- EOF
+commonName = $commonname
+
+[v3_issued]
+#certificatePolicies=2.5.29.32.0${eku:+,${eku}}
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always
+#authorityKeyIdentifier=keyid:always,issuer:always
+EOF
+if test -n "$aia" ; then
+	echo "authorityInfoAccess = ${aia}" >> openssl.cnf
+fi
+if test -n "$crl" ; then
+	echo "crlDistributionPoints = ${crl}" >> openssl.cnf
+fi
+if test -n "$keyusage" ; then
+	echo "keyUsage = critical,${keyusage}" >> openssl.cnf
+fi
+if test -n "$altnames" ; then
+	echo "subjectAltName = ${altnames}" >> openssl.cnf
+fi
+if test -n "$eku" ; then
+	echo "extendedKeyUsage = ${eku}" >> openssl.cnf
+	:
+fi
+if test "x$CA" = xTRUE ; then
+	echo "basicConstraints=critical,CA:TRUE" >> openssl.cnf
+	echo 'nsComment="Testing CA Certificate for '"$commonname"'"' >> openssl.cnf
+else
+	echo "basicConstraints=CA:FALSE" >> openssl.cnf
+	echo 'nsComment="Testing Certificate for '"$commonname"'"' >> openssl.cnf
+fi
+for value in $principals; do
+	user=`echo "$value" | cut -f1 -d@`
+	realm=`echo "$value" | cut -f2- -d@`
+	echo "" >> openssl.cnf
+	echo "[$value]" >> openssl.cnf
+	echo "realm=EXPLICIT:0,GeneralString:$realm" >> openssl.cnf
+	echo "kerberosname=EXPLICIT:1,SEQUENCE:krb5$user" >> openssl.cnf
+
+	echo "" >> openssl.cnf
+	echo "[krb5$user]" >> openssl.cnf
+	echo "nametype=EXPLICIT:0,INTEGER:1" >> openssl.cnf
+	echo "namelist=EXPLICIT:1,SEQUENCE:krb5basic$user" >> openssl.cnf
+
+	echo "[krb5basic$user]" >> openssl.cnf
+	count=0
+	for part in `echo "$user" | sed 's,/, ,g'` ; do
+		echo "$count.part=GeneralString:$part" >> openssl.cnf
+		count=`expr "$count" + 1`
+	done
+done
+
+# Create the data files for a new CA.
+if ! test -s ca.srl ; then
+	(dd if=/dev/urandom bs=8 count=1 2> /dev/null) | od -t x1c | head -n 1 | awk '{$1="00";OFS="";print}' > ca.srl
+else
+	echo "You already have a ca.srl file; not replacing."
+fi
+if ! test -s ca.db ; then
+	touch ca.db
+else
+	echo "You already have a ca.db file; not replacing."
+fi
+if ! test -s ca.db.attr ; then
+	touch ca.db.attr
+else
+	echo "You already have a ca.db.attr file; not replacing."
+fi
+
+# If we need a CA key, generate one.
+if ! test -s ca.key ; then
+	umask=`umask -p`
+	umask 077
+	keygen ca > ca.key 2> /dev/null
+	$umask
+else
+	echo "You already have a ca.key file; not replacing."
+	done=echo
+fi
+
+# If we need a CA certificate, generate one.
+if ! test -s ca.crt ; then
+	sed -i -e 's,^\[req_ca\]$,\[req\],g' `pwd`/openssl.cnf
+	openssl req -config `pwd`/openssl.cnf -new -key ca.key > ca.csr 2> /dev/null -passin pass:shim
+	sed -i -e 's,^\[req\]$,\[req_ca\],g' `pwd`/openssl.cnf
+	openssl x509 -extfile `pwd`/openssl.cnf -CAserial ca.srl -signkey ca.key -extensions v3_ca -req -in ca.csr -days $DAYS -out ca.crt ; : 2> /dev/null
+	openssl x509 -noout -text -in ca.crt > ca.txt
+	cat ca.crt >> ca.txt
+	cat ca.txt > ca.crt
+	rm ca.txt
+	cat ca.crt > ca.chain.crt
+else
+	echo "You already have a ca.crt file; not replacing."
+	done=echo
+fi
+
+# If we need an OCSP key, generate one.
+if ! test -s ocsp.key ; then
+	umask=`umask -p`
+	umask 077
+	keygen ocsp > ocsp.key 2> /dev/null
+	$umask
+else
+	echo "You already have an ocsp.key file; not replacing."
+	done=echo
+fi
+
+# Generate the OCSP signing cert.  Set the X.509v3 basic constraints and EKU.
+if ! test -s ocsp.crt ; then
+	sed -i -e 's,^\[req_ocsp\]$,\[req\],g' `pwd`/openssl.cnf
+	openssl req -config `pwd`/openssl.cnf -new -key ocsp.key > ocsp.csr 2> /dev/null
+	sed -i -e 's,^\[req\]$,\[req_ocsp\],g' `pwd`/openssl.cnf
+	openssl ca -batch -config `pwd`/openssl.cnf -extensions v3_ocsp -preserveDN -in ocsp.csr -days $DAYS -out ocsp.crt 2> /dev/null
+	openssl x509 -noout -text -in ocsp.crt > ocsp.txt
+	cat ocsp.crt >> ocsp.txt
+	cat ocsp.txt >  ocsp.crt
+	rm ocsp.txt
+else
+	echo "You already have an ocsp.crt file; not replacing."
+	done=echo
+fi
+
+# If we were told to revoke the certificate with the specified common name,
+# do so.
+if $revoke_cert ; then
+	openssl ca -config `pwd`/openssl.cnf -revoke "$commonname".crt
+fi
+
+# Always refresh the CRL.
+openssl ca -config `pwd`/openssl.cnf -gencrl ${CRLHOURS:+-crlhours ${CRLHOURS}} ${CRLDAYS:+-crldays ${CRLDAYS}} -out ca.crl.pem
+openssl crl -in ca.crl.pem -outform der -out ca.crl
+openssl crl -in ca.crl -inform der -noout -text > ca.crl.pem
+openssl crl -in ca.crl -inform der >> ca.crl.pem
+
+# If we were told to start up the mini OCSP server, do so.
+if $ocsp_serve ; then
+	openssl ocsp -text -index `pwd`/ca.db -CA `pwd`/ca.crt -rsigner `pwd`/ocsp.crt -rkey `pwd`/ocsp.key -rother `pwd`/ocsp.crt -port "`cut -f3 -d/ ca.ocsp.uri.txt | sed -r 's,(^[^:]*),0.0.0.0,g'`"
+	exit 0
+fi
+
+# If we're just here to do a revocation or refresh the CRL, we're done.
+if $revoke_cert || $refresh_crl ; then
+	exit 0
+fi
+
+# Create a new serial number and whatnot if this is a new sub-CA.
+if test "x$CA" = xTRUE ; then
+	if ! test -d "$commonname" ; then
+		mkdir "$commonname"
+	fi
+	if ! test -s "$commonname/ca.srl" ; then
+		(dd if=/dev/urandom bs=8 count=1 2> /dev/null) | od -t x1c | head -n 1 | awk '{$1="00";OFS="";print}' > "$commonname/ca.srl"
+	else
+		echo "You already have a $commonname/ca.srl file; not replacing."
+	fi
+	if test -n "$aia" ; then
+		echo -n "$aiaval" > "$commonname/ca.ocsp.uri.txt"
+	fi
+	if test -n "$crl" ; then
+		echo -n "$crlval" > "$commonname/ca.crldp.uri.txt"
+	fi
+	echo "$DOMAIN" > "$commonname/ca.domain.txt"
+	touch "$commonname/ca.db" "$commonname/ca.db.attr"
+	cert="$commonname/ca.crt"
+	csr="$commonname/ca.csr"
+	key="$commonname/ca.key"
+	pem="$commonname/ca.pem"
+	pfx="$commonname/ca.p12"
+	ln -s ../`basename $0` "$commonname"/
+else
+	cert="$commonname.crt"
+	csr="$commonname.csr"
+	key="$commonname.key"
+	pem="$commonname.pem"
+	pfx="$commonname.p12"
+fi
+
+# Generate the subject's certificate.  Set the X.509v3 basic constraints.
+if ! test -s "$cert" ; then
+	# Generate another key, unless we have a key or CSR.
+	if ! test -s "$key" && ! test -s "$csr" ; then
+		umask=`umask -p`
+		umask 077
+		keygen "$commonname" > "$key" 2> /dev/null
+		$umask
+	else
+		echo "You already have a $key or $csr file; not replacing."
+		done=echo
+	fi
+
+	if ! test -s "$csr" ; then
+		sed -i -e 's,^\[req_issued\]$,\[req\],g' `pwd`/openssl.cnf
+		openssl req -config `pwd`/openssl.cnf -new -key "$key" > "$csr" 2> /dev/null
+		sed -i -e 's,^\[req\]$,\[req_issued\],g' `pwd`/openssl.cnf
+	fi
+	openssl ca -batch -config `pwd`/openssl.cnf -extensions v3_issued -preserveDN -in "$csr" -days $DAYS -out "$cert" 2> /dev/null
+	openssl x509 -noout -text -in "$cert" > "$cert.txt"
+	cat "$cert" >> "$cert.txt"
+	cat "$cert.txt" > "$cert"
+	rm -f "$cert.txt"
+else
+	echo "You already have a $cert file; not replacing."
+	done=echo
+fi
+
+if test -s ca.chain.crt ; then
+	chain=ca.chain.crt
+else
+	chain=ca.crt
+fi
+if test "x$CA" = xTRUE ; then
+	cat "$chain" "$cert" > "$commonname/ca.chain.crt"
+fi
+
+# Create ca.pem and the subject's name.pem for the benefit of applications
+# which expect both the private key and the certificate in one file.
+umask=`umask -p`
+umask 077
+if ! test -s ca.pem ; then
+	cat ca.key ca.crt > ca.pem
+else
+	echo "You already have a ca.pem file; not replacing."
+	done=echo
+fi
+if ! test -s "$pem" ; then
+	cat "$key" "$cert" > "$pem"
+else
+	echo "You already have a $pem file; not replacing."
+	done=echo
+fi
+if ! test -s "$pfx" ; then
+	#openssl pkcs12 -export -inkey "$key" -in "$cert" -name "$commonname" -out "$pfx" -nodes -passout pass:qweqwe
+	openssl pkcs12 -export -inkey "$key" -in "$cert" -name "$commonname" -out "$pfx" -nodes -passout pass:
+else
+	echo "You already have a $pfx file; not replacing."
+	done=echo
+fi
+$umask
+$done
+
+echo CA certificate:
+openssl x509 -noout -issuer  -in ca.crt | sed s,=\ ,\ ,g
+openssl x509 -noout -subject -in ca.crt | sed s,=\ ,\ ,g
+echo
+echo End entity certificate:
+openssl x509 -noout -issuer  -in "$cert" | sed s,=\ ,\ ,g
+openssl x509 -noout -subject -in "$cert" | sed s,=\ ,\ ,g
+openssl x509 -noout -serial  -in "$cert" | sed s,=,\ ,g
+echo
+echo PKCS12 bag:
+openssl pkcs12 -in "$pfx" -nodes -nokeys -nocerts -info -passin pass:
+#openssl pkcs12 -in "$pfx" -nodes -nokeys -nocerts -info -passin pass:qweqwe
+echo
+echo Verifying:
+echo + openssl verify -CAfile "$chain" "$cert"
+openssl verify -CAfile "$chain" "$cert"
