@@ -416,8 +416,6 @@ static BOOLEAN secure_mode (void)
 	UINT8 sb, setupmode;
 	UINT32 attributes;
 
-	return TRUE;
-
 	if (insecure_mode)
 		return FALSE;
 
