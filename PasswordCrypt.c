@@ -154,7 +154,7 @@ static EFI_STATUS sha256_crypt (const char *key,  UINT32 key_len,
 	CopyMem(cp, tmp_result, cnt);
 
 	SHA256_Init(&alt_ctx);
-	for (cnt = 0; cnt < 16 + alt_result[0]; ++cnt)
+	for (cnt = 0; cnt < 16ul + alt_result[0]; ++cnt)
 		SHA256_Update(&alt_ctx, salt, salt_size);
 	SHA256_Final(tmp_result, &alt_ctx);
 
@@ -242,7 +242,7 @@ static EFI_STATUS sha512_crypt (const char *key,  UINT32 key_len,
 	CopyMem(cp, tmp_result, cnt);
 
 	SHA512_Init(&alt_ctx);
-	for (cnt = 0; cnt < 16 + alt_result[0]; ++cnt)
+	for (cnt = 0; cnt < 16ul + alt_result[0]; ++cnt)
 		SHA512_Update(&alt_ctx, salt, salt_size);
 	SHA512_Final(tmp_result, &alt_ctx);
 

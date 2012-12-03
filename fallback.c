@@ -229,7 +229,7 @@ EFI_STATUS
 find_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label,
 		CHAR16 *arguments, UINT16 *optnum)
 {
-	int size = sizeof(UINT32) + sizeof (UINT16) +
+	unsigned int size = sizeof(UINT32) + sizeof (UINT16) +
 		StrLen(label)*2 + 2 + DevicePathSize(dp) +
 		StrLen(arguments) * 2 + 2;
 
@@ -768,7 +768,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	if (EFI_ERROR(rc)) {
 		CHAR16 *dps = DevicePathToStr(first_new_option);
 		UINTN s = DevicePathSize(first_new_option);
-		int i;
+		unsigned int i;
 		UINT8 *dpv = (void *)first_new_option;
 		Print(L"LoadImage failed: %d\nDevice path: \"%s\"\n", rc, dps);
 		for (i = 0; i < s; i++) {
