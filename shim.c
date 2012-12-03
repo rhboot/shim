@@ -100,7 +100,7 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 /*
  * Perform basic bounds checking of the intra-image pointers
  */
-static void *ImageAddress (void *image, int size, unsigned int address)
+static void *ImageAddress (void *image, unsigned int size, unsigned int address)
 {
 	if (address > size)
 		return NULL;
@@ -443,13 +443,12 @@ static BOOLEAN secure_mode (void)
  * Calculate the SHA1 and SHA256 hashes of a binary
  */
 
-static EFI_STATUS generate_hash (char *data, int datasize,
+static EFI_STATUS generate_hash (char *data, unsigned int datasize,
 				 PE_COFF_LOADER_IMAGE_CONTEXT *context,
 				 UINT8 *sha256hash, UINT8 *sha1hash)
 
 {
 	unsigned int sha256ctxsize, sha1ctxsize;
-	unsigned int size = datasize;
 	void *sha256ctx = NULL, *sha1ctx = NULL;
 	char *hashbase;
 	unsigned int hashsize;
@@ -457,7 +456,6 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 	unsigned int index, pos;
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
-	EFI_IMAGE_SECTION_HEADER  *SectionCache;
 	EFI_STATUS status = EFI_SUCCESS;
 
 	sha256ctxsize = Sha256GetContextSize();
@@ -516,22 +514,29 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 	/* Sort sections */
 	SumOfBytesHashed = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
 
-	Section = (EFI_IMAGE_SECTION_HEADER *) (
-		(char *)context->PEHdr + sizeof (UINT32) +
-		sizeof (EFI_IMAGE_FILE_HEADER) +
-		context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader
-		);
+	/* Validate section locations and sizes. */
+	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
+		EFI_IMAGE_SECTION_HEADER  *SectionPtr;
 
-	SectionCache = Section;
-
-	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++, SectionCache++) {
-		SumOfSectionBytes += SectionCache->SizeOfRawData;
-	}
-
-	if (SumOfSectionBytes >= datasize) {
-		Print(L"Malformed binary: %x %x\n", SumOfSectionBytes, size);
-		status = EFI_INVALID_PARAMETER;
-		goto done;
+		/* Validate SectionPtr is within image. */
+		SectionPtr = ImageAddress(data, datasize,
+			sizeof (UINT32) +
+	                sizeof (EFI_IMAGE_FILE_HEADER) +
+	                context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader +
+			(index * sizeof(*SectionPtr)));
+		if (!SectionPtr) {
+			Print(L"Malformed section %d\n", index);
+			status = EFI_INVALID_PARAMETER;
+			goto done;
+		}
+		/* Validate section size is within image. */
+		if (SectionPtr->SizeOfRawData >
+		    datasize - SumOfBytesHashed - SumOfSectionBytes) {
+			Print(L"Malformed section %d size\n", index);
+			status = EFI_INVALID_PARAMETER;
+			goto done;
+		}
+		SumOfSectionBytes += SectionPtr->SizeOfRawData;
 	}
 
 	SectionHeader = (EFI_IMAGE_SECTION_HEADER *) AllocateZeroPool (sizeof (EFI_IMAGE_SECTION_HEADER) * context->PEHdr->Pe32.FileHeader.NumberOfSections);
@@ -540,6 +545,11 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 		status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
+
+	/* Already validated above. */
+	Section = ImageAddress(data, datasize, sizeof (UINT32) +
+                sizeof (EFI_IMAGE_FILE_HEADER) +
+                context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader);
 
 	/* Sort the section headers */
 	for (index = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
@@ -558,14 +568,22 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 		if (Section->SizeOfRawData == 0) {
 			continue;
 		}
-		hashbase  = ImageAddress(data, size, Section->PointerToRawData);
-		hashsize  = (unsigned int) Section->SizeOfRawData;
-
+		hashbase  = ImageAddress(data, datasize,
+					 Section->PointerToRawData);
 		if (!hashbase) {
 			Print(L"Malformed section header\n");
 			status = EFI_INVALID_PARAMETER;
 			goto done;
 		}
+
+		/* Verify hashsize within image. */
+		if (Section->SizeOfRawData >
+		    datasize - Section->PointerToRawData) {
+			Print(L"Malformed section raw size %d\n", index);
+			status = EFI_INVALID_PARAMETER;
+			goto done;
+		}
+		hashsize  = (unsigned int) Section->SizeOfRawData;
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -577,10 +595,10 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 	}
 
 	/* Hash all remaining data */
-	if (size > SumOfBytesHashed) {
+	if (datasize > SumOfBytesHashed) {
 		hashbase = data + SumOfBytesHashed;
 		hashsize = (unsigned int)(
-			size -
+			datasize -
 			context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
 			SumOfBytesHashed);
 
@@ -780,7 +798,8 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	if (((UINT8 *)context->SecDir - (UINT8 *)data) > (datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
+	if ((unsigned long)((UINT8 *)context->SecDir - (UINT8 *)data) >
+	    (datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
 		Print(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
@@ -800,7 +819,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 {
 	EFI_STATUS efi_status;
 	char *buffer;
-	int i, size;
+	int i;
+	unsigned int size;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
