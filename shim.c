@@ -42,11 +42,15 @@
 #include "netboot.h"
 #include "shim_cert.h"
 
-#define SECOND_STAGE L"\\grub.efi"
+#define DEFAULT_LOADER L"\\grub.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
 
 static EFI_SYSTEM_TABLE *systab;
 static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
+
+static CHAR16 *second_stage;
+static void *load_options;
+static UINT32 load_options_size;
 
 /*
  * The vendor certificate used for validating the second stage loader
@@ -881,6 +885,10 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	li->ImageBase = buffer;
 	li->ImageSize = context.ImageSize;
 
+	/* Pass the load options to the second stage loader */
+	li->LoadOptions = load_options;
+	li->LoadOptionsSize = load_options_size;
+
 	if (!entry_point) {
 		Print(L"Invalid entry point\n");
 		FreePool(buffer);
@@ -1192,7 +1200,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = start_image(image_handle, SECOND_STAGE);
+	efi_status = start_image(image_handle, second_stage);
 
 	if (efi_status != EFI_SUCCESS)
 		efi_status = start_image(image_handle, MOK_MANAGER);
@@ -1312,6 +1320,55 @@ static EFI_STATUS check_mok_sb (void)
 	return status;
 }
 
+/*
+ * Check the load options to specify the second stage loader
+ */
+EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
+{
+	EFI_STATUS status;
+	EFI_LOADED_IMAGE *li;
+	CHAR16 *start = NULL, *c;
+	int i, remaining_size = 0;
+
+	second_stage = DEFAULT_LOADER;
+	load_options = NULL;
+	load_options_size = 0;
+
+	status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
+				   &LoadedImageProtocol, (void **) &li);
+	if (status != EFI_SUCCESS) {
+		Print (L"Failed to get load options\n");
+		return status;
+	}
+
+	/* Expect a CHAR16 string with at least one CHAR16 */
+	if (li->LoadOptionsSize < 4 || li->LoadOptionsSize % 2 != 0) {
+		return EFI_BAD_BUFFER_SIZE;
+	}
+	c = (CHAR16 *)(li->LoadOptions + (li->LoadOptionsSize - 2));
+	if (*c != L'\0') {
+		return EFI_BAD_BUFFER_SIZE;
+	}
+
+	for (i = 0; i < li->LoadOptionsSize; i += 2) {
+		c = (CHAR16 *)(li->LoadOptions + i);
+		if (*c == L' ') {
+			*c = L'\0';
+			start = c + 1;
+			remaining_size = li->LoadOptionsSize - i - 2;
+			break;
+		}
+	}
+
+	second_stage = (CHAR16 *)li->LoadOptions;
+	if (start && remaining_size > 0) {
+		load_options = start;
+		load_options_size = remaining_size;
+	}
+
+	return EFI_SUCCESS;
+}
+
 EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1333,6 +1390,9 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
+
+	/* Set the second stage loader */
+	set_second_stage (image_handle);
 
 	/*
 	 * Check whether the user has configured the system to run in
