@@ -675,6 +675,7 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
 	UINT32 length;
 	EFI_STATUS efi_status;
 
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 	Print(L"Erase all stored keys? (y/N): ");
 
 	get_line (&length, line, 1, 1);
