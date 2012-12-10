@@ -637,6 +637,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 }
 
 static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	CHAR16 line[1];
 	UINT32 length;
 	EFI_STATUS efi_status;
@@ -657,6 +658,19 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 				Print(L"Failed to enroll keys\n");
 				return -1;
 			}
+
+			if (auth) {
+				LibDeleteVariable(L"MokNew", &shim_lock_guid);
+				LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+
+				Print(L"\nPress a key to reboot system\n");
+				Pause();
+				uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+						  EFI_SUCCESS, 0, NULL);
+				Print(L"Failed to reboot\n");
+				return -1;
+			}
+
 			return 0;
 		}
 	} while (line[0] != 'N' && line[0] != 'n');
@@ -671,6 +685,7 @@ static INTN mok_enrollment_prompt_callback (void *MokNew, void *data2,
 }
 
 static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	CHAR16 line[1];
 	UINT32 length;
 	EFI_STATUS efi_status;
@@ -687,6 +702,16 @@ static INTN mok_deletion_prompt (void *MokNew, void *data2, void *data3) {
 			Print(L"Failed to erase keys\n");
 			return -1;
 		}
+
+		LibDeleteVariable(L"MokNew", &shim_lock_guid);
+		LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+
+		Print(L"\nPress a key to reboot system\n");
+		Pause();
+		uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+				  EFI_SUCCESS, 0, NULL);
+		Print(L"Failed to reboot\n");
+		return -1;
 	}
 
 	return 0;
