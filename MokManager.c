@@ -558,17 +558,61 @@ done:
 	return status;
 }
 
+static EFI_STATUS match_password (void *Data, UINTN DataSize,
+				  UINT8 auth[SHA256_DIGEST_SIZE],
+				  CHAR16 *prompt)
+{
+	EFI_STATUS efi_status;
+	UINT8 hash[SHA256_DIGEST_SIZE];
+	CHAR16 password[PASSWORD_MAX];
+	UINT32 pw_length;
+	UINT8 fail_count = 0;
+
+	while (fail_count < 3) {
+		if (prompt) {
+			Print(L"%s", prompt);
+		} else {
+			Print(L"Password: ");
+		}
+		get_line(&pw_length, password, PASSWORD_MAX, 0);
+
+		if (pw_length < PASSWORD_MIN || pw_length > PASSWORD_MAX) {
+			Print(L"Invalid password length\n");
+			fail_count++;
+			continue;
+		}
+
+		efi_status = compute_pw_hash(Data, DataSize, password,
+					     pw_length, hash);
+
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Unable to generate password hash\n");
+			fail_count++;
+			continue;
+		}
+
+		if (CompareMem(auth, hash, SHA256_DIGEST_SIZE) != 0) {
+			Print(L"Password doesn't match\n");
+			fail_count++;
+			continue;
+		}
+
+		break;
+	}
+
+	if (fail_count >= 3)
+		return EFI_ACCESS_DENIED;
+
+	return EFI_SUCCESS;
+}
+
 static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
-	UINT8 hash[SHA256_DIGEST_SIZE];
 	UINT8 auth[SHA256_DIGEST_SIZE];
 	UINTN auth_size;
 	UINT32 attributes;
-	CHAR16 password[PASSWORD_MAX];
-	UINT32 pw_length;
-	UINT8 fail_count = 0;
 
 	if (authenticate) {
 		auth_size = SHA256_DIGEST_SIZE;
@@ -582,32 +626,8 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 			return efi_status;
 		}
 
-		while (fail_count < 3) {
-			Print(L"Password(%d-%d characters): ",
-			      PASSWORD_MIN, PASSWORD_MAX);
-			get_line(&pw_length, password, PASSWORD_MAX, 0);
-
-			if (pw_length < 8) {
-				Print(L"At least %d characters for the password\n",
-				      PASSWORD_MIN);
-			}
-
-			efi_status = compute_pw_hash(MokNew, MokNewSize, password,
-						     pw_length, hash);
-
-			if (efi_status != EFI_SUCCESS) {
-				return efi_status;
-			}
-
-			if (CompareMem(auth, hash, SHA256_DIGEST_SIZE) != 0) {
-				Print(L"Password doesn't match\n");
-				fail_count++;
-			} else {
-				break;
-			}
-		}
-
-		if (fail_count >= 3)
+		efi_status = match_password(MokNew, MokNewSize, auth, NULL);
+		if (efi_status != EFI_SUCCESS)
 			return EFI_ACCESS_DENIED;
 	}
 
@@ -819,9 +839,7 @@ static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	UINTN MokPWSize = (UINTN)data2;
-	UINT8 fail_count = 0;
 	UINT8 hash[SHA256_DIGEST_SIZE];
-	CHAR16 password[PASSWORD_MAX];
 	UINT32 length;
 	CHAR16 line[1];
 
@@ -849,34 +867,8 @@ static INTN mok_pw_prompt (void *MokPW, void *data2, void *data3) {
 		return 0;
 	}
 
-	while (fail_count < 3) {
-		Print(L"Confirm MOK passphrase: ");
-		get_line(&length, password, PASSWORD_MAX, 0);
-
-		if ((length < PASSWORD_MIN) || (length > PASSWORD_MAX)) {
-			Print(L"Invalid password length\n");
-			fail_count++;
-			continue;
-		}
-
-		efi_status = compute_pw_hash(NULL, 0, password, length, hash);
-
-		if (efi_status != EFI_SUCCESS) {
-			Print(L"Unable to generate password hash\n");
-			fail_count++;
-			continue;
-		}
-
-		if (CompareMem(MokPW, hash, SHA256_DIGEST_SIZE) != 0) {
-			Print(L"Password doesn't match\n");
-			fail_count++;
-			continue;
-		}
-
-		break;
-	}
-
-	if (fail_count >= 3) {
+	efi_status = match_password(NULL, 0, MokPW, L"Confirm MOK passphrase: ");
+	if (efi_status != EFI_SUCCESS) {
 		Print(L"Password limit reached\n");
 		return -1;
 	}
@@ -1483,12 +1475,8 @@ static BOOLEAN verify_pw(void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
-	CHAR16 password[PASSWORD_MAX];
-	UINT8 fail_count = 0;
-	UINT8 hash[SHA256_DIGEST_SIZE];
 	UINT8 pwhash[SHA256_DIGEST_SIZE];
 	UINTN size = SHA256_DIGEST_SIZE;
-	UINT32 length;
 	UINT32 attributes;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokPWStore",
@@ -1508,35 +1496,13 @@ static BOOLEAN verify_pw(void)
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
-	while (fail_count < 3) {
-		Print(L"Enter MOK password: ");
-		get_line(&length, password, PASSWORD_MAX, 0);
-
-		if (length < PASSWORD_MIN || length > PASSWORD_MAX) {
-			Print(L"Invalid password length\n");
-			fail_count++;
-			continue;
-		}
-
-		efi_status = compute_pw_hash(NULL, 0, password, length, hash);
-
-		if (efi_status != EFI_SUCCESS) {
-			Print(L"Unable to generate password hash\n");
-			fail_count++;
-			continue;
-		}
-
-		if (CompareMem(pwhash, hash, SHA256_DIGEST_SIZE) != 0) {
-			Print(L"Password doesn't match\n");
-			fail_count++;
-			continue;
-		}
-
-		return TRUE;
+	efi_status = match_password(NULL, 0, pwhash, L"Enter MOK password: ");
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"Password limit reached\n");
+		return FALSE;
 	}
 
-	Print(L"Password limit reached\n");
-	return FALSE;
+	return TRUE;
 }
 
 static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle, void *MokNew,
