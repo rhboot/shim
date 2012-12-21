@@ -124,7 +124,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		Cert = (EFI_SIGNATURE_DATA *) (((UINT8 *) CertList) +
 		  sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 
-		list[count].MokSize = CertList->SignatureSize;
+		list[count].MokSize = CertList->SignatureSize - sizeof(EFI_GUID);
 		list[count].Mok = (void *)Cert->SignatureData;
 
 		count++;
@@ -317,7 +317,7 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 	if (!Mok || MokSize == 0)
 		return;
 
-	if (MokSize != 48) {
+	if (MokSize != SHA256_DIGEST_SIZE) {
 		if (X509ConstructCertificate(Mok, MokSize,
 				 (UINT8 **) &X509Cert) && X509Cert != NULL) {
 			show_x509_info(X509Cert);
