@@ -1271,7 +1271,8 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 
 	if (check_var(L"MokNew") || check_var(L"MokSB") ||
-	    check_var(L"MokPW") || check_var(L"MokAuth")) {
+	    check_var(L"MokPW") || check_var(L"MokAuth") ||
+	    check_var(L"MokDel")) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (efi_status != EFI_SUCCESS) {
