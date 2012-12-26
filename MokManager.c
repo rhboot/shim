@@ -1241,6 +1241,9 @@ static void run_menu (CHAR16 *header, UINTN lines, struct menu_item *items,
 			if (ret < 0) {
 				Print(L"Press a key to continue\n");
 				Pause();
+				/* Clear the key in the queue */
+				uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2,
+						  ST->ConIn, &key);
 			}
 			draw_menu (header, lines, items, count);
 			pos = 0;
