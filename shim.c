@@ -1329,9 +1329,10 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS status;
 	EFI_LOADED_IMAGE *li;
-	CHAR16 *bootpath = NULL;
 	CHAR16 *start = NULL, *c;
 	int i, remaining_size = 0;
+	CHAR16 *loader_str = NULL;
+	int loader_len = 0;
 
 	second_stage = DEFAULT_LOADER;
 	load_options = NULL;
@@ -1353,6 +1354,11 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		return EFI_BAD_BUFFER_SIZE;
 	}
 
+	/*
+	 * UEFI shell copies the whole line of the command into LoadOptions.
+	 * We ignore the string before the first L' ', i.e. the name of this
+	 * program.
+	 */
 	for (i = 0; i < li->LoadOptionsSize; i += 2) {
 		c = (CHAR16 *)(li->LoadOptions + i);
 		if (*c == L' ') {
@@ -1363,11 +1369,30 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		}
 	}
 
-	bootpath = DevicePathToStr(li->FilePath);
-	if (!StrCaseCmp(bootpath, (CHAR16 *)li->LoadOptions))
-		second_stage = (CHAR16 *)li->LoadOptions;
+	if (!start || remaining_size <= 0)
+		return EFI_SUCCESS;
 
-	if (start && remaining_size > 0) {
+	for (i = 0; start[i] != '\0'; i++) {
+		if (start[i] == L' ' || start[i] == L'\0')
+			break;
+		loader_len++;
+	}
+
+	/*
+	 * Setup the name of the alternative loader and the LoadOptions for
+	 * the loader
+	 */
+	if (loader_len > 0) {
+		loader_str = AllocatePool((loader_len + 1) * sizeof(CHAR16));
+		if (!loader_str) {
+			Print(L"Failed to allocate loader string\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		for (i = 0; i < loader_len; i++)
+			loader_str[i] = start[i];
+		loader_str[loader_len] = L'\0';
+
+		second_stage = loader_str;
 		load_options = start;
 		load_options_size = remaining_size;
 	}
@@ -1443,6 +1468,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
 			  &shim_lock_guid, &shim_lock_interface);
+
+	/*
+	 * Free the space allocated for the alternative 2nd stage loader
+	 */
+	if (load_options_size > 0)
+		FreePool(second_stage);
 
 	return efi_status;
 }
