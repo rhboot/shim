@@ -353,11 +353,9 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINTN *bufs
 
 try_again:
 	rc = uefi_call_wrapper(pxe->Mtftp, 10, pxe, read, *buffer, overwrite,
-				&bufsiz, &blksz, &tftp_addr, full_path, NULL, nobuffer);
+				bufsiz, &blksz, &tftp_addr, full_path, NULL, nobuffer);
 
 	if (rc == EFI_BUFFER_TOO_SMALL) {
-		/* try again, doubling buf size */
-		*bufsiz *= 2;
 		FreePool(*buffer);
 		*buffer = AllocatePool(*bufsiz);
 		if (!*buffer)
