@@ -638,7 +638,7 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 				  UINT8 *auth, CHAR16 *prompt)
 {
 	EFI_STATUS status;
-	UINT8 hash[SHA256_DIGEST_SIZE];
+	UINT8 hash[128];
 	UINT8 *auth_hash;
 	UINT32 auth_size;
 	CHAR16 password[PASSWORD_MAX];
@@ -647,14 +647,10 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 	int i;
 
 	if (pw_crypt) {
-		/*
-		 * Only support sha256 now
-		 */
-		if(pw_crypt->method != SHA256_BASED)
-			return EFI_INVALID_PARAMETER;
 		auth_hash = pw_crypt->hash;
-		/* FIXME assign auth_size according to pw_crypt->method */
-		auth_size = SHA256_DIGEST_SIZE;
+		auth_size = get_hash_size (pw_crypt->method);
+		if (auth_size == 0)
+			return EFI_INVALID_PARAMETER;
 	} else if (auth) {
 		auth_hash = auth;
 		auth_size = SHA256_DIGEST_SIZE;

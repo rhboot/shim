@@ -22,5 +22,6 @@ typedef struct {
 
 EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 			   const PASSWORD_CRYPT *pw_hash, UINT8 *hash);
+UINT16 get_hash_size (const UINT16 method);
 
 #endif /* __PASSWORD_CRYPT_H__ */
