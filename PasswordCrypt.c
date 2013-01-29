@@ -28,6 +28,69 @@ UINT16 get_hash_size (const UINT16 method)
 	return 0;
 }
 
+static const char md5_salt_prefix[] = "$1$";
+
+static EFI_STATUS md5_crypt (const char *key,  UINT32 key_len,
+			     const char *salt, UINT32 salt_size,
+			     UINT8 *hash)
+{
+	MD5_CTX ctx, alt_ctx;
+	UINT8 alt_result[MD5_DIGEST_LENGTH];
+	UINTN cnt;
+
+	MD5_Init(&ctx);
+	MD5_Update(&ctx, key, key_len);
+	MD5_Update(&ctx, md5_salt_prefix, sizeof(md5_salt_prefix) - 1);
+	MD5_Update(&ctx, salt, salt_size);
+
+	MD5_Init(&alt_ctx);
+	MD5_Update(&alt_ctx, key, key_len);
+	MD5_Update(&alt_ctx, salt, salt_size);
+	MD5_Update(&alt_ctx, key, key_len);
+	MD5_Final(alt_result, &alt_ctx);
+
+	for (cnt = key_len; cnt > 16; cnt -= 16)
+		MD5_Update(&ctx, alt_result, 16);
+	MD5_Update(&ctx, alt_result, cnt);
+
+	*alt_result = '\0';
+
+	for (cnt = key_len; cnt > 0; cnt >>= 1) {
+		if ((cnt & 1) != 0) {
+			MD5_Update(&ctx, alt_result, 1);
+		} else {
+			MD5_Update(&ctx, key, 1);
+		}
+	}
+	MD5_Final(alt_result, &ctx);
+
+	for (cnt = 0; cnt < 1000; ++cnt) {
+		MD5_Init(&ctx);
+
+		if ((cnt & 1) != 0)
+			MD5_Update(&ctx, key, key_len);
+		else
+			MD5_Update(&ctx, alt_result, 16);
+
+		if (cnt % 3 != 0)
+			MD5_Update(&ctx, salt, salt_size);
+
+		if (cnt % 7 != 0)
+			MD5_Update(&ctx, key, key_len);
+
+		if ((cnt & 1) != 0)
+			MD5_Update(&ctx, alt_result, 16);
+		else
+			MD5_Update(&ctx, key, key_len);
+
+		MD5_Final(alt_result, &ctx);
+	}
+
+	CopyMem(hash, alt_result, MD5_DIGEST_LENGTH);
+
+	return EFI_SUCCESS;
+}
+
 static EFI_STATUS sha256_crypt (const char *key,  UINT32 key_len,
 				const char *salt, UINT32 salt_size,
 				const UINT32 rounds, UINT8 *hash)
@@ -229,9 +292,12 @@ EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 	switch (pw_crypt->method) {
 	case TRANDITIONAL_DES:
 	case EXTEND_BSDI_DES:
-	case MD5_BASED:
 		/* TODO unsupported */
 		status = EFI_UNSUPPORTED;
+		break;
+	case MD5_BASED:
+		status = md5_crypt (password, pw_length, (char *)pw_crypt->salt,
+				    pw_crypt->salt_size, hash);
 		break;
 	case SHA256_BASED:
 		status = sha256_crypt(password, pw_length, (char *)pw_crypt->salt,
