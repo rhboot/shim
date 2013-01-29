@@ -3,18 +3,21 @@
 #include <Library/BaseCryptLib.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
+#include <openssl/des.h>
 #include "PasswordCrypt.h"
 #include "crypt_blowfish.h"
 
+#define TRAD_DES_HASH_SIZE 13 /* (64/6+1) + (12/6) */
+#define BSDI_DES_HASH_SIZE 20 /* (64/6+1) + (24/6) + 4 + 1 */
 #define BLOWFISH_HASH_SIZE 31 /* 184/6+1 */
 
 UINT16 get_hash_size (const UINT16 method)
 {
 	switch (method) {
-	case TRANDITIONAL_DES:
-		return 64 / 8; /* per "man crypt" */
+	case TRADITIONAL_DES:
+		return TRAD_DES_HASH_SIZE;
 	case EXTEND_BSDI_DES:
-		return 64 / 8; /* per "man crypt" */
+		return BSDI_DES_HASH_SIZE;
 	case MD5_BASED:
 		return MD5_DIGEST_LENGTH;
 	case SHA256_BASED:
@@ -26,6 +29,20 @@ UINT16 get_hash_size (const UINT16 method)
 	}
 
 	return 0;
+}
+
+static EFI_STATUS trad_des_crypt (const char *key, const char *salt, UINT8 *hash)
+{
+	char result[TRAD_DES_HASH_SIZE + 1];
+	char *ret;
+
+	ret = DES_fcrypt(key, salt, result);
+	if (ret) {
+		CopyMem(hash, result, TRAD_DES_HASH_SIZE);
+		return EFI_SUCCESS;
+	}
+
+	return EFI_UNSUPPORTED;
 }
 
 static const char md5_salt_prefix[] = "$1$";
@@ -290,9 +307,10 @@ EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 		return EFI_INVALID_PARAMETER;
 
 	switch (pw_crypt->method) {
-	case TRANDITIONAL_DES:
+	case TRADITIONAL_DES:
+		status = trad_des_crypt (password, (char *)pw_crypt->salt, hash);
+		break;
 	case EXTEND_BSDI_DES:
-		/* TODO unsupported */
 		status = EFI_UNSUPPORTED;
 		break;
 	case MD5_BASED:
