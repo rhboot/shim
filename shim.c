@@ -995,15 +995,25 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 
 	pathlen = StrLen(bootpath);
 
+	/*
+	 * DevicePathToStr() concatenates two nodes with '/'.
+	 * Convert '/' to '\\'.
+	 */
+	for (i = 0; i < pathlen; i++) {
+		if (bootpath[i] == '/')
+			bootpath[i] = '\\';
+	}
 	for (i=pathlen; i>0; i--) {
-		if (bootpath[i] == '\\')
+		if (bootpath[i] == '\\' && bootpath[i-1] != '\\')
 			break;
 	}
+	if (bootpath[i] == '\\')
+		bootpath[i+1] = '\0';
+	else
+		bootpath[0] = '\0';
 
-	bootpath[i+1] = '\0';
-
-	if (i == 0 || bootpath[i-i] == '\\')
-		bootpath[i] = '\0';
+	while (*ImagePath == '\\')
+		ImagePath++;
 
 	*PathName = AllocatePool(StrSize(bootpath) + StrSize(ImagePath));
 
@@ -1021,6 +1031,8 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 	*grubpath = FileDevicePath(device, *PathName);
 
 error:
+	FreePool(bootpath);
+
 	return efi_status;
 }
 
