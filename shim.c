@@ -983,7 +983,7 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 {
 	EFI_DEVICE_PATH *devpath;
 	EFI_HANDLE device;
-	int i;
+	int i, j, last = -1;
 	unsigned int pathlen = 0;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	CHAR16 *bootpath;
@@ -1003,14 +1003,27 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 		if (bootpath[i] == '/')
 			bootpath[i] = '\\';
 	}
+
 	for (i=pathlen; i>0; i--) {
-		if (bootpath[i] == '\\' && bootpath[i-1] != '\\')
-			break;
+		if (bootpath[i] == '\\' && bootpath[i-1] == '\\')
+			bootpath[i] = '/';
+		else if (last == -1 && bootpath[i] == '\\')
+			last = i;
 	}
-	if (bootpath[i] == '\\')
-		bootpath[i+1] = '\0';
-	else
-		bootpath[0] = '\0';
+
+	if (last == -1 && bootpath[0] == '\\')
+		last = 0;
+	bootpath[last+1] = '\0';
+
+	if (last > 0) {
+		for (i = 0, j = 0; bootpath[i] != '\0'; i++) {
+			if (bootpath[i] != '/') {
+				bootpath[j] = bootpath[i];
+				j++;
+			}
+		}
+		bootpath[j] = '\0';
+	}
 
 	while (*ImagePath == '\\')
 		ImagePath++;
