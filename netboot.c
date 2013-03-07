@@ -39,6 +39,7 @@
 #include "shim.h"
 #include "netboot.h"
 
+#define DEFAULT_LOADER "/grub.efi"
 
 static inline unsigned short int __swap16(unsigned short int x)
 {
@@ -228,7 +229,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 {
 	CHAR8 *start, *end;
 	char ip6str[40];
-	CHAR8 *template = (CHAR8 *)"/grubx64.efi";
+	CHAR8 *template = DEFAULT_LOADER;
 
 	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
 		Print(L"URLS MUST START WITH tftp://\n");
@@ -288,7 +289,7 @@ static EFI_STATUS parseDhcp6()
 
 static EFI_STATUS parseDhcp4()
 {
-	CHAR8 *template = (CHAR8 *)"/grubx64.efi";
+	CHAR8 *template = DEFAULT_LOADER;
 	full_path = AllocateZeroPool(strlen(template)+1);
 
 	if (!full_path)
