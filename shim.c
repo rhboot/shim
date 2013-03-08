@@ -232,7 +232,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
-			CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
+			CertCount = (CertList->SignatureListSize - sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			for (Index = 0; Index < CertCount; Index++) {
 				IsFound = AuthenticodeVerify (data->CertData,
@@ -297,7 +297,7 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 	BOOLEAN IsFound = FALSE;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		CertCount = (CertList->SignatureListSize - CertList->SignatureHeaderSize) / CertList->SignatureSize;
+		CertCount = (CertList->SignatureListSize -sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 		if (CompareGuid(&CertList->SignatureType, &CertType) == 0) {
 			for (Index = 0; Index < CertCount; Index++) {
