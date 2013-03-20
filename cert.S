@@ -10,7 +10,7 @@ vendor_cert_size:
 	.data
 	.align	1
 	.type	vendor_cert, @object
-	.size	vendor_cert_size, vendor_cert_size-vendor_cert
+	.size	vendor_cert, .L0-vendor_cert
 vendor_cert:
 .incbin VENDOR_CERT_FILE
 .L0:

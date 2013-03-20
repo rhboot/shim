@@ -10,7 +10,7 @@ vendor_dbx_size:
 	.data
 	.align	1
 	.type	vendor_dbx, @object
-	.size	vendor_dbx_size, vendor_dbx_size-vendor_dbx
+	.size	vendor_dbx, .L0-vendor_dbx
 vendor_dbx:
 .incbin VENDOR_DBX_FILE
 .L0:
