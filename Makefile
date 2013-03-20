@@ -12,7 +12,7 @@ LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC) 
 
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
-EFI_LDS		= $(EFI_PATH)/elf_$(ARCH)_efi.lds
+EFI_LDS		= elf_$(ARCH)_efi.lds
 
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -mno-red-zone -maccumulate-outgoing-args \
@@ -88,6 +88,7 @@ Cryptlib/OpenSSL/libopenssl.a:
 	objcopy -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym  -j .rel \
 		-j .rela -j .reloc -j .eh_frame \
+		-j .vendor_cert \
 		--target=efi-app-$(ARCH) $^ $@
 	objcopy -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym  -j .rel \
