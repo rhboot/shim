@@ -29,8 +29,18 @@ EFI_STATUS
 	PE_COFF_LOADER_IMAGE_CONTEXT *context
 	);
 
+typedef
+EFI_STATUS
+(*EFI_SHIM_LOCK_VERIFY_BLOB) (
+	IN VOID *data,
+	IN UINTN datasize,
+	IN VOID *sig,
+	IN UINTN sigsize
+	);
+
 typedef struct _SHIM_LOCK {
 	EFI_SHIM_LOCK_VERIFY Verify;
 	EFI_SHIM_LOCK_HASH Hash;
 	EFI_SHIM_LOCK_CONTEXT Context;
+	EFI_SHIM_LOCK_VERIFY_BLOB VerifyBlob;
 } SHIM_LOCK;

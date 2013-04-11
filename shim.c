@@ -36,6 +36,12 @@
 #include <efi.h>
 #include <efilib.h>
 #include <Library/BaseCryptLib.h>
+#include <openssl/rsa.h>
+#include <openssl/bio.h>
+#include <openssl/x509.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
+
 #include "PeImage.h"
 #include "shim.h"
 #include "netboot.h"
@@ -61,6 +67,15 @@ static void *load_options;
 static UINT32 load_options_size;
 
 EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
+
+typedef BOOLEAN EFIAPI (*verify_func)(
+  IN  CONST UINT8  *AuthData,
+  IN  UINTN        DataSize,
+  IN  CONST UINT8  *TrustedCert,
+  IN  UINTN        CertSize,
+  IN  CONST UINT8  *ImageHash,
+  IN  UINTN        HashSize
+  );
 
 /*
  * The vendor certificate used for validating the second stage loader
@@ -222,10 +237,12 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
-					 UINTN dbsize,
-					 WIN_CERTIFICATE_EFI_PKCS *data,
-					 UINT8 *hash)
+static CHECK_STATUS internal_check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
+					          UINTN dbsize,
+						  CONST UINT8 *sigdata,
+					          UINTN sigsize,
+					          UINT8 *hash,
+					          verify_func vfunc)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertCount, Index;
@@ -237,11 +254,10 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			CertCount = (CertList->SignatureListSize - sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			for (Index = 0; Index < CertCount; Index++) {
-				IsFound = AuthenticodeVerify (data->CertData,
-							      data->Hdr.dwLength - sizeof(data->Hdr),
-							      Cert->SignatureData,
-							      CertList->SignatureSize,
-							      hash, SHA256_DIGEST_SIZE);
+				IsFound = vfunc(sigdata, sigsize,
+						Cert->SignatureData,
+						CertList->SignatureSize,
+						hash, SHA256_DIGEST_SIZE);
 				if (IsFound)
 					break;
 
@@ -263,8 +279,21 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
-				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+
+static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
+					     UINTN dbsize,
+					     WIN_CERTIFICATE_EFI_PKCS *data,
+					     UINT8 *hash)
+{
+	return internal_check_db_cert_in_ram(CertList, dbsize, data->CertData,
+					     data->Hdr.dwLength - sizeof(data->Hdr),
+					     hash, AuthenticodeVerify);
+}
+
+
+static CHECK_STATUS internal_check_db_cert(CHAR16 *dbname, EFI_GUID guid,
+				  CONST UINT8 *sigdata, UINTN sigsize,
+				  UINT8 *hash, verify_func vfunc)
 {
 	CHECK_STATUS rc;
 	EFI_STATUS efi_status;
@@ -279,12 +308,23 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
-	rc = check_db_cert_in_ram(CertList, dbsize, data, hash);
+	rc = internal_check_db_cert_in_ram(CertList, dbsize, sigdata, sigsize,
+			hash, vfunc);
 
 	FreePool(db);
 
 	return rc;
 }
+
+
+static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
+				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+{
+	return internal_check_db_cert(dbname, guid, data->CertData,
+				  data->Hdr.dwLength - sizeof(data->Hdr),
+				  hash, AuthenticodeVerify);
+}
+
 
 /*
  * Check a hash against an EFI_SIGNATURE_LIST in a buffer
@@ -683,6 +723,212 @@ static EFI_STATUS verify_mok (void) {
 
 	return EFI_SUCCESS;
 }
+
+
+static VOID pr_error_openssl(void)
+{
+	unsigned long code;
+
+	while ( (code = ERR_get_error()) )
+		/* Sadly, can't print out the friendly error string  because
+		 * all the BIO snprintf() functions are stubbed out due to the
+		 * lack of most 8-bit string functions in gnu-efi. Look up the
+		 * codes using 'openssl errstr' in a shell */
+		Print(L"openssl error code %08X\n", code);
+}
+
+
+static EVP_PKEY *get_pkey(CONST UINT8 *cert, UINTN certsize)
+{
+	BIO *bio;
+	X509 *x509 = NULL;
+	EVP_PKEY *pkey = NULL;
+
+	/* BIO is the OpenSSL input/output abstraction. Instantiate
+	 * one using a memory buffer containing the certificate */
+	bio = BIO_new_mem_buf((void *)cert, certsize);
+	if (!bio) {
+		return NULL;
+	}
+
+	/* Obtain an x509 structure from the DER cert data */
+	x509 = d2i_X509_bio(bio, NULL);
+	if (!x509) {
+		goto done;
+	}
+
+        /* And finally get the public key out of the certificate */
+	pkey = X509_get_pubkey(x509);
+	if (!pkey) {
+		goto done;
+	}
+
+	if (EVP_PKEY_RSA != EVP_PKEY_type(pkey->type)) {
+		EVP_PKEY_free(pkey);
+		pkey = NULL;
+	}
+done:
+	if (bio != NULL)
+		BIO_free(bio);
+	if (x509 != NULL)
+		X509_free(x509);
+	return pkey;
+}
+
+
+static BOOLEAN EFIAPI openssl_verify(
+		IN CONST UINT8 *sig, IN UINTN sigsize,
+		IN CONST UINT8 *cert, IN UINTN certsize,
+		IN CONST UINT8 *hash, IN UINTN hashsize)
+{
+	EVP_PKEY *pkey;
+	UINTN ret;
+
+	if (!sig || !cert || !hash)
+		return FALSE;
+
+	pkey = get_pkey(cert, certsize);
+	if (!pkey) {
+		Print(L"Unable to extract public key from certificate\n");
+		return FALSE;
+	}
+
+	ret = RSA_verify(NID_sha256, hash, hashsize, (unsigned char *)sig,
+			sigsize, EVP_PKEY_get1_RSA(pkey));
+	EVP_PKEY_free(pkey);
+	return (ret == 1) ? TRUE : FALSE;
+}
+
+
+static CHECK_STATUS check_db_blob_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
+					      UINTN dbsize,
+					      UINT8 *data,
+					      UINTN datasize,
+					      UINT8 *hash)
+{
+	return internal_check_db_cert_in_ram(CertList, dbsize, data,
+					     datasize, hash, openssl_verify);
+}
+
+
+static CHECK_STATUS check_db_blob_cert(
+		CHAR16 *dbname, EFI_GUID guid,
+		UINT8 *data, UINTN datasize,
+		UINT8 *hash)
+{
+	return internal_check_db_cert(dbname, guid, data, datasize,
+				  hash, openssl_verify);
+}
+
+
+/*
+ * Check whether the binary signature or hash are present in dbx or the
+ * built-in blacklist
+ */
+static EFI_STATUS blob_check_blacklist (
+	IN UINT8 *sig,
+	IN UINTN sigsize,
+	UINT8 *sha256hash)
+{
+	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
+
+	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
+				 SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) ==
+				DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_blob_cert_in_ram(dbx, vendor_dbx_size, sig, sigsize,
+				 sha256hash) == DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+
+	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+	if (check_db_blob_cert(L"dbx", secure_var, sig, sigsize, sha256hash) == DATA_FOUND)
+		return EFI_ACCESS_DENIED;
+
+	return EFI_SUCCESS;
+}
+
+
+/*
+ * Check whether the binary signature or hash are present in db or MokList
+ */
+static EFI_STATUS blob_check_whitelist (
+		IN UINT8 *sig,
+		IN UINTN sigsize,
+		UINT8 *sha256hash)
+{
+	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	EFI_GUID shim_var = SHIM_LOCK_GUID;
+
+	if (!ignore_db) {
+		if (check_db_hash(L"db", secure_var, sha256hash,
+				SHA256_DIGEST_SIZE,
+				EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+			update_verification_method(VERIFIED_BY_HASH);
+			return EFI_SUCCESS;
+		}
+		if (check_db_blob_cert(L"db", secure_var, sig, sigsize,
+				sha256hash) == DATA_FOUND) {
+			update_verification_method(VERIFIED_BY_CERT);
+			return EFI_SUCCESS;
+		}
+	}
+
+	if (check_db_hash(L"MokList", shim_var, sha256hash, SHA256_DIGEST_SIZE,
+			EFI_CERT_SHA256_GUID) == DATA_FOUND)
+		return EFI_SUCCESS;
+	if (check_db_blob_cert(L"MokList", shim_var, sig, sigsize, sha256hash) == DATA_FOUND)
+		return EFI_SUCCESS;
+
+	return EFI_ACCESS_DENIED;
+}
+
+
+static EFI_STATUS verify_generic_blob (VOID *data, UINTN datasize,
+			VOID *sig, UINTN sigsize)
+{
+	SHA256_CTX sha_ctx;
+	UINT8 digest[SHA256_DIGEST_LENGTH];
+
+	loader_is_participating = 1;
+
+	if (1 != SHA256_Init(&sha_ctx))
+		return EFI_INVALID_PARAMETER;
+
+	if (1 != SHA256_Update(&sha_ctx, data, datasize))
+		return EFI_INVALID_PARAMETER;
+
+	if (1 != SHA256_Final(digest, &sha_ctx))
+		return EFI_INVALID_PARAMETER;
+
+	if (EFI_ERROR(verify_mok())) {
+		Print(L"MokList is compromised and could not be erased");
+		return EFI_ACCESS_DENIED;
+	}
+
+	if (EFI_ERROR(blob_check_blacklist(sig, sigsize, digest))) {
+		Print(L"Binary is blacklisted\n");
+		return EFI_ACCESS_DENIED;
+	}
+
+	if (EFI_SUCCESS == blob_check_whitelist(sig, sigsize, digest))
+		return EFI_SUCCESS;
+
+	if (openssl_verify(sig, sigsize, shim_cert, sizeof(shim_cert),
+				digest, SHA256_DIGEST_LENGTH))
+		return EFI_SUCCESS;
+
+	if (openssl_verify(sig, sigsize, vendor_cert, vendor_cert_size,
+				digest, SHA256_DIGEST_LENGTH))
+		return EFI_SUCCESS;
+
+	pr_error_openssl();
+	Print(L"Invalid signature\n");
+	return EFI_ACCESS_DENIED;
+}
+
 
 /*
  * Check that the signature is valid and matches the binary
@@ -1702,6 +1948,7 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Verify = shim_verify;
 	shim_lock_interface.Hash = generate_hash;
 	shim_lock_interface.Context = read_header;
+	shim_lock_interface.VerifyBlob = verify_generic_blob;
 
 	systab = passed_systab;
 
