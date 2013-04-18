@@ -1375,6 +1375,63 @@ static BOOLEAN verify_pw(void)
 	return TRUE;
 }
 
+static int draw_countdown()
+{
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	EFI_INPUT_KEY key;
+	EFI_STATUS status;
+	UINTN cols, rows;
+	CHAR16 *title[2];
+	CHAR16 *message =  L"Press any key to perform MOK management";
+	int timeout = 10, wait = 10000000;
+
+	CopyMem(&SavedMode, ST->ConOut->Mode, sizeof(SavedMode));
+	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, FALSE);
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
+
+	title[0] = PoolPrint (L"%s UEFI key management", SHIM_VENDOR);
+	title[1] = NULL;
+
+	console_print_box_at(title, -1, 0, 0, -1, -1, 1, 1);
+
+	uefi_call_wrapper(ST->ConOut->QueryMode, 4, ST->ConOut,
+			  ST->ConOut->Mode->Mode, &cols, &rows);
+
+	PrintAt((cols - StrLen(message))/2, rows/2, message);
+	while (1) {
+		if (timeout > 1)
+			PrintAt(2, rows - 3, L"Booting in %d seconds  ", timeout);
+		else if (timeout)
+			PrintAt(2, rows - 3, L"Booting in %d second   ", timeout);
+
+		status = WaitForSingleEvent(ST->ConIn->WaitForKey, wait);
+
+		if (status != EFI_TIMEOUT) {
+			/* Clear the key in the queue */
+			uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2,
+					  ST->ConIn, &key);
+			break;
+		}
+
+		timeout--;
+		if (!timeout)
+			break;
+	}
+
+	FreePool(title[0]);
+
+	/* Restore everything */
+	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut,
+			  SavedMode.CursorVisible);
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
+			  SavedMode.CursorColumn, SavedMode.CursorRow);
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  SavedMode.Attribute);
+
+	return timeout;
+}
+
 typedef enum {
 	MOK_CONTINUE_BOOT,
 	MOK_RESET_MOK,
@@ -1491,6 +1548,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 	i++;
 
 	menu_strings[i] = NULL;
+
+	if (draw_countdown() == 0)
+		goto out;
 
 	while (choice >= 0) {
 		choice = console_select((CHAR16 *[]){ L"Perform MOK management", NULL },
