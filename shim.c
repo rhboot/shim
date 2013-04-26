@@ -1206,7 +1206,6 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 
 	if (efi_status != EFI_SUCCESS)
 		efi_status = start_image(image_handle, MOK_MANAGER);
-done:
 
 	return efi_status;
 }
