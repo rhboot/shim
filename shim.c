@@ -44,6 +44,7 @@
 #include "ucs2.h"
 
 #define DEFAULT_LOADER L"\\grub.efi"
+#define FALLBACK L"\\fallback.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
 
 static EFI_SYSTEM_TABLE *systab;
@@ -899,6 +900,69 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	return EFI_SUCCESS;
 }
 
+static int
+should_use_fallback(EFI_HANDLE image_handle)
+{
+	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
+	EFI_LOADED_IMAGE *li;
+	EFI_DEVICE_PATH *devpath;
+	int i;
+	unsigned int pathlen = 0;
+	CHAR16 *bootpath;
+	EFI_FILE_IO_INTERFACE *fio = NULL;
+	EFI_FILE_HANDLE vh;
+	EFI_FILE_HANDLE fh;
+	EFI_STATUS rc;
+
+	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
+				       &loaded_image_protocol, (void **)&li);
+	if (EFI_ERROR(rc))
+		return 0;
+
+	devpath = li->FilePath;
+
+	bootpath = DevicePathToStr(devpath);
+
+	/* Check the beginning of the string and the end, to avoid
+	 * caring about which arch this is. */
+	/* I really don't know why, but sometimes bootpath gives us
+	 * L"\\EFI\\BOOT\\/BOOTX64.EFI".  So just handle that here...
+	 */
+	if (StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\BOOT", 14) &&
+			StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\/BOOT", 15))
+		return 0;
+	pathlen = StrLen(bootpath);
+	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
+		return 0;
+
+	for (i=pathlen; i>0; i--) {
+		if (bootpath[i] == '\\')
+			break;
+	}
+
+	bootpath[i+1] = '\0';
+
+	rc = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
+			       &FileSystemProtocol, &fio);
+	if (EFI_ERROR(rc))
+		return 0;
+	
+	rc = uefi_call_wrapper(fio->OpenVolume, 2, fio, &vh);
+	if (EFI_ERROR(rc))
+		return 0;
+
+	rc = uefi_call_wrapper(vh->Open, 5, vh, &fh, L"\\EFI\\BOOT" FALLBACK,
+			       EFI_FILE_READ_ONLY, 0);
+	if (EFI_ERROR(rc)) {
+		uefi_call_wrapper(vh->Close, 1, vh);
+		return 0;
+	}
+	uefi_call_wrapper(fh->Close, 1, fh);
+	uefi_call_wrapper(vh->Close, 1, vh);
+
+	return 1;
+}
+
 /*
  * Generate the path of an executable given shim's path and the name
  * of the executable
@@ -1202,7 +1266,10 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = start_image(image_handle, second_stage);
+	if (should_use_fallback(image_handle))
+		efi_status = start_image(image_handle, FALLBACK);
+	else
+		efi_status = start_image(image_handle, second_stage);
 
 	if (efi_status != EFI_SUCCESS)
 		efi_status = start_image(image_handle, MOK_MANAGER);
