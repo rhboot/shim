@@ -73,4 +73,20 @@ StrnCaseCmp(CHAR16 *s0, CHAR16 *s1, int n)
 	return 0;
 }
 
+static inline UINTN
+__attribute__((unused))
+StrCSpn(const CHAR16 *s, const CHAR16 *reject)
+{
+	UINTN ret;
+
+	for (ret = 0; s[ret] != L'\0'; ret++) {
+		int i;
+		for (i = 0; reject[i] != L'\0'; i++) {
+			if (reject[i] == s[ret])
+				return ret;
+		}
+	}
+	return ret;
+}
+
 #endif /* SHIM_UCS2_H */
