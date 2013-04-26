@@ -41,6 +41,7 @@
 #include "signature.h"
 #include "netboot.h"
 #include "shim_cert.h"
+#include "ucs2.h"
 
 #define DEFAULT_LOADER L"\\grub.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
@@ -1328,6 +1329,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS status;
 	EFI_LOADED_IMAGE *li;
+	CHAR16 *bootpath = NULL;
 	CHAR16 *start = NULL, *c;
 	int i, remaining_size = 0;
 
@@ -1361,7 +1363,10 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		}
 	}
 
-	second_stage = (CHAR16 *)li->LoadOptions;
+	bootpath = DevicePathToStr(li->FilePath);
+	if (!StrCaseCmp(bootpath, (CHAR16 *)li->LoadOptions))
+		second_stage = (CHAR16 *)li->LoadOptions;
+
 	if (start && remaining_size > 0) {
 		load_options = start;
 		load_options_size = remaining_size;
