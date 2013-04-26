@@ -375,10 +375,8 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 	if (*start == 0xfeff)
 		start++;
 	while (*start) {
-		while (*start == L'\r' || *start == L'\n') {
+		while (*start == L'\r' || *start == L'\n')
 			start++;
-			continue;
-		}
 		UINTN l = StrCSpn(start, L"\r\n");
 		if (l == 0) {
 			if (start[l] == L'\0')
