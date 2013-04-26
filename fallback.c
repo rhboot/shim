@@ -203,16 +203,18 @@ update_boot_order(void)
 		int n = size / sizeof (CHAR16) + nbootorder;
 
 		newbootorder = AllocateZeroPool(n * sizeof (CHAR16));
+		if (!newbootorder)
+			return EFI_OUT_OF_RESOURCES;
 		CopyMem(newbootorder, bootorder, nbootorder * sizeof (CHAR16));
 		CopyMem(newbootorder + nbootorder, oldbootorder, size);
 		size = n * sizeof (CHAR16);
 	} else {
 		size = nbootorder * sizeof(CHAR16);
 		newbootorder = AllocateZeroPool(size);
+		if (!newbootorder)
+			return EFI_OUT_OF_RESOURCES;
 		CopyMem(newbootorder, bootorder, size);
 	}
-	if (!newbootorder)
-		return EFI_OUT_OF_RESOURCES;
 
 #ifdef DEBUG_FALLBACK
 	Print(L"nbootorder: %d\nBootOrder: ", size / sizeof (CHAR16));
