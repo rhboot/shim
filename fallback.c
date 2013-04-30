@@ -475,8 +475,6 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	} while (bs != 0);
 
 	rc = EFI_SUCCESS;
-	if (nbootorder > 0)
-		rc = update_boot_order();
 
 	return rc;
 }
@@ -587,9 +585,12 @@ find_boot_options(EFI_HANDLE device)
 
 	} while (1);
 
+	if (rc == EFI_SUCCESS && nbootorder > 0)
+		rc = update_boot_order();
+
 	uefi_call_wrapper(fh2->Close, 1, fh2);
 	uefi_call_wrapper(fh->Close, 1, fh);
-	return EFI_SUCCESS;
+	return rc;
 }
 EFI_STATUS
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
