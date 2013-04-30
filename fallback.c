@@ -114,6 +114,10 @@ make_full_path(CHAR16 *dirname, CHAR16 *filename, CHAR16 **out, UINT64 *outlen)
 CHAR16 *bootorder = NULL;
 int nbootorder = 0;
 
+EFI_DEVICE_PATH *first_new_option = NULL;
+VOID *first_new_option_args = NULL;
+UINTN first_new_option_size = 0;
+
 EFI_STATUS
 add_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
 {
@@ -284,6 +288,13 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	CHAR16 *dps = DevicePathToStr(dp);
 	Print(L"device path: \"%s\"\n", dps);
 #endif
+	if (!first_new_option) {
+		CHAR16 *dps = DevicePathToStr(dp);
+		Print(L"device path: \"%s\"\n", dps);
+		first_new_option = DuplicateDevicePath(dp);
+		first_new_option_args = arguments;
+		first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
+	}
 
 	add_boot_option(dp, fullpath, label, arguments);
 
@@ -596,6 +607,33 @@ find_boot_options(EFI_HANDLE device)
 	uefi_call_wrapper(fh->Close, 1, fh);
 	return rc;
 }
+
+static EFI_STATUS
+try_start_first_option(EFI_HANDLE parent_image_handle)
+{
+	EFI_STATUS rc;
+	EFI_HANDLE image_handle;
+
+	if (!first_new_option) {
+		return EFI_SUCCESS;
+	}
+
+	rc = uefi_call_wrapper(BS->LoadImage, 6, 0, parent_image_handle,
+			       first_new_option, NULL, 0,
+			       &image_handle);
+	if (EFI_ERROR(rc)) {
+		Print(L"LoadImage failed: %d\n", rc);
+		uefi_call_wrapper(BS->Stall, 1, 2000000);
+		return rc;
+	}
+	rc = uefi_call_wrapper(BS->StartImage, 3, image_handle, NULL, NULL);
+	if (EFI_ERROR(rc)) {
+		Print(L"StartImage failed: %d\n", rc);
+		uefi_call_wrapper(BS->Stall, 1, 2000000);
+	}
+	return rc;
+}
+
 EFI_STATUS
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 {
@@ -617,8 +655,10 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		return rc;
 	}
 
+	try_start_first_option(image);
+
 	Print(L"Reset System\n");
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetCold,
 			  EFI_SUCCESS, 0, NULL);
 
 	return EFI_SUCCESS;
