@@ -365,9 +365,13 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 #endif
 
 	CHAR16 *start = buffer;
-	/* If I create boot.csv with the efi shell's "edit" command,
-	 * it starts with 0xfeff.  I assume there's some reason for this,
-	 * but it doesn't matter much to me...
+	/* The file may or may not start with the Unicode byte order marker.
+	 * Sadness ensues.  Since UEFI is defined as LE, I'm going to decree
+	 * that these files must also be LE.
+	 *
+	 * IT IS THUS SO.
+	 *
+	 * But if we find the LE byte order marker, just skip it.
 	 */
 	if (*start == 0xfeff)
 		start++;
