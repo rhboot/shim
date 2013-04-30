@@ -612,5 +612,9 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		return rc;
 	}
 
+	Print(L"Reset System\n");
+	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+			  EFI_SUCCESS, 0, NULL);
+
 	return EFI_SUCCESS;
 }
