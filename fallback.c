@@ -95,7 +95,7 @@ make_full_path(CHAR16 *dirname, CHAR16 *filename, CHAR16 **out, UINT64 *outlen)
 	
 	len = StrLen(dirname) + StrLen(filename) + StrLen(L"\\EFI\\\\") + 2;
 
-	CHAR16 *fullpath = AllocateZeroPool(len);
+	CHAR16 *fullpath = AllocateZeroPool(len*sizeof(CHAR16));
 	if (!fullpath) {
 		Print(L"Could not allocate memory\n");
 		return EFI_OUT_OF_RESOURCES;
@@ -286,11 +286,8 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 #endif
 
 	add_boot_option(dp, fullpath, label, arguments);
-	FreePool(fullpath);
 
 err:
-	if (dph)
-		FreePool(dph);
 	if (dpf)
 		FreePool(dpf);
 	if (dp)
