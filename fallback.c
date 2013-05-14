@@ -626,6 +626,14 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
 		return rc;
 	}
+
+	EFI_LOADED_IMAGE *image;
+	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle, &LoadedImageProtocol, (void *)&image);
+	if (!EFI_ERROR(rc)) {
+		image->LoadOptions = first_new_option_args;
+		image->LoadOptionsSize = first_new_option_size;
+	}
+
 	rc = uefi_call_wrapper(BS->StartImage, 3, image_handle, NULL, NULL);
 	if (EFI_ERROR(rc)) {
 		Print(L"StartImage failed: %d\n", rc);
