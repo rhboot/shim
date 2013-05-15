@@ -948,7 +948,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	}
 
 	rc = uefi_call_wrapper(vh->Open, 5, vh, &fh, L"\\EFI\\BOOT" FALLBACK,
-			       EFI_FILE_READ_ONLY, 0);
+			       EFI_FILE_MODE_READ, 0);
 	if (EFI_ERROR(rc)) {
 		Print(L"Could not open \"\\EFI\\BOOT%s\": %d\n", FALLBACK, rc);
 		uefi_call_wrapper(vh->Close, 1, vh);
