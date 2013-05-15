@@ -501,7 +501,7 @@ find_boot_options(EFI_HANDLE device)
 
 	EFI_FILE_IO_INTERFACE *fio = NULL;
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				&FileSystemProtocol, &fio);
+				&FileSystemProtocol, (void **)&fio);
 	if (EFI_ERROR(rc)) {
 		Print(L"Couldn't find file system: %d\n", rc);
 		return rc;

@@ -910,8 +910,8 @@ should_use_fallback(EFI_HANDLE image_handle)
 	unsigned int pathlen = 0;
 	CHAR16 *bootpath;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
-	EFI_FILE_HANDLE vh;
-	EFI_FILE_HANDLE fh;
+	EFI_FILE *vh;
+	EFI_FILE *fh;
 	EFI_STATUS rc;
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
@@ -943,7 +943,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	bootpath[i+1] = '\0';
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
-			       &FileSystemProtocol, &fio);
+			       &FileSystemProtocol, (void **)&fio);
 	if (EFI_ERROR(rc))
 		return 0;
 	
