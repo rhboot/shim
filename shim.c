@@ -914,8 +914,10 @@ should_use_fallback(EFI_HANDLE image_handle)
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, (void **)&li);
-	if (EFI_ERROR(rc))
+	if (EFI_ERROR(rc)) {
+		Print(L"Could not get image for bootx64.efi: %d\n", rc);
 		return 0;
+	}
 
 	bootpath = DevicePathToStr(li->FilePath);
 
@@ -934,16 +936,21 @@ should_use_fallback(EFI_HANDLE image_handle)
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
 			       &FileSystemProtocol, (void **)&fio);
-	if (EFI_ERROR(rc))
+	if (EFI_ERROR(rc)) {
+		Print(L"Could not get fio for li->DeviceHandle: %d\n", rc);
 		return 0;
+	}
 	
 	rc = uefi_call_wrapper(fio->OpenVolume, 2, fio, &vh);
-	if (EFI_ERROR(rc))
+	if (EFI_ERROR(rc)) {
+		Print(L"Could not open fio volume: %d\n", rc);
 		return 0;
+	}
 
 	rc = uefi_call_wrapper(vh->Open, 5, vh, &fh, L"\\EFI\\BOOT" FALLBACK,
 			       EFI_FILE_READ_ONLY, 0);
 	if (EFI_ERROR(rc)) {
+		Print(L"Could not open \"\\EFI\\BOOT%s\": %d\n", FALLBACK, rc);
 		uefi_call_wrapper(vh->Close, 1, vh);
 		return 0;
 	}
