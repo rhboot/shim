@@ -905,8 +905,6 @@ should_use_fallback(EFI_HANDLE image_handle)
 {
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_LOADED_IMAGE *li;
-	EFI_DEVICE_PATH *devpath;
-	int i;
 	unsigned int pathlen = 0;
 	CHAR16 *bootpath;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
@@ -919,9 +917,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	if (EFI_ERROR(rc))
 		return 0;
 
-	devpath = li->FilePath;
-
-	bootpath = DevicePathToStr(devpath);
+	bootpath = DevicePathToStr(li->FilePath);
 
 	/* Check the beginning of the string and the end, to avoid
 	 * caring about which arch this is. */
@@ -931,16 +927,10 @@ should_use_fallback(EFI_HANDLE image_handle)
 	if (StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\BOOT", 14) &&
 			StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\/BOOT", 15))
 		return 0;
+
 	pathlen = StrLen(bootpath);
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
 		return 0;
-
-	for (i=pathlen; i>0; i--) {
-		if (bootpath[i] == '\\')
-			break;
-	}
-
-	bootpath[i+1] = '\0';
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
 			       &FileSystemProtocol, (void **)&fio);
