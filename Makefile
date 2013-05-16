@@ -18,7 +18,7 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wcha
 		  -Wall -mno-red-zone \
 		  $(EFI_INCLUDES)
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -DEFI_FUNCTION_WRAPPER
+	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
 endif
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
