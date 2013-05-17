@@ -36,8 +36,8 @@ TARGET	= shim.efi MokManager.efi.signed fallback.efi.signed
 OBJS	= shim.o netboot.o cert.o dbx.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key
 SOURCES	= shim.c shim.h netboot.c signature.h PeImage.h
-MOK_OBJS = MokManager.o PasswordCrypt.o
-MOK_SOURCES = MokManager.c shim.h console_control.h PasswordCrypt.c PasswordCrypt.h
+MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
+MOK_SOURCES = MokManager.c shim.h console_control.h PasswordCrypt.c PasswordCrypt.h crypt_blowfish.c crypt_blowfish.h
 FALLBACK_OBJS = fallback.o
 FALLBACK_SRCS = fallback.c
 

@@ -4,7 +4,9 @@
 #include <openssl/sha.h>
 #include <openssl/md5.h>
 #include "PasswordCrypt.h"
+#include "crypt_blowfish.h"
 
+#define BLOWFISH_HASH_SIZE 31 /* 184/6+1 */
 
 UINT16 get_hash_size (const UINT16 method)
 {
@@ -20,7 +22,7 @@ UINT16 get_hash_size (const UINT16 method)
 	case SHA512_BASED:
 		return SHA512_DIGEST_LENGTH;
 	case BLOWFISH_BASED:
-		return 184 / 8; /* per "man crypt" */
+		return BLOWFISH_HASH_SIZE;
 	}
 
 	return 0;
@@ -201,6 +203,21 @@ static EFI_STATUS sha512_crypt (const char *key,  UINT32 key_len,
 	return EFI_SUCCESS;
 }
 
+#define BF_RESULT_SIZE (7 + 22 + 31 + 1)
+
+static EFI_STATUS blowfish_crypt (const char *key, const char *salt, UINT8 *hash)
+{
+	char *retval, result[BF_RESULT_SIZE];
+
+	retval = crypt_blowfish_rn (key, salt, result, BF_RESULT_SIZE);
+	if (!retval)
+		return EFI_UNSUPPORTED;
+
+	CopyMem(hash, result + 7 + 22, BF_RESULT_SIZE);
+
+	return EFI_SUCCESS;
+}
+
 EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 			   const PASSWORD_CRYPT *pw_crypt, UINT8 *hash)
 {
@@ -227,8 +244,11 @@ EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 				      hash);
 		break;
 	case BLOWFISH_BASED:
-		/* TODO unsupported */
-		status = EFI_UNSUPPORTED;
+		if (pw_crypt->salt_size != (7 + 22 + 1)) {
+			status = EFI_INVALID_PARAMETER;
+			break;
+		}
+		status = blowfish_crypt(password, (char *)pw_crypt->salt, hash);
 		break;
 	default:
 		return EFI_INVALID_PARAMETER;
