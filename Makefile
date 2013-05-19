@@ -1,6 +1,6 @@
 ARCH		= $(shell uname -m | sed s,i[3456789]86,ia32,)
 
-SUBDIRS		= Cryptlib
+SUBDIRS		= Cryptlib lib
 
 LIB_PATH	= /usr/lib64
 
@@ -78,14 +78,17 @@ fallback.so: $(FALLBACK_OBJS)
 
 MokManager.o: $(SOURCES)
 
-MokManager.so: $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+MokManager.so: $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 Cryptlib/libcryptlib.a:
 	$(MAKE) -C Cryptlib
 
 Cryptlib/OpenSSL/libopenssl.a:
 	$(MAKE) -C Cryptlib/OpenSSL
+
+lib/lib.a:
+	$(MAKE) -C lib
 
 %.efi: %.so
 	objcopy -j .text -j .sdata -j .data \
