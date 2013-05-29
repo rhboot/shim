@@ -6,7 +6,6 @@ ARCH            = $(shell uname -m | sed s,i[3456789]86,ia32,)
 
 EFI_INCLUDE     = /usr/include/efi
 EFI_INCLUDES    = -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -I../include
-EFI_PATH        = /usr/lib64/gnuefi
 
 EFI_CRT_OBJS    = $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS         = $(EFI_PATH)/elf_$(ARCH)_efi.lds

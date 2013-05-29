@@ -6,7 +6,7 @@ LIB_PATH	= /usr/lib64
 
 EFI_INCLUDE	= /usr/include/efi
 EFI_INCLUDES	= -nostdinc -ICryptlib -ICryptlib/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
-EFI_PATH	= /usr/lib64/gnuefi
+EFI_PATH	:= /usr/lib64/gnuefi
 
 LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC) 
@@ -88,7 +88,7 @@ Cryptlib/OpenSSL/libopenssl.a:
 	$(MAKE) -C Cryptlib/OpenSSL
 
 lib/lib.a:
-	$(MAKE) -C lib
+	$(MAKE) -C lib EFI_PATH=$(EFI_PATH)
 
 %.efi: %.so
 	objcopy -j .text -j .sdata -j .data \
