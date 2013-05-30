@@ -109,6 +109,7 @@ lib/lib.a:
 clean:
 	$(MAKE) -C Cryptlib clean
 	$(MAKE) -C Cryptlib/OpenSSL clean
+	$(MAKE) -C lib clean
 	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb
 	rm -f *.debug *.so *.efi
 
