@@ -56,15 +56,6 @@ static EFI_IP_ADDRESS tftp_addr;
 static char *full_path;
 
 
-/*
- * Not in the EFI header set yet, so I have to declare it here
- */
-typedef struct {
-	UINT32 MessageType:8;
-	UINT32 TransactionId:24;
-	UINT8 DhcpOptions[1024];
-} EFI_PXE_BASE_CODE_DHCPV6_PACKET;
-
 typedef struct {
 	UINT16 OpCode;
 	UINT16 Length;
