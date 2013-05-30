@@ -344,9 +344,12 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 			goto next;
 
 		if (next->Attribute & EFI_FILE_DIRECTORY) {
-				(*result)[(*count)] = next->FileName;
-				(*result)[(*count)][len] = '/';
-				(*result)[(*count)++][len + 1] = '\0';
+				(*result)[(*count)] = PoolPrint(L"%s/", next->FileName);
+				if (!(*result)[(*count)]) {
+					Print(L"Failed to allocate buffer");
+					return EFI_OUT_OF_RESOURCES;
+				}
+				(*count)++;
 				goto next;
 		}
 
@@ -354,7 +357,12 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 			offs = StrLen(filterarr[c]);
 
 			if (StrCmp(&next->FileName[len - offs], filterarr[c]) == 0) {
-				(*result)[(*count)++] = next->FileName;
+				(*result)[(*count)] = StrDuplicate(next->FileName);
+				if (!(*result)[(*count)]) {
+					Print(L"Failed to allocate buffer");
+					return EFI_OUT_OF_RESOURCES;
+				}
+				(*count)++;
 			} else {
 				continue;
 			}
@@ -362,7 +370,7 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 		}
 
 	next:		
-		if (StrCmp(next->FileName, L"../") == 0) {
+		if (StrCmp(next->FileName, L"..") == 0) {
 			/* place .. directory first */
 			CHAR16 *tmp = (*result)[(*count) - 1];
 
@@ -390,6 +398,15 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 		*result = NULL;
 	}
 	return status;
+}
+
+static void
+free_entries(CHAR16 **entries, int count)
+{
+	int i;
+
+	for (i = 0; i<count; i++)
+		FreePool(entries[i]);
 }
 
 void
@@ -436,8 +453,6 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 		/* ESC key */
 		goto out_free;
 	selected = entries[select];
-	FreePool(entries);
-	entries = NULL;
 	/* note that memory used by selected is valid until dmp is freed */
 	len = StrLen(selected);
 	if (selected[len - 1] == '/') {
@@ -445,6 +460,9 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 
 		/* stay where we are */
 		if (StrCmp(selected, L"./") == 0) {
+			free_entries(entries, count);
+			FreePool(entries);
+			entries = NULL;
 			FreePool(dmp);
 			goto redo;
 		} else if (StrCmp(selected, L"../") == 0) {
@@ -463,6 +481,9 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 			if (StrCmp(name, L"\\") != 0
 			    && StrCmp(&name[i], L"..") != 0) {
 				name[i] = '\0';
+				free_entries(entries, count);
+				FreePool(entries);
+				entries = NULL;
 				FreePool(dmp);
 				goto redo;
 			}
@@ -478,6 +499,9 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 		/* remove trailing / */
 		newname[StrLen(newname) - 1] = '\0';
 
+		free_entries(entries, count);
+		FreePool(entries);
+		entries = NULL;
 		FreePool(dmp);
 		FreePool(name);
 		name = newname;
@@ -494,8 +518,10 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 
  out_free:
 	FreePool(dmp);
-	if (entries)
+	if (entries) {
+		free_entries(entries, count);
 		FreePool(entries);
+	}
  out_free_name:
 	FreePool(name);
 }
