@@ -1448,45 +1448,45 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	menu_strings[i] = StrDuplicate(L"Continue boot");
+	menu_strings[i] = L"Continue boot";
 	menu_item[i] = MOK_CONTINUE_BOOT;
 
 	i++;
 
 	if (MokNew || MokAuth) {
 		if (!MokNew) {
-			menu_strings[i] = StrDuplicate(L"Reset MOK");
+			menu_strings[i] = L"Reset MOK";
 			menu_item[i] = MOK_RESET_MOK;
 		} else {
-			menu_strings[i] = StrDuplicate(L"Enroll MOK");
+			menu_strings[i] = L"Enroll MOK";
 			menu_item[i] = MOK_ENROLL_MOK;
 		}
 		i++;
 	}
 
 	if (MokDel || MokDelAuth) {		
-		menu_strings[i] = StrDuplicate(L"Delete MOK");
+		menu_strings[i] = L"Delete MOK";
 		menu_item[i] = MOK_DELETE_MOK;
 		i++;
 	}
 
 	if (MokSB) {
-		menu_strings[i] = StrDuplicate(L"Change Secure Boot state");
+		menu_strings[i] = L"Change Secure Boot state";
 		menu_item[i] = MOK_CHANGE_SB;
 		i++;
 	}
 
 	if (MokPW) {
-		menu_strings[i] = StrDuplicate(L"Set MOK password");
+		menu_strings[i] = L"Set MOK password";
 		menu_item[i] = MOK_SET_PW;
 		i++;
 	}
 
-	menu_strings[i] = StrDuplicate(L"Enroll key from disk");
+	menu_strings[i] = L"Enroll key from disk";
 	menu_item[i] = MOK_KEY_ENROLL;
 	i++;
 
-	menu_strings[i] = StrDuplicate(L"Enroll hash from disk");
+	menu_strings[i] = L"Enroll hash from disk";
 	menu_item[i] = MOK_HASH_ENROLL;
 	i++;
 
@@ -1528,9 +1528,6 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 
 out:
 	console_reset();
-
-	for (i=0; menu_strings[i] != NULL; i++)
-		FreePool(menu_strings[i]);
 
 	FreePool(menu_strings);
 
