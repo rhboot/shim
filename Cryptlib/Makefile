@@ -10,7 +10,7 @@ LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi $(LIB_GCC)
 
 CFLAGS		= -ggdb -O0 -I. -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall $(EFI_INCLUDES) -mno-red-zone
+		  -Wall $(EFI_INCLUDES) -mno-red-zone -mno-sse -mno-mmx
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER
 endif

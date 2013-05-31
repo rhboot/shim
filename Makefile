@@ -14,8 +14,8 @@ EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(EFI_PATH)/elf_$(ARCH)_efi.lds
 
-CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall -mno-red-zone \
+CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
+		  -fshort-wchar -Wall -mno-red-zone -mno-mmx -mno-sse \
 		  $(EFI_INCLUDES)
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
