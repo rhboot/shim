@@ -102,8 +102,8 @@ Cryptlib/OpenSSL/libopenssl.a:
 clean:
 	$(MAKE) -C Cryptlib clean
 	$(MAKE) -C Cryptlib/OpenSSL clean
-	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(KEYS) certdb
-	rm -f *.debug *.so
+	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb
+	rm -f *.debug *.so *.efi
 
 GITTAG = $(VERSION)
 
