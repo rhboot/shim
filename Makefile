@@ -24,6 +24,9 @@ endif
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
+ifneq ($(origin VENDOR_DBX_FILE), undefined)
+	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
+endif
 
 LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS)
 
