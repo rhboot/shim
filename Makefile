@@ -5,7 +5,7 @@ SUBDIRS		= Cryptlib
 LIB_PATH	= /usr/lib64
 
 EFI_INCLUDE	= /usr/include/efi
-EFI_INCLUDES	= -nostdinc -ICryptlib -ICryptlib/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol 
+EFI_INCLUDES	= -nostdinc -ICryptlib -ICryptlib/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
 EFI_PATH	= /usr/lib64/gnuefi
 
 LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
@@ -15,7 +15,8 @@ EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(EFI_PATH)/elf_$(ARCH)_efi.lds
 
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
-		  -fshort-wchar -Wall -mno-red-zone -mno-mmx -mno-sse \
+		  -fshort-wchar -Wall -mno-red-zone -maccumulate-outgoing-args \
+		  -mno-mmx -mno-sse \
 		  $(EFI_INCLUDES)
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
