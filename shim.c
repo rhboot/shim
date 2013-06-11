@@ -59,7 +59,7 @@ static UINT32 load_options_size;
  */
 extern UINT8 vendor_cert[];
 extern UINT32 vendor_cert_size;
-extern EFI_SIGNATURE_LIST *vendor_dbx;
+extern UINT8 vendor_dbx[];
 extern UINT32 vendor_dbx_size;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
@@ -359,16 +359,17 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
-	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha256hash,
+	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
 				 SHA256_DIGEST_SIZE, EfiHashSha256Guid) ==
 				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_hash_in_ram(vendor_dbx, vendor_dbx_size, sha1hash,
+	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
 				 SHA1_DIGEST_SIZE, EfiHashSha1Guid) ==
 				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_cert_in_ram(vendor_dbx, vendor_dbx_size, cert,
+	if (check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
 				 sha256hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 

@@ -32,5 +32,5 @@ vendor_cert:
 	.size	vendor_cert_size, 4
 	.section .vendor_cert, "a", @progbits
 vendor_cert_size:
-	.long	1
+	.long	0
 #endif
