@@ -951,7 +951,12 @@ should_use_fallback(EFI_HANDLE image_handle)
 	rc = uefi_call_wrapper(vh->Open, 5, vh, &fh, L"\\EFI\\BOOT" FALLBACK,
 			       EFI_FILE_MODE_READ, 0);
 	if (EFI_ERROR(rc)) {
-		Print(L"Could not open \"\\EFI\\BOOT%s\": %d\n", FALLBACK, rc);
+		/* Do not print the error here - this is an acceptable case
+		 * for removable media, where we genuinely don't want
+		 * fallback.efi to exist.
+		 * Print(L"Could not open \"\\EFI\\BOOT%s\": %d\n", FALLBACK,
+		 * 	 rc);
+		 */
 		uefi_call_wrapper(vh->Close, 1, vh);
 		return 0;
 	}
