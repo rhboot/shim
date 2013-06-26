@@ -73,18 +73,6 @@ static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
 	return efi_status;
 }
 
-static EFI_INPUT_KEY get_keystroke (void)
-{
-	EFI_INPUT_KEY key;
-	UINTN EventIndex;
-
-	uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey,
-			  &EventIndex);
-	uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, &key);
-
-	return key;
-}
-
 static EFI_STATUS get_sha1sum (void *Data, int DataSize, UINT8 *hash)
 {
 	EFI_STATUS status;
@@ -553,7 +541,7 @@ static UINT8 get_line (UINT32 *length, CHAR16 *line, UINT32 line_max, UINT8 show
 	int count = 0;
 
 	do {
-		key = get_keystroke();
+		key = console_get_keystroke();
 
 		if ((count >= line_max &&
 		     key.UnicodeChar != CHAR_BACKSPACE) ||
