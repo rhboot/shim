@@ -621,6 +621,61 @@ done:
 	return status;
 }
 
+static void console_save_and_set_mode (SIMPLE_TEXT_OUTPUT_MODE *SavedMode)
+{
+	if (!SavedMode) {
+		Print(L"Invalid parameter: SavedMode\n");
+		return;
+	}
+
+	CopyMem(SavedMode, ST->ConOut->Mode, sizeof(SIMPLE_TEXT_OUTPUT_MODE));
+	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, FALSE);
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
+}
+
+static void console_restore_mode (SIMPLE_TEXT_OUTPUT_MODE *SavedMode)
+{
+	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut,
+			  SavedMode->CursorVisible);
+	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
+			  SavedMode->CursorColumn, SavedMode->CursorRow);
+	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
+			  SavedMode->Attribute);
+}
+
+static UINT32 get_password (CHAR16 *prompt, CHAR16 *password, UINT32 max)
+{
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	CHAR16 *str;
+	CHAR16 *message[2];
+	UINTN length;
+	UINT32 pw_length;
+
+	if (!prompt)
+		prompt = L"Password:";
+
+	console_save_and_set_mode(&SavedMode);
+
+	str = PoolPrint(L"%s            ", prompt);
+	if (!str) {
+		console_errorbox(L"Failed to allocate prompt");
+		return 0;
+	}
+
+	message[0] = str;
+	message[1] = NULL;
+	length = StrLen(message[0]);
+	console_print_box_at(message, -1, -length-4, -5, length+4, 3, 0, 1);
+	get_line(&pw_length, password, max, 0);
+
+	console_restore_mode(&SavedMode);
+
+	FreePool(str);
+
+	return pw_length;
+}
+
 static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 				  void *Data, UINTN DataSize,
 				  UINT8 *auth, CHAR16 *prompt)
@@ -647,15 +702,10 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 	}
 
 	while (fail_count < 3) {
-		if (prompt) {
-			Print(L"%s", prompt);
-		} else {
-			Print(L"Password: ");
-		}
-		get_line(&pw_length, password, PASSWORD_MAX, 0);
+		pw_length = get_password(prompt, password, PASSWORD_MAX);
 
 		if (pw_length < PASSWORD_MIN || pw_length > PASSWORD_MAX) {
-			Print(L"Invalid password length\n");
+			console_errorbox(L"Invalid password length");
 			fail_count++;
 			continue;
 		}
@@ -678,13 +728,13 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 						 pw_length * sizeof(CHAR16), hash);
 		}
 		if (status != EFI_SUCCESS) {
-			Print(L"Unable to generate password hash\n");
+			console_errorbox(L"Unable to generate password hash");
 			fail_count++;
 			continue;
 		}
 
 		if (CompareMem(auth_hash, hash, auth_size) != 0) {
-			Print(L"Password doesn't match\n");
+			console_errorbox(L"Password doesn't match");
 			fail_count++;
 			continue;
 		}
@@ -1322,13 +1372,17 @@ static void mok_key_enroll(void)
 	FreePool(data);
 }
 
-static BOOLEAN verify_pw(void)
+static BOOLEAN verify_pw(BOOLEAN *protected)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	UINT8 pwhash[PASSWORD_CRYPT_SIZE];
 	UINTN size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
+	CHAR16 *message[2];
+
+	*protected = FALSE;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokPWStore",
 				       &shim_lock_guid, &attributes, &size,
@@ -1348,17 +1402,27 @@ static BOOLEAN verify_pw(void)
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
+	/* Draw the background */
+	console_save_and_set_mode(&SavedMode);
+	message[0] = PoolPrint (L"%s UEFI key management", SHIM_VENDOR);
+	message[1] = NULL;
+	console_print_box_at(message, -1, 0, 0, -1, -1, 1, 1);
+	FreePool(message[0]);
+	console_restore_mode(&SavedMode);
+
 	if (size == PASSWORD_CRYPT_SIZE) {
 		efi_status = match_password((PASSWORD_CRYPT *)pwhash, NULL, 0,
-					    NULL, L"Enter MOK password: ");
+					    NULL, L"Enter MOK password:");
 	} else {
 		efi_status = match_password(NULL, NULL, 0, pwhash,
-					    L"Enter MOK password: ");
+					    L"Enter MOK password:");
 	}
 	if (efi_status != EFI_SUCCESS) {
 		console_notify(L"Password limit reached");
 		return FALSE;
 	}
+
+	*protected = TRUE;
 
 	return TRUE;
 }
@@ -1373,10 +1437,7 @@ static int draw_countdown()
 	CHAR16 *message =  L"Press any key to perform MOK management";
 	int timeout = 10, wait = 10000000;
 
-	CopyMem(&SavedMode, ST->ConOut->Mode, sizeof(SavedMode));
-	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut, FALSE);
-	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
-			  EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
+	console_save_and_set_mode (&SavedMode);
 
 	title[0] = PoolPrint (L"%s UEFI key management", SHIM_VENDOR);
 	title[1] = NULL;
@@ -1409,13 +1470,7 @@ static int draw_countdown()
 
 	FreePool(title[0]);
 
-	/* Restore everything */
-	uefi_call_wrapper(ST->ConOut->EnableCursor, 2, ST->ConOut,
-			  SavedMode.CursorVisible);
-	uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut,
-			  SavedMode.CursorColumn, SavedMode.CursorRow);
-	uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut,
-			  SavedMode.Attribute);
+	console_restore_mode(&SavedMode);
 
 	return timeout;
 }
@@ -1448,9 +1503,10 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 	UINT8 auth[PASSWORD_CRYPT_SIZE];
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
+	BOOLEAN protected;
 	EFI_STATUS ret = EFI_SUCCESS;
 
-	if (verify_pw() == FALSE)
+	if (verify_pw(&protected) == FALSE)
 		return EFI_ACCESS_DENIED;
 	
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
@@ -1537,7 +1593,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 
 	menu_strings[i] = NULL;
 
-	if (draw_countdown() == 0)
+	if (protected == FALSE && draw_countdown() == 0)
 		goto out;
 
 	while (choice >= 0) {
