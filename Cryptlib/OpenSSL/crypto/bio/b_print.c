@@ -129,8 +129,10 @@ static void fmtstr     (char **, char **, size_t *, size_t *,
 			const char *, int, int, int);
 static void fmtint     (char **, char **, size_t *, size_t *,
 			LLONG, int, int, int, int);
+#ifndef OPENSSL_SYS_UEFI
 static void fmtfp      (char **, char **, size_t *, size_t *,
 			LDOUBLE, int, int, int);
+#endif
 static void doapr_outch (char **, char **, size_t *, size_t *, int);
 static void _dopr(char **sbuffer, char **buffer,
 		  size_t *maxlen, size_t *retlen, int *truncated,
@@ -177,7 +179,9 @@ _dopr(
 {
     char ch;
     LLONG value;
+#ifndef OPENSSL_SYS_UEFI
     LDOUBLE fvalue;
+#endif
     char *strvalue;
     int min;
     int max;
@@ -336,6 +340,7 @@ _dopr(
                        ch == 'o' ? 8 : (ch == 'u' ? 10 : 16),
                        min, max, flags);
                 break;
+#ifndef OPENSSL_SYS_UEFI
             case 'f':
                 if (cflags == DP_C_LDOUBLE)
                     fvalue = va_arg(args, LDOUBLE);
@@ -360,6 +365,7 @@ _dopr(
                 else
                     fvalue = va_arg(args, double);
                 break;
+#endif
             case 'c':
                 doapr_outch(sbuffer, buffer, &currlen, maxlen,
                     va_arg(args, int));
@@ -566,6 +572,7 @@ fmtint(
     return;
 }
 
+#ifndef OPENSSL_SYS_UEFI
 static LDOUBLE
 abs_val(LDOUBLE value)
 {
@@ -721,6 +728,7 @@ fmtfp(
         ++padlen;
     }
 }
+#endif
 
 static void
 doapr_outch(
