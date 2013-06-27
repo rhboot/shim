@@ -293,16 +293,6 @@ size_t fwrite (const void *buffer, size_t size, size_t count, FILE *stream)
 //  -- Dummy OpenSSL Support Routines --
 //
 
-int BIO_printf (void *bio, const char *format, ...)
-{
-  return 0;
-}
-
-int BIO_snprintf(char *buf, size_t n, const char *format, ...)
-{
-  return 0;
-}
-
 void *UI_OpenSSL(void)
 {
   return NULL;

@@ -215,6 +215,7 @@ OBJS		=   crypto/cryptlib.o \
   crypto/bio/bf_null.o \
   crypto/bio/bf_buff.o \
   crypto/bio/b_dump.o \
+  crypto/bio/b_print.o \
   crypto/bio/bf_nbio.o \
   crypto/bio/bss_log.o \
   crypto/bio/bss_bio.o \
