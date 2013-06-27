@@ -195,136 +195,30 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	return list;
 }
 
-static CHAR16* get_x509_name (X509_NAME *X509Name, CHAR16 *name)
+static CHAR16* get_x509_common_name (X509_NAME *X509Name)
 {
-	char *str;
-	CHAR16 *ret = NULL;
+	char str[80];
 
-	str = X509_NAME_oneline(X509Name, NULL, 0);
-	if (str) {
-		ret = PoolPrint(L"%s: %a", name, str);
-		OPENSSL_free(str);
-	}
-	return ret;
+	ZeroMem(str, 80);
+	X509_NAME_get_text_by_NID (X509Name, NID_commonName, str, 80);
+
+	return PoolPrint(L"%a", str);
 }
 
-static const char *mon[12]= {
-"Jan","Feb","Mar","Apr","May","Jun",
-"Jul","Aug","Sep","Oct","Nov","Dec"
-};
-
-static void print_x509_GENERALIZEDTIME_time (ASN1_TIME *time, CHAR16 *time_string)
+static CHAR16* get_x509_time (ASN1_TIME *time)
 {
-	char *v;
-	int gmt = 0;
-	int i;
-	int y = 0,M = 0,d = 0,h = 0,m = 0,s = 0;
-	char *f = NULL;
-	int f_len = 0;
+	BIO *bio = BIO_new (BIO_s_mem());
+	char str[30];
+	int len;
 
-	i=time->length;
-	v=(char *)time->data;
+	ASN1_TIME_print (bio, time);
+	len = BIO_read(bio, str, 29);
+	if (len < 0)
+		len = 0;
+	str[len] = '\0';
+	BIO_free (bio);
 
-	if (i < 12)
-		goto error;
-
-	if (v[i-1] == 'Z')
-		gmt=1;
-
-	for (i=0; i<12; i++) {
-		if ((v[i] > '9') || (v[i] < '0'))
-			goto error;
-	}
-
-	y = (v[0]-'0')*1000+(v[1]-'0')*100 + (v[2]-'0')*10+(v[3]-'0');
-	M = (v[4]-'0')*10+(v[5]-'0');
-
-	if ((M > 12) || (M < 1))
-		goto error;
-
-	d = (v[6]-'0')*10+(v[7]-'0');
-	h = (v[8]-'0')*10+(v[9]-'0');
-	m = (v[10]-'0')*10+(v[11]-'0');
-
-	if (time->length >= 14 &&
-	    (v[12] >= '0') && (v[12] <= '9') &&
-	    (v[13] >= '0') && (v[13] <= '9')) {
-		s = (v[12]-'0')*10+(v[13]-'0');
-		/* Check for fractions of seconds. */
-		if (time->length >= 15 && v[14] == '.')	{
-			int l = time->length;
-			f = &v[14];	/* The decimal point. */
-			f_len = 1;
-			while (14 + f_len < l && f[f_len] >= '0' &&
-			       f[f_len] <= '9')
-				++f_len;
-		}
-	}
-
-	SPrint(time_string, 0, L"%a %2d %02d:%02d:%02d%.*a %d%a",
-	       mon[M-1], d, h, m, s, f_len, f, y, (gmt)?" GMT":"");
-error:
-	return;
-}
-
-static void print_x509_UTCTIME_time (ASN1_TIME *time, CHAR16 *time_string)
-{
-	char *v;
-	int gmt=0;
-	int i;
-	int y = 0,M = 0,d = 0,h = 0,m = 0,s = 0;
-
-	i=time->length;
-	v=(char *)time->data;
-
-	if (i < 10)
-		goto error;
-
-	if (v[i-1] == 'Z')
-		gmt=1;
-
-	for (i=0; i<10; i++)
-		if ((v[i] > '9') || (v[i] < '0'))
-			goto error;
-
-	y = (v[0]-'0')*10+(v[1]-'0');
-
-	if (y < 50)
-		y+=100;
-
-	M = (v[2]-'0')*10+(v[3]-'0');
-
-	if ((M > 12) || (M < 1))
-		goto error;
-
-	d = (v[4]-'0')*10+(v[5]-'0');
-	h = (v[6]-'0')*10+(v[7]-'0');
-	m = (v[8]-'0')*10+(v[9]-'0');
-
-	if (time->length >=12 &&
-	    (v[10] >= '0') && (v[10] <= '9') &&
-	    (v[11] >= '0') && (v[11] <= '9'))
-		s = (v[10]-'0')*10+(v[11]-'0');
-
-	SPrint(time_string, 0, L"%a %2d %02d:%02d:%02d %d%a",
-	       mon[M-1], d, h, m, s, y+1900, (gmt)?" GMT":"");
-error:
-	return;
-}
-
-static CHAR16* get_x509_time (ASN1_TIME *time, CHAR16 *name)
-{
-	CHAR16 time_string[30];
-
-	if (time->type == V_ASN1_UTCTIME) {
-		print_x509_UTCTIME_time(time, time_string);
-	} else if (time->type == V_ASN1_GENERALIZEDTIME) {
-		print_x509_GENERALIZEDTIME_time(time, time_string);
-	} else {
-		time_string[0] = '\0';
-	}
-
-	return PoolPrint(L"%s: %s", name, time_string);
+	return PoolPrint(L"%a", str);
 }
 
 static void show_x509_info (X509 *X509Cert, UINT8 *hash)
@@ -354,7 +248,6 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 		int i, n;
 		bnser = ASN1_INTEGER_to_BN(serial, NULL);
 		n = BN_bn2bin(bnser, hexbuf);
-		CatPrint(&serial_string, L"Serial Number:");
 		for (i = 0; i < n; i++) {
 			CatPrint(&serial_string, L"%02x:", hexbuf[i]);
 		}
@@ -365,34 +258,32 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 
 	X509Name = X509_get_issuer_name(X509Cert);
 	if (X509Name) {
-		issuer = get_x509_name(X509Name, L"Issuer");
+		issuer = get_x509_common_name(X509Name);
 		if (issuer)
 			fields++;
 	}
 
 	X509Name = X509_get_subject_name(X509Cert);
 	if (X509Name) {
-		subject = get_x509_name(X509Name, L"Subject");
+		subject = get_x509_common_name(X509Name);
 		if (subject)
 			fields++;
 	}
 
 	time = X509_get_notBefore(X509Cert);
 	if (time) {
-		from = get_x509_time(time, L"Validity from");
-		if (time)
+		from = get_x509_time(time);
+		if (from)
 			fields++;
 	}
 
 	time = X509_get_notAfter(X509Cert);
 	if (time) {
-		until = get_x509_time(time, L"Validity till");
+		until = get_x509_time(time);
 		if (until)
 			fields++;
 	}
 
-#if 0
-	CatPrint(&hash_string1, L"SHA1 Fingerprint: ");
 	for (i=0; i<10; i++)
 		CatPrint(&hash_string1, L"%02x ", hash[i]);
 	for (i=10; i<20; i++)
@@ -403,42 +294,48 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 
 	if (hash_string2.str)
 		fields++;
-#endif
+
 	if (!fields)
 		return;
 
-	text = AllocateZeroPool(sizeof(CHAR16 *) * (fields + 1));
+	i = 0;
+	text = AllocateZeroPool(sizeof(CHAR16 *) * (fields*3 + 1));
 	if (serial_string.str) {
-		text[i] = serial_string.str;
-		i++;
+		text[i++] = StrDuplicate(L"[Serial Number]");
+		text[i++] = serial_string.str;
+		text[i++] = StrDuplicate(L"");
 	}
 	if (issuer) {
-		text[i] = issuer;
-		i++;
+		text[i++] = StrDuplicate(L"[Issuer]");
+		text[i++] = issuer;
+		text[i++] = StrDuplicate(L"");
 	}
 	if (subject) {
-		text[i] = subject;
-		i++;
+		text[i++] = StrDuplicate(L"[Subject]");
+		text[i++] = subject;
+		text[i++] = StrDuplicate(L"");
 	}
 	if (from) {
-		text[i] = from;
-		i++;
+		text[i++] = StrDuplicate(L"[Valid Not Before]");
+		text[i++] = from;
+		text[i++] = StrDuplicate(L"");
 	}
 	if (until) {
-		text[i] = until;
-		i++;
+		text[i++] = StrDuplicate(L"[Valid Not After]");
+		text[i++] = until;
+		text[i++] = StrDuplicate(L"");
 	}
 	if (hash_string1.str) {
-		text[i] = hash_string1.str;
-		i++;
+		text[i++] = StrDuplicate(L"[Fingerprint]");
+		text[i++] = hash_string1.str;
 	}
 	if (hash_string2.str) {
-		text[i] = hash_string2.str;
-		i++;
+		text[i++] = hash_string2.str;
+		text[i++] = StrDuplicate(L"");
 	}
 	text[i] = NULL;
 
-	console_alertbox(text);
+	console_print_box(text, -1);
 
 	for (i=0; text[i] != NULL; i++)
 		FreePool(text[i]);
@@ -446,11 +343,41 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 	FreePool(text);
 }
 
+static void show_efi_hash (UINT8 *hash)
+{
+	CHAR16 *text[5];
+	POOL_PRINT hash_string1;
+	POOL_PRINT hash_string2;
+	int i;
+
+	ZeroMem(&hash_string1, sizeof(hash_string1));
+	ZeroMem(&hash_string2, sizeof(hash_string2));
+
+	text[0] = L"SHA256 hash";
+	text[1] = L"";
+
+	for (i=0; i<16; i++)
+		CatPrint(&hash_string1, L"%02x ", hash[i]);
+	for (i=16; i<32; i++)
+		CatPrint(&hash_string2, L"%02x ", hash[i]);
+
+	text[2] = hash_string1.str;
+	text[3] = hash_string2.str;
+	text[4] = NULL;
+
+	console_print_box(text, -1);
+
+	if (hash_string1.str)
+		FreePool(hash_string1.str);
+
+	if (hash_string2.str)
+		FreePool(hash_string2.str);
+}
+
 static void show_mok_info (void *Mok, UINTN MokSize)
 {
 	EFI_STATUS efi_status;
 	UINT8 hash[SHA1_DIGEST_SIZE];
-	unsigned int i;
 	X509 *X509Cert;
 
 	if (!Mok || MokSize == 0)
@@ -473,13 +400,7 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 			return;
 		}
 	} else {
-		Print(L"SHA256 hash:\n   ");
-		for (i = 0; i < SHA256_DIGEST_SIZE; i++) {
-			Print(L" %02x", ((UINT8 *)Mok)[i]);
-			if (i % 10 == 9)
-				Print(L"\n   ");
-		}
-		Print(L"\n");
+		show_efi_hash(Mok);
 	}
 }
 
@@ -521,7 +442,9 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 		key_num = console_select((CHAR16 *[]){ title, NULL },
 					 menu_strings, 0);
 
-		if (key_num < MokNum)
+		if (key_num < 0)
+			break;
+		else if (key_num < MokNum)
 			show_mok_info(keys[key_num].Mok, keys[key_num].MokSize);
 	}
 
