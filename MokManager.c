@@ -957,13 +957,39 @@ static INTN mok_deletion_prompt (void *MokDel, UINTN MokDelSize)
 	return -1;
 }
 
+static CHAR16 get_password_charater (CHAR16 *prompt)
+{
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	CHAR16 *message[2];
+	CHAR16 character;
+	UINTN length;
+	UINT32 pw_length;
+
+	if (!prompt)
+		prompt = L"Password charater: ";
+
+	console_save_and_set_mode(&SavedMode);
+
+	message[0] = prompt;
+	message[1] = NULL;
+	length = StrLen(message[0]);
+	console_print_box_at(message, -1, -length-4, -5, length+4, 3, 0, 1);
+	get_line(&pw_length, &character, 1, 0);
+
+	console_restore_mode(&SavedMode);
+
+	return character;
+}
+
 static INTN mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	MokSBvar *var = MokSB;
+	CHAR16 *message[4];
 	CHAR16 pass1, pass2, pass3;
+	CHAR16 *str;
 	UINT8 fail_count = 0;
-	UINT32 length;
 	UINT8 sbval = 1;
 	UINT8 pos1, pos2, pos3;
 	int ret;
@@ -974,6 +1000,13 @@ static INTN mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 	}
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	message[0] = L"Change Secure Boot state";
+	message[1] = NULL;
+
+	console_save_and_set_mode(&SavedMode);
+	console_print_box_at(message, -1, 0, 0, -1, -1, 1, 1);
+	console_restore_mode(&SavedMode);
 
 	while (fail_count < 3) {
 		RandomBytes (&pos1, sizeof(pos1));
@@ -989,14 +1022,29 @@ static INTN mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 			pos3 = (pos3 % var->PWLen) ;
 		} while (pos3 == pos2 || pos3 == pos1);
 
-		Print(L"Enter password character %d: ", pos1 + 1);
-		get_line(&length, &pass1, 1, 0);
+		str = PoolPrint(L"Enter password character %d: ", pos1 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return -1;
+		}
+		pass1 = get_password_charater(str);
+		FreePool(str);
 
-		Print(L"Enter password character %d: ", pos2 + 1);
-		get_line(&length, &pass2, 1, 0);
+		str = PoolPrint(L"Enter password character %d: ", pos2 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return -1;
+		}
+		pass2 = get_password_charater(str);
+		FreePool(str);
 
-		Print(L"Enter password character %d: ", pos3 + 1);
-		get_line(&length, &pass3, 1, 0);
+		str = PoolPrint(L"Enter password character %d: ", pos3 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return -1;
+		}
+		pass3 = get_password_charater(str);
+		FreePool(str);
 
 		if (pass1 != var->Password[pos1] ||
 		    pass2 != var->Password[pos2] ||
