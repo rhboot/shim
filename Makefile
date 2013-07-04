@@ -38,7 +38,7 @@ VERSION		= 0.4
 TARGET	= shim.efi MokManager.efi.signed fallback.efi.signed
 OBJS	= shim.o netboot.o cert.o dbx.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key
-SOURCES	= shim.c shim.h netboot.c signature.h include/PeImage.h include/wincert.h
+SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
 MOK_SOURCES = MokManager.c shim.h console_control.h PasswordCrypt.c PasswordCrypt.h crypt_blowfish.c crypt_blowfish.h
 FALLBACK_OBJS = fallback.o
@@ -71,7 +71,7 @@ cert.o : cert.S
 dbx.o : dbx.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
+shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 fallback.o: $(FALLBACK_SRCS)

@@ -4,12 +4,13 @@
 #include <openssl/x509.h>
 #include "console_control.h"
 #include "shim.h"
-#include "signature.h"
 #include "PeImage.h"
 #include "PasswordCrypt.h"
 
-#include "include/console.h"
-#include "include/simple_file.h"
+#include "guid.h"
+#include "console.h"
+#include "simple_file.h"
+#include "efiauthenticated.h"
 
 #define PASSWORD_MAX 256
 #define PASSWORD_MIN 1
@@ -115,8 +116,8 @@ done:
 static UINT32 count_keys(void *Data, UINTN DataSize)
 {
 	EFI_SIGNATURE_LIST *CertList = Data;
-	EFI_GUID CertType = EfiCertX509Guid;
-	EFI_GUID HashType = EfiHashSha256Guid;
+	EFI_GUID CertType = X509_GUID;
+	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINTN dbsize = DataSize;
 	UINT32 MokNum = 0;
 
@@ -152,8 +153,8 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	MokListNode *list;
 	EFI_SIGNATURE_LIST *CertList = Data;
 	EFI_SIGNATURE_DATA *Cert;
-	EFI_GUID CertType = EfiCertX509Guid;
-	EFI_GUID HashType = EfiHashSha256Guid;
+	EFI_GUID CertType = X509_GUID;
+	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINTN dbsize = DataSize;
 	UINTN count = 0;
 
@@ -1271,7 +1272,7 @@ static EFI_STATUS enroll_file (void *data, UINTN datasize, BOOLEAN hash)
 			goto out;
 
 		CertList = mokbuffer;
-		CertList->SignatureType = EfiHashSha256Guid;
+		CertList->SignatureType = EFI_CERT_SHA256_GUID;
 		CertList->SignatureSize = 16 + SHA256_DIGEST_SIZE;
 		CertData = (EFI_SIGNATURE_DATA *)(((UINT8 *)mokbuffer) +
 						  sizeof(EFI_SIGNATURE_LIST));
@@ -1285,7 +1286,7 @@ static EFI_STATUS enroll_file (void *data, UINTN datasize, BOOLEAN hash)
 			goto out;
 
 		CertList = mokbuffer;
-		CertList->SignatureType = EfiCertX509Guid;
+		CertList->SignatureType = X509_GUID;
 		CertList->SignatureSize = 16 + datasize;
 
 		memcpy(mokbuffer + sizeof(EFI_SIGNATURE_LIST) + 16, data,

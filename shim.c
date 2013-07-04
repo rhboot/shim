@@ -38,10 +38,12 @@
 #include <Library/BaseCryptLib.h>
 #include "PeImage.h"
 #include "shim.h"
-#include "signature.h"
 #include "netboot.h"
 #include "shim_cert.h"
 #include "ucs2.h"
+
+#include "guid.h"
+#include "efiauthenticated.h"
 
 #define FALLBACK L"\\fallback.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
@@ -228,7 +230,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertCount, Index;
 	BOOLEAN IsFound = FALSE;
-	EFI_GUID CertType = EfiCertX509Guid;
+	EFI_GUID CertType = X509_GUID;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
@@ -364,11 +366,11 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
-				 SHA256_DIGEST_SIZE, EfiHashSha256Guid) ==
+				 SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) ==
 				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
-				 SHA1_DIGEST_SIZE, EfiHashSha1Guid) ==
+				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) ==
 				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 	if (check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
@@ -376,10 +378,10 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		return EFI_ACCESS_DENIED;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EfiHashSha256Guid) == DATA_FOUND)
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
-			  EfiHashSha1Guid) == DATA_FOUND)
+			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 	if (check_db_cert(L"dbx", secure_var, cert, sha256hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
@@ -397,13 +399,13 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	EFI_GUID shim_var = SHIM_LOCK_GUID;
 
 	if (check_db_hash(L"db", secure_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EfiHashSha256Guid) == DATA_FOUND)
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
 		return EFI_SUCCESS;
 	if (check_db_hash(L"db", secure_var, sha1hash, SHA1_DIGEST_SIZE,
-			  EfiHashSha1Guid) == DATA_FOUND)
+			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
 		return EFI_SUCCESS;
 	if (check_db_hash(L"MokList", shim_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EfiHashSha256Guid) == DATA_FOUND)
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
 		return EFI_SUCCESS;
 	if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND)
 		return EFI_SUCCESS;
