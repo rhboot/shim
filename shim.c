@@ -43,6 +43,7 @@
 #include "ucs2.h"
 
 #include "guid.h"
+#include "variables.h"
 #include "efiauthenticated.h"
 
 #define FALLBACK L"\\fallback.efi"
@@ -80,32 +81,6 @@ typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
 } MokListNode;
-
-static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
-				UINTN *size, void **buffer)
-{
-	EFI_STATUS efi_status;
-	char allocate = !(*size);
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       attributes, size, buffer);
-
-	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate) {
-		return efi_status;
-	}
-
-	*buffer = AllocatePool(*size);
-
-	if (!*buffer) {
-		Print(L"Unable to allocate variable buffer\n");
-		return EFI_OUT_OF_RESOURCES;
-	}
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       attributes, size, *buffer);
-
-	return efi_status;
-}
 
 /*
  * Perform basic bounds checking of the intra-image pointers
@@ -270,15 +245,14 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
 	UINTN dbsize = 0;
-	UINT32 attributes;
-	void *db;
+	UINT8 *db;
 
-	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
+	efi_status = get_variable(dbname, &db, &dbsize, guid);
 
 	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
 
-	CertList = db;
+	CertList = (EFI_SIGNATURE_LIST *)db;
 
 	rc = check_db_cert_in_ram(CertList, dbsize, data, hash);
 
@@ -336,17 +310,16 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 {
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
-	UINT32 attributes;
 	UINTN dbsize = 0;
-	void *db;
+	UINT8 *db;
 
-	efi_status = get_variable(dbname, guid, &attributes, &dbsize, &db);
+	efi_status = get_variable(dbname, &db, &dbsize, guid);
 
 	if (efi_status != EFI_SUCCESS) {
 		return VAR_NOT_FOUND;
 	}
 
-	CertList = db;
+	CertList = (EFI_SIGNATURE_LIST *)db;
 
 	CHECK_STATUS rc = check_db_hash_in_ram(CertList, dbsize, data,
 						SignatureSize, CertType);
@@ -423,15 +396,16 @@ static BOOLEAN secure_mode (void)
 {
 	EFI_STATUS status;
 	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
-	UINTN charsize = sizeof(char);
+	UINTN len;
+	UINT8 *Data;
 	UINT8 sb, setupmode;
-	UINT32 attributes;
 
 	if (insecure_mode)
 		return FALSE;
 
-	status = get_variable(L"SecureBoot", global_var, &attributes, &charsize,
-			      (void *)&sb);
+	status = get_variable(L"SecureBoot", &Data, &len, global_var);
+	sb = *Data;
+	FreePool(Data);
 
 	/* FIXME - more paranoia here? */
 	if (status != EFI_SUCCESS || sb != 1) {
@@ -440,8 +414,9 @@ static BOOLEAN secure_mode (void)
 		return FALSE;
 	}
 
-	status = get_variable(L"SetupMode", global_var, &attributes, &charsize,
-			      (void *)&setupmode);
+	status = get_variable(L"SetupMode", &Data, &len, global_var);
+	setupmode = *Data;
+	FreePool(Data);
 
 	if (status == EFI_SUCCESS && setupmode == 1) {
 		if (verbose)
@@ -629,12 +604,12 @@ done:
 static EFI_STATUS verify_mok (void) {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
-	void *MokListData = NULL;
+	UINT8 *MokListData = NULL;
 	UINTN MokListDataSize = 0;
 	UINT32 attributes;
 
-	status = get_variable(L"MokList", shim_lock_guid, &attributes,
-			      &MokListDataSize, &MokListData);
+	status = get_variable_attr(L"MokList", &MokListData, &MokListDataSize,
+				   shim_lock_guid, &attributes);
 
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		Print(L"MokList is compromised!\nErase all keys in MokList!\n");
@@ -1325,12 +1300,10 @@ EFI_STATUS mirror_mok_list()
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
-	UINT32 attributes;
-	void *Data = NULL;
+	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
 
-	efi_status = get_variable(L"MokList", shim_lock_guid, &attributes,
-				  &DataSize, &Data);
+	efi_status = get_variable(L"MokList", &Data, &DataSize, shim_lock_guid);
 
 	if (efi_status != EFI_SUCCESS) {
 		goto done;
@@ -1400,12 +1373,12 @@ static EFI_STATUS check_mok_sb (void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
-	void *MokSBState = NULL;
+	UINT8 *MokSBState = NULL;
 	UINTN MokSBStateSize = 0;
 	UINT32 attributes;
 
-	status = get_variable(L"MokSBState", shim_lock_guid, &attributes,
-			      &MokSBStateSize, &MokSBState);
+	status = get_variable_attr(L"MokSBState", &MokSBState, &MokSBStateSize,
+				   shim_lock_guid, &attributes);
 
 	if (status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
@@ -1517,7 +1490,6 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	EFI_STATUS efi_status;
 	UINT8 verbose_check;
 	UINTN verbose_check_size;
-	UINT32 attributes;
 	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
 
 	/*
@@ -1536,8 +1508,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	InitializeLib(image_handle, systab);
 
 	verbose_check_size = 1;
-	efi_status = get_variable(L"SHIM_VERBOSE", global_var, &attributes,
-				  &verbose_check_size, (void *)&verbose_check);
+	efi_status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
+				  &verbose_check_size, global_var);
 	if (!EFI_ERROR(efi_status))
 		verbose = verbose_check;
 

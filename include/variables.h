@@ -1,6 +1,6 @@
 #include <efiauthenticated.h>
 
-#include <sha256.h>		/* for SHA256_DIGEST_SIZE */
+#include <PeImage.h>		/* for SHA256_DIGEST_SIZE */
 
 #define certlist_for_each_certentry(cl, cl_init, s, s_init)		\
 	for (cl = (EFI_SIGNATURE_LIST *)(cl_init), s = (s_init);	\

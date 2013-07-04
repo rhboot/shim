@@ -9,6 +9,7 @@
 
 #include "guid.h"
 #include "console.h"
+#include "variables.h"
 #include "simple_file.h"
 #include "efiauthenticated.h"
 
@@ -49,32 +50,6 @@ typedef struct {
 	UINT32 PWLen;
 	CHAR16 Password[SB_PASSWORD_LEN];
 } __attribute__ ((packed)) MokSBvar;
-
-static EFI_STATUS get_variable (CHAR16 *name, EFI_GUID guid, UINT32 *attributes,
-				UINTN *size, void **buffer)
-{
-	EFI_STATUS efi_status;
-	char allocate = !(*size);
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       attributes, size, buffer);
-
-	if (efi_status != EFI_BUFFER_TOO_SMALL || !allocate) {
-		return efi_status;
-	}
-
-	*buffer = AllocatePool(*size);
-
-	if (!*buffer) {
-		console_notify(L"Unable to allocate variable buffer");
-		return EFI_OUT_OF_RESOURCES;
-	}
-
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, name, &guid,
-				       attributes, size, *buffer);
-
-	return efi_status;
-}
 
 static EFI_STATUS get_sha1sum (void *Data, int DataSize, UINT8 *hash)
 {
@@ -904,7 +879,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
 	UINT8 auth[PASSWORD_CRYPT_SIZE];
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
-	void *MokListData = NULL;
+	UINT8 *MokListData = NULL;
 	UINTN MokListDataSize = 0;
 	MokListNode *mok, *del_key;
 	INTN mok_num, del_num;
@@ -929,9 +904,8 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
 	if (efi_status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
 
-	efi_status = get_variable(L"MokList", shim_lock_guid, &attributes,
-				  &MokListDataSize, &MokListData);
-
+	efi_status = get_variable_attr (L"MokList", &MokListData, &MokListDataSize,
+				        shim_lock_guid, &attributes);
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		console_alertbox((CHAR16 *[]){L"MokList is compromised!",
 					L"Erase all keys in MokList!",

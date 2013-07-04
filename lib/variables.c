@@ -27,7 +27,6 @@
 #include <variables.h>
 #include <guid.h>
 #include <console.h>
-#include <sha256.h>
 #include <errors.h>
 
 EFI_STATUS
