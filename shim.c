@@ -643,6 +643,9 @@ static EFI_STATUS verify_mok (void) {
 		return status;
 	}
 
+	if (MokListData)
+		FreePool(MokListData);
+
 	return EFI_SUCCESS;
 }
 
@@ -1420,6 +1423,8 @@ static EFI_STATUS check_mok_sb (void)
 			insecure_mode = 1;
 		}
 	}
+
+	FreePool(MokSBState);
 
 	return status;
 }
