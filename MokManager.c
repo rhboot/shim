@@ -1122,7 +1122,11 @@ static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 
 		LibDeleteVariable(L"MokPWStore", &shim_lock_guid);
 		LibDeleteVariable(L"MokPW", &shim_lock_guid);
-		return 0;
+		console_notify(L"The system must now be rebooted");
+		uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm, EFI_SUCCESS, 0,
+				  NULL);
+		console_notify(L"Failed to reboot");
+		return -1;
 	}
 
 	if (MokPWSize == PASSWORD_CRYPT_SIZE) {
