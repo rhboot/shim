@@ -53,6 +53,7 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 static CHAR16 *second_stage;
 static void *load_options;
 static UINT32 load_options_size;
+static UINT8 verbose;
 
 /*
  * The vendor certificate used for validating the second stage loader
@@ -431,7 +432,8 @@ static BOOLEAN secure_mode (void)
 
 	/* FIXME - more paranoia here? */
 	if (status != EFI_SUCCESS || sb != 1) {
-		Print(L"Secure boot not enabled\n");
+		if (verbose)
+			Print(L"Secure boot not enabled\n");
 		return FALSE;
 	}
 
@@ -439,7 +441,8 @@ static BOOLEAN secure_mode (void)
 			      (void *)&setupmode);
 
 	if (status == EFI_SUCCESS && setupmode == 1) {
-		Print(L"Platform is in setup mode\n");
+		if (verbose)
+			Print(L"Platform is in setup mode\n");
 		return FALSE;
 	}
 
@@ -699,7 +702,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	status = check_whitelist(cert, sha256hash, sha1hash);
 
 	if (status == EFI_SUCCESS) {
-		Print(L"Binary is whitelisted\n");
+		if (verbose)
+			Print(L"Binary is whitelisted\n");
 		return status;
 	}
 
@@ -711,7 +715,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
-		Print(L"Binary is verified by the vendor certificate\n");
+		if (verbose)
+			Print(L"Binary is verified by the vendor certificate\n");
 		return status;
 	}
 
@@ -724,7 +729,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       vendor_cert, vendor_cert_size, sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
-		Print(L"Binary is verified by the vendor certificate\n");
+		if (verbose)
+			Print(L"Binary is verified by the vendor certificate\n");
 		return status;
 	}
 
@@ -1476,6 +1482,10 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	static SHIM_LOCK shim_lock_interface;
 	EFI_HANDLE handle = NULL;
 	EFI_STATUS efi_status;
+	UINT8 verbose_check;
+	UINTN verbose_check_size;
+	UINT32 attributes;
+	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
 
 	/*
 	 * Set up the shim lock protocol so that grub and MokManager can
@@ -1491,6 +1501,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
+
+	verbose_check_size = 1;
+	efi_status = get_variable(L"SHIM_VERBOSE", global_var, &attributes,
+				  &verbose_check_size, (void *)&verbose_check);
+	if (!EFI_ERROR(efi_status))
+		verbose = verbose_check;
 
 	/* Set the second stage loader */
 	set_second_stage (image_handle);
