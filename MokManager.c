@@ -1214,7 +1214,7 @@ static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 	return -1;
 }
 
-static UINTN verify_certificate(void *cert, UINTN size)
+static BOOLEAN verify_certificate(void *cert, UINTN size)
 {
 	X509 *X509Cert;
 	if (!cert || size == 0)
@@ -1356,6 +1356,34 @@ static void mok_hash_enroll(void)
 	FreePool(data);
 }
 
+static CHAR16 *der_suffix[] = {
+	L".cer",
+	L".der",
+	L".crt",
+	NULL
+};
+
+static BOOLEAN check_der_suffix (CHAR16 *file_name)
+{
+	CHAR16 suffix[5];
+	int i;
+
+	if (!file_name || StrLen(file_name) <= 4)
+		return FALSE;
+
+	suffix[0] = '\0';
+	StrCat(suffix, file_name + StrLen(file_name) - 4);
+
+	StrLwr (suffix);
+	for (i = 0; der_suffix[i] != NULL; i++) {
+		if (StrCmp(suffix, der_suffix[i]) == 0) {
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 static void mok_key_enroll(void)
 {
 	EFI_STATUS efi_status;
@@ -1376,6 +1404,15 @@ static void mok_key_enroll(void)
 
 	if (!file_name)
 		return;
+
+	if (!check_der_suffix(file_name)) {
+		console_alertbox((CHAR16 *[]){
+			L"Unsupported Format",
+			L"",
+			L"Only DER encoded certificate (*.cer/der/crt) is supported",
+			NULL});
+		return;
+	}
 
 	efi_status = simple_file_open(im, file_name, &file, EFI_FILE_MODE_READ);
 
