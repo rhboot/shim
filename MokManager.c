@@ -15,6 +15,8 @@
 #define PASSWORD_MIN 1
 #define SB_PASSWORD_LEN 16
 
+#define NAME_LINE_MAX 70
+
 #ifndef SHIM_VENDOR
 #define SHIM_VENDOR L"Shim"
 #endif
@@ -195,14 +197,61 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	return list;
 }
 
-static CHAR16* get_x509_common_name (X509_NAME *X509Name)
+typedef struct {
+	int nid;
+	CHAR16 *name;
+} NidName;
+
+static NidName nidname[] = {
+	{NID_commonName, L"CN"},
+	{NID_organizationName, L"O"},
+	{NID_countryName, L"C"},
+	{NID_stateOrProvinceName, L"ST"},
+	{NID_localityName, L"L"},
+	{-1, NULL}
+};
+
+static CHAR16* get_x509_name (X509_NAME *X509Name)
 {
-	char str[80];
+	CHAR16 name[NAME_LINE_MAX+1];
+	CHAR16 part[NAME_LINE_MAX+1];
+	char str[NAME_LINE_MAX];
+	int i, len, rest, first;
 
-	ZeroMem(str, 80);
-	X509_NAME_get_text_by_NID (X509Name, NID_commonName, str, 80);
+	name[0] = '\0';
+	rest = NAME_LINE_MAX;
+	first = 1;
+	for (i = 0; nidname[i].name != NULL; i++) {
+		int add;
+		len = X509_NAME_get_text_by_NID (X509Name, nidname[i].nid,
+						 str, NAME_LINE_MAX);
+		if (len <= 0)
+			continue;
 
-	return PoolPrint(L"%a", str);
+		if (first)
+			add = len + (int)StrLen(nidname[i].name) + 1;
+		else
+			add = len + (int)StrLen(nidname[i].name) + 3;
+
+		if (add > rest)
+			continue;
+
+		if (first) {
+			SPrint(part, NAME_LINE_MAX * sizeof(CHAR16), L"%s=%a",
+			       nidname[i].name, str);
+		} else {
+			SPrint(part, NAME_LINE_MAX * sizeof(CHAR16), L", %s=%a",
+			       nidname[i].name, str);
+		}
+		StrCat(name, part);
+		rest -= add;
+		first = 0;
+	}
+
+	if (rest >= 0 && rest < NAME_LINE_MAX)
+		return PoolPrint(L"%s", name);
+
+	return NULL;
 }
 
 static CHAR16* get_x509_time (ASN1_TIME *time)
@@ -258,14 +307,14 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 
 	X509Name = X509_get_issuer_name(X509Cert);
 	if (X509Name) {
-		issuer = get_x509_common_name(X509Name);
+		issuer = get_x509_name(X509Name);
 		if (issuer)
 			fields++;
 	}
 
 	X509Name = X509_get_subject_name(X509Cert);
 	if (X509Name) {
-		subject = get_x509_common_name(X509Name);
+		subject = get_x509_name(X509Name);
 		if (subject)
 			fields++;
 	}
