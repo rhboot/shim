@@ -1,6 +1,6 @@
 TARGET = lib.a
 
-LIBFILES = simple_file.o guid.o console.o execute.o configtable.o shell.o variables.o
+LIBFILES = simple_file.o guid.o console.o execute.o configtable.o shell.o variables.o security_policy.o
 
 ARCH            = $(shell uname -m | sed s,i[3456789]86,ia32,)
 

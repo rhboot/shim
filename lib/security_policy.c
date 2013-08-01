@@ -10,7 +10,6 @@
 #include <efilib.h>
 
 #include <guid.h>
-#include <sha256.h>
 #include <variables.h>
 #include <simple_file.h>
 #include <errors.h>
@@ -50,59 +49,7 @@ struct _EFI_SECURITY_PROTOCOL {
 
 static UINT8 *security_policy_esl = NULL;
 static UINTN security_policy_esl_len;
-
-static EFI_STATUS
-security_policy_check_mok(void *data, UINTN len)
-{
-	EFI_STATUS status;
-	UINT8 hash[SHA256_DIGEST_SIZE];
-	UINT32 attr;
-	UINT8 *VarData;
-	UINTN VarLen;
-
-	/* first check is MokSBState.  If we're in insecure mode, boot
-	 * anyway regardless of dbx contents */
-	status = get_variable_attr(L"MokSBState", &VarData, &VarLen,
-				   MOK_OWNER, &attr);
-	if (status == EFI_SUCCESS) {
-		UINT8 MokSBState = VarData[0];
-
-		FreePool(VarData);
-		if ((attr & EFI_VARIABLE_RUNTIME_ACCESS) == 0
-		    && MokSBState)
-			return EFI_SUCCESS;
-	}
-
-	status = sha256_get_pecoff_digest_mem(data, len, hash);
-	if (status != EFI_SUCCESS)
-		return status;
-
-	if (find_in_variable_esl(L"dbx", SIG_DB, hash, SHA256_DIGEST_SIZE)
-	    == EFI_SUCCESS)
-		/* MOK list cannot override dbx */
-		return EFI_SECURITY_VIOLATION;
-
-	status = get_variable_attr(L"MokList", &VarData, &VarLen, MOK_OWNER,
-				   &attr);
-	if (status != EFI_SUCCESS)
-		goto check_tmplist;
-
-	FreePool(VarData);
-
-	if (attr & EFI_VARIABLE_RUNTIME_ACCESS)
-		goto check_tmplist;
-
-	if (find_in_variable_esl(L"MokList", MOK_OWNER, hash, SHA256_DIGEST_SIZE) == EFI_SUCCESS)
-		return EFI_SUCCESS;
-
- check_tmplist:
-	if (security_policy_esl
-	    && find_in_esl(security_policy_esl, security_policy_esl_len, hash,
-			   SHA256_DIGEST_SIZE) == EFI_SUCCESS)
-		return EFI_SUCCESS;
-
-	return EFI_SECURITY_VIOLATION;
-}
+static SecurityHook extra_check = NULL;
 
 static EFI_SECURITY_FILE_AUTHENTICATION_STATE esfas = NULL;
 static EFI_SECURITY2_FILE_AUTHENTICATION es2fa = NULL;
@@ -143,7 +90,10 @@ security2_policy_authentication (
 	if (status == EFI_SUCCESS)
 		return status;
 
-	auth = security_policy_check_mok(FileBuffer, FileSize);
+	if (extra_check)
+		auth = extra_check(FileBuffer, FileSize);
+	else
+		return EFI_SECURITY_VIOLATION;
 
 	if (auth == EFI_SECURITY_VIOLATION || auth == EFI_ACCESS_DENIED)
 		/* return previous status, which is the correct one
@@ -202,7 +152,10 @@ security_policy_authentication (
 	if (status != EFI_SUCCESS)
 		goto out;
 
-	status = security_policy_check_mok(FileBuffer, FileSize);
+	if (extra_check)
+		status = extra_check(FileBuffer, FileSize);
+	else
+		status = EFI_SECURITY_VIOLATION;
 	FreePool(FileBuffer);
 
 	if (status == EFI_ACCESS_DENIED || status == EFI_SECURITY_VIOLATION)
@@ -307,7 +260,7 @@ asm (
 );
 
 EFI_STATUS
-security_policy_install(void)
+security_policy_install(SecurityHook hook)
 {
 	EFI_SECURITY_PROTOCOL *security_protocol;
 	EFI_SECURITY2_PROTOCOL *security2_protocol = NULL;
@@ -325,8 +278,8 @@ security_policy_install(void)
 			  &security2_protocol);
 
 	status = uefi_call_wrapper(BS->LocateProtocol, 3,
-					   &SECURITY_PROTOCOL_GUID, NULL,
-					   &security_protocol);
+				   &SECURITY_PROTOCOL_GUID, NULL,
+				   &security_protocol);
 	if (status != EFI_SUCCESS)
 		/* This one is mandatory, so there's a serious problem */
 		return status;
@@ -340,6 +293,9 @@ security_policy_install(void)
 	esfas = security_protocol->FileAuthenticationState;
 	security_protocol->FileAuthenticationState =
 		thunk_security_policy_authentication;
+
+	if (hook)
+		extra_check = hook;
 
 	return EFI_SUCCESS;
 }
@@ -379,6 +335,9 @@ security_policy_uninstall(void)
 		security2_protocol->FileAuthentication = es2fa;
 		es2fa = NULL;
 	}
+
+	if (extra_check)
+		extra_check = NULL;
 
 	return EFI_SUCCESS;
 }
