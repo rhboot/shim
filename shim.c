@@ -126,7 +126,11 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	int size = context->ImageSize;
 	void *ImageEnd = (char *)data + size;
 
+#if __LP64__
 	context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)data;
+#else
+	context->PEHdr->Pe32.OptionalHeader.ImageBase = (UINT32)data;
+#endif
 
 	if (context->NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
 		Print(L"Image has no relocation entry\n");
@@ -141,7 +145,7 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		return EFI_UNSUPPORTED;
 	}
 
-	Adjust = (UINT64)data - context->ImageAddress;
+	Adjust = (UINTN)data - context->ImageAddress;
 
 	if (Adjust == 0)
 		return EFI_SUCCESS;
@@ -549,9 +553,15 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 	}
 
 	/* Hash end of certificate table to end of image header */
+#if __LP64__
 	hashbase = (char *) &context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
 	hashsize = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders -
 		(int) ((char *) (&context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - data);
+#else
+	hashbase = (char *) &context->PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
+	hashsize = context->PEHdr->Pe32.OptionalHeader.SizeOfHeaders -
+		(int) ((char *) (&context->PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - data);
+#endif
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -561,7 +571,11 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 	}
 
 	/* Sort sections */
+#if __LP64__
 	SumOfBytesHashed = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
+#else
+	SumOfBytesHashed = context->PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
+#endif
 
 	Section = (EFI_IMAGE_SECTION_HEADER *) (
 		(char *)context->PEHdr + sizeof (UINT32) +
@@ -628,7 +642,11 @@ static EFI_STATUS generate_hash (char *data, int datasize,
 		hashbase = data + SumOfBytesHashed;
 		hashsize = (unsigned int)(
 			size -
+#if __LP64__
 			context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
+#else
+			context->PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
+#endif
 			SumOfBytesHashed);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
@@ -781,7 +799,7 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
-	unsigned long HeaderWithoutDataDir, SectionHeaderOffset;
+	unsigned long HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
 
 	if (datasize < sizeof(EFI_IMAGE_DOS_HEADER)) {
 		Print(L"Invalid image\n");
@@ -790,18 +808,28 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
+#if __LP64__
+	context->NumberOfRvaAndSizes = PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes;
+	context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
+	context->ImageSize = PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
+	OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
+#else
+	context->NumberOfRvaAndSizes = PEHdr->Pe32.OptionalHeader.NumberOfRvaAndSizes;
+	context->SizeOfHeaders = PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
+	context->ImageSize = (UINT64)PEHdr->Pe32.OptionalHeader.SizeOfImage;
+	OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
+#endif
+	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
-	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES
-			< PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes) {
+	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < context->NumberOfRvaAndSizes) {
 		Print(L"Image header too small\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	HeaderWithoutDataDir = sizeof (EFI_IMAGE_OPTIONAL_HEADER64)
+	HeaderWithoutDataDir = OptHeaderSize
 			- sizeof (EFI_IMAGE_DATA_DIRECTORY) * EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES;
-	if (((UINT32)PEHdr->Pe32Plus.FileHeader.SizeOfOptionalHeader - HeaderWithoutDataDir) !=
-			PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes
-				* sizeof (EFI_IMAGE_DATA_DIRECTORY)) {
+	if (((UINT32)PEHdr->Pe32.FileHeader.SizeOfOptionalHeader - HeaderWithoutDataDir) !=
+			context->NumberOfRvaAndSizes * sizeof (EFI_IMAGE_DATA_DIRECTORY)) {
 		Print(L"Image header overflows data directory\n");
 		return EFI_UNSUPPORTED;
 	}
@@ -809,15 +837,15 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	SectionHeaderOffset = DosHdr->e_lfanew
 				+ sizeof (UINT32)
 				+ sizeof (EFI_IMAGE_FILE_HEADER)
-				+ PEHdr->Pe32Plus.FileHeader.SizeOfOptionalHeader;
-	if ((PEHdr->Pe32Plus.OptionalHeader.SizeOfImage - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
-			<= PEHdr->Pe32Plus.FileHeader.NumberOfSections) {
+				+ PEHdr->Pe32.FileHeader.SizeOfOptionalHeader;
+	if (((UINT32)context->ImageSize - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
+			<= context->NumberOfSections) {
 		Print(L"Image sections overflow image size\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	if ((PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
-			< (UINT32)PEHdr->Pe32Plus.FileHeader.NumberOfSections) {
+	if ((context->SizeOfHeaders - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
+			< (UINT32)context->NumberOfSections) {
 		Print(L"Image sections overflow section headers\n");
 		return EFI_UNSUPPORTED;
 	}
@@ -837,21 +865,19 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	if (PEHdr->Pe32.OptionalHeader.Magic != EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
-		Print(L"Only 64-bit images supported\n");
-		return EFI_UNSUPPORTED;
-	}
-
 	context->PEHdr = PEHdr;
+#if __LP64__
 	context->ImageAddress = PEHdr->Pe32Plus.OptionalHeader.ImageBase;
-	context->ImageSize = (UINT64)PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
-	context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
 	context->EntryPoint = PEHdr->Pe32Plus.OptionalHeader.AddressOfEntryPoint;
 	context->RelocDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
-	context->NumberOfRvaAndSizes = PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes;
-	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
-	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
+#else
+	context->ImageAddress = PEHdr->Pe32.OptionalHeader.ImageBase;
+	context->EntryPoint = PEHdr->Pe32.OptionalHeader.AddressOfEntryPoint;
+	context->RelocDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
+	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
+#endif
+	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 
 	if (context->ImageSize < context->SizeOfHeaders) {
 		Print(L"Invalid image\n");
