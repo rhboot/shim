@@ -2,8 +2,6 @@ Versioned protocol:
 - Make shim and the bootloaders using it express how enlightened they
   are to one another, so we can stop earlier without tricks like
   the one above
-MokListRT containing shim key:
-- MokListRT has to contain the shim key...
 MokListRT signing:
 - For kexec and hybernate to work right, MokListRT probably needs to
   be an authenticated variable.  It's probable this needs to be done

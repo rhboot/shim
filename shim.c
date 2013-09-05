@@ -1342,23 +1342,57 @@ EFI_STATUS mirror_mok_list()
 	EFI_STATUS efi_status;
 	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
+	void *FullData = NULL;
+	UINTN FullDataSize = 0;
+	EFI_SIGNATURE_LIST *CertList = NULL;
+	EFI_SIGNATURE_DATA *CertData = NULL;
+	uint8_t *p = NULL;
 
 	efi_status = get_variable(L"MokList", &Data, &DataSize, shim_lock_guid);
+	if (efi_status != EFI_SUCCESS)
+		DataSize = 0;
 
-	if (efi_status != EFI_SUCCESS) {
-		goto done;
+	FullDataSize = DataSize
+		     + sizeof (*CertList)
+		     + sizeof (EFI_GUID)
+		     + vendor_cert_size
+		     ;
+	FullData = AllocatePool(FullDataSize);
+	if (!FullData) {
+		Print(L"Failed to allocate space for MokListRT\n");
+		return EFI_OUT_OF_RESOURCES;
 	}
+	p = FullData;
+
+	if (efi_status == EFI_SUCCESS && DataSize > 0) {
+		CopyMem(p, Data, DataSize);
+		p += DataSize;
+	}
+	CertList = (EFI_SIGNATURE_LIST *)p;
+	p += sizeof (*CertList);
+	CertData = (EFI_SIGNATURE_DATA *)p;
+	p += sizeof (EFI_GUID);
+
+	CertList->SignatureType = EFI_CERT_X509_GUID;
+	CertList->SignatureListSize = vendor_cert_size
+				      + sizeof (*CertList)
+				      + sizeof (*CertData)
+				      -1;
+	CertList->SignatureHeaderSize = 0;
+	CertList->SignatureSize = vendor_cert_size + sizeof (EFI_GUID);
+
+	CertData->SignatureOwner = SHIM_LOCK_GUID;
+	CopyMem(p, vendor_cert, vendor_cert_size);
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
 				       &shim_lock_guid,
 				       EFI_VARIABLE_BOOTSERVICE_ACCESS
 				       | EFI_VARIABLE_RUNTIME_ACCESS,
-				       DataSize, Data);
+				       FullDataSize, FullData);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to set MokListRT %d\n", efi_status);
 	}
 
-done:
 	return efi_status;
 }
 
