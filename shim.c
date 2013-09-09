@@ -40,6 +40,7 @@
 #include "shim.h"
 #include "netboot.h"
 #include "shim_cert.h"
+#include "replacements.h"
 #include "ucs2.h"
 
 #include "guid.h"
@@ -75,9 +76,15 @@ UINT32 vendor_dbx_size;
 UINT8 *vendor_cert;
 UINT8 *vendor_dbx;
 
+/*
+ * indicator of how an image has been verified
+ */
+verification_method_t verification_method;
+int loader_is_participating;
+
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
-static UINT8 insecure_mode;
+UINT8 insecure_mode;
 
 typedef enum {
 	DATA_FOUND,
@@ -370,6 +377,12 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	return EFI_SUCCESS;
 }
 
+static void update_verification_method(verification_method_t method)
+{
+	if (verification_method == VERIFIED_BY_NOTHING)
+		verification_method = method;
+}
+
 /*
  * Check whether the binary signature or hash are present in db or MokList
  */
@@ -380,19 +393,34 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	EFI_GUID shim_var = SHIM_LOCK_GUID;
 
 	if (check_db_hash(L"db", secure_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
+	}
 	if (check_db_hash(L"db", secure_var, sha1hash, SHA1_DIGEST_SIZE,
-			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
+			  EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
+	}
 	if (check_db_hash(L"MokList", shim_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
-	if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND)
+	}
+	if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_CERT;
+		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
-	if (check_db_cert(L"MokList", shim_var, cert, sha256hash) == DATA_FOUND)
+	}
+	if (check_db_cert(L"MokList", shim_var, cert, sha256hash) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_CERT;
+		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
+	}
 
+	update_verification_method(VERIFIED_BY_NOTHING);
 	return EFI_ACCESS_DENIED;
 }
 
@@ -1169,6 +1197,8 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	EFI_STATUS status;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 
+	loader_is_participating = 1;
+
 	if (!secure_mode())
 		return EFI_SUCCESS;
 
@@ -1261,6 +1291,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		CopyMem(li, &li_bak, sizeof(li_bak));
 		goto done;
 	}
+
+	loader_is_participating = 0;
 
 	/*
 	 * The binary is trusted and relocated. Run it
@@ -1391,6 +1423,8 @@ static EFI_STATUS check_mok_sb (void)
 	if (status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
 
+	insecure_mode = 0;
+
 	/*
 	 * Delete and ignore the variable if it's been set from or could be
 	 * modified by the OS
@@ -1500,6 +1534,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	UINTN verbose_check_size;
 	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
 
+	verification_method = VERIFIED_BY_NOTHING;
+
 	vendor_cert_size = cert_table.vendor_cert_size;
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
@@ -1541,6 +1577,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	if (insecure_mode) {
 		Print(L"Booting in insecure mode\n");
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
+	} else {
+		/*
+		 * Install our hooks for ExitBootServices() and StartImage()
+		 */
+		hook_system_services(systab);
+		loader_is_participating = 0;
 	}
 
 	/*

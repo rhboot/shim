@@ -17,7 +17,7 @@ EFI_LDS		= elf_$(ARCH)_efi.lds
 DEFAULT_LOADER	:= \\\\grub.efi
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Werror -mno-red-zone -maccumulate-outgoing-args \
-		  -mno-mmx -mno-sse \
+		  -mno-mmx -mno-sse -fno-builtin \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 		  $(EFI_INCLUDES)
@@ -36,9 +36,9 @@ LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH
 VERSION		= 0.4
 
 TARGET	= shim.efi MokManager.efi.signed fallback.efi.signed
-OBJS	= shim.o netboot.o cert.o dbx.o
+OBJS	= shim.o netboot.o cert.o replacements.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key
-SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h
+SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h replacements.c replacements.h
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
 MOK_SOURCES = MokManager.c shim.h console_control.h PasswordCrypt.c PasswordCrypt.h crypt_blowfish.c crypt_blowfish.h
 FALLBACK_OBJS = fallback.o
