@@ -68,9 +68,6 @@ shim.o: $(SOURCES) shim_cert.h
 cert.o : cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-dbx.o : dbx.S
-	$(CC) $(CFLAGS) -c -o $@ $<
-
 shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 

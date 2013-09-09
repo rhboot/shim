@@ -63,10 +63,17 @@ EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8,
 /*
  * The vendor certificate used for validating the second stage loader
  */
-extern UINT8 vendor_cert[];
-extern UINT32 vendor_cert_size;
-extern UINT8 vendor_dbx[];
-extern UINT32 vendor_dbx_size;
+extern struct {
+	UINT32 vendor_cert_size;
+	UINT32 vendor_dbx_size;
+	UINT32 vendor_cert_offset;
+	UINT32 vendor_dbx_offset;
+} cert_table;
+
+UINT32 vendor_cert_size;
+UINT32 vendor_dbx_size;
+UINT8 *vendor_cert;
+UINT8 *vendor_dbx;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
@@ -1492,6 +1499,11 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	UINT8 verbose_check;
 	UINTN verbose_check_size;
 	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+
+	vendor_cert_size = cert_table.vendor_cert_size;
+	vendor_dbx_size = cert_table.vendor_dbx_size;
+	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
+	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
 
 	/*
 	 * Set up the shim lock protocol so that grub and MokManager can
