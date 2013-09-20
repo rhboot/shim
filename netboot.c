@@ -251,7 +251,7 @@ static BOOLEAN extract_tftp_info(char *url)
 		return FALSE;
 	}
 	memset(ip6str, 0, 128);
-	memcpy(ip6str, start, end + 1 - start);
+	memcpy(ip6str, start, end - start);
 	end++;
 	memcpy(&tftp_addr.v6, str2ip6(ip6str), 16);
 	full_path = AllocateZeroPool(strlen(end)+strlen(template)+1);
