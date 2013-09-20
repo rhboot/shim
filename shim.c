@@ -1181,7 +1181,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	EFI_DEVICE_PATH *path;
 	CHAR16 *PathName = NULL;
 	void *sourcebuffer = NULL;
-	UINTN sourcesize = 0;
+	UINT64 sourcesize = 0;
 	void *data = NULL;
 	int datasize;
 
