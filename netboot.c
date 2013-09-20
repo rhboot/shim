@@ -53,7 +53,7 @@ static inline unsigned short int __swap16(unsigned short int x)
 
 static EFI_PXE_BASE_CODE *pxe;
 static EFI_IP_ADDRESS tftp_addr;
-static char *full_path;
+static UINT8 *full_path;
 
 
 typedef struct {
@@ -111,7 +111,7 @@ try_again:
 	for (i=0; i < (bs / sizeof(EFI_HANDLE)); i++) {
 		status = uefi_call_wrapper(BS->OpenProtocol, 6, hbuf[i],
 					   &pxe_base_code_protocol,
-					   &pxe, image_handle, NULL,
+					   (void **)&pxe, image_handle, NULL,
 					   EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 
 		if (status != EFI_SUCCESS) {
@@ -227,15 +227,15 @@ static UINT8 *str2ip6(char *str)
 
 static BOOLEAN extract_tftp_info(char *url)
 {
-	char *start, *end;
+	CHAR8 *start, *end;
 	char ip6str[128];
-	char *template = "/grubx64.efi";
+	CHAR8 *template = (CHAR8 *)"/grubx64.efi";
 
 	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
 		Print(L"URLS MUST START WITH tftp://\n");
 		return FALSE;
 	}
-	start = url + 7;
+	start = (CHAR8 *)url + 7;
 	if (*start != '[') {
 		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
@@ -250,21 +250,19 @@ static BOOLEAN extract_tftp_info(char *url)
 		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
 	}
-	*end = '\0';
 	memset(ip6str, 0, 128);
-	memcpy(ip6str, start, strlen((UINT8 *)start));
-	*end = ']';
+	memcpy(ip6str, start, end + 1 - start);
 	end++;
 	memcpy(&tftp_addr.v6, str2ip6(ip6str), 16);
-	full_path = AllocatePool(strlen((UINT8 *)end)+strlen((UINT8 *)template)+1);
+	full_path = AllocateZeroPool(strlen(end)+strlen(template)+1);
 	if (!full_path)
 		return FALSE;
-	memset(full_path, 0, strlen((UINT8 *)end)+strlen((UINT8 *)template));
-	memcpy(full_path, end, strlen((UINT8 *)end));
-	end = strrchr(full_path, '/');
+	memcpy(full_path, end, strlen(end));
+	end = (CHAR8 *)strrchr((char *)full_path, '/');
 	if (!end)
-		end = full_path;
-	memcpy(end, template, strlen((UINT8 *)template));
+		end = (CHAR8 *)full_path;
+	memcpy(end, template, strlen(template));
+	end[strlen(template)] = '\0';
 
 	return TRUE;
 }
@@ -285,19 +283,15 @@ static EFI_STATUS parseDhcp6()
 
 static EFI_STATUS parseDhcp4()
 {
-	char *template = "/grubx64.efi";
-	char *tmp = AllocatePool(16);
+	CHAR8 *template = (CHAR8 *)"/grubx64.efi";
+	full_path = AllocateZeroPool(strlen(template)+1);
 
-
-	if (!tmp)
+	if (!full_path)
 		return EFI_OUT_OF_RESOURCES;
-
 
 	memcpy(&tftp_addr.v4, pxe->Mode->DhcpAck.Dhcpv4.BootpSiAddr, 4);
 
-	memcpy(tmp, template, 12);
-	tmp[13] = '\0';
-	full_path = tmp;
+	memcpy(full_path, template, strlen(template));
 
 	/* Note we don't capture the filename option here because we know its shim.efi
 	 * We instead assume the filename at the end of the path is going to be grubx64.efi
