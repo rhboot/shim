@@ -326,7 +326,7 @@ EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle)
 	return rc;
 }
 
-EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINTN *bufsiz)
+EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *bufsiz)
 {
 	EFI_STATUS rc;
 	EFI_PXE_BASE_CODE_TFTP_OPCODE read = EFI_PXE_BASE_CODE_TFTP_READ_FILE;
@@ -344,7 +344,7 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINTN *bufs
 
 try_again:
 	rc = uefi_call_wrapper(pxe->Mtftp, 10, pxe, read, *buffer, overwrite,
-				&bufsiz, &blksz, &tftp_addr, full_path, NULL, nobuffer);
+				bufsiz, &blksz, &tftp_addr, full_path, NULL, nobuffer);
 
 	if (rc == EFI_BUFFER_TOO_SMALL) {
 		/* try again, doubling buf size */
