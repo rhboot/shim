@@ -15,7 +15,7 @@ EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= elf_$(ARCH)_efi.lds
 
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
-		  -fshort-wchar -Wall -mno-red-zone -maccumulate-outgoing-args \
+		  -fshort-wchar -Wall -Werror -mno-red-zone -maccumulate-outgoing-args \
 		  -mno-mmx -mno-sse \
 		  $(EFI_INCLUDES)
 ifeq ($(ARCH),x86_64)
