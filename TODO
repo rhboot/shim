@@ -1,1 +1,35 @@
-Support for netbooting
+Hardening startimage:
+- Don't allow non-participating bootloaders/kernels to call
+  ExitBootServices(), but trap in StartImage() so we can let them do
+  that.
+Versioned protocol:
+- Make shim and the bootloaders using it express how enlightened they
+  are to one another, so we can stop earlier without tricks like
+  the one above
+MokListRT containing shim key:
+- MokListRT has to contain the shim key...
+MokListRT signing:
+- For kexec and hybernate to work right, MokListRT probably needs to
+  be an authenticated variable.  It's probable this needs to be done
+  in the kernel boot stub instead, just because it'll need an
+  ephemeral key to be generated, and that means we need some entropy
+  to build up.
+Better ui:
+- Gary Lin at SuSE is working on better UI for MokManager.  It
+  desperately needs it.
+James's modification:
+- We're merging James Bottomley's hack to make shim use unpublished
+  system crypto services, as a compile time option.
+New security protocol:
+- TBD
+kexec MoK Management:
+Modsign enforcement mgmt MoK:
+- This is part of the plan for SecureBoot patches.  Basically these
+  features need to be disableable/enableable in MokManager.
+Variable for debug:
+- basically we need to be able to set a UEFI variable and get debug
+  output.
+Db key mokutil config:
+- I've completely forgotten what I meant by this.  It was something
+  Vojtêch was going to do/have done, so I'm sure he'll be able to
+  refresh my memory.
