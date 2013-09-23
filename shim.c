@@ -55,6 +55,8 @@ static void *load_options;
 static UINT32 load_options_size;
 static UINT8 verbose;
 
+EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
+
 /*
  * The vendor certificate used for validating the second stage loader
  */
