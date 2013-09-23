@@ -227,7 +227,7 @@ static UINT8 *str2ip6(char *str)
 static BOOLEAN extract_tftp_info(CHAR8 *url)
 {
 	CHAR8 *start, *end;
-	char ip6str[128];
+	char ip6str[40];
 	CHAR8 *template = (CHAR8 *)"/grubx64.efi";
 
 	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
@@ -244,12 +244,16 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	end = start;
 	while ((*end != '\0') && (*end != ']')) {
 		end++;
+		if (end - start > 39) {
+			Print(L"TFTP URL includes malformed IPv6 address\n");
+			return FALSE;
+		}
 	}
 	if (end == '\0') {
 		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
 	}
-	memset(ip6str, 0, 128);
+	memset(ip6str, 0, 40);
 	memcpy(ip6str, start, end - start);
 	end++;
 	memcpy(&tftp_addr.v6, str2ip6(ip6str), 16);
