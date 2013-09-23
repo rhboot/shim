@@ -141,11 +141,11 @@ try_again:
 	return rc;
 }
 
-static char *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
+static CHAR8 *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
 {
 	void *optr;
 	EFI_DHCP6_PACKET_OPTION *option;
-	char *url;
+	CHAR8 *url;
 	UINT32 urllen;
 
 	optr = pkt->DhcpOptions;
@@ -224,7 +224,7 @@ static UINT8 *str2ip6(char *str)
         return (UINT8 *)ip;
 }
 
-static BOOLEAN extract_tftp_info(char *url)
+static BOOLEAN extract_tftp_info(CHAR8 *url)
 {
 	CHAR8 *start, *end;
 	char ip6str[128];
@@ -234,7 +234,7 @@ static BOOLEAN extract_tftp_info(char *url)
 		Print(L"URLS MUST START WITH tftp://\n");
 		return FALSE;
 	}
-	start = (CHAR8 *)url + 7;
+	start = url + 7;
 	if (*start != '[') {
 		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
@@ -269,8 +269,7 @@ static BOOLEAN extract_tftp_info(char *url)
 static EFI_STATUS parseDhcp6()
 {
 	EFI_PXE_BASE_CODE_DHCPV6_PACKET *packet = (EFI_PXE_BASE_CODE_DHCPV6_PACKET *)&pxe->Mode->DhcpAck.Raw;
-	char *bootfile_url;
-
+	CHAR8 *bootfile_url;
 
 	bootfile_url = get_v6_bootfile_url(packet);
 	if (!bootfile_url)
