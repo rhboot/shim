@@ -355,6 +355,8 @@ try_again:
 		goto try_again;
 	}
 
+	if (rc != EFI_SUCCESS && *buffer) {
+		FreePool(*buffer);
+	}
 	return rc;
-
 }
