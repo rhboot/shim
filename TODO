@@ -33,3 +33,6 @@ Db key mokutil config:
 - Asked for by Mimi Zohar: An (on/off) option that would prevent the shim
   and the kernel from trusting keys listed in 'db' and only use those coming
   from the MOK List.
+Hashing of option roms:
+- hash option roms and add them to MokListRT
+- probably belongs in MokManager
