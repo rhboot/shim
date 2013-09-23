@@ -159,10 +159,9 @@ static char *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
 		if (ntohs(option->OpCode) == 59) {
 			/* This is the bootfile url option */
 			urllen = ntohs(option->Length);
-			url = AllocatePool(urllen+2);
+			url = AllocateZeroPool(urllen+1);
 			if (!url)
 				return NULL;
-			memset(url, 0, urllen+2);
 			memcpy(url, option->Data, urllen);
 			return url;
 		}
@@ -274,10 +273,13 @@ static EFI_STATUS parseDhcp6()
 
 
 	bootfile_url = get_v6_bootfile_url(packet);
-	if (extract_tftp_info(bootfile_url) == FALSE)
-		return EFI_NOT_FOUND;
 	if (!bootfile_url)
 		return EFI_NOT_FOUND;
+	if (extract_tftp_info(bootfile_url) == FALSE) {
+		FreePool(bootfile_url);
+		return EFI_NOT_FOUND;
+	}
+	FreePool(bootfile_url);
 	return EFI_SUCCESS;
 }
 
