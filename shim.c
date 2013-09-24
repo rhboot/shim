@@ -43,7 +43,6 @@
 #include "shim_cert.h"
 #include "ucs2.h"
 
-#define DEFAULT_LOADER L"\\grub.efi"
 #define FALLBACK L"\\fallback.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
 

@@ -39,8 +39,6 @@
 #include "shim.h"
 #include "netboot.h"
 
-#define DEFAULT_LOADER "/grub.efi"
-
 static inline unsigned short int __swap16(unsigned short int x)
 {
         __asm__("xchgb %b0,%h0"
@@ -62,6 +60,24 @@ typedef struct {
 	UINT16 Length;
 	UINT8 Data[1];
 } EFI_DHCP6_PACKET_OPTION;
+
+static CHAR8 *
+translate_slashes(char *str)
+{
+	int i;
+	int j;
+	if (str == NULL)
+		return (CHAR8 *)str;
+
+	for (i = 0, j = 0; str[i] != '\0'; i++, j++) {
+		if (str[i] == '\\') {
+			str[j] = '/';
+			if (str[i+1] == '\\')
+				i++;
+		}
+	}
+	return (CHAR8 *)str;
+}
 
 /*
  * usingNetboot
@@ -229,7 +245,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 {
 	CHAR8 *start, *end;
 	char ip6str[40];
-	CHAR8 *template = DEFAULT_LOADER;
+	CHAR8 *template = (CHAR8 *)translate_slashes(DEFAULT_LOADER_CHAR);
 
 	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
 		Print(L"URLS MUST START WITH tftp://\n");
@@ -289,7 +305,7 @@ static EFI_STATUS parseDhcp6()
 
 static EFI_STATUS parseDhcp4()
 {
-	CHAR8 *template = DEFAULT_LOADER;
+	CHAR8 *template = (CHAR8 *)DEFAULT_LOADER_CHAR;
 	full_path = AllocateZeroPool(strlen(template)+1);
 
 	if (!full_path)
