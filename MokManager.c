@@ -6,6 +6,7 @@
 #include "shim.h"
 #include "PeImage.h"
 #include "PasswordCrypt.h"
+#include "console_control.h"
 
 #include "guid.h"
 #include "console.h"
