@@ -5,6 +5,7 @@
 #include "shim.h"
 #include "signature.h"
 #include "PeImage.h"
+#include "console_control.h"
 
 #define PASSWORD_MAX 16
 #define PASSWORD_MIN 8
@@ -1894,6 +1895,34 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+static VOID setup_console (int text)
+{
+	EFI_STATUS status;
+	EFI_GUID console_control_guid = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
+	EFI_CONSOLE_CONTROL_PROTOCOL *concon;
+	static EFI_CONSOLE_CONTROL_SCREEN_MODE mode =
+					EfiConsoleControlScreenGraphics;
+	EFI_CONSOLE_CONTROL_SCREEN_MODE new_mode;
+
+	status = LibLocateProtocol(&console_control_guid, (VOID **)&concon);
+	if (status != EFI_SUCCESS)
+		return;
+
+	if (text) {
+		new_mode = EfiConsoleControlScreenText;
+
+		status = uefi_call_wrapper(concon->GetMode, 4, concon, &mode,
+						0, 0);
+		/* If that didn't work, assume it's graphics */
+		if (status != EFI_SUCCESS)
+			mode = EfiConsoleControlScreenGraphics;
+	} else {
+		new_mode = mode;
+	}
+
+	uefi_call_wrapper(concon->SetMode, 2, concon, new_mode);
+}
+
 static EFI_STATUS setup_rand (void)
 {
 	EFI_TIME time;
@@ -1925,9 +1954,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 
 	InitializeLib(image_handle, systab);
 
+	setup_console(1);
+
 	setup_rand();
 
 	efi_status = check_mok_request(image_handle);
 
+	setup_console(0);
 	return efi_status;
 }

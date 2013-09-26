@@ -37,7 +37,7 @@ OBJS	= shim.o netboot.o cert.o dbx.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key
 SOURCES	= shim.c shim.h netboot.c signature.h PeImage.h
 MOK_OBJS = MokManager.o
-MOK_SOURCES = MokManager.c shim.h
+MOK_SOURCES = MokManager.c shim.h console_control.h
 FALLBACK_OBJS = fallback.o
 FALLBACK_SRCS = fallback.c
 
