@@ -1685,45 +1685,62 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	void *MokDel = NULL;
 	void *MokSB = NULL;
 	void *MokPW = NULL;
+	EFI_STATUS status;
 
-	MokNew = LibGetVariableAndSize(L"MokNew", &shim_lock_guid, &MokNewSize);
+	status = get_variable(L"MokNew", (UINT8 **)&MokNew, &MokNewSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokNew");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokNew", status);
+	}
 
-	MokDel = LibGetVariableAndSize(L"MokDel", &shim_lock_guid, &MokDelSize);
+	status = get_variable(L"MokDel", (UINT8 **)&MokDel, &MokDelSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokDel", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokDel");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokDel", status);
+	}
 
-	MokSB = LibGetVariableAndSize(L"MokSB", &shim_lock_guid, &MokSBSize);
+	status = get_variable(L"MokSB", (UINT8 **)&MokSB, &MokSBSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokSB", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokSB");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokSB", status);
+	}
 
-	MokPW = LibGetVariableAndSize(L"MokPW", &shim_lock_guid, &MokPWSize);
+	status = get_variable(L"MokPW", (UINT8 **)&MokPW, &MokPWSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokPW", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokPW");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokPW", status);
+	}
 
 	enter_mok_menu(image_handle, MokNew, MokNewSize, MokDel, MokDelSize,
 		       MokSB, MokSBSize, MokPW, MokPWSize);
 
-	if (MokNew) {
-		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
-			console_notify(L"Failed to delete MokNew");
-		}
+	if (MokNew)
 		FreePool (MokNew);
-	}
 
-	if (MokDel) {
-		if (LibDeleteVariable(L"MokDel", &shim_lock_guid) != EFI_SUCCESS) {
-			console_notify(L"Failed to delete MokDel");
-		}
+	if (MokDel)
 		FreePool (MokDel);
-	}
 
-	if (MokSB) {
-		if (LibDeleteVariable(L"MokSB", &shim_lock_guid) != EFI_SUCCESS) {
-			console_notify(L"Failed to delete MokSB");
-		}
-		FreePool (MokNew);
-	}
+	if (MokSB)
+		FreePool (MokSB);
 
-	if (MokPW) {
-		if (LibDeleteVariable(L"MokPW", &shim_lock_guid) != EFI_SUCCESS) {
-			console_notify(L"Failed to delete MokPW");
-		}
-		FreePool (MokNew);
-	}
+	if (MokPW)
+		FreePool (MokPW);
 
 	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 	LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
