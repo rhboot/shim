@@ -41,4 +41,6 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
   EFI_CONSOLE_CONTROL_PROTOCOL_LOCK_STD_IN        LockStdIn;
 };
 
+extern VOID setup_console (int text);
+
 #endif /* _SHIM_CONSOLE_CONTROL_H */

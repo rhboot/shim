@@ -43,10 +43,12 @@
 #include "replacements.h"
 #include "ucs2.h"
 
+#include "console_control.h"
 #include "guid.h"
 #include "variables.h"
 #include "efiauthenticated.h"
 #include "security_policy.h"
+#include "console.h"
 
 #define FALLBACK L"\\fallback.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
@@ -446,7 +448,7 @@ static BOOLEAN secure_mode (void)
 	/* FIXME - more paranoia here? */
 	if (status != EFI_SUCCESS || sb != 1) {
 		if (verbose)
-			Print(L"Secure boot not enabled\n");
+			console_notify(L"Secure boot not enabled\n");
 		return FALSE;
 	}
 
@@ -456,7 +458,7 @@ static BOOLEAN secure_mode (void)
 
 	if (status == EFI_SUCCESS && setupmode == 1) {
 		if (verbose)
-			Print(L"Platform is in setup mode\n");
+			console_notify(L"Platform is in setup mode\n");
 		return FALSE;
 	}
 
@@ -720,7 +722,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 
 	if (status == EFI_SUCCESS) {
 		if (verbose)
-			Print(L"Binary is whitelisted\n");
+			console_notify(L"Binary is whitelisted\n");
 		return status;
 	}
 
@@ -733,7 +735,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
 		if (verbose)
-			Print(L"Binary is verified by the vendor certificate\n");
+			console_notify(L"Binary is verified by the vendor certificate\n");
 		return status;
 	}
 
@@ -747,7 +749,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
 		if (verbose)
-			Print(L"Binary is verified by the vendor certificate\n");
+			console_notify(L"Binary is verified by the vendor certificate\n");
 		return status;
 	}
 
@@ -1590,6 +1592,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	InitializeLib(image_handle, systab);
 
+	setup_console(1);
+
 	verbose_check_size = 1;
 	efi_status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
 				  &verbose_check_size, global_var);
@@ -1664,6 +1668,8 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	if (load_options_size > 0)
 		FreePool(second_stage);
+
+	setup_console(0);
 
 	return efi_status;
 }
