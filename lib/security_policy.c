@@ -14,6 +14,7 @@
 #include <simple_file.h>
 #include <errors.h>
 
+#if defined(OVERRIDE_SECURITY_POLICY)
 #include <security_policy.h>
 
 /*
@@ -348,3 +349,4 @@ security_protocol_set_hashes(unsigned char *esl, int len)
 	security_policy_esl = esl;
 	security_policy_esl_len = len;
 }
+#endif /* OVERRIDE_SECURITY_POLICY */

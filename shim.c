@@ -1629,10 +1629,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			  &shim_lock_guid, EFI_NATIVE_INTERFACE,
 			  &shim_lock_interface);
 
+#if defined(OVERRIDE_SECURITY_POLICY)
 	/*
 	 * Install the security protocol hook
 	 */
 	security_policy_install(shim_verify);
+#endif
 
 	/*
 	 * Enter MokManager if necessary
@@ -1657,10 +1659,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
 			  &shim_lock_guid, &shim_lock_interface);
 
+#if defined(OVERRIDE_SECURITY_POLICY)
 	/*
 	 * Clean up the security protocol hook
 	 */
 	security_policy_uninstall();
+#endif
 
 	/*
 	 * Free the space allocated for the alternative 2nd stage loader

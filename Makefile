@@ -21,6 +21,10 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 		  $(EFI_INCLUDES)
+
+ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
+	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
+endif
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
 endif
