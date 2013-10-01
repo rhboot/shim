@@ -103,7 +103,7 @@ execute(EFI_HANDLE image, CHAR16 *name)
 	CHAR16 *PathName;
 
 	status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
-				   &IMAGE_PROTOCOL, &li);
+				   &IMAGE_PROTOCOL, (void **)&li);
 	if (status != EFI_SUCCESS)
 		return status;
 

@@ -25,7 +25,7 @@ simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UIN
 	EFI_FILE *root;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &SIMPLE_FS_PROTOCOL, &drive);
+				       &SIMPLE_FS_PROTOCOL, (void **)&drive);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to find simple file protocol (%d)\n", efi_status);
@@ -56,7 +56,7 @@ simple_file_open(EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 	CHAR16 *PathName = NULL;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
-				       &IMAGE_PROTOCOL, &li);
+				       &IMAGE_PROTOCOL, (void **)&li);
 
 	if (efi_status != EFI_SUCCESS)
 		return simple_file_open_by_handle(image, name, file, mode);
@@ -116,7 +116,7 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 		return EFI_OUT_OF_RESOURCES;
 	int i;
 	for (i = 0; i < *count; i++) {
-		int len = size;
+		UINTN len = size;
 		uefi_call_wrapper(file->Read, 3, file, &len, ptr);
 		ptr += len;
 		size -= len;
@@ -223,7 +223,8 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 
 		status = uefi_call_wrapper(BS->HandleProtocol, 3,
 					   vol_handles[i],
-					   &SIMPLE_FS_PROTOCOL, &drive);
+					   &SIMPLE_FS_PROTOCOL,
+					   (void **)&drive);
 		if (status != EFI_SUCCESS || !drive)
 			continue;
 
