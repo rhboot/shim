@@ -43,7 +43,6 @@
 #include "replacements.h"
 #include "ucs2.h"
 
-#include "console_control.h"
 #include "guid.h"
 #include "variables.h"
 #include "efiauthenticated.h"

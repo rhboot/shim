@@ -2,7 +2,6 @@
 #include <efilib.h>
 #include <Library/BaseCryptLib.h>
 #include <openssl/x509.h>
-#include "console_control.h"
 #include "shim.h"
 #include "PeImage.h"
 #include "PasswordCrypt.h"
