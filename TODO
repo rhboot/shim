@@ -14,12 +14,6 @@ MokListRT signing:
   in the kernel boot stub instead, just because it'll need an
   ephemeral key to be generated, and that means we need some entropy
   to build up.
-Better ui:
-- Gary Lin at SuSE is working on better UI for MokManager.  It
-  desperately needs it.
-James's modification:
-- We're merging James Bottomley's hack to make shim use unpublished
-  system crypto services, as a compile time option.
 New security protocol:
 - TBD
 kexec MoK Management:
