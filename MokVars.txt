@@ -25,6 +25,23 @@ three randomly chosen characters from the password. If successful,
 they will then be prompted to change the signature validation 
 according to MokSBState. BS,RT,NV
 
+MokDB: Set by MokUtil when requesting a change in state of validation 
+using db hashes and certs. A packed structure as follows:
+
+typedef struct {
+        UINT32 MokDBState;
+        UINT32 PWLen;
+        CHAR16 Password[PASSWORD_MAX];
+} __attribute__ ((packed)) MokDBvar;
+
+If MokDBState is 0, the user will be prompted to disable usage of db for 
+validation. Otherwise, the user will be prompted to allow it. PWLen 
+is the length of the password, in characters. Password is a UCS-2 
+representation of the password. The user will be prompted to enter 
+three randomly chosen characters from the password. If successful, 
+they will then be prompted to change the signature validation 
+according to MokDBState. BS,RT,NV
+
 MokNew: Set by MokUtil when requesting the addition or removal of keys 
 from MokList. Is an EFI_SIGNATURE_LIST as described in the UEFI 
 specification. BS,RT,NV
@@ -45,6 +62,12 @@ MokListRT: A copy of MokList made available to the kernel at runtime. RT
 
 MokSBState: An 8-bit unsigned integer. If 1, shim will switch to 
 insecure mode. BS,NV
+
+MokDBState: An 8-bit unsigned integer. If 1, shim will not use db for 
+verification. BS,NV
+
+MokIgnoreDB: An 8-bit unsigned integer.  This allows the OS to query whether
+or not to import DB certs for its own verification purposes.
 
 MokPWStore: A SHA-256 representation of the password set by the user 
 via MokPW. The user will be prompted to enter this password in order 

@@ -86,6 +86,7 @@ int loader_is_participating;
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
 UINT8 insecure_mode;
+UINT8 ignore_db;
 
 typedef enum {
 	DATA_FOUND,
@@ -393,26 +394,29 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	EFI_GUID shim_var = SHIM_LOCK_GUID;
 
-	if (check_db_hash(L"db", secure_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
-		update_verification_method(VERIFIED_BY_HASH);
-		return EFI_SUCCESS;
+	if (!ignore_db) {
+		if (check_db_hash(L"db", secure_var, sha256hash, SHA256_DIGEST_SIZE,
+					EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+			update_verification_method(VERIFIED_BY_HASH);
+			return EFI_SUCCESS;
+		}
+		if (check_db_hash(L"db", secure_var, sha1hash, SHA1_DIGEST_SIZE,
+					EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+			verification_method = VERIFIED_BY_HASH;
+			update_verification_method(VERIFIED_BY_HASH);
+			return EFI_SUCCESS;
+		}
+		if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND) {
+			verification_method = VERIFIED_BY_CERT;
+			update_verification_method(VERIFIED_BY_CERT);
+			return EFI_SUCCESS;
+		}
 	}
-	if (check_db_hash(L"db", secure_var, sha1hash, SHA1_DIGEST_SIZE,
-			  EFI_CERT_SHA1_GUID) == DATA_FOUND) {
-		verification_method = VERIFIED_BY_HASH;
-		update_verification_method(VERIFIED_BY_HASH);
-		return EFI_SUCCESS;
-	}
+
 	if (check_db_hash(L"MokList", shim_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
-		return EFI_SUCCESS;
-	}
-	if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND) {
-		verification_method = VERIFIED_BY_CERT;
-		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
 	}
 	if (check_db_cert(L"MokList", shim_var, cert, sha256hash) == DATA_FOUND) {
@@ -1428,7 +1432,7 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	if (check_var(L"MokNew") || check_var(L"MokSB") ||
 	    check_var(L"MokPW") || check_var(L"MokAuth") ||
-	    check_var(L"MokDel")) {
+	    check_var(L"MokDel") || check_var(L"MokDB")) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (efi_status != EFI_SUCCESS) {
@@ -1479,6 +1483,71 @@ static EFI_STATUS check_mok_sb (void)
 	FreePool(MokSBState);
 
 	return status;
+}
+
+/*
+ * Verify that MokDBState is valid, and if appropriate set ignore db mode
+ */
+
+static EFI_STATUS check_mok_db (void)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS status = EFI_SUCCESS;
+	UINT8 *MokDBState = NULL;
+	UINTN MokDBStateSize = 0;
+	UINT32 attributes;
+
+	status = get_variable_attr(L"MokDBState", &MokDBState, &MokDBStateSize,
+			shim_lock_guid, &attributes);
+
+	if (status != EFI_SUCCESS)
+		return EFI_ACCESS_DENIED;
+
+	ignore_db = 0;
+
+	/*
+	 * Delete and ignore the variable if it's been set from or could be
+	 * modified by the OS
+	 */
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+		Print(L"MokDBState is compromised! Clearing it\n");
+		if (LibDeleteVariable(L"MokDBState", &shim_lock_guid) != EFI_SUCCESS) {
+			Print(L"Failed to erase MokDBState\n");
+		}
+		status = EFI_ACCESS_DENIED;
+	} else {
+		if (*(UINT8 *)MokDBState == 1) {
+			ignore_db = 1;
+		}
+	}
+
+	FreePool(MokDBState);
+
+	return status;
+}
+
+static EFI_STATUS mok_ignore_db()
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	UINT8 Data = 1;
+	UINTN DataSize = sizeof(UINT8);
+
+	check_mok_db();
+
+	if (ignore_db) {
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokIgnoreDB",
+				&shim_lock_guid,
+				EFI_VARIABLE_BOOTSERVICE_ACCESS
+				| EFI_VARIABLE_RUNTIME_ACCESS,
+				DataSize, (void *)&Data);
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to set MokIgnoreDB %d\n", efi_status);
+		}
+	}
+
+	return efi_status;
+
 }
 
 /*
@@ -1651,6 +1720,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * use of it
 	 */
 	efi_status = mirror_mok_list();
+
+	/*
+	 * Create the runtime MokIgnoreDB variable so the kernel can make
+	 * use of it
+	 */
+	efi_status = mok_ignore_db();
 
 	/*
 	 * Hand over control to the second stage bootloader

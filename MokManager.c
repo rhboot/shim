@@ -50,6 +50,12 @@ typedef struct {
 	CHAR16 Password[SB_PASSWORD_LEN];
 } __attribute__ ((packed)) MokSBvar;
 
+typedef struct {
+	UINT32 MokDBState;
+	UINT32 PWLen;
+	CHAR16 Password[SB_PASSWORD_LEN];
+} __attribute__ ((packed)) MokDBvar;
+
 static EFI_STATUS get_sha1sum (void *Data, int DataSize, UINT8 *hash)
 {
 	EFI_STATUS status;
@@ -1116,6 +1122,118 @@ static INTN mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 	return -1;
 }
 
+static INTN mok_db_prompt (void *MokDB, UINTN MokDBSize) {
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	MokDBvar *var = MokDB;
+	CHAR16 *message[4];
+	CHAR16 pass1, pass2, pass3;
+	CHAR16 *str;
+	UINT8 fail_count = 0;
+	UINT8 dbval = 1;
+	UINT8 pos1, pos2, pos3;
+	int ret;
+
+	if (MokDBSize != sizeof(MokDBvar)) {
+		console_notify(L"Invalid MokDB variable contents");
+		return -1;
+	}
+
+	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
+
+	message[0] = L"Change DB state";
+	message[1] = NULL;
+
+	console_save_and_set_mode(&SavedMode);
+	console_print_box_at(message, -1, 0, 0, -1, -1, 1, 1);
+	console_restore_mode(&SavedMode);
+
+	while (fail_count < 3) {
+		RandomBytes (&pos1, sizeof(pos1));
+		pos1 = (pos1 % var->PWLen);
+
+		do {
+			RandomBytes (&pos2, sizeof(pos2));
+			pos2 = (pos2 % var->PWLen);
+		} while (pos2 == pos1);
+
+		do {
+			RandomBytes (&pos3, sizeof(pos3));
+			pos3 = (pos3 % var->PWLen) ;
+		} while (pos3 == pos2 || pos3 == pos1);
+
+		str = PoolPrint(L"Enter password character %d: ", pos1 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return -1;
+		}
+		pass1 = get_password_charater(str);
+		FreePool(str);
+
+		str = PoolPrint(L"Enter password character %d: ", pos2 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return -1;
+		}
+		pass2 = get_password_charater(str);
+		FreePool(str);
+
+		str = PoolPrint(L"Enter password character %d: ", pos3 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return -1;
+		}
+		pass3 = get_password_charater(str);
+		FreePool(str);
+
+		if (pass1 != var->Password[pos1] ||
+		    pass2 != var->Password[pos2] ||
+		    pass3 != var->Password[pos3]) {
+			Print(L"Invalid character\n");
+			fail_count++;
+		} else {
+			break;
+		}
+	}
+
+	if (fail_count >= 3) {
+		console_notify(L"Password limit reached");
+		return -1;
+	}
+
+	if (var->MokDBState == 0)
+		ret = console_yes_no((CHAR16 *[]){L"Ignore DB certs/hashes", NULL});
+	else
+		ret = console_yes_no((CHAR16 *[]){L"Use DB certs/hashes", NULL});
+
+	if (ret == 0) {
+		LibDeleteVariable(L"MokDB", &shim_lock_guid);
+		return -1;
+	}
+
+	if (var->MokDBState == 0) {
+		efi_status = uefi_call_wrapper(RT->SetVariable,
+					       5, L"MokDBState",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					       1, &dbval);
+		if (efi_status != EFI_SUCCESS) {
+			console_notify(L"Failed to set DB state");
+			return -1;
+		}
+	} else {
+		LibDeleteVariable(L"MokDBState", &shim_lock_guid);
+	}
+
+	console_notify(L"The system must now be rebooted");
+	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+			  EFI_SUCCESS, 0, NULL);
+	console_notify(L"Failed to reboot");
+	return -1;
+}
+
 static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
@@ -1517,6 +1635,7 @@ typedef enum {
 	MOK_DELETE_MOK,
 	MOK_CHANGE_SB,
 	MOK_SET_PW,
+	MOK_CHANGE_DB,
 	MOK_KEY_ENROLL,
 	MOK_HASH_ENROLL
 } mok_menu_item;
@@ -1525,7 +1644,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 				 void *MokNew, UINTN MokNewSize,
 				 void *MokDel, UINTN MokDelSize,
 				 void *MokSB, UINTN MokSBSize,
-				 void *MokPW, UINTN MokPWSize)
+				 void *MokPW, UINTN MokPWSize,
+				 void *MokDB, UINTN MokDBSize)
 {
 	CHAR16 **menu_strings;
 	mok_menu_item *menu_item;
@@ -1570,6 +1690,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		menucount++;
 
 	if (MokPW)
+		menucount++;
+
+	if (MokDB)
 		menucount++;
 
 	menu_strings = AllocateZeroPool(sizeof(CHAR16 *) * (menucount + 1));
@@ -1618,6 +1741,12 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		i++;
 	}
 
+	if (MokDB) {
+		menu_strings[i] = L"Change DB state";
+		menu_item[i] = MOK_CHANGE_DB;
+		i++;
+	}
+
 	menu_strings[i] = L"Enroll key from disk";
 	menu_item[i] = MOK_KEY_ENROLL;
 	i++;
@@ -1656,6 +1785,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		case MOK_SET_PW:
 			mok_pw_prompt(MokPW, MokPWSize);
 			break;
+		case MOK_CHANGE_DB:
+			mok_db_prompt(MokDB, MokDBSize);
+			break;
 		case MOK_KEY_ENROLL:
 			mok_key_enroll();
 			break;
@@ -1679,11 +1811,13 @@ out:
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	UINTN MokNewSize = 0, MokDelSize = 0, MokSBSize = 0, MokPWSize = 0;
+	UINTN MokNewSize = 0, MokDelSize = 0, MokSBSize = 0, MokPWSize = 0,
+		  MokDBSize = 0;
 	void *MokNew = NULL;
 	void *MokDel = NULL;
 	void *MokSB = NULL;
 	void *MokPW = NULL;
+	void *MokDB = NULL;
 	EFI_STATUS status;
 
 	status = get_variable(L"MokNew", (UINT8 **)&MokNew, &MokNewSize,
@@ -1726,8 +1860,18 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		console_error(L"Could not retrieve MokPW", status);
 	}
 
+	status = get_variable(L"MokDB", (UINT8 **)&MokDB, &MokDBSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokDB", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokDB");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokDB", status);
+	}
+
 	enter_mok_menu(image_handle, MokNew, MokNewSize, MokDel, MokDelSize,
-		       MokSB, MokSBSize, MokPW, MokPWSize);
+		       MokSB, MokSBSize, MokPW, MokPWSize, MokDB, MokDBSize);
 
 	if (MokNew)
 		FreePool (MokNew);
@@ -1740,6 +1884,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	if (MokPW)
 		FreePool (MokPW);
+
+	if (MokDB)
+		FreePool (MokDB);
 
 	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 	LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
