@@ -1629,7 +1629,7 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			  &handle, &shim_lock_guid, EFI_NATIVE_INTERFACE,
 			  &shim_lock_interface);
 	if (EFI_ERROR(efi_status)) {
-		console_error("Could not install security protocol",
+		console_error(L"Could not install security protocol",
 			      efi_status);
 		return efi_status;
 	}
