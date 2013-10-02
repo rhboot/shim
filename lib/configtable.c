@@ -101,7 +101,7 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath)
 			break;
 		}
 		
-		if (CompareMem(dp, DevicePath, Size) == 0) {
+		if (CompareMem(dp, (void *)DevicePath, Size) == 0) {
 #ifdef DEBUG_CONFIG
 			Print(L"***FOUND\n");
 			console_get_keystroke();
