@@ -48,6 +48,7 @@
 #include "efiauthenticated.h"
 #include "security_policy.h"
 #include "console.h"
+#include "version.h"
 
 #define FALLBACK L"\\fallback.efi"
 #define MOK_MANAGER L"\\MokManager.efi"
@@ -1667,6 +1668,9 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 				  &verbose_check_size, global_var);
 	if (!EFI_ERROR(efi_status))
 		verbose = verbose_check;
+
+	if (verbose)
+		console_notify_ascii(shim_version);
 
 	/* Set the second stage loader */
 	set_second_stage (image_handle);

@@ -40,9 +40,9 @@ LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH
 VERSION		= 0.4
 
 TARGET	= shim.efi MokManager.efi.signed fallback.efi.signed
-OBJS	= shim.o netboot.o cert.o replacements.o
+OBJS	= shim.o netboot.o cert.o replacements.o version.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
-SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h include/console.h replacements.c replacements.h
+SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h include/console.h replacements.c replacements.h version.c version.h
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
 MOK_SOURCES = MokManager.c shim.h include/console.h PasswordCrypt.c PasswordCrypt.h crypt_blowfish.c crypt_blowfish.h
 FALLBACK_OBJS = fallback.o
@@ -60,6 +60,12 @@ shim_cert.h: shim.cer
 	echo "static UINT8 shim_cert[] = {" > $@
 	hexdump -v -e '1/1 "0x%02x, "' $< >> $@
 	echo "};" >> $@
+
+version.c : version.c.in
+	sed	-e "s,@@VERSION@@,$(VERSION)," \
+		-e "s,@@UNAME@@,$(shell uname -a)," \
+		-e "s,@@COMMIT@@,$(shell if [ -d .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo commit id not available; fi)," \
+		< version.c.in > version.c
 
 certdb/secmod.db: shim.crt
 	-mkdir certdb
@@ -115,7 +121,7 @@ clean:
 	$(MAKE) -C Cryptlib/OpenSSL clean
 	$(MAKE) -C lib clean
 	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb
-	rm -f *.debug *.so *.efi *.tar.*
+	rm -f *.debug *.so *.efi *.tar.* version.c
 
 GITTAG = $(VERSION)
 
@@ -125,6 +131,7 @@ test-archive:
 	@git archive --format=tar $(shell git branch | awk '/^*/ { print $$2 }') | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
 	@git diff | ( cd /tmp/shim-$(VERSION)-tmp/ ; patch -s -p1 -b -z .gitdiff )
 	@mv /tmp/shim-$(VERSION)-tmp/ /tmp/shim-$(VERSION)/
+	@git log -1 --pretty=format:%H > /tmp/shim-$(VERSION)/commit
 	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
 	@rm -rf /tmp/shim-$(VERSION)
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
@@ -135,6 +142,7 @@ archive:
 	@mkdir -p /tmp/shim-$(VERSION)-tmp
 	@git archive --format=tar $(GITTAG) | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
 	@mv /tmp/shim-$(VERSION)-tmp/ /tmp/shim-$(VERSION)/
+	@git log -1 --pretty=format:%H > /tmp/shim-$(VERSION)/commit
 	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
 	@rm -rf /tmp/shim-$(VERSION)
 	@echo "The archive is in shim-$(VERSION).tar.bz2"

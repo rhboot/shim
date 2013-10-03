@@ -20,6 +20,8 @@ console_alertbox(CHAR16 **title);
 void
 console_notify(CHAR16 *string);
 void
+console_notify_ascii(CHAR8 *string);
+void
 console_reset(void);
 #define NOSEL 0x7fffffff
 
