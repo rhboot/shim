@@ -144,10 +144,18 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 
 	Adjust = (UINT64)data - context->ImageAddress;
 
+	if (Adjust == 0)
+		return EFI_SUCCESS;
+
 	while (RelocBase < RelocBaseEnd) {
 		Reloc = (UINT16 *) ((char *) RelocBase + sizeof (EFI_IMAGE_BASE_RELOCATION));
-		RelocEnd = (UINT16 *) ((char *) RelocBase + RelocBase->SizeOfBlock);
 
+		if ((RelocBase->SizeOfBlock == 0) || (RelocBase->SizeOfBlock > context->RelocDir->Size)) {
+			Print(L"Reloc block size is invalid\n");
+			return EFI_UNSUPPORTED;
+		}
+
+		RelocEnd = (UINT16 *) ((char *) RelocBase + RelocBase->SizeOfBlock);
 		if ((void *)RelocEnd < data || (void *)RelocEnd > ImageEnd) {
 			Print(L"Reloc entry overflows binary\n");
 			return EFI_UNSUPPORTED;
