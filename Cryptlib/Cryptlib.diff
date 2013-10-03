@@ -34,3 +34,24 @@ index 805e6b4..bb7bcba 100644
  
    //
    // Years Handling
+diff --git a/Cryptlib/SysCall/CrtWrapper.c b/Cryptlib/SysCall/CrtWrapper.c
+index fb446b6..5a8322d 100644
+--- a/Cryptlib/SysCall/CrtWrapper.c
++++ b/Cryptlib/SysCall/CrtWrapper.c
+@@ -293,16 +293,6 @@ size_t fwrite (const void *buffer, size_t size, size_t count, FILE *stream)
+ //  -- Dummy OpenSSL Support Routines --
+ //
+ 
+-int BIO_printf (void *bio, const char *format, ...)
+-{
+-  return 0;
+-}
+-
+-int BIO_snprintf(char *buf, size_t n, const char *format, ...)
+-{
+-  return 0;
+-}
+-
+ void *UI_OpenSSL(void)
+ {
+   return NULL;
