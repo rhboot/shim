@@ -1,7 +1,7 @@
 /** @file
   PEM (Privacy Enhanced Mail) Format Handler Wrapper Implementation over OpenSSL.
 
-Copyright (c) 2010 - 2012, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2010 - 2013, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -36,7 +36,7 @@ PasswordCallback (
 {
   INTN  KeyLength;
 
-  ZeroMem ((VOID *)Buf, (UINTN)Size);
+  ZeroMem ((VOID *) Buf, (UINTN) Size);
   if (Key != NULL) {
     //
     // Duplicate key phrase directly.
@@ -86,31 +86,41 @@ RsaGetPrivateKeyFromPem (
     return FALSE;
   }
 
-  Status = FALSE;
-  PemBio = NULL;
-
   //
   // Add possible block-cipher descriptor for PEM data decryption.
   // NOTE: Only support most popular ciphers (3DES, AES) for the encrypted PEM.
   //
-  EVP_add_cipher (EVP_des_ede3_cbc());
-  EVP_add_cipher (EVP_aes_128_cbc());
-  EVP_add_cipher (EVP_aes_192_cbc());
-  EVP_add_cipher (EVP_aes_256_cbc());
+  if (EVP_add_cipher (EVP_des_ede3_cbc ()) == 0) {
+    return FALSE;
+  }
+  if (EVP_add_cipher (EVP_aes_128_cbc ()) == 0) {
+    return FALSE;
+  }
+  if (EVP_add_cipher (EVP_aes_192_cbc ()) == 0) {
+    return FALSE;
+  }
+  if (EVP_add_cipher (EVP_aes_256_cbc ()) == 0) {
+    return FALSE;
+  }
+
+  Status = FALSE;
 
   //
   // Read encrypted PEM Data.
   //
   PemBio = BIO_new (BIO_s_mem ());
-  BIO_write (PemBio, PemData, (int)PemSize);
   if (PemBio == NULL) {
+    goto _Exit;
+  }
+
+  if (BIO_write (PemBio, PemData, (int) PemSize) <= 0) {
     goto _Exit;
   }
 
   //
   // Retrieve RSA Private Key from encrypted PEM data.
   //
-  *RsaContext = PEM_read_bio_RSAPrivateKey (PemBio, NULL, (pem_password_cb *)&PasswordCallback, (void *)Password);
+  *RsaContext = PEM_read_bio_RSAPrivateKey (PemBio, NULL, (pem_password_cb *) &PasswordCallback, (void *) Password);
   if (*RsaContext != NULL) {
     Status = TRUE;
   }

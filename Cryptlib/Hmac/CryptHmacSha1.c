@@ -30,7 +30,7 @@ HmacSha1GetContextSize (
   //
   // Retrieves the OpenSSL HMAC-SHA1 Context Size
   //
-  return (UINTN)(sizeof (HMAC_CTX));
+  return (UINTN) (sizeof (HMAC_CTX));
 }
 
 /**
@@ -58,7 +58,7 @@ HmacSha1Init (
   //
   // Check input parameters.
   //
-  if (HmacSha1Context == NULL) {
+  if (HmacSha1Context == NULL || KeySize > INT_MAX) {
     return FALSE;
   }
 

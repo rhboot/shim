@@ -27,7 +27,8 @@ OBJS		=   Hash/CryptMd4.o \
 		    Cipher/CryptTdes.o \
 		    Cipher/CryptArc4.o \
 		    Rand/CryptRand.o \
-		    Pk/CryptRsa.o \
+		    Pk/CryptRsaBasic.o \
+		    Pk/CryptRsaExt.o \
 		    Pk/CryptPkcs7.o \
 		    Pk/CryptDh.o \
 		    Pk/CryptX509.o \
