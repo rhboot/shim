@@ -11,6 +11,8 @@
 #include <variables.h>
 #include <errors.h>
 
+static EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
+
 static int min(int a, int b)
 {
 	if (a < b)
@@ -409,13 +411,13 @@ VOID
 setup_verbosity(VOID)
 {
 	EFI_STATUS status;
-	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	EFI_GUID guid = SHIM_LOCK_GUID;
 	UINT8 verbose_check;
 	UINTN verbose_check_size;
 
 	verbose_check_size = 1;
 	status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
-				  &verbose_check_size, global_var);
+				  &verbose_check_size, guid);
 	verbose = 0;
 	if (!EFI_ERROR(status))
 		verbose = verbose_check;
