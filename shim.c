@@ -779,6 +779,7 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
+	unsigned long HeaderWithoutDataDir, SectionHeaderOffset;
 
 	if (datasize < sizeof(EFI_IMAGE_DOS_HEADER)) {
 		Print(L"Invalid image\n");
@@ -787,6 +788,37 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
+
+	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES
+			< PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes) {
+		Print(L"Image header too small\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	HeaderWithoutDataDir = sizeof (EFI_IMAGE_OPTIONAL_HEADER64)
+			- sizeof (EFI_IMAGE_DATA_DIRECTORY) * EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES;
+	if (((UINT32)PEHdr->Pe32Plus.FileHeader.SizeOfOptionalHeader - HeaderWithoutDataDir) !=
+			PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes
+				* sizeof (EFI_IMAGE_DATA_DIRECTORY)) {
+		Print(L"Image header overflows data directory\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	SectionHeaderOffset = DosHdr->e_lfanew
+				+ sizeof (UINT32)
+				+ sizeof (EFI_IMAGE_FILE_HEADER)
+				+ PEHdr->Pe32Plus.FileHeader.SizeOfOptionalHeader;
+	if ((PEHdr->Pe32Plus.OptionalHeader.SizeOfImage - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
+			<= PEHdr->Pe32Plus.FileHeader.NumberOfSections) {
+		Print(L"Image sections overflow image size\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	if ((PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
+			< (UINT32)PEHdr->Pe32Plus.FileHeader.NumberOfSections) {
+		Print(L"Image sections overflow section headers\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	if ((((UINT8 *)PEHdr - (UINT8 *)data) + sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION)) > datasize) {
 		Print(L"Invalid image\n");
@@ -894,6 +926,12 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		if (!base || !end) {
 			Print(L"Invalid section size\n");
+			return EFI_UNSUPPORTED;
+		}
+
+		if (Section->VirtualAddress < context.SizeOfHeaders ||
+				Section->PointerToRawData < context.SizeOfHeaders) {
+			Print(L"Section is inside image headers\n");
 			return EFI_UNSUPPORTED;
 		}
 
