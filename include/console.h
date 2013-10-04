@@ -20,8 +20,6 @@ console_alertbox(CHAR16 **title);
 void
 console_notify(CHAR16 *string);
 void
-console_notify_ascii(CHAR8 *string);
-void
 console_reset(void);
 #define NOSEL 0x7fffffff
 
@@ -66,5 +64,25 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
 };
 
 extern VOID setup_console (int text);
+extern VOID setup_verbosity(VOID);
+extern UINT8 verbose;
+#define dprint(fmt, ...) ({						\
+		UINTN __dprint_ret = 0;					\
+		if (verbose)						\
+			__dprint_ret = Print((fmt), ##__VA_ARGS__);	\
+		__dprint_ret;						\
+	})
+#define dprinta(fmt, ...) ({									\
+		UINTN __dprinta_ret = 0;							\
+		if (verbose) {									\
+			UINTN __dprinta_i;							\
+			CHAR16 *__dprinta_str = AllocateZeroPool((strlena(fmt) + 1) * 2);	\
+			for (__dprinta_i = 0; fmt[__dprinta_i] != '\0'; __dprinta_i++)		\
+				__dprinta_str[__dprinta_i] = fmt[__dprinta_i];			\
+			__dprinta_ret = Print((__dprinta_str), ##__VA_ARGS__);			\
+			FreePool(__dprinta_str);						\
+		}										\
+		__dprinta_ret;									\
+	})
 
 #endif /* _SHIM_LIB_CONSOLE_H */

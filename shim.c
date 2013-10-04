@@ -59,7 +59,6 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 static CHAR16 *second_stage;
 static void *load_options;
 static UINT32 load_options_size;
-static UINT8 verbose;
 
 EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
 
@@ -731,12 +730,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	 * databases
 	 */
 	status = check_whitelist(cert, sha256hash, sha1hash);
-
-	if (status == EFI_SUCCESS) {
-		if (verbose)
-			console_notify(L"Binary is whitelisted\n");
+	if (status == EFI_SUCCESS)
 		return status;
-	}
 
 	/*
 	 * Check against the shim build key
@@ -746,8 +741,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
-		if (verbose)
-			console_notify(L"Binary is verified by the vendor certificate\n");
 		return status;
 	}
 
@@ -760,12 +753,9 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       vendor_cert, vendor_cert_size, sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 		status = EFI_SUCCESS;
-		if (verbose)
-			console_notify(L"Binary is verified by the vendor certificate\n");
 		return status;
 	}
 
-	Print(L"Invalid signature\n");
 	status = EFI_ACCESS_DENIED;
 
 	return status;
@@ -896,9 +886,12 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	if (secure_mode ()) {
 		efi_status = verify_buffer(data, datasize, &context);
 
-		if (efi_status != EFI_SUCCESS) {
-			Print(L"Verification failed\n");
+		if (EFI_ERROR(efi_status)) {
+			console_error(L"Verification failed", efi_status);
 			return efi_status;
+		} else {
+			if (verbose)
+				console_notify(L"Verification succeeded");
 		}
 	}
 
@@ -1681,9 +1674,6 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	static SHIM_LOCK shim_lock_interface;
 	EFI_HANDLE handle = NULL;
 	EFI_STATUS efi_status;
-	UINT8 verbose_check;
-	UINTN verbose_check_size;
-	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
 
 	verification_method = VERIFIED_BY_NOTHING;
 
@@ -1708,15 +1698,9 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	InitializeLib(image_handle, systab);
 
 	setup_console(1);
+	setup_verbosity();
 
-	verbose_check_size = 1;
-	efi_status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
-				  &verbose_check_size, global_var);
-	if (!EFI_ERROR(efi_status))
-		verbose = verbose_check;
-
-	if (verbose)
-		console_notify_ascii(shim_version);
+	dprinta(shim_version);
 
 	/* Set the second stage loader */
 	set_second_stage (image_handle);

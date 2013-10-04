@@ -8,6 +8,7 @@
 #include <efi/efilib.h>
 
 #include <console.h>
+#include <variables.h>
 #include <errors.h>
 
 static int min(int a, int b)
@@ -312,20 +313,6 @@ console_notify(CHAR16 *string)
 	console_alertbox(str_arr);
 }
 
-void
-console_notify_ascii(CHAR8 *string)
-{
-	CHAR16 *str = AllocateZeroPool((strlena(string) + 1) * 2);
-	int i, j;
-
-	if (!str)
-		return;
-
-	for (i = 0, j = 1; string[i] != '\0'; i++, j+=2)
-		str[j] = string[i];
-	console_notify(str);
-}
-
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 /* Copy of gnu-efi-3.0 with the added secure boot strings */
@@ -414,6 +401,24 @@ console_reset(void)
 	/* set mode 0 - required to be 80x25 */
 	uefi_call_wrapper(co->SetMode, 2, co, 0);
 	uefi_call_wrapper(co->ClearScreen, 1, co);
+}
+
+UINT8 verbose;
+
+VOID
+setup_verbosity(VOID)
+{
+	EFI_STATUS status;
+	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
+	UINT8 verbose_check;
+	UINTN verbose_check_size;
+
+	verbose_check_size = 1;
+	status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
+				  &verbose_check_size, global_var);
+	verbose = 0;
+	if (!EFI_ERROR(status))
+		verbose = verbose_check;
 }
 
 VOID setup_console (int text)
