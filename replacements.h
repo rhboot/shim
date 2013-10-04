@@ -39,5 +39,6 @@ extern verification_method_t verification_method;
 extern int loader_is_participating;
 
 extern void hook_system_services(EFI_SYSTEM_TABLE *local_systab);
+extern void unhook_system_services(void);
 
 #endif /* SHIM_REPLACEMENTS_H */

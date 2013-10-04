@@ -1767,18 +1767,24 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	efi_status = init_grub(image_handle);
 
-	/*
-	 * If we're back here then clean everything up before exiting
-	 */
-	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
-			  &shim_lock_guid, &shim_lock_interface);
-
 #if defined(OVERRIDE_SECURITY_POLICY)
 	/*
 	 * Clean up the security protocol hook
 	 */
 	security_policy_uninstall();
 #endif
+
+	/*
+	 * If we're back here then clean everything up before exiting
+	 */
+	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
+			  &shim_lock_guid, &shim_lock_interface);
+
+
+	/*
+	 * Remove our hooks from system services.
+	 */
+	unhook_system_services();
 
 	/*
 	 * Free the space allocated for the alternative 2nd stage loader

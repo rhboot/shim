@@ -66,7 +66,7 @@ static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
 
 extern UINT8 insecure_mode;
 
-static void
+void
 unhook_system_services(void)
 {
 	if (insecure_mode)
