@@ -371,8 +371,8 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) ==
 				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
-				 sha256hash) == DATA_FOUND)
+	if (cert && check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
+					 sha256hash) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
@@ -381,7 +381,8 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
 			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
 		return EFI_ACCESS_DENIED;
-	if (check_db_cert(L"dbx", secure_var, cert, sha256hash) == DATA_FOUND)
+	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash) ==
+				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
 
 	return EFI_SUCCESS;
@@ -414,7 +415,8 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		}
-		if (check_db_cert(L"db", secure_var, cert, sha256hash) == DATA_FOUND) {
+		if (cert && check_db_cert(L"db", secure_var, cert, sha256hash)
+					== DATA_FOUND) {
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
 			return EFI_SUCCESS;
@@ -427,7 +429,8 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
 	}
-	if (check_db_cert(L"MokList", shim_var, cert, sha256hash) == DATA_FOUND) {
+	if (cert && check_db_cert(L"MokList", shim_var, cert, sha256hash) ==
+				DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
@@ -712,25 +715,24 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	EFI_STATUS status = EFI_ACCESS_DENIED;
-	WIN_CERTIFICATE_EFI_PKCS *cert;
+	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
 	unsigned int size = datasize;
 
-	if (context->SecDir->Size == 0) {
-		Print(L"Empty security header\n");
-		return EFI_INVALID_PARAMETER;
-	}
+	if (context->SecDir->Size != 0) {
+		cert = ImageAddress (data, size,
+				     context->SecDir->VirtualAddress);
 
-	cert = ImageAddress (data, size, context->SecDir->VirtualAddress);
+		if (!cert) {
+			Print(L"Certificate located outside the image\n");
+			return EFI_INVALID_PARAMETER;
+		}
 
-	if (!cert) {
-		Print(L"Certificate located outside the image\n");
-		return EFI_INVALID_PARAMETER;
-	}
-
-	if (cert->Hdr.wCertificateType != WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
-		Print(L"Unsupported certificate type %x\n",
-		      cert->Hdr.wCertificateType);
-		return EFI_UNSUPPORTED;
+		if (cert->Hdr.wCertificateType !=
+		    WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
+			Print(L"Unsupported certificate type %x\n",
+				cert->Hdr.wCertificateType);
+			return EFI_UNSUPPORTED;
+		}
 	}
 
 	status = generate_hash(data, datasize, context, sha256hash, sha1hash);
@@ -761,27 +763,29 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (status == EFI_SUCCESS)
 		return status;
 
-	/*
-	 * Check against the shim build key
-	 */
-	if (AuthenticodeVerify(cert->CertData,
+	if (cert) {
+		/*
+		 * Check against the shim build key
+		 */
+		if (AuthenticodeVerify(cert->CertData,
 			       context->SecDir->Size - sizeof(cert->Hdr),
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
-		status = EFI_SUCCESS;
-		return status;
-	}
+			status = EFI_SUCCESS;
+			return status;
+		}
 
 
-	/*
-	 * And finally, check against shim's built-in key
-	 */
-	if (AuthenticodeVerify(cert->CertData,
+		/*
+		 * And finally, check against shim's built-in key
+		 */
+		if (AuthenticodeVerify(cert->CertData,
 			       context->SecDir->Size - sizeof(cert->Hdr),
 			       vendor_cert, vendor_cert_size, sha256hash,
 			       SHA256_DIGEST_SIZE)) {
-		status = EFI_SUCCESS;
-		return status;
+			status = EFI_SUCCESS;
+			return status;
+		}
 	}
 
 	status = EFI_ACCESS_DENIED;
