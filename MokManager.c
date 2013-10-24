@@ -739,23 +739,37 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
+static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
+			      BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	CHAR16 *db_name;
+	CHAR16 *auth_name;
 	UINT8 auth[PASSWORD_CRYPT_SIZE];
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
 
+	if (MokX) {
+		db_name = L"MokListX";
+		auth_name = L"MokXAuth";
+	} else {
+		db_name = L"MokList";
+		auth_name = L"MokAuth";
+	}
+
 	if (authenticate) {
-		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
+		efi_status = uefi_call_wrapper(RT->GetVariable, 5, auth_name,
 					       &shim_lock_guid,
 					       &attributes, &auth_size, auth);
 
 		if (efi_status != EFI_SUCCESS ||
 		    (auth_size != SHA256_DIGEST_SIZE &&
 		     auth_size != PASSWORD_CRYPT_SIZE)) {
-			console_error(L"Failed to get MokAuth", efi_status);
+			if (MokX)
+				console_error(L"Failed to get MokXAuth", efi_status);
+			else
+				console_error(L"Failed to get MokAuth", efi_status);
 			return efi_status;
 		}
 
@@ -772,14 +786,14 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 
 	if (!MokNewSize) {
 		/* Delete MOK */
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
 					       &shim_lock_guid,
 					       EFI_VARIABLE_NON_VOLATILE
 					       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
 	} else {
 		/* Write new MOK */
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
 					       &shim_lock_guid,
 					       EFI_VARIABLE_NON_VOLATILE
 					       | EFI_VARIABLE_BOOTSERVICE_ACCESS
@@ -795,17 +809,25 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate)
 	return EFI_SUCCESS;
 }
 
-static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
+static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth,
+				    BOOLEAN MokX)
+{
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	CHAR16 *title;
 
-	if (list_keys(MokNew, MokNewSize, L"[Enroll MOK]") != EFI_SUCCESS)
+	if (MokX)
+		title = L"[Enroll MOKX]";
+	else
+		title = L"[Enroll MOK]";
+
+	if (list_keys(MokNew, MokNewSize, title) != EFI_SUCCESS)
 		return 0;
 
 	if (console_yes_no((CHAR16 *[]){L"Enroll the key(s)?", NULL}) == 0)
 		return 0;
 
-	efi_status = store_keys(MokNew, MokNewSize, auth);
+	efi_status = store_keys(MokNew, MokNewSize, auth, MokX);
 
 	if (efi_status != EFI_SUCCESS) {
 		console_notify(L"Failed to enroll keys\n");
@@ -813,8 +835,13 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 	}
 
 	if (auth) {
-		LibDeleteVariable(L"MokNew", &shim_lock_guid);
-		LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+		if (MokX) {
+			LibDeleteVariable(L"MokXNew", &shim_lock_guid);
+			LibDeleteVariable(L"MokXAuth", &shim_lock_guid);
+		} else {
+			LibDeleteVariable(L"MokNew", &shim_lock_guid);
+			LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+		}
 
 		console_notify(L"The system must now be rebooted");
 		uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
@@ -826,25 +853,35 @@ static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth) {
 	return 0;
 }
 
-static INTN mok_reset_prompt ()
+static INTN mok_reset_prompt (BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	CHAR16 *prompt;
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
-	if (console_yes_no((CHAR16 *[]){L"Erase all stored keys?", NULL }) == 0)
+	if (MokX)
+		prompt = L"Erase all stored keys in MokListX?";
+	else
+		prompt = L"Erase all stored keys in MokList?";
+	if (console_yes_no((CHAR16 *[]){prompt, NULL }) == 0)
 		return 0;
 
-	efi_status = store_keys(NULL, 0, TRUE);
+	efi_status = store_keys(NULL, 0, TRUE, MokX);
 
 	if (efi_status != EFI_SUCCESS) {
 		console_notify(L"Failed to erase keys\n");
 		return -1;
 	}
 
-	LibDeleteVariable(L"MokNew", &shim_lock_guid);
-	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+	if (MokX) {
+		LibDeleteVariable(L"MokXNew", &shim_lock_guid);
+		LibDeleteVariable(L"MokXAuth", &shim_lock_guid);
+	} else {
+		LibDeleteVariable(L"MokNew", &shim_lock_guid);
+		LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+	}
 
 	console_notify(L"The system must now be rebooted");
 	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
@@ -853,7 +890,8 @@ static INTN mok_reset_prompt ()
 	return -1;
 }
 
-static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num)
+static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
+				       BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
@@ -862,6 +900,12 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num)
 	void *Data = NULL, *ptr;
 	INTN DataSize = 0;
 	int i;
+	CHAR16 *db_name;
+
+	if (MokX)
+		db_name = L"MokListX";
+	else
+		db_name = L"MokList";
 
 	for (i = 0; i < key_num; i++) {
 		if (list[i].Mok == NULL)
@@ -899,7 +943,7 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num)
 		      sizeof(EFI_GUID) + list[i].MokSize;
 	}
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokList",
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
 				       &shim_lock_guid,
 				       EFI_VARIABLE_NON_VOLATILE
 				       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
@@ -915,10 +959,14 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num)
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
+static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	CHAR16 *db_name;
+	CHAR16 *auth_name;
+	CHAR16 *err_str1;
+	CHAR16 *err_str2;
 	UINT8 auth[PASSWORD_CRYPT_SIZE];
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
@@ -928,13 +976,24 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
 	INTN mok_num, del_num;
 	int i, j;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDelAuth",
+	if (MokX) {
+		db_name = L"MokListX";
+		auth_name = L"MokXDelAuth";
+	} else {
+		db_name = L"MokList";
+		auth_name = L"MokDelAuth";
+	}
+
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, auth_name,
 				       &shim_lock_guid,
 				       &attributes, &auth_size, auth);
 
 	if (efi_status != EFI_SUCCESS ||
 	    (auth_size != SHA256_DIGEST_SIZE && auth_size != PASSWORD_CRYPT_SIZE)) {
-		console_error(L"Failed to get MokDelAuth", efi_status);
+		if (MokX)
+			console_error(L"Failed to get MokXDelAuth", efi_status);
+		else
+			console_error(L"Failed to get MokDelAuth", efi_status);
 		return efi_status;
 	}
 
@@ -947,15 +1006,18 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
 	if (efi_status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
 
-	efi_status = get_variable_attr (L"MokList", &MokListData, &MokListDataSize,
+	efi_status = get_variable_attr (db_name, &MokListData, &MokListDataSize,
 				        shim_lock_guid, &attributes);
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
-		console_alertbox((CHAR16 *[]){L"MokList is compromised!",
-					L"Erase all keys in MokList!",
-					NULL});
-		if (LibDeleteVariable(L"MokList", &shim_lock_guid) != EFI_SUCCESS) {
-			console_notify(L"Failed to erase MokList");
+		if (MokX) {
+			err_str1 = L"MokListX is compromised!";
+			err_str2 = L"Erase all keys in MokListX!";
+		} else {
+			err_str1 = L"MokList is compromised!";
+			err_str2 = L"Erase all keys in MokList!";
 		}
+		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
+		LibDeleteVariable(db_name, &shim_lock_guid);
 		return EFI_ACCESS_DENIED;
 	}
 
@@ -983,7 +1045,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
 		}
 	}
 
-	efi_status = write_back_mok_list(mok, mok_num);
+	efi_status = write_back_mok_list(mok, mok_num, MokX);
 
 	if (MokListData)
 		FreePool(MokListData);
@@ -995,27 +1057,38 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize)
 	return efi_status;
 }
 
-static INTN mok_deletion_prompt (void *MokDel, UINTN MokDelSize)
+static INTN mok_deletion_prompt (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+	CHAR16 *title;
 
-	if (list_keys(MokDel, MokDelSize, L"[Delete MOK]") != EFI_SUCCESS) {
+	if (MokX)
+		title = L"[Delete MOKX]";
+	else
+		title = L"[Delete MOK]";
+
+	if (list_keys(MokDel, MokDelSize, title) != EFI_SUCCESS) {
 		return 0;
 	}
 
         if (console_yes_no((CHAR16 *[]){L"Delete the key(s)?", NULL}) == 0)
                 return 0;
 
-	efi_status = delete_keys(MokDel, MokDelSize);
+	efi_status = delete_keys(MokDel, MokDelSize, MokX);
 
 	if (efi_status != EFI_SUCCESS) {
 		console_notify(L"Failed to delete keys");
 		return -1;
 	}
 
-	LibDeleteVariable(L"MokDel", &shim_lock_guid);
-	LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
+	if (MokX) {
+		LibDeleteVariable(L"MokXDel", &shim_lock_guid);
+		LibDeleteVariable(L"MokXDelAuth", &shim_lock_guid);
+	} else {
+		LibDeleteVariable(L"MokDel", &shim_lock_guid);
+		LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
+	}
 
 	console_notify(L"The system must now be rebooted");
 	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
@@ -1478,7 +1551,7 @@ static EFI_STATUS enroll_file (void *data, UINTN datasize, BOOLEAN hash)
 			goto out;
 	}
 
-	mok_enrollment_prompt(mokbuffer, mokbuffersize, FALSE);
+	mok_enrollment_prompt(mokbuffer, mokbuffersize, FALSE, FALSE);
 out:
 	if (mokbuffer)
 		FreePool(mokbuffer);
@@ -1713,8 +1786,11 @@ static int draw_countdown()
 typedef enum {
 	MOK_CONTINUE_BOOT,
 	MOK_RESET_MOK,
+	MOK_RESET_MOKX,
 	MOK_ENROLL_MOK,
+	MOK_ENROLL_MOKX,
 	MOK_DELETE_MOK,
+	MOK_DELETE_MOKX,
 	MOK_CHANGE_SB,
 	MOK_SET_PW,
 	MOK_CHANGE_DB,
@@ -1727,13 +1803,17 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 				 void *MokDel, UINTN MokDelSize,
 				 void *MokSB, UINTN MokSBSize,
 				 void *MokPW, UINTN MokPWSize,
-				 void *MokDB, UINTN MokDBSize)
+				 void *MokDB, UINTN MokDBSize,
+				 void *MokXNew, UINTN MokXNewSize,
+				 void *MokXDel, UINTN MokXDelSize)
 {
 	CHAR16 **menu_strings;
 	mok_menu_item *menu_item;
 	int choice = 0;
 	UINT32 MokAuth = 0;
 	UINT32 MokDelAuth = 0;
+	UINT32 MokXAuth = 0;
+	UINT32 MokXDelAuth = 0;
 	UINTN menucount = 3, i = 0;
 	EFI_STATUS efi_status;
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -1762,10 +1842,32 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 	   (auth_size == SHA256_DIGEST_SIZE || auth_size == PASSWORD_CRYPT_SIZE))
 		MokDelAuth = 1;
 
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokXAuth",
+					       &shim_lock_guid,
+					       &attributes, &auth_size, auth);
+
+	if ((efi_status == EFI_SUCCESS) &&
+	    (auth_size == SHA256_DIGEST_SIZE || auth_size == PASSWORD_CRYPT_SIZE))
+		MokXAuth = 1;
+
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokXDelAuth",
+					       &shim_lock_guid,
+					       &attributes, &auth_size, auth);
+
+	if ((efi_status == EFI_SUCCESS) &&
+	   (auth_size == SHA256_DIGEST_SIZE || auth_size == PASSWORD_CRYPT_SIZE))
+		MokXDelAuth = 1;
+
 	if (MokNew || MokAuth)
 		menucount++;
 
 	if (MokDel || MokDelAuth)
+		menucount++;
+
+	if (MokXNew || MokXAuth)
+		menucount++;
+
+	if (MokXDel || MokXDelAuth)
 		menucount++;
 
 	if (MokSB)
@@ -1805,9 +1907,26 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		i++;
 	}
 
-	if (MokDel || MokDelAuth) {		
+	if (MokDel || MokDelAuth) {
 		menu_strings[i] = L"Delete MOK";
 		menu_item[i] = MOK_DELETE_MOK;
+		i++;
+	}
+
+	if (MokXNew || MokXAuth) {
+		if (!MokXNew) {
+			menu_strings[i] = L"Reset MOKX";
+			menu_item[i] = MOK_RESET_MOKX;
+		} else {
+			menu_strings[i] = L"Enroll MOKX";
+			menu_item[i] = MOK_ENROLL_MOKX;
+		}
+		i++;
+	}
+
+	if (MokXDel || MokXDelAuth) {
+		menu_strings[i] = L"Delete MOKX";
+		menu_item[i] = MOK_DELETE_MOKX;
 		i++;
 	}
 
@@ -1853,13 +1972,22 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		case MOK_CONTINUE_BOOT:
 			goto out;
 		case MOK_RESET_MOK:
-			mok_reset_prompt();
+			mok_reset_prompt(FALSE);
 			break;
 		case MOK_ENROLL_MOK:
-			mok_enrollment_prompt(MokNew, MokNewSize, TRUE);
+			mok_enrollment_prompt(MokNew, MokNewSize, TRUE, FALSE);
 			break;
 		case MOK_DELETE_MOK:
-			mok_deletion_prompt(MokDel, MokDelSize);
+			mok_deletion_prompt(MokDel, MokDelSize, FALSE);
+			break;
+		case MOK_RESET_MOKX:
+			mok_reset_prompt(TRUE);
+			break;
+		case MOK_ENROLL_MOKX:
+			mok_enrollment_prompt(MokXNew, MokXNewSize, TRUE, TRUE);
+			break;
+		case MOK_DELETE_MOKX:
+			mok_deletion_prompt(MokXDel, MokXDelSize, TRUE);
 			break;
 		case MOK_CHANGE_SB:
 			mok_sb_prompt(MokSB, MokSBSize);
@@ -1893,13 +2021,15 @@ out:
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	UINTN MokNewSize = 0, MokDelSize = 0, MokSBSize = 0, MokPWSize = 0,
-		  MokDBSize = 0;
+	UINTN MokNewSize = 0, MokDelSize = 0, MokSBSize = 0, MokPWSize = 0;
+	UINTN MokDBSize = 0, MokXNewSize = 0, MokXDelSize = 0;
 	void *MokNew = NULL;
 	void *MokDel = NULL;
 	void *MokSB = NULL;
 	void *MokPW = NULL;
 	void *MokDB = NULL;
+	void *MokXNew = NULL;
+	void *MokXDel = NULL;
 	EFI_STATUS status;
 
 	status = get_variable(L"MokNew", (UINT8 **)&MokNew, &MokNewSize,
@@ -1952,8 +2082,29 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		console_error(L"Could not retrieve MokDB", status);
 	}
 
+	status = get_variable(L"MokXNew", (UINT8 **)&MokXNew, &MokXNewSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokXNew", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokXNew");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokXNew", status);
+	}
+
+	status = get_variable(L"MokXDel", (UINT8 **)&MokXDel, &MokXDelSize,
+				shim_lock_guid);
+	if (status == EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokXDel", &shim_lock_guid) != EFI_SUCCESS) {
+			console_notify(L"Failed to delete MokXDel");
+		}
+	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokXDel", status);
+	}
+
 	enter_mok_menu(image_handle, MokNew, MokNewSize, MokDel, MokDelSize,
-		       MokSB, MokSBSize, MokPW, MokPWSize, MokDB, MokDBSize);
+		       MokSB, MokSBSize, MokPW, MokPWSize, MokDB, MokDBSize,
+		       MokXNew, MokXNewSize, MokXDel, MokXDelSize);
 
 	if (MokNew)
 		FreePool (MokNew);
@@ -1970,8 +2121,16 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	if (MokDB)
 		FreePool (MokDB);
 
+	if (MokXNew)
+		FreePool (MokXNew);
+
+	if (MokXDel)
+		FreePool (MokXDel);
+
 	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 	LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
+	LibDeleteVariable(L"MokXAuth", &shim_lock_guid);
+	LibDeleteVariable(L"MokXDelAuth", &shim_lock_guid);
 
 	return EFI_SUCCESS;
 }
