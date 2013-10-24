@@ -188,9 +188,16 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 			return NULL;
 		}
 
-		list[count].MokSize = CertList->SignatureSize - sizeof(EFI_GUID);
-		list[count].Mok = (void *)Cert->SignatureData;
 		list[count].Type = CertList->SignatureType;
+		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
+			list[count].MokSize = CertList->SignatureSize -
+					      sizeof(EFI_GUID);
+			list[count].Mok = (void *)Cert->SignatureData;
+		} else {
+			list[count].MokSize = CertList->SignatureListSize -
+					      sizeof(EFI_SIGNATURE_LIST);
+			list[count].Mok = (void *)Cert;
+		}
 
 		/* MOK out of bounds? */
 		if (list[count].MokSize > (unsigned long)end -
@@ -403,7 +410,7 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 	FreePool(text);
 }
 
-static void show_efi_hash (UINT8 *hash)
+static void show_sha256_digest (UINT8 *hash)
 {
 	CHAR16 *text[5];
 	POOL_PRINT hash_string1;
@@ -434,16 +441,68 @@ static void show_efi_hash (UINT8 *hash)
 		FreePool(hash_string2.str);
 }
 
-static void show_mok_info (void *Mok, UINTN MokSize)
+static void show_efi_hash (void *Mok, UINTN MokSize)
+{
+	UINTN sig_size;
+	UINTN hash_num;
+	UINT8 *hash;
+	CHAR16 **menu_strings;
+	int key_num = 0;
+	int i;
+
+	sig_size = SHA256_DIGEST_SIZE + sizeof(EFI_GUID);
+	if ((MokSize % sig_size) != 0) {
+		console_errorbox(L"Corrupted Hash List");
+		return;
+	}
+	hash_num = MokSize / sig_size;
+
+	if (hash_num == 1) {
+		hash = (UINT8 *)Mok + sizeof(EFI_GUID);
+		show_sha256_digest(hash);
+		return;
+	}
+
+	menu_strings = AllocateZeroPool(sizeof(CHAR16 *) * (hash_num + 2));
+	if (!menu_strings) {
+		console_errorbox(L"Out of Resources");
+		return;
+	}
+	for (i=0; i<hash_num; i++) {
+		menu_strings[i] = PoolPrint(L"View hash %d", i);
+	}
+	menu_strings[i] = StrDuplicate(L"Continue");
+	menu_strings[i+1] = NULL;
+
+	while (key_num < hash_num) {
+		key_num = console_select((CHAR16 *[]){ L"[Hash List]", NULL },
+					 menu_strings, 0);
+
+		if (key_num < 0 || key_num >= hash_num)
+			break;
+
+		hash = (UINT8 *)Mok + sig_size*key_num + sizeof(EFI_GUID);
+		show_sha256_digest(hash);
+	}
+
+	for (i=0; menu_strings[i] != NULL; i++)
+		FreePool(menu_strings[i]);
+
+	FreePool(menu_strings);
+}
+
+static void show_mok_info (EFI_GUID Type, void *Mok, UINTN MokSize)
 {
 	EFI_STATUS efi_status;
 	UINT8 hash[SHA1_DIGEST_SIZE];
 	X509 *X509Cert;
+	EFI_GUID CertType = X509_GUID;
+	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 
 	if (!Mok || MokSize == 0)
 		return;
 
-	if (MokSize != SHA256_DIGEST_SIZE) {
+	if (CompareGuid (&Type, &CertType) == 0) {
 		efi_status = get_sha1sum(Mok, MokSize, hash);
 
 		if (efi_status != EFI_SUCCESS) {
@@ -459,8 +518,8 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 			console_notify(L"Not a valid X509 certificate");
 			return;
 		}
-	} else {
-		show_efi_hash(Mok);
+	} else if (CompareGuid (&Type, &HashType) == 0) {
+		show_efi_hash(Mok, MokSize);
 	}
 }
 
@@ -468,7 +527,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 {
 	INTN MokNum = 0;
 	MokListNode *keys = NULL;
-	INTN key_num = 0;
+	int key_num = 0;
 	CHAR16 **menu_strings;
 	int i;
 
@@ -504,10 +563,11 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 		key_num = console_select((CHAR16 *[]){ title, NULL },
 					 menu_strings, 0);
 
-		if (key_num < 0)
+		if (key_num < 0 || key_num >= MokNum)
 			break;
-		else if (key_num < MokNum)
-			show_mok_info(keys[key_num].Mok, keys[key_num].MokSize);
+
+		show_mok_info(keys[key_num].Type, keys[key_num].Mok,
+			      keys[key_num].MokSize);
 	}
 
 	for (i=0; menu_strings[i] != NULL; i++)
