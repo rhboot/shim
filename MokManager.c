@@ -1019,9 +1019,116 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 	return EFI_SUCCESS;
 }
 
+static void delete_cert (void *key, UINT32 key_size,
+			 MokListNode *mok, INTN mok_num)
+{
+	EFI_GUID CertType = X509_GUID;
+	int i;
+
+	for (i = 0; i < mok_num; i++) {
+		if (CompareGuid(&(mok[i].Type), &CertType) != 0)
+			continue;
+
+		if (mok[i].MokSize == key_size &&
+		    CompareMem(key, mok[i].Mok, key_size) == 0) {
+			/* Remove the key */
+			mok[i].Mok = NULL;
+			mok[i].MokSize = 0;
+		}
+	}
+}
+
+static int match_hash (UINT8 *hash, UINT32 hash_size,
+		       void *hash_list, UINT32 list_num)
+{
+	UINT8 *ptr;
+	int i;
+
+	ptr = hash_list + sizeof(EFI_GUID);
+	for (i = 0; i < list_num; i++) {
+		if (CompareMem(hash, ptr, hash_size) == 0)
+			return i;
+		ptr += hash_size + sizeof(EFI_GUID);
+	}
+
+	return -1;
+}
+
+static void mem_move (void *dest, void *src, UINTN size)
+{
+	UINT8 *d, *s;
+	int i;
+
+	d = (UINT8 *)dest;
+	s = (UINT8 *)src;
+	for (i = 0; i < size; i++)
+		d[i] = s[i];
+}
+
+static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
+				 MokListNode *mok, INTN mok_num)
+{
+	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
+	UINT32 sig_size;
+	int i, del_ind;
+	void *start, *end;
+	UINT32 remain;
+
+	sig_size = hash_size + sizeof(EFI_GUID);
+
+	for (i = 0; i < mok_num; i++) {
+		if ((CompareGuid(&(mok[i].Type), &HashType) != 0) ||
+		    (mok[i].MokSize < sig_size))
+			continue;
+
+		del_ind = match_hash(hash, hash_size, mok[i].Mok,
+				     mok[i].MokSize);
+		if (del_ind < 0)
+			continue;
+		/* Remove the hash */
+		if (sig_size == mok[i].MokSize) {
+			mok[i].Mok = NULL;
+			mok[i].MokSize = 0;
+		} else {
+			start = mok[i].Mok + del_ind * sig_size;
+			end = start + sig_size;
+			remain = mok[i].MokSize - (del_ind + 1)*sig_size;
+
+			mem_move(start, end, remain);
+			mok[i].MokSize -= sig_size;
+		}
+	}
+}
+
+static void delete_hash_list (void *hash_list, UINT32 list_size,
+			      MokListNode *mok, INTN mok_num)
+{
+	UINT32 hash_size;
+	UINT32 hash_num;
+	UINT32 sig_size;
+	UINT8 *hash;
+	int i;
+
+	hash_size = SHA256_DIGEST_SIZE;
+	sig_size = hash_size + sizeof(EFI_GUID);
+	if (list_size < sig_size)
+		return;
+
+	hash_num = list_size / sig_size;
+
+	hash = hash_list + sizeof(EFI_GUID);
+
+	for (i = 0; i < hash_num; i++) {
+		delete_hash_in_list (hash, hash_size, mok, mok_num);
+		hash += sig_size;
+	}
+}
+
 static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_GUID CertType = X509_GUID;
+	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *db_name;
 	CHAR16 *auth_name;
@@ -1034,7 +1141,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	UINTN MokListDataSize = 0;
 	MokListNode *mok, *del_key;
 	INTN mok_num, del_num;
-	int i, j;
+	int i;
 
 	if (MokX) {
 		db_name = L"MokListX";
@@ -1093,15 +1200,12 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 
 	/* Search and destroy */
 	for (i = 0; i < del_num; i++) {
-		UINT32 key_size = del_key[i].MokSize;
-		void *key = del_key[i].Mok;
-		for (j = 0; j < mok_num; j++) {
-			if (mok[j].MokSize == key_size &&
-			    CompareMem(key, mok[j].Mok, key_size) == 0) {
-				/* Remove the key */
-				mok[j].Mok = NULL;
-				mok[j].MokSize = 0;
-			}
+		if (CompareGuid(&(del_key[i].Type), &CertType) == 0) {
+			delete_cert(del_key[i].Mok, del_key[i].MokSize,
+				    mok, mok_num);
+		} else if (CompareGuid(&(del_key[i].Type), &HashType) == 0) {
+			delete_hash_list(del_key[i].Mok, del_key[i].MokSize,
+					 mok, mok_num);
 		}
 	}
 
