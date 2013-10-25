@@ -471,12 +471,12 @@ static void show_efi_hash (void *Mok, UINTN MokSize)
 	for (i=0; i<hash_num; i++) {
 		menu_strings[i] = PoolPrint(L"View hash %d", i);
 	}
-	menu_strings[i] = StrDuplicate(L"Continue");
+	menu_strings[i] = StrDuplicate(L"Back");
 	menu_strings[i+1] = NULL;
 
 	while (key_num < hash_num) {
 		key_num = console_select((CHAR16 *[]){ L"[Hash List]", NULL },
-					 menu_strings, 0);
+					 menu_strings, key_num);
 
 		if (key_num < 0 || key_num >= hash_num)
 			break;
@@ -561,7 +561,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 
 	while (key_num < MokNum) {
 		key_num = console_select((CHAR16 *[]){ title, NULL },
-					 menu_strings, 0);
+					 menu_strings, key_num);
 
 		if (key_num < 0 || key_num >= MokNum)
 			break;
@@ -954,6 +954,7 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 				       BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_GUID CertType = X509_GUID;
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *CertData;
@@ -990,17 +991,24 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 			   sizeof(EFI_SIGNATURE_LIST));
 
 		CertList->SignatureType = list[i].Type;
-		CertList->SignatureListSize = list[i].MokSize +
-					      sizeof(EFI_SIGNATURE_LIST) +
-					      sizeof(EFI_SIGNATURE_DATA) - 1;
 		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = list[i].MokSize + sizeof(EFI_GUID);
 
-		CertData->SignatureOwner = shim_lock_guid;
-		CopyMem(CertData->SignatureData, list[i].Mok, list[i].MokSize);
+		if (CompareGuid(&(list[i].Type), &CertType) == 0) {
+			CertList->SignatureListSize = list[i].MokSize +
+						      sizeof(EFI_SIGNATURE_LIST) +
+						      sizeof(EFI_GUID);
+			CertList->SignatureSize = list[i].MokSize + sizeof(EFI_GUID);
 
-		ptr = (uint8_t *)ptr + sizeof(EFI_SIGNATURE_LIST) +
-		      sizeof(EFI_GUID) + list[i].MokSize;
+			CertData->SignatureOwner = shim_lock_guid;
+			CopyMem(CertData->SignatureData, list[i].Mok, list[i].MokSize);
+		} else {
+			CertList->SignatureListSize = list[i].MokSize +
+						      sizeof(EFI_SIGNATURE_LIST);
+			CertList->SignatureSize = SHA256_DIGEST_SIZE + sizeof(EFI_GUID);
+
+			CopyMem(CertData, list[i].Mok, list[i].MokSize);
+		}
+		ptr = (uint8_t *)ptr + CertList->SignatureListSize;
 	}
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
