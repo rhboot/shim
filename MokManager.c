@@ -1038,14 +1038,14 @@ static void delete_cert (void *key, UINT32 key_size,
 	}
 }
 
-static int match_hash (UINT8 *hash, UINT32 hash_size,
+static int match_hash (UINT8 *hash, UINT32 hash_size, int start,
 		       void *hash_list, UINT32 list_num)
 {
 	UINT8 *ptr;
 	int i;
 
 	ptr = hash_list + sizeof(EFI_GUID);
-	for (i = 0; i < list_num; i++) {
+	for (i = start; i < list_num; i++) {
 		if (CompareMem(hash, ptr, hash_size) == 0)
 			return i;
 		ptr += hash_size + sizeof(EFI_GUID);
@@ -1081,21 +1081,25 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 		    (mok[i].MokSize < sig_size))
 			continue;
 
-		del_ind = match_hash(hash, hash_size, mok[i].Mok,
+		del_ind = match_hash(hash, hash_size, 0, mok[i].Mok,
 				     mok[i].MokSize);
-		if (del_ind < 0)
-			continue;
-		/* Remove the hash */
-		if (sig_size == mok[i].MokSize) {
-			mok[i].Mok = NULL;
-			mok[i].MokSize = 0;
-		} else {
+		while (del_ind >= 0) {
+			/* Remove the hash */
+			if (sig_size == mok[i].MokSize) {
+				mok[i].Mok = NULL;
+				mok[i].MokSize = 0;
+				break;
+			}
+
 			start = mok[i].Mok + del_ind * sig_size;
 			end = start + sig_size;
 			remain = mok[i].MokSize - (del_ind + 1)*sig_size;
 
 			mem_move(start, end, remain);
 			mok[i].MokSize -= sig_size;
+
+			del_ind = match_hash(hash, hash_size, del_ind,
+					     mok[i].Mok, mok[i].MokSize);
 		}
 	}
 }
