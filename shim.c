@@ -1718,7 +1718,7 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	/*
 	 * Tell the user that we're in insecure mode if necessary
 	 */
-	if (insecure_mode) {
+	if (!secure_mode()) {
 		Print(L"Booting in insecure mode\n");
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
 	} else {
