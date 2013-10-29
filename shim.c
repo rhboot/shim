@@ -1397,7 +1397,7 @@ error:
  * Open the second stage bootloader and read it into a buffer
  */
 static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
-			      int *datasize, CHAR16 *PathName)
+			      int *datasize, CHAR16 *PathName, CHAR16 *PathName2)
 {
 	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
 	EFI_GUID file_info_id = EFI_FILE_INFO_ID;
@@ -1436,8 +1436,12 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 				       EFI_FILE_MODE_READ, 0);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to open %s - %r\n", PathName, efi_status);
-		goto error;
+		efi_status = uefi_call_wrapper(root->Open, 5, root, &grub, PathName2,
+				       EFI_FILE_MODE_READ, 0);
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"Failed to open %s - %r\n", PathName, efi_status);
+			goto error;
+		}
 	}
 
 	fileinfo = AllocatePool(buffersize);
@@ -1596,7 +1600,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		/*
 		 * Read the new executable off disk
 		 */
-		efi_status = load_image(li, &data, &datasize, PathName);
+		efi_status = load_image(li, &data, &datasize, PathName, ImagePath);
 
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Failed to load image %s: %r\n", PathName, efi_status);
