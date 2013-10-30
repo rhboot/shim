@@ -456,21 +456,30 @@ static BOOLEAN secure_mode (void)
 		return FALSE;
 
 	status = get_variable(L"SecureBoot", &Data, &len, global_var);
+	if (status != EFI_SUCCESS) {
+		if (verbose)
+			console_notify(L"Secure boot not enabled\n");
+		return FALSE;
+	}
 	sb = *Data;
 	FreePool(Data);
 
-	/* FIXME - more paranoia here? */
-	if (status != EFI_SUCCESS || sb != 1) {
+	if (sb != 1) {
 		if (verbose)
 			console_notify(L"Secure boot not enabled\n");
 		return FALSE;
 	}
 
 	status = get_variable(L"SetupMode", &Data, &len, global_var);
+	if (status == EFI_SUCCESS) {
+		if (verbose)
+			console_notify(L"Platform is in setup mode\n");
+		return FALSE;
+	}
 	setupmode = *Data;
 	FreePool(Data);
 
-	if (status == EFI_SUCCESS && setupmode == 1) {
+	if (setupmode == 1) {
 		if (verbose)
 			console_notify(L"Platform is in setup mode\n");
 		return FALSE;
