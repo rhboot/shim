@@ -1079,11 +1079,12 @@ should_use_fallback(EFI_HANDLE image_handle)
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_LOADED_IMAGE *li;
 	unsigned int pathlen = 0;
-	CHAR16 *bootpath;
+	CHAR16 *bootpath = NULL;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
 	EFI_FILE *vh;
 	EFI_FILE *fh;
 	EFI_STATUS rc;
+	int ret = 0;
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, (void **)&li);
@@ -1101,23 +1102,23 @@ should_use_fallback(EFI_HANDLE image_handle)
 	 */
 	if (StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\BOOT", 14) &&
 			StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\/BOOT", 15))
-		return 0;
+		goto error;
 
 	pathlen = StrLen(bootpath);
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
-		return 0;
+		goto error;
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
 			       &FileSystemProtocol, (void **)&fio);
 	if (EFI_ERROR(rc)) {
 		perror(L"Could not get fio for li->DeviceHandle: %r\n", rc);
-		return 0;
+		goto error;
 	}
 
 	rc = uefi_call_wrapper(fio->OpenVolume, 2, fio, &vh);
 	if (EFI_ERROR(rc)) {
 		perror(L"Could not open fio volume: %r\n", rc);
-		return 0;
+		goto error;
 	}
 
 	rc = uefi_call_wrapper(vh->Open, 5, vh, &fh, L"\\EFI\\BOOT" FALLBACK,
@@ -1130,12 +1131,17 @@ should_use_fallback(EFI_HANDLE image_handle)
 		 * 	 rc);
 		 */
 		uefi_call_wrapper(vh->Close, 1, vh);
-		return 0;
+		goto error;
 	}
 	uefi_call_wrapper(fh->Close, 1, fh);
 	uefi_call_wrapper(vh->Close, 1, vh);
 
-	return 1;
+	ret = 1;
+error:
+	if (bootpath)
+		FreePool(bootpath);
+
+	return ret;
 }
 
 /*
