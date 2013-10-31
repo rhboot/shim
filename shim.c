@@ -1517,13 +1517,12 @@ static EFI_STATUS check_mok_sb (void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
-	UINT8 *MokSBState = NULL;
-	UINTN MokSBStateSize = 0;
+	UINT8 MokSBState;
+	UINTN MokSBStateSize = sizeof(MokSBState);
 	UINT32 attributes;
 
-	status = get_variable_attr(L"MokSBState", &MokSBState, &MokSBStateSize,
-				   shim_lock_guid, &attributes);
-
+	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSBState", &shim_lock_guid,
+				   &attributes, &MokSBStateSize, &MokSBState);
 	if (status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
 
@@ -1540,12 +1539,10 @@ static EFI_STATUS check_mok_sb (void)
 		}
 		status = EFI_ACCESS_DENIED;
 	} else {
-		if (*(UINT8 *)MokSBState == 1) {
+		if (MokSBState == 1) {
 			insecure_mode = 1;
 		}
 	}
-
-	FreePool(MokSBState);
 
 	return status;
 }
@@ -1558,13 +1555,12 @@ static EFI_STATUS check_mok_db (void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
-	UINT8 *MokDBState = NULL;
-	UINTN MokDBStateSize = 0;
+	UINT8 MokDBState;
+	UINTN MokDBStateSize = sizeof(MokDBStateSize);
 	UINT32 attributes;
 
-	status = get_variable_attr(L"MokDBState", &MokDBState, &MokDBStateSize,
-			shim_lock_guid, &attributes);
-
+	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDBState", &shim_lock_guid,
+				   &attributes, &MokDBStateSize, &MokDBState);
 	if (status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
 
@@ -1581,12 +1577,10 @@ static EFI_STATUS check_mok_db (void)
 		}
 		status = EFI_ACCESS_DENIED;
 	} else {
-		if (*(UINT8 *)MokDBState == 1) {
+		if (MokDBState == 1) {
 			ignore_db = 1;
 		}
 	}
-
-	FreePool(MokDBState);
 
 	return status;
 }
