@@ -176,8 +176,6 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 	console_get_keystroke(&key);
 
 	uefi_call_wrapper(co->EnableCursor, 2, co, SavedConsoleMode.CursorVisible);
-
-	uefi_call_wrapper(co->EnableCursor, 2, co, SavedConsoleMode.CursorVisible);
 	uefi_call_wrapper(co->SetCursorPosition, 3, co, SavedConsoleMode.CursorColumn, SavedConsoleMode.CursorRow);
 	uefi_call_wrapper(co->SetAttribute, 2, co, SavedConsoleMode.Attribute);
 }
@@ -271,8 +269,6 @@ console_select(CHAR16 *title[], CHAR16* selectors[], int start)
 				     size_cols, size_rows, 0, lines);
 	} while (!(k.ScanCode == SCAN_NULL
 		   && k.UnicodeChar == CHAR_CARRIAGE_RETURN));
-
-	uefi_call_wrapper(co->EnableCursor, 2, co, SavedConsoleMode.CursorVisible);
 
 	uefi_call_wrapper(co->EnableCursor, 2, co, SavedConsoleMode.CursorVisible);
 	uefi_call_wrapper(co->SetCursorPosition, 3, co, SavedConsoleMode.CursorColumn, SavedConsoleMode.CursorRow);
