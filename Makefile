@@ -136,8 +136,10 @@ test-archive:
 	@rm -rf /tmp/shim-$(VERSION)
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
 
-archive:
-	git tag $(GITTAG) refs/heads/master
+tag:
+	git tag --sign $(GITTAG) refs/heads/master
+
+archive: tag
 	@rm -rf /tmp/shim-$(VERSION) /tmp/shim-$(VERSION)-tmp
 	@mkdir -p /tmp/shim-$(VERSION)-tmp
 	@git archive --format=tar $(GITTAG) | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
