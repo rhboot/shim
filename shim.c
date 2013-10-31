@@ -454,40 +454,16 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 
 static BOOLEAN secure_mode (void)
 {
-	EFI_STATUS status;
-	EFI_GUID global_var = EFI_GLOBAL_VARIABLE;
-	UINTN len;
-	UINT8 *Data;
-	UINT8 sb, setupmode;
-
 	if (insecure_mode)
 		return FALSE;
 
-	status = get_variable(L"SecureBoot", &Data, &len, global_var);
-	if (status != EFI_SUCCESS) {
-		if (verbose && !in_protocol)
-			console_notify(L"Secure boot not enabled");
-		return FALSE;
-	}
-	sb = *Data;
-	FreePool(Data);
-
-	if (sb != 1) {
+	if (variable_is_secureboot() != 1) {
 		if (verbose && !in_protocol)
 			console_notify(L"Secure boot not enabled");
 		return FALSE;
 	}
 
-	status = get_variable(L"SetupMode", &Data, &len, global_var);
-	if (status == EFI_SUCCESS) {
-		if (verbose && !in_protocol)
-			console_notify(L"Platform is in setup mode");
-		return FALSE;
-	}
-	setupmode = *Data;
-	FreePool(Data);
-
-	if (setupmode == 1) {
+	if (variable_is_setupmode() == 1) {
 		if (verbose && !in_protocol)
 			console_notify(L"Platform is in setup mode");
 		return FALSE;
