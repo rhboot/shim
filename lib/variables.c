@@ -284,9 +284,12 @@ variable_is_setupmode(void)
 	/* set to 1 because we return true if SetupMode doesn't exist */
 	UINT8 SetupMode = 1;
 	UINTN DataSize = sizeof(SetupMode);
+	EFI_STATUS status;
 
-	uefi_call_wrapper(RT->GetVariable, 5, L"SetupMode", &GV_GUID, NULL,
-			  &DataSize, &SetupMode);
+	status = uefi_call_wrapper(RT->GetVariable, 5, L"SetupMode", &GV_GUID, NULL,
+				   &DataSize, &SetupMode);
+	if (EFI_ERROR(status))
+		return 1;
 
 	return SetupMode;
 }
@@ -297,10 +300,13 @@ variable_is_secureboot(void)
 	/* return false if variable doesn't exist */
 	UINT8 SecureBoot = 0;
 	UINTN DataSize;
+	EFI_STATUS status;
 
 	DataSize = sizeof(SecureBoot);
-	uefi_call_wrapper(RT->GetVariable, 5, L"SecureBoot", &GV_GUID, NULL,
-			  &DataSize, &SecureBoot);
+	status = uefi_call_wrapper(RT->GetVariable, 5, L"SecureBoot", &GV_GUID, NULL,
+				   &DataSize, &SecureBoot);
+	if (EFI_ERROR(status))
+		return 0;
 
 	return SecureBoot;
 }
