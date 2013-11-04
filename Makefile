@@ -73,7 +73,6 @@ version.c : version.c.in
 
 certdb/secmod.db: shim.crt
 	-mkdir certdb
-	certutil -A -n 'my CA' -d certdb/ -t CT,CT,CT -i ca.crt
 	pk12util -d certdb/ -i shim.p12 -W "" -K ""
 	certutil -d certdb/ -A -i shim.crt -n shim -t u
 
