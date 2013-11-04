@@ -519,6 +519,7 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
+	EFI_GUID shim_var = SHIM_LOCK_GUID;
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
@@ -542,6 +543,14 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash) ==
 				DATA_FOUND)
 		return EFI_ACCESS_DENIED;
+	if (check_db_hash(L"MokListX", shim_var, sha256hash, SHA256_DIGEST_SIZE,
+			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+		return EFI_ACCESS_DENIED;
+	}
+	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash) ==
+				DATA_FOUND) {
+		return EFI_ACCESS_DENIED;
+	}
 
 	return EFI_SUCCESS;
 }
