@@ -471,11 +471,9 @@ static BOOLEAN secure_mode (void)
 	}
 
 	status = get_variable(L"SetupMode", &Data, &len, global_var);
-	if (status == EFI_SUCCESS) {
-		if (verbose)
-			console_notify(L"Platform is in setup mode\n");
-		return FALSE;
-	}
+	if (status != EFI_SUCCESS)
+		return TRUE;
+
 	setupmode = *Data;
 	FreePool(Data);
 
@@ -1509,13 +1507,14 @@ static EFI_STATUS check_mok_sb (void)
 	UINTN MokSBStateSize = 0;
 	UINT32 attributes;
 
+	insecure_mode = 0;
+	ignore_db = 0;
+
 	status = get_variable_attr(L"MokSBState", &MokSBState, &MokSBStateSize,
 				   shim_lock_guid, &attributes);
 
 	if (status != EFI_SUCCESS)
 		return EFI_ACCESS_DENIED;
-
-	insecure_mode = 0;
 
 	/*
 	 * Delete and ignore the variable if it's been set from or could be
