@@ -472,17 +472,14 @@ static BOOLEAN secure_mode (void)
 
 	status = get_variable(L"SetupMode", &Data, &len, global_var);
 	if (status == EFI_SUCCESS) {
-		if (verbose)
-			console_notify(L"Platform is in setup mode\n");
-		return FALSE;
-	}
-	setupmode = *Data;
-	FreePool(Data);
+		setupmode = *Data;
+		FreePool(Data);
 
-	if (setupmode == 1) {
-		if (verbose)
-			console_notify(L"Platform is in setup mode\n");
-		return FALSE;
+		if (setupmode == 1) {
+			if (verbose)
+				console_notify(L"Platform is in setup mode\n");
+			return FALSE;
+		}
 	}
 
 	return TRUE;
