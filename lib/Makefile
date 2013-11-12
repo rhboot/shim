@@ -17,6 +17,9 @@ CFLAGS          = -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 ifeq ($(ARCH),x86_64)
         CFLAGS  += -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
 endif
+ifeq ($(ARCH),ia32)
+        CFLAGS  += -m32
+endif
 
 lib.a: $(LIBFILES)
 	ar rcs lib.a $(LIBFILES)

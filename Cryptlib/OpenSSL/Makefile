@@ -1,7 +1,5 @@
 ARCH		= $(shell uname -m | sed s,i[3456789]86,ia32,)
 
-LIB_PATH	= /usr/lib64
-
 EFI_INCLUDE	= /usr/include/efi
 EFI_INCLUDES	= -I../Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
 EFI_PATH	= /usr/lib64/gnuefi
@@ -15,7 +13,7 @@ ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -DSIXTY_FOUR_BIT_LONG
 endif
 ifeq ($(ARCH),ia32)
-	CFLAGS	+= -DTHIRTY_TWO_BIT
+	CFLAGS	+= -m32 -DTHIRTY_TWO_BIT
 endif
 LDFLAGS		= -nostdlib -znocombreloc
 
