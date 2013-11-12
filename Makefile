@@ -92,13 +92,13 @@ MokManager.so: $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a 
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 Cryptlib/libcryptlib.a:
-	$(MAKE) -C Cryptlib
+	$(MAKE) -C Cryptlib EFI_PATH=$(EFI_PATH) EFI_INCLUDE=$(EFI_INCLUDE) ARCH=$(ARCH)
 
 Cryptlib/OpenSSL/libopenssl.a:
-	$(MAKE) -C Cryptlib/OpenSSL
+	$(MAKE) -C Cryptlib/OpenSSL EFI_PATH=$(EFI_PATH) EFI_INCLUDE=$(EFI_INCLUDE) ARCH=$(ARCH) 
 
 lib/lib.a:
-	$(MAKE) -C lib EFI_PATH=$(EFI_PATH)
+	$(MAKE) -C lib EFI_PATH=$(EFI_PATH) EFI_INCLUDE=$(EFI_INCLUDE) ARCH=$(ARCH)
 
 %.efi: %.so
 	objcopy -j .text -j .sdata -j .data \
