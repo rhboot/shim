@@ -15,7 +15,7 @@
 EFI_LOADED_IMAGE *this_image = NULL;
 
 static EFI_STATUS
-get_file_size(EFI_FILE_HANDLE fh, UINT64 *retsize)
+get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 {
 	EFI_STATUS rc;
 	void *buffer = NULL;
@@ -60,7 +60,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 		return rc;
 	}
 
-	UINT64 len = 0;
+	UINTN len = 0;
 	CHAR16 *b = NULL;
 	rc = get_file_size(fh2, &len);
 	if (EFI_ERROR(rc)) {
