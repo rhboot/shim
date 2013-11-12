@@ -83,7 +83,7 @@ shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 
 fallback.o: $(FALLBACK_SRCS)
 
-fallback.so: $(FALLBACK_OBJS)
+fallback.so: $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(MOK_SOURCES)
