@@ -914,7 +914,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	 */
 	efi_status = read_header(data, datasize, &context);
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to read header\n");
+		Print(L"Failed to read header: %r\n", efi_status);
 		return efi_status;
 	}
 
@@ -981,7 +981,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	efi_status = relocate_coff(&context, buffer);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Relocation failed\n");
+		Print(L"Relocation failed: %r\n", efi_status);
 		FreePool(buffer);
 		return efi_status;
 	}
@@ -1022,7 +1022,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				       &loaded_image_protocol, (void **)&li);
 	if (EFI_ERROR(rc)) {
-		Print(L"Could not get image for bootx64.efi: %d\n", rc);
+		Print(L"Could not get image for bootx64.efi: %r\n", rc);
 		return 0;
 	}
 
@@ -1044,13 +1044,13 @@ should_use_fallback(EFI_HANDLE image_handle)
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
 			       &FileSystemProtocol, (void **)&fio);
 	if (EFI_ERROR(rc)) {
-		Print(L"Could not get fio for li->DeviceHandle: %d\n", rc);
+		Print(L"Could not get fio for li->DeviceHandle: %r\n", rc);
 		return 0;
 	}
 	
 	rc = uefi_call_wrapper(fio->OpenVolume, 2, fio, &vh);
 	if (EFI_ERROR(rc)) {
-		Print(L"Could not open fio volume: %d\n", rc);
+		Print(L"Could not open fio volume: %r\n", rc);
 		return 0;
 	}
 
@@ -1172,14 +1172,14 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 				       (void **)&drive);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to find fs\n");
+		Print(L"Failed to find fs: %r\n", efi_status);
 		goto error;
 	}
 
 	efi_status = uefi_call_wrapper(drive->OpenVolume, 2, drive, &root);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to open fs\n");
+		Print(L"Failed to open fs: %r\n", efi_status);
 		goto error;
 	}
 
@@ -1190,7 +1190,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 				       EFI_FILE_MODE_READ, 0);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to open %s - %lx\n", PathName, efi_status);
+		Print(L"Failed to open %s - %r\n", PathName, efi_status);
 		goto error;
 	}
 
@@ -1223,7 +1223,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	}
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to get file info\n");
+		Print(L"Unable to get file info: %r\n", efi_status);
 		goto error;
 	}
 
@@ -1251,7 +1251,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	}
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unexpected return from initial read: %x, buffersize %x\n", efi_status, buffersize);
+		Print(L"Unexpected return from initial read: %r, buffersize %x\n", efi_status, buffersize);
 		goto error;
 	}
 
@@ -1328,20 +1328,20 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	efi_status = generate_path(li, ImagePath, &path, &PathName);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Unable to generate path: %s\n", ImagePath);
+		Print(L"Unable to generate path %s: %r\n", ImagePath, efi_status);
 		goto done;
 	}
 
 	if (findNetboot(image_handle)) {
 		efi_status = parseNetbootinfo(image_handle);
 		if (efi_status != EFI_SUCCESS) {
-			Print(L"Netboot parsing failed: %d\n", efi_status);
+			Print(L"Netboot parsing failed: %r\n", efi_status);
 			return EFI_PROTOCOL_ERROR;
 		}
 		efi_status = FetchNetbootimage(image_handle, &sourcebuffer,
 					       &sourcesize);
 		if (efi_status != EFI_SUCCESS) {
-			Print(L"Unable to fetch TFTP image\n");
+			Print(L"Unable to fetch TFTP image: %r\n", efi_status);
 			return efi_status;
 		}
 		data = sourcebuffer;
@@ -1353,7 +1353,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		efi_status = load_image(li, &data, &datasize, PathName);
 
 		if (efi_status != EFI_SUCCESS) {
-			Print(L"Failed to load image\n");
+			Print(L"Failed to load image %s: %r\n", PathName, efi_status);
 			goto done;
 		}
 	}
@@ -1370,7 +1370,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	efi_status = handle_image(data, datasize, li);
 
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to load image\n");
+		Print(L"Failed to load image: %r\n", efi_status);
 		CopyMem(li, &li_bak, sizeof(li_bak));
 		goto done;
 	}
@@ -1473,7 +1473,7 @@ EFI_STATUS mirror_mok_list()
 				       | EFI_VARIABLE_RUNTIME_ACCESS,
 				       FullDataSize, FullData);
 	if (efi_status != EFI_SUCCESS) {
-		Print(L"Failed to set MokListRT %d\n", efi_status);
+		Print(L"Failed to set MokListRT: %r\n", efi_status);
 	}
 
 	return efi_status;
@@ -1514,7 +1514,7 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (efi_status != EFI_SUCCESS) {
-			Print(L"Failed to start MokManager\n");
+			Print(L"Failed to start MokManager: %r\n", efi_status);
 			return efi_status;
 		}
 	}
@@ -1621,7 +1621,7 @@ static EFI_STATUS mok_ignore_db()
 				| EFI_VARIABLE_RUNTIME_ACCESS,
 				DataSize, (void *)&Data);
 		if (efi_status != EFI_SUCCESS) {
-			Print(L"Failed to set MokIgnoreDB %d\n", efi_status);
+			Print(L"Failed to set MokIgnoreDB: %r\n", efi_status);
 		}
 	}
 
@@ -1648,7 +1648,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
 				   &LoadedImageProtocol, (void **) &li);
 	if (status != EFI_SUCCESS) {
-		Print (L"Failed to get load options\n");
+		Print (L"Failed to get load options: %r\n", status);
 		return status;
 	}
 
