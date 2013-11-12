@@ -28,6 +28,9 @@ endif
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
 endif
+ifeq ($(ARCH),ia32)
+	CFLAGS	+= -m32
+endif
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
