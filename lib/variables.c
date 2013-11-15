@@ -224,7 +224,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 		return efi_status;
 
 	*data = AllocateZeroPool(*len);
-	if (!data)
+	if (!*data)
 		return EFI_OUT_OF_RESOURCES;
 	
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, var, &owner,
