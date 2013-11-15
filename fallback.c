@@ -445,25 +445,32 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		return EFI_SUCCESS;
 	}
 	FreePool(buffer);
+	buffer = NULL;
 
 	bs = 0;
 	do {
 		bs = 0;
 		rc = uefi_call_wrapper(fh->Read, 3, fh, &bs, NULL);
-		if (rc == EFI_BUFFER_TOO_SMALL) {
-			buffer = AllocateZeroPool(bs);
-			if (!buffer) {
-				Print(L"Could not allocate memory\n");
-				return EFI_OUT_OF_RESOURCES;
-			}
-
-			rc = uefi_call_wrapper(fh->Read, 3, fh, &bs, buffer);
+		if (EFI_ERROR(rc) && rc != EFI_BUFFER_TOO_SMALL) {
+			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname, rc);
+			if (buffer)
+				FreePool(buffer);
+			return rc;
 		}
+
+		buffer = AllocateZeroPool(bs);
+		if (!buffer) {
+			Print(L"Could not allocate memory\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+
+		rc = uefi_call_wrapper(fh->Read, 3, fh, &bs, buffer);
 		if (EFI_ERROR(rc)) {
 			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname, rc);
 			FreePool(buffer);
 			return rc;
 		}
+
 		if (bs == 0)
 			break;
 
