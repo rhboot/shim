@@ -415,7 +415,7 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 		     CHAR16 *filter, CHAR16 **result)
 {
 	EFI_STATUS status;
-	CHAR16 **entries;
+	CHAR16 **entries = NULL;
 	EFI_FILE_INFO *dmp;
 	int count, select, len;
 	CHAR16 *newname, *selected;
