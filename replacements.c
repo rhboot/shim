@@ -64,13 +64,9 @@ static typeof(systab->BootServices->StartImage) system_start_image;
 static typeof(systab->BootServices->Exit) system_exit;
 static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
 
-extern UINT8 insecure_mode;
-
 void
 unhook_system_services(void)
 {
-	if (insecure_mode)
-		return;
 	systab->BootServices->Exit = system_exit;
 	systab->BootServices->StartImage = system_start_image;
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
@@ -123,8 +119,6 @@ exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 void
 hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 {
-	if (insecure_mode)
-		return;
 	systab = local_systab;
 
 	/* We need to hook various calls to make this work... */
