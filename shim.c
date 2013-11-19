@@ -1757,11 +1757,15 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		Print(L"Booting in insecure mode\n");
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
 	} else if (secure_mode()) {
-		/*
-		 * Install our hooks for ExitBootServices() and StartImage()
-		 */
-		hook_system_services(systab);
-		loader_is_participating = 0;
+		if (vendor_cert_size || vendor_dbx_size) {
+			/*
+			 * If shim includes its own certificates then ensure
+			 * that anything it boots has performed some
+			 * validation of the next image.
+			 */
+			hook_system_services(systab);
+			loader_is_participating = 0;
+		}
 	}
 
 	/*
