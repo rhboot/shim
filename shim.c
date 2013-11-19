@@ -85,7 +85,7 @@ int loader_is_participating;
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
-UINT8 insecure_mode;
+UINT8 user_insecure_mode;
 UINT8 ignore_db;
 
 typedef enum {
@@ -456,7 +456,7 @@ static BOOLEAN secure_mode (void)
 	UINT8 *Data;
 	UINT8 sb, setupmode;
 
-	if (insecure_mode)
+	if (user_insecure_mode)
 		return FALSE;
 
 	status = get_variable(L"SecureBoot", &Data, &len, global_var);
@@ -1534,7 +1534,7 @@ static EFI_STATUS check_mok_sb (void)
 	UINTN MokSBStateSize = 0;
 	UINT32 attributes;
 
-	insecure_mode = 0;
+	user_insecure_mode = 0;
 	ignore_db = 0;
 
 	status = get_variable_attr(L"MokSBState", &MokSBState, &MokSBStateSize,
@@ -1555,7 +1555,7 @@ static EFI_STATUS check_mok_sb (void)
 		status = EFI_ACCESS_DENIED;
 	} else {
 		if (*(UINT8 *)MokSBState == 1) {
-			insecure_mode = 1;
+			user_insecure_mode = 1;
 		}
 	}
 
@@ -1753,10 +1753,10 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	/*
 	 * Tell the user that we're in insecure mode if necessary
 	 */
-	if (!secure_mode()) {
+	if (user_insecure_mode) {
 		Print(L"Booting in insecure mode\n");
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
-	} else {
+	} else if (secure_mode()) {
 		/*
 		 * Install our hooks for ExitBootServices() and StartImage()
 		 */
