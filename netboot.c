@@ -38,6 +38,7 @@
 #include <string.h>
 #include "shim.h"
 #include "netboot.h"
+#include "str.h"
 
 static inline unsigned short int __swap16(unsigned short int x)
 {
@@ -305,19 +306,32 @@ static EFI_STATUS parseDhcp6()
 
 static EFI_STATUS parseDhcp4()
 {
-	CHAR8 *template = (CHAR8 *)DEFAULT_LOADER_CHAR;
-	full_path = AllocateZeroPool(strlen(template)+1);
+	CHAR8 *template = (CHAR8 *)translate_slashes(DEFAULT_LOADER_CHAR);
+	UINTN template_len = strlen(template) + 1;
+
+	UINTN dir_len = strnlena(pxe->Mode->DhcpAck.Dhcpv4.BootpBootFile, 127);
+	UINTN i;
+	UINT8 *dir = pxe->Mode->DhcpAck.Dhcpv4.BootpBootFile;
+
+	for (i = dir_len; i >= 0; i--) {
+		if (dir[i] == '/')
+			break;
+	}
+	dir_len = (i >= 0) ? i + 1 : 0;
+
+	full_path = AllocateZeroPool(dir_len + template_len);
 
 	if (!full_path)
 		return EFI_OUT_OF_RESOURCES;
 
+	if (dir_len > 0) {
+		strncpya(full_path, dir, dir_len);
+		if (full_path[dir_len-1] == '/' && template[0] == '/')
+			full_path[dir_len-1] = '\0';
+	}
+	strcata(full_path, template);
 	memcpy(&tftp_addr.v4, pxe->Mode->DhcpAck.Dhcpv4.BootpSiAddr, 4);
 
-	memcpy(full_path, template, strlen(template));
-
-	/* Note we don't capture the filename option here because we know its shim.efi
-	 * We instead assume the filename at the end of the path is going to be grubx64.efi
-	 */
 	return EFI_SUCCESS;
 }
 
