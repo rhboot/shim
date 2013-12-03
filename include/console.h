@@ -1,8 +1,8 @@
 #ifndef _SHIM_LIB_CONSOLE_H
 #define _SHIM_LIB_CONSOLE_H 1
 
-EFI_INPUT_KEY
-console_get_keystroke(void);
+EFI_STATUS
+console_get_keystroke(EFI_INPUT_KEY *key);
 void
 console_print_box_at(CHAR16 *str_arr[], int highlight, int start_col, int start_row, int size_cols, int size_rows, int offset, int lines);
 void
