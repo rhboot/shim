@@ -488,13 +488,19 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 	return EFI_SUCCESS;
 }
 
-static UINT8 get_line (UINT32 *length, CHAR16 *line, UINT32 line_max, UINT8 show)
+static EFI_STATUS get_line (UINT32 *length, CHAR16 *line, UINT32 line_max, UINT8 show)
 {
 	EFI_INPUT_KEY key;
+	EFI_STATUS status;
 	unsigned int count = 0;
 
 	do {
-		key = console_get_keystroke();
+		status = console_get_keystroke(&key);
+		if (EFI_ERROR (status)) {
+			console_error(L"Failed to read the keystroke", status);
+			*length = 0;
+			return status;
+		}
 
 		if ((count >= line_max &&
 		     key.UnicodeChar != CHAR_BACKSPACE) ||
@@ -525,7 +531,7 @@ static UINT8 get_line (UINT32 *length, CHAR16 *line, UINT32 line_max, UINT8 show
 
 	*length = count;
 
-	return 1;
+	return EFI_SUCCESS;
 }
 
 static EFI_STATUS compute_pw_hash (void *Data, UINTN DataSize, UINT8 *password,
@@ -989,6 +995,7 @@ static INTN mok_deletion_prompt (void *MokDel, UINTN MokDelSize)
 static CHAR16 get_password_charater (CHAR16 *prompt)
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	EFI_STATUS status;
 	CHAR16 *message[2];
 	CHAR16 character;
 	UINTN length;
@@ -1003,7 +1010,9 @@ static CHAR16 get_password_charater (CHAR16 *prompt)
 	message[1] = NULL;
 	length = StrLen(message[0]);
 	console_print_box_at(message, -1, -length-4, -5, length+4, 3, 0, 1);
-	get_line(&pw_length, &character, 1, 0);
+	status = get_line(&pw_length, &character, 1, 0);
+	if (EFI_ERROR(status))
+		character = 0;
 
 	console_restore_mode(&SavedMode);
 
