@@ -15,6 +15,27 @@
 EFI_LOADED_IMAGE *this_image = NULL;
 
 static EFI_STATUS
+FindSubDevicePath(EFI_DEVICE_PATH *In, UINT8 Type, UINT8 SubType,
+		  EFI_DEVICE_PATH **Out)
+{
+	EFI_DEVICE_PATH *dp = In;
+	if (!In || !Out)
+		return EFI_INVALID_PARAMETER;
+
+	for (dp = In; !IsDevicePathEnd(dp); dp = NextDevicePathNode(dp)) {
+		if (DevicePathType(dp) == Type &&
+				DevicePathSubType(dp) == SubType) {
+			*Out = DuplicateDevicePath(dp);
+			if (!*Out)
+				return EFI_OUT_OF_RESOURCES;
+			return EFI_SUCCESS;
+		}
+	}
+	*Out = NULL;
+	return EFI_NOT_FOUND;
+}
+
+static EFI_STATUS
 get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 {
 	EFI_STATUS rc;
@@ -93,7 +114,9 @@ make_full_path(CHAR16 *dirname, CHAR16 *filename, CHAR16 **out, UINT64 *outlen)
 {
 	UINT64 len;
 	
-	len = StrLen(dirname) + StrLen(filename) + StrLen(L"\\EFI\\\\") + 2;
+	len = StrLen(L"\\EFI\\") + StrLen(dirname)
+	    + StrLen(L"\\") + StrLen(filename)
+	    + 2;
 
 	CHAR16 *fullpath = AllocateZeroPool(len*sizeof(CHAR16));
 	if (!fullpath) {
@@ -119,7 +142,8 @@ VOID *first_new_option_args = NULL;
 UINTN first_new_option_size = 0;
 
 EFI_STATUS
-add_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
+add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
+		CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
 {
 	static int i = 0;
 	CHAR16 varname[] = L"Boot0000";
@@ -136,24 +160,31 @@ add_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label, CHAR16 *ar
 		void *var = LibGetVariable(varname, &global);
 		if (!var) {
 			int size = sizeof(UINT32) + sizeof (UINT16) +
-				StrLen(label)*2 + 2 + DevicePathSize(dp) +
-				StrLen(arguments) * 2 + 2;
+				StrLen(label)*2 + 2 + DevicePathSize(hddp) +
+				StrLen(arguments) * 2;
 
 			CHAR8 *data = AllocateZeroPool(size);
 			CHAR8 *cursor = data;
 			*(UINT32 *)cursor = LOAD_OPTION_ACTIVE;
 			cursor += sizeof (UINT32);
-			*(UINT16 *)cursor = DevicePathSize(dp);
+			*(UINT16 *)cursor = DevicePathSize(hddp);
 			cursor += sizeof (UINT16);
 			StrCpy((CHAR16 *)cursor, label);
 			cursor += StrLen(label)*2 + 2;
-			CopyMem(cursor, dp, DevicePathSize(dp));
-			cursor += DevicePathSize(dp);
+			CopyMem(cursor, hddp, DevicePathSize(hddp));
+			cursor += DevicePathSize(hddp);
 			StrCpy((CHAR16 *)cursor, arguments);
 
 			Print(L"Creating boot entry \"%s\" with label \"%s\" "
 					L"for file \"%s\"\n",
 				varname, label, filename);
+
+			if (!first_new_option) {
+				first_new_option = DuplicateDevicePath(fulldp);
+				first_new_option_args = arguments;
+				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
+			}
+
 			rc = uefi_call_wrapper(RT->SetVariable, 5, varname,
 				&global, EFI_VARIABLE_NON_VOLATILE |
 					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
@@ -254,7 +285,10 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	if (EFI_ERROR(rc))
 		return rc;
 	
-	EFI_DEVICE_PATH *dph = NULL, *dpf = NULL, *dp = NULL;
+	EFI_DEVICE_PATH *dph = NULL;
+	EFI_DEVICE_PATH *file = NULL;
+	EFI_DEVICE_PATH *full_device_path = NULL;
+	EFI_DEVICE_PATH *dp = NULL;
 	
 	dph = DevicePathFromHandle(this_image->DeviceHandle);
 	if (!dph) {
@@ -262,19 +296,31 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 		goto err;
 	}
 
-	dpf = FileDevicePath(fh, fullpath);
-	if (!dpf) {
+	file = FileDevicePath(fh, fullpath);
+	if (!file) {
 		rc = EFI_OUT_OF_RESOURCES;
 		goto err;
 	}
 
-	dp = AppendDevicePath(dph, dpf);
-	if (!dp) {
+	full_device_path = AppendDevicePath(dph, file);
+	if (!full_device_path) {
 		rc = EFI_OUT_OF_RESOURCES;
 		goto err;
+	}
+
+	rc = FindSubDevicePath(full_device_path,
+				MEDIA_DEVICE_PATH, MEDIA_HARDDRIVE_DP, &dp);
+	if (EFI_ERROR(rc)) {
+		if (rc == EFI_NOT_FOUND) {
+			dp = full_device_path;
+		} else {
+			rc = EFI_OUT_OF_RESOURCES;
+			goto err;
+		}
 	}
 
 #ifdef DEBUG_FALLBACK
+	{
 	UINTN s = DevicePathSize(dp);
 	int i;
 	UINT8 *dpv = (void *)dp;
@@ -287,20 +333,16 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 
 	CHAR16 *dps = DevicePathToStr(dp);
 	Print(L"device path: \"%s\"\n", dps);
-#endif
-	if (!first_new_option) {
-		CHAR16 *dps = DevicePathToStr(dp);
-		Print(L"device path: \"%s\"\n", dps);
-		first_new_option = DuplicateDevicePath(dp);
-		first_new_option_args = arguments;
-		first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 	}
+#endif
 
-	add_boot_option(dp, fullpath, label, arguments);
+	add_boot_option(dp, full_device_path, fullpath, label, arguments);
 
 err:
-	if (dpf)
-		FreePool(dpf);
+	if (file)
+		FreePool(file);
+	if (full_device_path)
+		FreePool(full_device_path);
 	if (dp)
 		FreePool(dp);
 	if (fullpath)
@@ -629,8 +671,19 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 			       first_new_option, NULL, 0,
 			       &image_handle);
 	if (EFI_ERROR(rc)) {
-		Print(L"LoadImage failed: %d\n", rc);
-		uefi_call_wrapper(BS->Stall, 1, 2000000);
+		CHAR16 *dps = DevicePathToStr(first_new_option);
+		UINTN s = DevicePathSize(first_new_option);
+		int i;
+		UINT8 *dpv = (void *)first_new_option;
+		Print(L"LoadImage failed: %d\nDevice path: \"%s\"\n", rc, dps);
+		for (i = 0; i < s; i++) {
+			if (i > 0 && i % 16 == 0)
+				Print(L"\n");
+			Print(L"%02x ", dpv[i]);
+		}
+		Print(L"\n");
+
+		uefi_call_wrapper(BS->Stall, 1, 500000000);
 		return rc;
 	}
 
@@ -644,7 +697,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	rc = uefi_call_wrapper(BS->StartImage, 3, image_handle, NULL, NULL);
 	if (EFI_ERROR(rc)) {
 		Print(L"StartImage failed: %d\n", rc);
-		uefi_call_wrapper(BS->Stall, 1, 2000000);
+		uefi_call_wrapper(BS->Stall, 1, 500000000);
 	}
 	return rc;
 }
