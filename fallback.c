@@ -226,6 +226,85 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 }
 
 EFI_STATUS
+find_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label,
+		CHAR16 *arguments, UINT16 *optnum)
+{
+	int size = sizeof(UINT32) + sizeof (UINT16) +
+		StrLen(label)*2 + 2 + DevicePathSize(dp) +
+		StrLen(arguments) * 2 + 2;
+
+	CHAR8 *data = AllocateZeroPool(size);
+	if (!data)
+		return EFI_OUT_OF_RESOURCES;
+	CHAR8 *cursor = data;
+	*(UINT32 *)cursor = LOAD_OPTION_ACTIVE;
+	cursor += sizeof (UINT32);
+	*(UINT16 *)cursor = DevicePathSize(dp);
+	cursor += sizeof (UINT16);
+	StrCpy((CHAR16 *)cursor, label);
+	cursor += StrLen(label)*2 + 2;
+	CopyMem(cursor, dp, DevicePathSize(dp));
+	cursor += DevicePathSize(dp);
+	StrCpy((CHAR16 *)cursor, arguments);
+
+	int i = 0;
+	CHAR16 varname[] = L"Boot0000";
+	CHAR16 hexmap[] = L"0123456789ABCDEF";
+	EFI_GUID global = EFI_GLOBAL_VARIABLE;
+	EFI_STATUS rc;
+
+	CHAR8 *candidate = AllocateZeroPool(size);
+	if (!candidate) {
+		FreePool(data);
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	for(i = 0; i < nbootorder && i < 0x10000; i++) {
+		varname[4] = hexmap[(bootorder[i] & 0xf000) >> 12];
+		varname[5] = hexmap[(bootorder[i] & 0x0f00) >> 8];
+		varname[6] = hexmap[(bootorder[i] & 0x00f0) >> 4];
+		varname[7] = hexmap[(bootorder[i] & 0x000f) >> 0];
+
+		UINTN candidate_size = size;
+		rc = uefi_call_wrapper(RT->GetVariable, 5, varname, &global,
+					NULL, &candidate_size, candidate);
+		if (EFI_ERROR(rc))
+			continue;
+
+		if (candidate_size != size)
+			continue;
+
+		if (CompareMem(candidate, data, size))
+			continue;
+
+		/* at this point, we have duplicate data. */
+		*optnum = i;
+		FreePool(candidate);
+		FreePool(data);
+		return EFI_SUCCESS;
+	}
+	FreePool(candidate);
+	FreePool(data);
+	return EFI_NOT_FOUND;
+}
+
+EFI_STATUS
+set_boot_order(void)
+{
+	CHAR16 *oldbootorder;
+	UINTN size;
+	EFI_GUID global = EFI_GLOBAL_VARIABLE;
+
+	oldbootorder = LibGetVariableAndSize(L"BootOrder", &global, &size);
+	if (oldbootorder) {
+		nbootorder = size / sizeof (CHAR16);
+		bootorder = oldbootorder;
+	}
+	return EFI_SUCCESS;
+
+}
+
+EFI_STATUS
 update_boot_order(void)
 {
 	CHAR16 *oldbootorder;
@@ -336,7 +415,23 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	}
 #endif
 
-	add_boot_option(dp, full_device_path, fullpath, label, arguments);
+	UINT16 option;
+	rc = find_boot_option(dp, fullpath, label, arguments, &option);
+	if (EFI_ERROR(rc)) {
+		add_boot_option(dp, full_device_path, fullpath, label, arguments);
+	} else if (option != 0) {
+		CHAR16 *newbootorder;
+		newbootorder = AllocateZeroPool(sizeof (CHAR16) * nbootorder);
+		if (!newbootorder)
+			return EFI_OUT_OF_RESOURCES;
+
+		newbootorder[0] = bootorder[option];
+		CopyMem(newbootorder + 1, bootorder, sizeof (CHAR16) * option);
+		CopyMem(newbootorder + option + 1, bootorder + option + 1,
+			sizeof (CHAR16) * (nbootorder - option - 1));
+		FreePool(bootorder);
+		bootorder = newbootorder;
+	}
 
 err:
 	if (file)
@@ -716,6 +811,8 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	}
 
 	Print(L"System BootOrder not found.  Initializing defaults.\n");
+
+	set_boot_order();
 
 	rc = find_boot_options(this_image->DeviceHandle);
 	if (EFI_ERROR(rc)) {
