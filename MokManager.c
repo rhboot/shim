@@ -972,7 +972,9 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 		if (list[i].Mok == NULL)
 			continue;
 
-		DataSize += sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID);
+		DataSize += sizeof(EFI_SIGNATURE_LIST);
+		if (CompareGuid(&(list[i].Type), &CertType) == 0)
+			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
 
