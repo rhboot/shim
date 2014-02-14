@@ -1,0 +1,80 @@
+How to test a new shim build for RHEL/fedora:
+
+1) build pesign-test-app, and sign it with the appropriate key
+2) build shim with the appropriate key built in
+3) install pesign-test-app and shim-unsigned on the test machine
+4) make a lockdown.efi for "Red Hat Test Certificate" and put it in \EFI\test
+   mkdir /boot/efi/EFI/test/
+   wget http://pjones.fedorapeople.org/shim/LockDown-rhtest.efi
+   mv LockDown-rhtest.efi /boot/efi/EFI/test/lockdown.efi
+5) sign shim with RHTC and put it in \EFI\test:
+   pesign -i /usr/share/shim/shim.efi -o /boot/efi/EFI/test/shim.efi \
+        -s -c "Red Hat Test Certificate"
+6) put pesign-test-app-signed.efi in \EFI\test as grubx64.efi
+   cp /usr/share/pesign-test-app-0.4/pesign-test-app-signed.efi \
+   	/boot/efi/EFI/test/test.efi
+7) sign a copy of grubx64.efi with RHTC and iput it in \EFI\test\:
+    pesign -i /boot/efi/EFI/redhat/grubx64.efi -o grubx64-unsigned.efi \
+    	-r -u 0
+    pesign -i grubx64-unsigned.efi -o /boot/efi/EFI/test/grub.efi \
+        -s -c "Red Hat Test Certificate"
+8) sign a copy of mokmanager with RHTC and put it in \EFI\test:
+    pesign -i /usr/share/shim/MokManager.efi \
+    	-o /boot/efi/EFI/test/MokManager.efi -s \
+	-c "Red Hat Test Certificate"
+9) copy grub.cfg to our test directory:
+    cp /boot/efi/EFI/redhat/grub.cfg /boot/efi/EFI/test/grub.cfg
+10) *move* \EFI\redhat\BOOT.CSV to \EFI\test 
+    mv /boot/efi/EFI/redhat/BOOT.CSV /boot/efi/EFI/test/BOOT.CSV
+11) sign a copy of fallback.efi and put it in \EFI\BOOT\fallback.efi
+    rm -rf /boot/efi/EFI/BOOT/
+    mkdir /boot/efi/EFI/BOOT/
+    pesign -i /usr/share/shim/fallback.efi \
+	-o /boot/efi/EFI/BOOT/fallback.efi \
+	-s -c "Red Hat Test Certificate"
+12) put shim.efi there as well
+    cp /boot/efi/EFI/test/shim.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+13) enroll the current kernel's certificate with mokutil:
+    mokutil --import ~/redhatsecurebootca2.cer
+14) put machine in setup mode
+15) boot to the UEFI shell
+16) run lockdown.efi from #4:
+    fs0:\EFI\test\lockdown.efi
+17) enable secure boot verification
+18) verify it can't run other binaries:
+    fs0:\EFI\redhat\grubx64.efi
+    result should be an error, probably similar to:
+    "fs0:\...\grubx64.efi is not recognized as an internal or external command"
+19) copy test.efi to grubx64.efi:
+    cp \EFI\test\test.efi \EFI\test\grubx64.efi
+20) in the EFI shell, run fs0:\EFI\test\shim.efi
+21) you should see MokManager.  Enroll the certificate you added in #13, and
+    the system will reboot.
+22) reboot to the UEFI shell and run fs0:\EFI\test\shim.efi
+    result: "This is a test application that should be completely safe."
+  If you get the expected result, shim can run things signed by its internal
+  key ring.  Check a box someplace that says it can do that.
+23) from the EFI shell, copy grub to grubx64.efi:
+    cp \EFI\test\grubx.efi \EFI\test\grubx64.efi
+24) in the EFI shell, run fs0:\EFI\test\shim.efi
+    result: this should start grub, which will let you boot a kernel
+  If grub starts, it means shim can run things signed by a key in the system's
+  db.  Check a box someplace that says it can do that.
+  If the kernel boots, it means shim can run things from Mok.  Check a box
+  someplace that says it can do that.
+25) remove all boot entries and the BootOrder variable:
+    [root@uefi ~]# cd /sys/firmware/efi/efivars/
+    [root@uefi efivars]# rm -vf Boot[0123456789]* BootOrder-*
+    removed ‘Boot0000-8be4df61-93ca-11d2-aa0d-00e098032b8c’
+    removed ‘Boot0001-8be4df61-93ca-11d2-aa0d-00e098032b8c’
+    removed ‘Boot0002-8be4df61-93ca-11d2-aa0d-00e098032b8c’
+    removed ‘Boot2001-8be4df61-93ca-11d2-aa0d-00e098032b8c’
+    removed ‘BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c’
+    [root@uefi efivars]# 
+27) reboot
+28) the system should run \EFI\BOOT\BOOTX64.EFI .  If it doesn't, you may just
+    have an old machine.  In that case, go to the EFI shell and run:
+    fs0:\EFI\BOOT\BOOTX64.EFI
+  If this works, you should see a bit of output very quickly and then the same
+  thing as #24.  This means shim recognized it was in \EFI\BOOT and ran
+  fallback.efi, which worked.
