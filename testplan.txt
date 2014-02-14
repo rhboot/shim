@@ -12,23 +12,26 @@ How to test a new shim build for RHEL/fedora:
         -s -c "Red Hat Test Certificate"
 6) put pesign-test-app-signed.efi in \EFI\test as grubx64.efi
    cp /usr/share/pesign-test-app-0.4/pesign-test-app-signed.efi \
-   	/boot/efi/EFI/test/test.efi
-7) sign a copy of grubx64.efi with RHTC and iput it in \EFI\test\:
-    pesign -i /boot/efi/EFI/redhat/grubx64.efi -o grubx64-unsigned.efi \
-    	-r -u 0
-    pesign -i grubx64-unsigned.efi -o /boot/efi/EFI/test/grub.efi \
-        -s -c "Red Hat Test Certificate"
+	/boot/efi/EFI/test/test.efi
+7) sign a copy of grubx64.efi with RHTC and iput it in \EFI\test\ .  Also
+   leave an unsigned copy there:
+    pesign -i /boot/efi/EFI/redhat/grubx64.efi \
+	-o /boot/efi/EFI/test/grubx64-unsigned.efi \
+	-r -u 0
+    pesign -i /boot/efi/EFI/test/grubx64-unsigned.efi \
+	-o /boot/efi/EFI/test/grub.efi \
+	-s -c "Red Hat Test Certificate"
 8) sign a copy of mokmanager with RHTC and put it in \EFI\test:
     pesign -i /usr/share/shim/MokManager.efi \
-    	-o /boot/efi/EFI/test/MokManager.efi -s \
+	-o /boot/efi/EFI/test/MokManager.efi -s \
 	-c "Red Hat Test Certificate"
 9) copy grub.cfg to our test directory:
     cp /boot/efi/EFI/redhat/grub.cfg /boot/efi/EFI/test/grub.cfg
 10) *move* \EFI\redhat\BOOT.CSV to \EFI\test 
-    mv /boot/efi/EFI/redhat/BOOT.CSV /boot/efi/EFI/test/BOOT.CSV
-11) sign a copy of fallback.efi and put it in \EFI\BOOT\fallback.efi
     rm -rf /boot/efi/EFI/BOOT/
     mkdir /boot/efi/EFI/BOOT/
+    mv /boot/efi/EFI/redhat/BOOT.CSV /boot/efi/EFI/test/BOOT.CSV
+11) sign a copy of fallback.efi and put it in \EFI\BOOT\fallback.efi
     pesign -i /usr/share/shim/fallback.efi \
 	-o /boot/efi/EFI/BOOT/fallback.efi \
 	-s -c "Red Hat Test Certificate"
@@ -55,7 +58,7 @@ How to test a new shim build for RHEL/fedora:
   If you get the expected result, shim can run things signed by its internal
   key ring.  Check a box someplace that says it can do that.
 23) from the EFI shell, copy grub to grubx64.efi:
-    cp \EFI\test\grubx.efi \EFI\test\grubx64.efi
+    cp \EFI\test\grub.efi \EFI\test\grubx64.efi
 24) in the EFI shell, run fs0:\EFI\test\shim.efi
     result: this should start grub, which will let you boot a kernel
   If grub starts, it means shim can run things signed by a key in the system's
@@ -78,3 +81,7 @@ How to test a new shim build for RHEL/fedora:
   If this works, you should see a bit of output very quickly and then the same
   thing as #24.  This means shim recognized it was in \EFI\BOOT and ran
   fallback.efi, which worked.
+29) copy the unsigned grub into place and reboot:
+  cp /boot/efi/EFI/test/grubx64-unsigned.efi /boot/efi/EFI/test/grubx64.efi
+30) reboot again.
+    result: shim should refuse to load grub.
