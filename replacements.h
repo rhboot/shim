@@ -41,4 +41,7 @@ extern int loader_is_participating;
 extern void hook_system_services(EFI_SYSTEM_TABLE *local_systab);
 extern void unhook_system_services(void);
 
+extern EFI_STATUS install_shim_protocols(void);
+extern void uninstall_shim_protocols(void);
+
 #endif /* SHIM_REPLACEMENTS_H */

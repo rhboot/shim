@@ -1707,11 +1707,56 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
+static SHIM_LOCK shim_lock_interface;
+static EFI_HANDLE shim_lock_handle;
+
+EFI_STATUS
+install_shim_protocols(void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	static SHIM_LOCK shim_lock_interface;
-	EFI_HANDLE handle = NULL;
+	EFI_STATUS efi_status;
+	/*
+	 * Install the protocol
+	 */
+	efi_status = uefi_call_wrapper(BS->InstallProtocolInterface, 4,
+			  &shim_lock_handle, &shim_lock_guid,
+			  EFI_NATIVE_INTERFACE, &shim_lock_interface);
+	if (EFI_ERROR(efi_status)) {
+		console_error(L"Could not install security protocol",
+			      efi_status);
+		return efi_status;
+	}
+
+#if defined(OVERRIDE_SECURITY_POLICY)
+	/*
+	 * Install the security protocol hook
+	 */
+	security_policy_install(shim_verify);
+#endif
+
+	return EFI_SUCCESS;
+}
+
+void
+uninstall_shim_protocols(void)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+#if defined(OVERRIDE_SECURITY_POLICY)
+	/*
+	 * Clean up the security protocol hook
+	 */
+	security_policy_uninstall();
+#endif
+
+	/*
+	 * If we're back here then clean everything up before exiting
+	 */
+	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, shim_lock_handle,
+			  &shim_lock_guid, &shim_lock_interface);
+}
+
+EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
+{
 	EFI_STATUS efi_status;
 
 	verification_method = VERIFIED_BY_NOTHING;
@@ -1768,24 +1813,9 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		}
 	}
 
-	/*
-	 * Install the protocol
-	 */
-	efi_status = uefi_call_wrapper(BS->InstallProtocolInterface, 4,
-			  &handle, &shim_lock_guid, EFI_NATIVE_INTERFACE,
-			  &shim_lock_interface);
-	if (EFI_ERROR(efi_status)) {
-		console_error(L"Could not install security protocol",
-			      efi_status);
+	efi_status = install_shim_protocols();
+	if (EFI_ERROR(efi_status))
 		return efi_status;
-	}
-
-#if defined(OVERRIDE_SECURITY_POLICY)
-	/*
-	 * Install the security protocol hook
-	 */
-	security_policy_install(shim_verify);
-#endif
 
 	/*
 	 * Enter MokManager if necessary
@@ -1810,20 +1840,7 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	efi_status = init_grub(image_handle);
 
-#if defined(OVERRIDE_SECURITY_POLICY)
-	/*
-	 * Clean up the security protocol hook
-	 */
-	security_policy_uninstall();
-#endif
-
-	/*
-	 * If we're back here then clean everything up before exiting
-	 */
-	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, handle,
-			  &shim_lock_guid, &shim_lock_interface);
-
-
+	uninstall_shim_protocols();
 	/*
 	 * Remove our hooks from system services.
 	 */

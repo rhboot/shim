@@ -60,16 +60,39 @@
 
 static EFI_SYSTEM_TABLE *systab;
 
+static typeof(systab->BootServices->LoadImage) system_load_image;
 static typeof(systab->BootServices->StartImage) system_start_image;
 static typeof(systab->BootServices->Exit) system_exit;
 static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
+
+static EFI_HANDLE last_loaded_image;
 
 void
 unhook_system_services(void)
 {
 	systab->BootServices->Exit = system_exit;
+	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
+}
+
+static EFI_STATUS EFIAPI
+load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
+	EFI_DEVICE_PATH *DevicePath, VOID *SourceBuffer,
+	UINTN SourceSize, EFI_HANDLE *ImageHandle)
+{
+	EFI_STATUS status;
+	unhook_system_services();
+
+	status = systab->BootServices->LoadImage(BootPolicy,
+			ParentImageHandle, DevicePath,
+			SourceBuffer, SourceSize, ImageHandle);
+	hook_system_services(systab);
+	if (EFI_ERROR(status))
+		last_loaded_image = NULL;
+	else
+		last_loaded_image = *ImageHandle;
+	return status;
 }
 
 static EFI_STATUS EFIAPI
@@ -77,9 +100,42 @@ start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 {
 	EFI_STATUS status;
 	unhook_system_services();
+
+	/* We have to uninstall shim's protocol here, because if we're
+	 * On the fallback.efi path, then our call pathway is:
+	 *
+	 * shim->fallback->shim->grub
+	 * ^               ^      ^
+	 * |               |      \- gets protocol #0
+	 * |               \- installs its protocol (#1)
+	 * \- installs its protocol (#0)
+	 * and if we haven't removed this, then grub will get the *first*
+	 * shim's protocol, but it'll get the second shim's systab
+	 * replacements.  So even though it will participate and verify
+	 * the kernel, the systab never finds out.
+	 */
+	if (image_handle == last_loaded_image) {
+		loader_is_participating = 1;
+		uninstall_shim_protocols();
+	}
 	status = systab->BootServices->StartImage(image_handle, exit_data_size, exit_data);
-	if (EFI_ERROR(status))
+	if (EFI_ERROR(status)) {
+		if (image_handle == last_loaded_image) {
+			EFI_STATUS status2 = install_shim_protocols();
+
+			if (EFI_ERROR(status2)) {
+				Print(L"Something has gone seriously wrong: %d\n",
+					status2);
+				Print(L"shim cannot continue, sorry.\n");
+				systab->BootServices->Stall(5000000);
+				systab->RuntimeServices->ResetSystem(
+					EfiResetShutdown,
+					EFI_SECURITY_VIOLATION, 0, NULL);
+			}
+		}
 		hook_system_services(systab);
+		loader_is_participating = 0;
+	}
 	return status;
 }
 
@@ -122,6 +178,16 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 	systab = local_systab;
 
 	/* We need to hook various calls to make this work... */
+
+	/* We need LoadImage() hooked so that fallback.c can load shim
+	 * without having to fake LoadImage as well.  This allows it
+	 * to call the system LoadImage(), and have us track the output
+	 * and mark loader_is_participating in start_image.  This means
+	 * anything added by fallback has to be verified by the system db,
+	 * which we want to preserve anyway, since that's all launching
+	 * through BDS gives us. */
+	system_load_image = systab->BootServices->LoadImage;
+	systab->BootServices->LoadImage = load_image;
 
 	/* we need StartImage() so that we can allow chain booting to an
 	 * image trusted by the firmware */
