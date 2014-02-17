@@ -1079,6 +1079,7 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 {
 	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINT32 sig_size;
+	UINT32 list_num;
 	int i, del_ind;
 	void *start, *end;
 	UINT32 remain;
@@ -1090,8 +1091,10 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 		    (mok[i].MokSize < sig_size))
 			continue;
 
+		list_num = mok[i].MokSize / sig_size;
+
 		del_ind = match_hash(hash, hash_size, 0, mok[i].Mok,
-				     mok[i].MokSize);
+				     list_num);
 		while (del_ind >= 0) {
 			/* Remove the hash */
 			if (sig_size == mok[i].MokSize) {
@@ -1106,9 +1109,10 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 
 			mem_move(start, end, remain);
 			mok[i].MokSize -= sig_size;
+			list_num--;
 
 			del_ind = match_hash(hash, hash_size, del_ind,
-					     mok[i].Mok, mok[i].MokSize);
+					     mok[i].Mok, list_num);
 		}
 	}
 }
