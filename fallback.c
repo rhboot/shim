@@ -226,8 +226,9 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 }
 
 EFI_STATUS
-find_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label,
-		CHAR16 *arguments, UINT16 *optnum)
+find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
+                 CHAR16 *filename, CHAR16 *label, CHAR16 *arguments,
+                 UINT16 *optnum)
 {
 	unsigned int size = sizeof(UINT32) + sizeof (UINT16) +
 		StrLen(label)*2 + 2 + DevicePathSize(dp) +
@@ -278,6 +279,12 @@ find_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label,
 			continue;
 
 		/* at this point, we have duplicate data. */
+		if (!first_new_option) {
+			first_new_option = DuplicateDevicePath(fulldp);
+			first_new_option_args = arguments;
+			first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
+		}
+
 		*optnum = i;
 		FreePool(candidate);
 		FreePool(data);
@@ -403,7 +410,7 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 #endif
 
 	UINT16 option;
-	rc = find_boot_option(dp, fullpath, label, arguments, &option);
+	rc = find_boot_option(dp, full_device_path, fullpath, label, arguments, &option);
 	if (EFI_ERROR(rc)) {
 		add_boot_option(dp, full_device_path, fullpath, label, arguments);
 	} else if (option != 0) {
