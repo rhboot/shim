@@ -204,12 +204,12 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				return EFI_OUT_OF_RESOURCES;
 
 			int j = 0;
+			newbootorder[0] = i & 0xffff;
 			if (nbootorder) {
 				for (j = 0; j < nbootorder; j++)
-					newbootorder[j] = bootorder[j];
+					newbootorder[j+1] = bootorder[j];
 				FreePool(bootorder);
 			}
-			newbootorder[j] = i & 0xffff;
 			bootorder = newbootorder;
 			nbootorder += 1;
 #ifdef DEBUG_FALLBACK
@@ -307,28 +307,17 @@ set_boot_order(void)
 EFI_STATUS
 update_boot_order(void)
 {
-	CHAR16 *oldbootorder;
 	UINTN size;
+	UINTN len = 0;
 	EFI_GUID global = EFI_GLOBAL_VARIABLE;
 	CHAR16 *newbootorder = NULL;
+	EFI_STATUS rc;
 
-	oldbootorder = LibGetVariableAndSize(L"BootOrder", &global, &size);
-	if (oldbootorder) {
-		int n = size / sizeof (CHAR16) + nbootorder;
-
-		newbootorder = AllocateZeroPool(n * sizeof (CHAR16));
-		if (!newbootorder)
-			return EFI_OUT_OF_RESOURCES;
-		CopyMem(newbootorder, bootorder, nbootorder * sizeof (CHAR16));
-		CopyMem(newbootorder + nbootorder, oldbootorder, size);
-		size = n * sizeof (CHAR16);
-	} else {
-		size = nbootorder * sizeof(CHAR16);
-		newbootorder = AllocateZeroPool(size);
-		if (!newbootorder)
-			return EFI_OUT_OF_RESOURCES;
-		CopyMem(newbootorder, bootorder, size);
-	}
+	size = nbootorder * sizeof(CHAR16);
+	newbootorder = AllocateZeroPool(size);
+	if (!newbootorder)
+		return EFI_OUT_OF_RESOURCES;
+	CopyMem(newbootorder, bootorder, size);
 
 #ifdef DEBUG_FALLBACK
 	Print(L"nbootorder: %d\nBootOrder: ", size / sizeof (CHAR16));
@@ -337,13 +326,11 @@ update_boot_order(void)
 		Print(L"%04x ", newbootorder[j]);
 	Print(L"\n");
 #endif
-
-	if (oldbootorder) {
+	rc = uefi_call_wrapper(RT->GetVariable, 5, L"BootOrder", &global,
+			       NULL, &len, NULL);
+	if (rc == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &global);
-		FreePool(oldbootorder);
-	}
 
-	EFI_STATUS rc;
 	rc = uefi_call_wrapper(RT->SetVariable, 5, L"BootOrder", &global,
 					EFI_VARIABLE_NON_VOLATILE |
 					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
