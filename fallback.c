@@ -231,7 +231,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, CHAR16 *filename, CHAR16 *label,
 {
 	unsigned int size = sizeof(UINT32) + sizeof (UINT16) +
 		StrLen(label)*2 + 2 + DevicePathSize(dp) +
-		StrLen(arguments) * 2 + 2;
+		StrLen(arguments) * 2;
 
 	CHAR8 *data = AllocateZeroPool(size);
 	if (!data)
