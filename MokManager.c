@@ -1112,7 +1112,16 @@ static INTN mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 			return -1;
 		}
 	} else {
-		LibDeleteVariable(L"MokSBState", &shim_lock_guid);
+		efi_status = uefi_call_wrapper(RT->SetVariable,
+					       5, L"MokSBState",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					       0, NULL);
+		if (efi_status != EFI_SUCCESS) {
+			console_notify(L"Failed to delete Secure Boot state");
+			return -1;
+		}
 	}
 
 	console_notify(L"The system must now be rebooted");
@@ -1224,7 +1233,16 @@ static INTN mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 			return -1;
 		}
 	} else {
-		LibDeleteVariable(L"MokDBState", &shim_lock_guid);
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5,
+					       L"MokDBState",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_NON_VOLATILE |
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					       0, NULL);
+		if (efi_status != EFI_SUCCESS) {
+			console_notify(L"Failed to delete DB state");
+			return -1;
+		}
 	}
 
 	console_notify(L"The system must now be rebooted");
@@ -1261,7 +1279,11 @@ static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 		if (console_yes_no((CHAR16 *[]){L"Clear MOK password?", NULL}) == 0)
 			return 0;
 
-		LibDeleteVariable(L"MokPWStore", &shim_lock_guid);
+		uefi_call_wrapper(RT->SetVariable, 5, L"MokPWStore",
+				  &shim_lock_guid,
+				  EFI_VARIABLE_NON_VOLATILE
+				  | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				  0, NULL);
 		LibDeleteVariable(L"MokPW", &shim_lock_guid);
 		console_notify(L"The system must now be rebooted");
 		uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm, EFI_SUCCESS, 0,
