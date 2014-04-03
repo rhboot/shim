@@ -94,11 +94,53 @@ done:
 	return status;
 }
 
+static BOOLEAN is_sha_hash (EFI_GUID Type)
+{
+	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
+	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
+
+	if (CompareGuid(&Type, &Sha1) == 0)
+		return TRUE;
+	else if (CompareGuid(&Type, &Sha256) == 0)
+		return TRUE;
+
+	return FALSE;
+}
+
+static UINT32 sha_size (EFI_GUID Type)
+{
+	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
+	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
+
+	if (CompareGuid(&Type, &Sha1) == 0)
+		return SHA1_DIGEST_SIZE;
+	else if (CompareGuid(&Type, &Sha256) == 0)
+		return SHA256_DIGEST_SIZE;
+
+	return 0;
+}
+
+static BOOLEAN is_valid_siglist (EFI_GUID Type, UINT32 SigSize)
+{
+	EFI_GUID CertType = X509_GUID;
+	UINT32 hash_sig_size;
+
+	if (CompareGuid (&Type, &CertType) == 0 && SigSize != 0)
+		return TRUE;
+
+	if (!is_sha_hash (Type))
+		return FALSE;
+
+	hash_sig_size = sha_size (Type) + sizeof(EFI_GUID);
+	if (SigSize != hash_sig_size)
+		return FALSE;
+
+	return TRUE;
+}
+
 static UINT32 count_keys(void *Data, UINTN DataSize)
 {
 	EFI_SIGNATURE_LIST *CertList = Data;
-	EFI_GUID CertType = X509_GUID;
-	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINTN dbsize = DataSize;
 	UINT32 MokNum = 0;
 	void *end = Data + DataSize;
@@ -113,18 +155,7 @@ static UINT32 count_keys(void *Data, UINTN DataSize)
 			return 0;
 		}
 
-		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
-		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
-			console_notify(L"Doesn't look like a key or hash");
-			dbsize -= CertList->SignatureListSize;
-			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						  CertList->SignatureListSize);
-			continue;
-		}
-
-		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
-		    (CertList->SignatureSize != 48)) {
-			console_notify(L"Doesn't look like a valid hash");
+		if (!is_valid_siglist(CertList->SignatureType, CertList->SignatureSize)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
 						  CertList->SignatureListSize);
@@ -145,7 +176,6 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	EFI_SIGNATURE_LIST *CertList = Data;
 	EFI_SIGNATURE_DATA *Cert;
 	EFI_GUID CertType = X509_GUID;
-	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINTN dbsize = DataSize;
 	UINTN count = 0;
 	void *end = Data + DataSize;
@@ -163,16 +193,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 			FreePool(list);
 			return NULL;
 		}
-		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
-		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
-			dbsize -= CertList->SignatureListSize;
-			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
-						  CertList->SignatureListSize);
-			continue;
-		}
-
-		if ((CompareGuid (&CertList->SignatureType, &HashType) == 0) &&
-		    (CertList->SignatureSize != 48)) {
+		if (!is_valid_siglist(CertList->SignatureType, CertList->SignatureSize)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
 						  CertList->SignatureListSize);
@@ -410,22 +431,34 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 	FreePool(text);
 }
 
-static void show_sha256_digest (UINT8 *hash)
+static void show_sha_digest (EFI_GUID Type, UINT8 *hash)
 {
+	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
+	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
 	CHAR16 *text[5];
 	POOL_PRINT hash_string1;
 	POOL_PRINT hash_string2;
 	int i;
+	int length;
+
+	if (CompareGuid(&Type, &Sha1) == 0) {
+		length = SHA1_DIGEST_SIZE;
+		text[0] = L"SHA1 hash";
+	} else if (CompareGuid(&Type, &Sha256) == 0) {
+		length = SHA256_DIGEST_SIZE;
+		text[0] = L"SHA256 hash";
+	} else {
+		return;
+	}
 
 	ZeroMem(&hash_string1, sizeof(hash_string1));
 	ZeroMem(&hash_string2, sizeof(hash_string2));
 
-	text[0] = L"SHA256 hash";
 	text[1] = L"";
 
-	for (i=0; i<16; i++)
+	for (i=0; i<length/2; i++)
 		CatPrint(&hash_string1, L"%02x ", hash[i]);
-	for (i=16; i<32; i++)
+	for (i=length/2; i<length; i++)
 		CatPrint(&hash_string2, L"%02x ", hash[i]);
 
 	text[2] = hash_string1.str;
@@ -441,7 +474,7 @@ static void show_sha256_digest (UINT8 *hash)
 		FreePool(hash_string2.str);
 }
 
-static void show_efi_hash (void *Mok, UINTN MokSize)
+static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 {
 	UINTN sig_size;
 	UINTN hash_num;
@@ -450,7 +483,7 @@ static void show_efi_hash (void *Mok, UINTN MokSize)
 	int key_num = 0;
 	int i;
 
-	sig_size = SHA256_DIGEST_SIZE + sizeof(EFI_GUID);
+	sig_size = sha_size(Type) + sizeof(EFI_GUID);
 	if ((MokSize % sig_size) != 0) {
 		console_errorbox(L"Corrupted Hash List");
 		return;
@@ -459,7 +492,7 @@ static void show_efi_hash (void *Mok, UINTN MokSize)
 
 	if (hash_num == 1) {
 		hash = (UINT8 *)Mok + sizeof(EFI_GUID);
-		show_sha256_digest(hash);
+		show_sha_digest(Type, hash);
 		return;
 	}
 
@@ -482,7 +515,7 @@ static void show_efi_hash (void *Mok, UINTN MokSize)
 			break;
 
 		hash = (UINT8 *)Mok + sig_size*key_num + sizeof(EFI_GUID);
-		show_sha256_digest(hash);
+		show_sha_digest(Type, hash);
 	}
 
 	for (i=0; menu_strings[i] != NULL; i++)
@@ -497,7 +530,6 @@ static void show_mok_info (EFI_GUID Type, void *Mok, UINTN MokSize)
 	UINT8 hash[SHA1_DIGEST_SIZE];
 	X509 *X509Cert;
 	EFI_GUID CertType = X509_GUID;
-	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 
 	if (!Mok || MokSize == 0)
 		return;
@@ -518,8 +550,8 @@ static void show_mok_info (EFI_GUID Type, void *Mok, UINTN MokSize)
 			console_notify(L"Not a valid X509 certificate");
 			return;
 		}
-	} else if (CompareGuid (&Type, &HashType) == 0) {
-		show_efi_hash(Mok, MokSize);
+	} else if (is_sha_hash(Type)) {
+		show_efi_hash(Type, Mok, MokSize);
 	}
 }
 
@@ -1006,7 +1038,7 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 		} else {
 			CertList->SignatureListSize = list[i].MokSize +
 						      sizeof(EFI_SIGNATURE_LIST);
-			CertList->SignatureSize = SHA256_DIGEST_SIZE + sizeof(EFI_GUID);
+			CertList->SignatureSize = sha_size(list[i].Type) + sizeof(EFI_GUID);
 
 			CopyMem(CertData, list[i].Mok, list[i].MokSize);
 		}
@@ -1078,7 +1110,6 @@ static void mem_move (void *dest, void *src, UINTN size)
 static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 				 MokListNode *mok, INTN mok_num)
 {
-	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINT32 sig_size;
 	UINT32 list_num;
 	int i, del_ind;
@@ -1088,8 +1119,7 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 	sig_size = hash_size + sizeof(EFI_GUID);
 
 	for (i = 0; i < mok_num; i++) {
-		if ((CompareGuid(&(mok[i].Type), &HashType) != 0) ||
-		    (mok[i].MokSize < sig_size))
+		if (!is_sha_hash(mok[i].Type) || (mok[i].MokSize < sig_size))
 			continue;
 
 		list_num = mok[i].MokSize / sig_size;
@@ -1118,7 +1148,7 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 	}
 }
 
-static void delete_hash_list (void *hash_list, UINT32 list_size,
+static void delete_hash_list (EFI_GUID Type, void *hash_list, UINT32 list_size,
 			      MokListNode *mok, INTN mok_num)
 {
 	UINT32 hash_size;
@@ -1127,7 +1157,7 @@ static void delete_hash_list (void *hash_list, UINT32 list_size,
 	UINT8 *hash;
 	int i;
 
-	hash_size = SHA256_DIGEST_SIZE;
+	hash_size = sha_size (Type);
 	sig_size = hash_size + sizeof(EFI_GUID);
 	if (list_size < sig_size)
 		return;
@@ -1146,7 +1176,6 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_GUID CertType = X509_GUID;
-	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *db_name;
 	CHAR16 *auth_name;
@@ -1221,9 +1250,9 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		if (CompareGuid(&(del_key[i].Type), &CertType) == 0) {
 			delete_cert(del_key[i].Mok, del_key[i].MokSize,
 				    mok, mok_num);
-		} else if (CompareGuid(&(del_key[i].Type), &HashType) == 0) {
-			delete_hash_list(del_key[i].Mok, del_key[i].MokSize,
-					 mok, mok_num);
+		} else if (is_sha_hash(del_key[i].Type)) {
+			delete_hash_list(del_key[i].Type, del_key[i].Mok,
+					 del_key[i].MokSize, mok, mok_num);
 		}
 	}
 
