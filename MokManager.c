@@ -566,7 +566,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 	if (KeyListSize < (sizeof(EFI_SIGNATURE_LIST) +
 			   sizeof(EFI_SIGNATURE_DATA))) {
 		console_notify(L"No MOK keys found");
-		return 0;
+		return EFI_NOT_FOUND;
 	}
 
 	MokNum = count_keys(KeyList, KeyListSize);
@@ -576,7 +576,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 
 	if (!keys) {
 		console_notify(L"Failed to construct key list");
-		return 0;
+		return EFI_ABORTED;
 	}
 
 	menu_strings = AllocateZeroPool(sizeof(CHAR16 *) * (MokNum + 2));
@@ -901,7 +901,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 	return EFI_SUCCESS;
 }
 
-static UINTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth,
+static INTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth,
 				    BOOLEAN MokX)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
