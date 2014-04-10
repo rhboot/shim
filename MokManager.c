@@ -183,10 +183,8 @@ static UINT32 count_keys(void *Data, UINTN DataSize)
 		}
 
 		if (!is_valid_siglist(CertList->SignatureType, CertList->SignatureSize)) {
-			dbsize -= CertList->SignatureListSize;
-			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
-						  CertList->SignatureListSize);
-			continue;
+			console_errorbox(L"Invalid signature list found");
+			return 0;
 		}
 
 		MokNum++;
@@ -220,12 +218,9 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 			FreePool(list);
 			return NULL;
 		}
-		if (!is_valid_siglist(CertList->SignatureType, CertList->SignatureSize)) {
-			dbsize -= CertList->SignatureListSize;
-			CertList = (EFI_SIGNATURE_LIST *)((UINT8 *) CertList +
-						  CertList->SignatureListSize);
-			continue;
-		}
+
+		/* Omit the signature check here since we already did it
+		   in count_keys() */
 
 		Cert = (EFI_SIGNATURE_DATA *) (((UINT8 *) CertList) +
 		  sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
