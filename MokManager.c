@@ -26,6 +26,9 @@
 #define EFI_VARIABLE_APPEND_WRITE 0x00000040
 
 EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
+EFI_GUID EFI_CERT_SHA224_GUID = { 0xb6e5233, 0xa65c, 0x44c9, {0x94, 0x7, 0xd9, 0xab, 0x83, 0xbf, 0xc8, 0xbd} };
+EFI_GUID EFI_CERT_SHA384_GUID = { 0xff3e5307, 0x9fd0, 0x48c9, {0x85, 0xf1, 0x8a, 0xd5, 0x6c, 0x70, 0x1e, 0x1} };
+EFI_GUID EFI_CERT_SHA512_GUID = { 0x93e0fae, 0xa6c4, 0x4f50, {0x9f, 0x1b, 0xd4, 0x1e, 0x2b, 0x89, 0xc1, 0x9a} };
 
 #define CERT_STRING L"Select an X509 certificate to enroll:\n\n"
 #define HASH_STRING L"Select a file to trust:\n\n"
@@ -97,11 +100,20 @@ done:
 static BOOLEAN is_sha_hash (EFI_GUID Type)
 {
 	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
+	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
 	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
+	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
+	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
 
 	if (CompareGuid(&Type, &Sha1) == 0)
 		return TRUE;
+	else if (CompareGuid(&Type, &Sha224) == 0)
+		return TRUE;
 	else if (CompareGuid(&Type, &Sha256) == 0)
+		return TRUE;
+	else if (CompareGuid(&Type, &Sha384) == 0)
+		return TRUE;
+	else if (CompareGuid(&Type, &Sha512) == 0)
 		return TRUE;
 
 	return FALSE;
@@ -110,12 +122,21 @@ static BOOLEAN is_sha_hash (EFI_GUID Type)
 static UINT32 sha_size (EFI_GUID Type)
 {
 	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
+	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
 	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
+	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
+	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
 
 	if (CompareGuid(&Type, &Sha1) == 0)
 		return SHA1_DIGEST_SIZE;
+	else if (CompareGuid(&Type, &Sha224) == 0)
+		return SHA224_DIGEST_LENGTH;
 	else if (CompareGuid(&Type, &Sha256) == 0)
 		return SHA256_DIGEST_SIZE;
+	else if (CompareGuid(&Type, &Sha384) == 0)
+		return SHA384_DIGEST_LENGTH;
+	else if (CompareGuid(&Type, &Sha512) == 0)
+		return SHA512_DIGEST_LENGTH;
 
 	return 0;
 }
@@ -440,7 +461,10 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 static void show_sha_digest (EFI_GUID Type, UINT8 *hash)
 {
 	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
+	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
 	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
+	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
+	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
 	CHAR16 *text[5];
 	POOL_PRINT hash_string1;
 	POOL_PRINT hash_string2;
@@ -450,9 +474,18 @@ static void show_sha_digest (EFI_GUID Type, UINT8 *hash)
 	if (CompareGuid(&Type, &Sha1) == 0) {
 		length = SHA1_DIGEST_SIZE;
 		text[0] = L"SHA1 hash";
+	} else if (CompareGuid(&Type, &Sha224) == 0) {
+		length = SHA224_DIGEST_LENGTH;
+		text[0] = L"SHA224 hash";
 	} else if (CompareGuid(&Type, &Sha256) == 0) {
 		length = SHA256_DIGEST_SIZE;
 		text[0] = L"SHA256 hash";
+	} else if (CompareGuid(&Type, &Sha384) == 0) {
+		length = SHA384_DIGEST_LENGTH;
+		text[0] = L"SHA384 hash";
+	} else if (CompareGuid(&Type, &Sha512) == 0) {
+		length = SHA512_DIGEST_LENGTH;
+		text[0] = L"SHA512 hash";
 	} else {
 		return;
 	}
@@ -1114,7 +1147,7 @@ static void mem_move (void *dest, void *src, UINTN size)
 		d[i] = s[i];
 }
 
-static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
+static void delete_hash_in_list (EFI_GUID Type, UINT8 *hash, UINT32 hash_size,
 				 MokListNode *mok, INTN mok_num)
 {
 	UINT32 sig_size;
@@ -1126,7 +1159,8 @@ static void delete_hash_in_list (UINT8 *hash, UINT32 hash_size,
 	sig_size = hash_size + sizeof(EFI_GUID);
 
 	for (i = 0; i < mok_num; i++) {
-		if (!is_sha_hash(mok[i].Type) || (mok[i].MokSize < sig_size))
+		if ((CompareGuid(&(mok[i].Type), &Type) != 0) ||
+		    (mok[i].MokSize < sig_size))
 			continue;
 
 		list_num = mok[i].MokSize / sig_size;
@@ -1174,7 +1208,7 @@ static void delete_hash_list (EFI_GUID Type, void *hash_list, UINT32 list_size,
 	hash = hash_list + sizeof(EFI_GUID);
 
 	for (i = 0; i < hash_num; i++) {
-		delete_hash_in_list (hash, hash_size, mok, mok_num);
+		delete_hash_in_list (Type, hash, hash_size, mok, mok_num);
 		hash += sig_size;
 	}
 }
