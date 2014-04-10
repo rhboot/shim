@@ -155,6 +155,12 @@ static UINT32 count_keys(void *Data, UINTN DataSize)
 			return 0;
 		}
 
+		if (CertList->SignatureListSize == 0 ||
+		    CertList->SignatureListSize <= CertList->SignatureSize) {
+			console_errorbox(L"Corrupted signature list");
+			return 0;
+		}
+
 		if (!is_valid_siglist(CertList->SignatureType, CertList->SignatureSize)) {
 			dbsize -= CertList->SignatureListSize;
 			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList +
@@ -570,12 +576,13 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 	}
 
 	MokNum = count_keys(KeyList, KeyListSize);
-	if (MokNum == 0)
-		return 0;
+	if (MokNum == 0) {
+		console_errorbox(L"Invalid key list");
+		return EFI_ABORTED;
+	}
 	keys = build_mok_list(MokNum, KeyList, KeyListSize);
-
 	if (!keys) {
-		console_notify(L"Failed to construct key list");
+		console_errorbox(L"Failed to construct key list");
 		return EFI_ABORTED;
 	}
 
@@ -1222,7 +1229,13 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 
 	efi_status = get_variable_attr (db_name, &MokListData, &MokListDataSize,
 				        shim_lock_guid, &attributes);
-	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+	if (efi_status != EFI_SUCCESS) {
+		if (MokX)
+			console_errorbox(L"Failed to retrieve MokListX");
+		else
+			console_errorbox(L"Failed to retrieve MokList");
+		return EFI_ABORTED;
+	} else if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		if (MokX) {
 			err_str1 = L"MokListX is compromised!";
 			err_str2 = L"Erase all keys in MokListX!";
@@ -1231,7 +1244,11 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 			err_str2 = L"Erase all keys in MokList!";
 		}
 		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
-		LibDeleteVariable(db_name, &shim_lock_guid);
+		uefi_call_wrapper(RT->SetVariable, 5, db_name,
+				  &shim_lock_guid,
+				  EFI_VARIABLE_NON_VOLATILE |
+				  EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				  0, NULL);
 		return EFI_ACCESS_DENIED;
 	}
 
@@ -1241,9 +1258,41 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 
 	/* Construct lists */
 	mok_num = count_keys(MokListData, MokListDataSize);
+	if (mok_num == 0) {
+		if (MokX) {
+			err_str1 = L"Failed to construct the key list of MokListX";
+			err_str2 = L"Reset MokListX!";
+		} else {
+			err_str1 = L"Failed to construct the key list of MokList";
+			err_str2 = L"Reset MokList!";
+		}
+		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
+		uefi_call_wrapper(RT->SetVariable, 5, db_name,
+				  &shim_lock_guid,
+				  EFI_VARIABLE_NON_VOLATILE |
+				  EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				  0, NULL);
+		efi_status = EFI_ABORTED;
+		goto error;
+	}
 	mok = build_mok_list(mok_num, MokListData, MokListDataSize);
+	if (!mok) {
+		console_errorbox(L"Failed to construct key list");
+		efi_status = EFI_ABORTED;
+		goto error;
+	}
 	del_num = count_keys(MokDel, MokDelSize);
+	if (del_num == 0) {
+		console_errorbox(L"Invalid key delete list");
+		efi_status = EFI_ABORTED;
+		goto error;
+	}
 	del_key = build_mok_list(del_num, MokDel, MokDelSize);
+	if (!del_key) {
+		console_errorbox(L"Failed to construct key list");
+		efi_status = EFI_ABORTED;
+		goto error;
+	}
 
 	/* Search and destroy */
 	for (i = 0; i < del_num; i++) {
@@ -1258,6 +1307,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 
 	efi_status = write_back_mok_list(mok, mok_num, MokX);
 
+error:
 	if (MokListData)
 		FreePool(MokListData);
 	if (mok)
