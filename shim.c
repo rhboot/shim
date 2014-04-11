@@ -511,18 +511,27 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
 	EFI_IMAGE_SECTION_HEADER  *SectionCache;
 	EFI_STATUS status = EFI_SUCCESS;
-
-	sha256ctxsize = Sha256GetContextSize();
-	sha256ctx = AllocatePool(sha256ctxsize);
-
-	sha1ctxsize = Sha1GetContextSize();
-	sha1ctx = AllocatePool(sha1ctxsize);
+	EFI_IMAGE_DOS_HEADER *DosHdr = (void *)data;
+	unsigned int PEHdr_offset = 0;
 
 	if (datasize_in < 0) {
 		Print(L"Invalid data size\n");
 		return EFI_INVALID_PARAMETER;
 	}
 	size = datasize = (unsigned int)datasize_in;
+
+	if (datasize <= sizeof (*DosHdr) ||
+	    DosHdr->e_magic != EFI_IMAGE_DOS_SIGNATURE) {
+		Print(L"Invalid signature\n");
+		return EFI_INVALID_PARAMETER;
+	}
+	PEHdr_offset = DosHdr->e_lfanew;
+
+	sha256ctxsize = Sha256GetContextSize();
+	sha256ctx = AllocatePool(sha256ctxsize);
+
+	sha1ctxsize = Sha1GetContextSize();
+	sha1ctx = AllocatePool(sha1ctxsize);
 
 	if (!sha256ctx || !sha1ctx) {
 		Print(L"Unable to allocate memory for hash context\n");
@@ -590,6 +599,7 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 
 		/* Validate SectionPtr is within image */
 		SectionPtr = ImageAddress(data, datasize,
+			PEHdr_offset +
 			sizeof (UINT32) +
 			sizeof (EFI_IMAGE_FILE_HEADER) +
 			context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader +
@@ -617,7 +627,9 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 	}
 
 	/* Already validated above */
-	Section = ImageAddress(data, datasize, sizeof (UINT32) +
+	Section = ImageAddress(data, datasize,
+		PEHdr_offset +
+		sizeof (UINT32) +
 		sizeof (EFI_IMAGE_FILE_HEADER) +
 		context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader);
 
