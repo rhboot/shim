@@ -509,7 +509,6 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 	unsigned int datasize;
 	EFI_IMAGE_SECTION_HEADER  *Section;
 	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
-	EFI_IMAGE_SECTION_HEADER  *SectionCache;
 	EFI_STATUS status = EFI_SUCCESS;
 	EFI_IMAGE_DOS_HEADER *DosHdr = (void *)data;
 	unsigned int PEHdr_offset = 0;
@@ -594,7 +593,7 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 #endif
 
 	/* Validate section locations and sizes */
-	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++, SectionCache++) {
+	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
 		EFI_IMAGE_SECTION_HEADER  *SectionPtr;
 
 		/* Validate SectionPtr is within image */
