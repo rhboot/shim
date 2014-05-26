@@ -1134,17 +1134,15 @@ should_use_fallback(EFI_HANDLE image_handle)
  * of the executable
  */
 static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
-				EFI_DEVICE_PATH **grubpath, CHAR16 **PathName)
+				CHAR16 **PathName)
 {
 	EFI_DEVICE_PATH *devpath;
-	EFI_HANDLE device;
 	unsigned int i;
 	int j, last = -1;
 	unsigned int pathlen = 0;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	CHAR16 *bootpath;
 
-	device = li->DeviceHandle;
 	devpath = li->FilePath;
 
 	bootpath = DevicePathToStr(devpath);
@@ -1196,8 +1194,6 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 	if (StrnCaseCmp(bootpath, ImagePath, StrLen(bootpath)))
 		StrCat(*PathName, bootpath);
 	StrCat(*PathName, ImagePath);
-
-	*grubpath = FileDevicePath(device, *PathName);
 
 error:
 	FreePool(bootpath);
@@ -1361,7 +1357,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
-	EFI_DEVICE_PATH *path;
 	CHAR16 *PathName = NULL;
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
@@ -1383,7 +1378,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	/*
 	 * Build a new path from the existing one plus the executable name
 	 */
-	efi_status = generate_path(li, ImagePath, &path, &PathName);
+	efi_status = generate_path(li, ImagePath, &PathName);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to generate path %s: %r\n", ImagePath, efi_status);
