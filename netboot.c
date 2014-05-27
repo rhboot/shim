@@ -85,78 +85,33 @@ translate_slashes(char *str)
  * Returns TRUE if we identify a protocol that is enabled and Providing us with
  * the needed information to fetch a grubx64.efi image
  */
-BOOLEAN findNetboot(EFI_HANDLE image_handle)
+BOOLEAN findNetboot(EFI_HANDLE device)
 {
-	UINTN bs = sizeof(EFI_HANDLE);
-	EFI_GUID pxe_base_code_protocol = EFI_PXE_BASE_CODE_PROTOCOL;
-	EFI_HANDLE *hbuf;
-	BOOLEAN rc = FALSE;
-	void *buffer = AllocatePool(bs);
-	UINTN errcnt = 0;
-	UINTN i;
 	EFI_STATUS status;
 
-	if (!buffer)
+	status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
+				   &PxeBaseCodeProtocol, (VOID **)&pxe);
+	if (status != EFI_SUCCESS) {
+		pxe = NULL;
 		return FALSE;
-
-try_again:
-	status = uefi_call_wrapper(BS->LocateHandle,5, ByProtocol, 
-				   &pxe_base_code_protocol, NULL, &bs,
-				   buffer);
-
-	if (status == EFI_BUFFER_TOO_SMALL) {
-		errcnt++;
-		FreePool(buffer);
-		if (errcnt > 1)
-			return FALSE;
-		buffer = AllocatePool(bs);
-		if (!buffer)
-			return FALSE;
-		goto try_again;
 	}
 
-	if (status == EFI_NOT_FOUND) {
-		FreePool(buffer);
+	if (!pxe || !pxe->Mode) {
+		pxe = NULL;
+		return FALSE;
+	}
+
+	if (!pxe->Mode->Started || !pxe->Mode->DhcpAckReceived) {
+		pxe = NULL;
 		return FALSE;
 	}
 
 	/*
- 	 * We have a list of pxe supporting protocols, lets see if any are
- 	 * active
- 	 */
-	hbuf = buffer;
-	pxe = NULL;
-	for (i=0; i < (bs / sizeof(EFI_HANDLE)); i++) {
-		status = uefi_call_wrapper(BS->OpenProtocol, 6, hbuf[i],
-					   &pxe_base_code_protocol,
-					   (void **)&pxe, image_handle, NULL,
-					   EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-
-		if (status != EFI_SUCCESS) {
-			pxe = NULL;
-			continue;
-		}
-
-		if (!pxe || !pxe->Mode) {
-			pxe = NULL;
-			continue;
-		}
-
-		if (pxe->Mode->Started && pxe->Mode->DhcpAckReceived) {
-			/*
- 			 * We've located a pxe protocol handle thats been 
- 			 * started and has received an ACK, meaning its
- 			 * something we'll be able to get tftp server info
- 			 * out of
- 			 */
-			rc = TRUE;
-			break;
-		}
-			
-	}
-
-	FreePool(buffer);
-	return rc;
+	 * We've located a pxe protocol handle thats been started and has
+	 * received an ACK, meaning its something we'll be able to get
+	 * tftp server info out of
+	 */
+	return TRUE;
 }
 
 static CHAR8 *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
