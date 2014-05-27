@@ -1373,7 +1373,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto done;
 	}
 
-	if (findNetboot(image_handle)) {
+	if (findNetboot(li->DeviceHandle)) {
 		efi_status = parseNetbootinfo(image_handle);
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"Netboot parsing failed: %r\n", efi_status);
