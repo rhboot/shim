@@ -1306,11 +1306,30 @@ static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 	return -1;
 }
 
-static BOOLEAN verify_certificate(void *cert, UINTN size)
+static BOOLEAN verify_certificate(UINT8 *cert, UINTN size)
 {
 	X509 *X509Cert;
-	if (!cert || size == 0)
+	UINTN length;
+	if (!cert || size < 0)
 		return FALSE;
+
+	/*
+	 * A DER encoding x509 certificate starts with SEQUENCE(0x30),
+	 * the number of length bytes, and the number of value bytes.
+	 * The size of a x509 certificate is usually between 127 bytes
+	 * and 64KB. For convenience, assume the number of value bytes
+	 * is 2, i.e. the second byte is 0x82.
+	 */
+	if (cert[0] != 0x30 || cert[1] != 0x82) {
+		console_notify(L"Not a DER encoding X509 certificate");
+		return FALSE;
+	}
+
+	length = (cert[2]<<8 | cert[3]);
+	if (length != (size - 4)) {
+		console_notify(L"Invalid X509 certificate: Inconsistent size");
+		return FALSE;
+	}
 
 	if (!(X509ConstructCertificate(cert, size, (UINT8 **) &X509Cert)) ||
 	    X509Cert == NULL) {

@@ -226,43 +226,60 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
+static BOOLEAN verify_x509(UINT8 *Cert, UINTN CertSize)
+{
+	UINTN length;
+
+	if (!Cert || CertSize < 4)
+		return FALSE;
+
+	/*
+	 * A DER encoding x509 certificate starts with SEQUENCE(0x30),
+	 * the number of length bytes, and the number of value bytes.
+	 * The size of a x509 certificate is usually between 127 bytes
+	 * and 64KB. For convenience, assume the number of value bytes
+	 * is 2, i.e. the second byte is 0x82.
+	 */
+	if (Cert[0] != 0x30 || Cert[1] != 0x82)
+		return FALSE;
+
+	length = Cert[2]<<8 | Cert[3];
+	if (length != (CertSize - 4))
+		return FALSE;
+
+	return TRUE;
+}
+
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
 					 UINT8 *hash)
 {
 	EFI_SIGNATURE_DATA *Cert;
-	UINTN CertCount, Index;
+	UINTN CertSize;
 	BOOLEAN IsFound = FALSE;
 	EFI_GUID CertType = X509_GUID;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
-			CertCount = (CertList->SignatureListSize - sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
-			for (Index = 0; Index < CertCount; Index++) {
+			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
+			if (verify_x509(Cert->SignatureData, CertSize)) {
 				IsFound = AuthenticodeVerify (data->CertData,
 							      data->Hdr.dwLength - sizeof(data->Hdr),
 							      Cert->SignatureData,
-							      CertList->SignatureSize,
+							      CertSize,
 							      hash, SHA256_DIGEST_SIZE);
 				if (IsFound)
-					break;
-
-				Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
+					return DATA_FOUND;
+			} else if (verbose) {
+				console_notify(L"Not a DER encoding x.509 Certificate");
 			}
-
 		}
-
-		if (IsFound)
-			break;
 
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
 	}
-
-	if (IsFound)
-		return DATA_FOUND;
 
 	return DATA_NOT_FOUND;
 }
