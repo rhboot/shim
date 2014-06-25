@@ -50,7 +50,7 @@ SETOSIndicationsAndReboot(UINT64 indications);
 int
 variable_is_secureboot(void);
 int
-variable_is_setupmode(void);
+variable_is_setupmode(int default_return);
 EFI_STATUS
 variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 		     UINT8 hash[SHA256_DIGEST_SIZE]);
