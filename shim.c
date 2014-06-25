@@ -499,6 +499,12 @@ static BOOLEAN secure_mode (void)
 		return FALSE;
 	}
 
+	/* If we /do/ have "SecureBoot", but /don't/ have "SetupMode",
+	 * then the implementation is bad, but we assume that secure boot is
+	 * enabled according to the status of "SecureBoot".  If we have both
+	 * of them, then "SetupMode" may tell us additional data, and we need
+	 * to consider it.
+	 */
 	status = get_variable(L"SetupMode", &Data, &len, global_var);
 	if (status != EFI_SUCCESS)
 		return TRUE;
