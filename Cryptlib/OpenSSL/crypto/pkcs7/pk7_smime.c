@@ -290,8 +290,8 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
 
 	bufsiz = 4096;
 	buf = OPENSSL_malloc (bufsiz);
-	if (buf == NULL) {
-		goto err;
+		if (buf == NULL) {
+			goto err;
 	}
 
 	/* We now have to 'read' from p7bio to calculate digests etc. */

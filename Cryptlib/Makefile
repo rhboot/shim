@@ -30,7 +30,11 @@ OBJS		=   Hash/CryptMd4.o \
 		    Rand/CryptRand.o \
 		    Pk/CryptRsaBasic.o \
 		    Pk/CryptRsaExt.o \
-		    Pk/CryptPkcs7.o \
+		    Pk/CryptRsaExtNull.o \
+		    Pk/CryptPkcs7Sign.o \
+		    Pk/CryptPkcs7SignNull.o \
+		    Pk/CryptPkcs7Verify.o \
+		    Pk/CryptPkcs7VerifyNull.o \
 		    Pk/CryptDh.o \
 		    Pk/CryptX509.o \
 		    Pk/CryptAuthenticode.o \
