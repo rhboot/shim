@@ -6,8 +6,8 @@ index 68bc25a..1abe78e 100644
    // BUG: hardcode OldSize == size! We have no any knowledge about
    // memory size of original pointer ptr.
    //
--  return ReallocatePool ((UINTN)size, (UINTN)size, ptr);
-+	return ReallocatePool (ptr, (UINTN)size, (UINTN)size);
+-  return ReallocatePool ((UINTN) size, (UINTN) size, ptr);
++  return ReallocatePool (ptr, (UINTN) size, (UINTN) size);
  }
  
  /* De-allocates or frees a memory block */

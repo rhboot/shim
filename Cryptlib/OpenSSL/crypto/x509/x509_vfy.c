@@ -386,11 +386,7 @@ static int get_issuer_sk(X509 **issuer, X509_STORE_CTX *ctx, X509 *x)
 
 static int check_chain_extensions(X509_STORE_CTX *ctx)
 {
-#if defined(OPENSSL_NO_CHAIN_VERIFY) || defined(OPENSSL_SYS_UEFI)
-  /* 
-    NOTE: Bypass KU Flags Checking for UEFI version. There are incorrect KU flag setting
-          in Authenticode Signing Certificates. 
-  */
+#ifdef OPENSSL_NO_CHAIN_VERIFY
 	return 1;
 #else
 	int i, ok=0, must_be_ca, plen = 0;
