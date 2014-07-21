@@ -12,5 +12,5 @@ in the shim.h header file and provides a single entry point. On 64-bit systems
 this entry point expects to be called with SysV ABI rather than MSABI, and
 so calls to it should not be wrapped.
 
-To use shim, simply place a hex dump of the public certificate in cert.h
-and build it with make.
+To use shim, simply place a DER-encoded public certificate in a file such as
+pub.cer and build with "make VENDOR_CERT_FILE=pub.cer".
