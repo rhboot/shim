@@ -108,29 +108,34 @@ BOOLEAN findNetboot(EFI_HANDLE device)
 
 static CHAR8 *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
 {
-	void *optr;
-	EFI_DHCP6_PACKET_OPTION *option;
-	CHAR8 *url;
-	UINT32 urllen;
+	void *optr = NULL, *end = NULL;
+	EFI_DHCP6_PACKET_OPTION *option = NULL;
+	CHAR8 *url = NULL;
+	UINT32 urllen = 0;
 
 	optr = pkt->DhcpOptions;
+	end = optr + sizeof(pkt->DhcpOptions);
 
-	for(;;) {
+	for (;;) {
 		option = (EFI_DHCP6_PACKET_OPTION *)optr;
 
 		if (ntohs(option->OpCode) == 0)
-			return NULL;
+			break;
 
 		if (ntohs(option->OpCode) == 59) {
 			/* This is the bootfile url option */
 			urllen = ntohs(option->Length);
-			url = AllocateZeroPool(urllen+1);
+			if ((void *)(option->Data + urllen) > end)
+				break;
+			url = AllocateZeroPool(urllen + 1);
 			if (!url)
-				return NULL;
+				break;
 			memcpy(url, option->Data, urllen);
 			return url;
 		}
 		optr += 4 + ntohs(option->Length);
+		if (optr + sizeof(EFI_DHCP6_PACKET_OPTION) > end)
+			break;
 	}
 
 	return NULL;
@@ -156,44 +161,59 @@ static CHAR16 str2ns(CHAR8 *str)
 
 static CHAR8 *str2ip6(CHAR8 *str)
 {
-        UINT8 i, j, p;
-	size_t len;
-        CHAR8 *a, *b, t;
-        static UINT16 ip[8];
+	UINT8 i = 0, j = 0, p = 0;
+	size_t len = 0, dotcount = 0;
+	enum { MAX_IP6_DOTS = 7 };
+	CHAR8 *a = NULL, *b = NULL, t = 0;
+	static UINT16 ip[8];
 
-        for(i=0; i < 8; i++) {
-                ip[i] = 0;
-        }
-        len = strlen(str);
-        a = b = str;
-        for(i=p=0; i < len; i++, b++) {
-                if (*b != ':')
-                        continue;
-                *b = '\0';
-                ip[p++] = str2ns(a);
-                *b = ':';
-                a = b + 1;
-                if ( *(b+1) == ':' )
-                        break;
-        }
-        a = b = (str + len);
-        for(j=len, p=7; j > i; j--, a--) {
-                if (*a != ':')
-                        continue;
-                t = *b;
-                *b = '\0';
-                ip[p--] = str2ns(a+1);
-                *b = t;
-                b = a;
-        }
-        return (CHAR8 *)ip;
+	memset(ip, 0, sizeof(ip));
+
+	/* Count amount of ':' to prevent overflows.
+	 * max. count = 7. Returns an invalid ip6 that
+	 * can be checked against
+	 */
+	for (a = str; *a != 0; ++a) {
+		if (*a == ':')
+			++dotcount;
+	}
+	if (dotcount > MAX_IP6_DOTS)
+		return (CHAR8 *)ip;
+
+	len = strlen(str);
+	a = b = str;
+	for (i = p = 0; i < len; i++, b++) {
+		if (*b != ':')
+			continue;
+		*b = '\0';
+		ip[p++] = str2ns(a);
+		*b = ':';
+		a = b + 1;
+		if (b[1] == ':' )
+			break;
+	}
+	a = b = (str + len);
+	for (j = len, p = 7; j > i; j--, a--) {
+		if (*a != ':')
+			continue;
+		t = *b;
+		*b = '\0';
+		ip[p--] = str2ns(a+1);
+		*b = t;
+		b = a;
+	}
+	return (CHAR8 *)ip;
 }
 
 static BOOLEAN extract_tftp_info(CHAR8 *url)
 {
 	CHAR8 *start, *end;
 	CHAR8 ip6str[40];
+	CHAR8 ip6inv[16];
 	CHAR8 *template = (CHAR8 *)translate_slashes(DEFAULT_LOADER_CHAR);
+
+	// to check against str2ip6() errors
+	memset(ip6inv, 0, sizeof(ip6inv));
 
 	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
 		Print(L"URLS MUST START WITH tftp://\n");
@@ -209,7 +229,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	end = start;
 	while ((*end != '\0') && (*end != ']')) {
 		end++;
-		if (end - start > 39) {
+		if (end - start >= (int)sizeof(ip6str)) {
 			Print(L"TFTP URL includes malformed IPv6 address\n");
 			return FALSE;
 		}
@@ -218,10 +238,12 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
 	}
-	memset(ip6str, 0, 40);
+	memset(ip6str, 0, sizeof(ip6str));
 	memcpy(ip6str, start, end - start);
 	end++;
 	memcpy(&tftp_addr.v6, str2ip6(ip6str), 16);
+	if (memcmp(&tftp_addr.v6, ip6inv, sizeof(ip6inv)) == 0)
+		return FALSE;
 	full_path = AllocateZeroPool(strlen(end)+strlen(template)+1);
 	if (!full_path)
 		return FALSE;
