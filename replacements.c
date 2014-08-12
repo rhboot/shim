@@ -70,6 +70,9 @@ static EFI_HANDLE last_loaded_image;
 void
 unhook_system_services(void)
 {
+	if (!systab)
+		return;
+
 	systab->BootServices->Exit = system_exit;
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
