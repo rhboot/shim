@@ -15,6 +15,9 @@ endif
 ifeq ($(ARCH),aarch64)
 	CFLAGS	+= -O2 -DSIXTY_FOUR_BIT_LONG -ffreestanding -I$(shell $(CC) -print-file-name=include)
 endif
+ifeq ($(ARCH),arm)
+	CFLAGS	+= -O2 -DTHIRTY_TWO_BIT -ffreestanding -I$(shell $(CC) -print-file-name=include)
+endif
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libopenssl.a

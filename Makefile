@@ -41,6 +41,10 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS	+= -ffreestanding -I$(shell $(CC) -print-file-name=include)
 endif
 
+ifeq ($(ARCH),arm)
+	CFLAGS	+= -ffreestanding -I$(shell $(CC) -print-file-name=include)
+endif
+
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
@@ -113,6 +117,12 @@ lib/lib.a:
 	$(MAKE) -C lib
 
 ifeq ($(ARCH),aarch64)
+FORMAT		:= -O binary
+SUBSYSTEM	:= 0xa
+LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+endif
+
+ifeq ($(ARCH),arm)
 FORMAT		:= -O binary
 SUBSYSTEM	:= 0xa
 LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
