@@ -1,19 +1,16 @@
-ARCH		= $(shell uname -m | sed s,i[3456789]86,ia32,)
 
-EFI_INCLUDE	= /usr/include/efi
 EFI_INCLUDES	= -I../Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
-EFI_PATH	= /usr/lib64/gnuefi
 
-LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
-EFI_LIBS	= -lefi -lgnuefi $(LIB_GCC)
-
-CFLAGS		= -ggdb -O0 -I. -I.. -I../Include/ -Icrypto -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
+CFLAGS		= -ggdb -O0 -I. -I.. -I../Include/ -Icrypto -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc \
 		  -Wall $(EFI_INCLUDES) -DOPENSSL_SYSNAME_UWIN -DOPENSSL_SYS_UEFI -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DOPENSSL_NO_CAMELLIA -DOPENSSL_NO_SEED -DOPENSSL_NO_RC5 -DOPENSSL_NO_MDC2 -DOPENSSL_NO_SOCK -DOPENSSL_NO_CMS -DOPENSSL_NO_JPAKE -DOPENSSL_NO_CAPIENG -DOPENSSL_NO_ERR -DOPENSSL_NO_KRB5 -DOPENSSL_NO_DYNAMIC_ENGINE -DGETPID_IS_MEANINGLESS -DOPENSSL_NO_STDIO -DOPENSSL_NO_FP_API -DOPENSSL_NO_DGRAM -DOPENSSL_NO_SHA0 -DOPENSSL_NO_LHASH -DOPENSSL_NO_HW -DOPENSSL_NO_OCSP -DOPENSSL_NO_LOCKING -DOPENSSL_NO_DEPRECATED -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
+
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -DSIXTY_FOUR_BIT_LONG
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
+		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -DSIXTY_FOUR_BIT_LONG
 endif
 ifeq ($(ARCH),ia32)
-	CFLAGS	+= -m32 -DTHIRTY_TWO_BIT
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
+		-m32 -DTHIRTY_TWO_BIT
 endif
 LDFLAGS		= -nostdlib -znocombreloc
 

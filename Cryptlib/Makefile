@@ -1,19 +1,15 @@
-ARCH		= $(shell uname -m | sed s,i[3456789]86,ia32,)
 
-EFI_INCLUDE	= /usr/include/efi
-EFI_INCLUDES	= -nostdinc -IInclude -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
-EFI_PATH	= /usr/lib64/gnuefi
-
-LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
-EFI_LIBS	= -lefi -lgnuefi $(LIB_GCC)
+EFI_INCLUDES	= -IInclude -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
 
 CFLAGS		= -ggdb -O0 -I. -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall $(EFI_INCLUDES) -mno-red-zone -maccumulate-outgoing-args -mno-sse -mno-mmx
+		  -Wall $(EFI_INCLUDES)
+
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args \
+		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
 endif
 ifeq ($(ARCH),ia32)
-	CFLAGS	+= -m32
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args -m32
 endif
 LDFLAGS		= -nostdlib -znocombreloc
 

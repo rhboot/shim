@@ -40,15 +40,7 @@
 #include "netboot.h"
 #include "str.h"
 
-static inline unsigned short int __swap16(unsigned short int x)
-{
-        __asm__("xchgb %b0,%h0"
-                : "=q" (x)
-                : "0" (x));
-	return x;
-}
-
-#define ntohs(x) __swap16(x)
+#define ntohs(x) __builtin_bswap16(x)	/* supported both by GCC and clang */
 #define htons(x) ntohs(x)
 
 static EFI_PXE_BASE_CODE *pxe;
