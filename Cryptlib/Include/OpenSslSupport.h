@@ -35,6 +35,14 @@ typedef VOID  *FILE;
 // Map all va_xxxx elements to VA_xxx defined in MdePkg/Include/Base.h
 //
 #if !defined(__CC_ARM) // if va_list is not already defined
+/*
+ * These are now unconditionally #defined by GNU_EFI's efistdarg.h,
+ * so we should #undef them here before providing a new definition.
+ */
+#undef va_arg
+#undef va_start
+#undef va_end
+
 #define va_list   VA_LIST
 #define va_arg    VA_ARG
 #define va_start  VA_START
