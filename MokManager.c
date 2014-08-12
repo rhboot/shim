@@ -100,8 +100,18 @@ static UINT32 count_keys(void *Data, UINTN DataSize)
 	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINTN dbsize = DataSize;
 	UINT32 MokNum = 0;
+	void *end = Data + DataSize;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+
+		/* Use ptr arithmetics to ensure bounded access. Do not allow 0
+		 * SignatureListSize that will cause endless loop.
+		 */
+		if ((void *)(CertList + 1) > end || CertList->SignatureListSize == 0) {
+			console_notify(L"Invalid MOK detected! Ignoring MOK List.");
+			return 0;
+		}
+
 		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
 		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
 			console_notify(L"Doesn't look like a key or hash");
@@ -137,6 +147,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	EFI_GUID HashType = EFI_CERT_SHA256_GUID;
 	UINTN dbsize = DataSize;
 	UINTN count = 0;
+	void *end = Data + DataSize;
 
 	list = AllocatePool(sizeof(MokListNode) * num);
 
@@ -146,6 +157,11 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	}
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		/* CertList out of bounds? */
+		if ((void *)(CertList + 1) > end || CertList->SignatureListSize == 0) {
+			FreePool(list);
+			return NULL;
+		}
 		if ((CompareGuid (&CertList->SignatureType, &CertType) != 0) &&
 		    (CompareGuid (&CertList->SignatureType, &HashType) != 0)) {
 			dbsize -= CertList->SignatureListSize;
@@ -165,9 +181,21 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		Cert = (EFI_SIGNATURE_DATA *) (((UINT8 *) CertList) +
 		  sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 
+		/* Cert out of bounds? */
+		if ((void *)(Cert + 1) > end || CertList->SignatureSize <= sizeof(EFI_GUID)) {
+			FreePool(list);
+			return NULL;
+		}
+
 		list[count].MokSize = CertList->SignatureSize - sizeof(EFI_GUID);
 		list[count].Mok = (void *)Cert->SignatureData;
 		list[count].Type = CertList->SignatureType;
+
+		/* MOK out of bounds? */
+		if (list[count].MokSize > end - (void *)list[count].Mok) {
+			FreePool(list);
+			return NULL;
+		}
 
 		count++;
 		dbsize -= CertList->SignatureListSize;
@@ -449,6 +477,8 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 	}
 
 	MokNum = count_keys(KeyList, KeyListSize);
+	if (MokNum == 0)
+		return 0;
 	keys = build_mok_list(MokNum, KeyList, KeyListSize);
 
 	if (!keys) {
