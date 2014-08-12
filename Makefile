@@ -37,6 +37,10 @@ ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args -m32
 endif
 
+ifeq ($(ARCH),aarch64)
+	CFLAGS	+= -ffreestanding -I$(shell $(CC) -print-file-name=include)
+endif
+
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
@@ -107,6 +111,12 @@ Cryptlib/OpenSSL/libopenssl.a:
 
 lib/lib.a:
 	$(MAKE) -C lib
+
+ifeq ($(ARCH),aarch64)
+FORMAT		:= -O binary
+SUBSYSTEM	:= 0xa
+LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+endif
 
 FORMAT		?= --target efi-app-$(ARCH)
 

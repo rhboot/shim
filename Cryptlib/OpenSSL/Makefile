@@ -12,6 +12,9 @@ ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
 		-m32 -DTHIRTY_TWO_BIT
 endif
+ifeq ($(ARCH),aarch64)
+	CFLAGS	+= -O2 -DSIXTY_FOUR_BIT_LONG -ffreestanding -I$(shell $(CC) -print-file-name=include)
+endif
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libopenssl.a
