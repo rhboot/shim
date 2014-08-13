@@ -145,6 +145,9 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		return EFI_UNSUPPORTED;
 	}
 
+	if (!context->RelocDir->Size)
+		return EFI_SUCCESS;
+
 	RelocBase = ImageAddress(data, size, context->RelocDir->VirtualAddress);
 	RelocBaseEnd = ImageAddress(data, size, context->RelocDir->VirtualAddress + context->RelocDir->Size - 1);
 
@@ -996,7 +999,11 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	 * Copy the executable's sections to their desired offsets
 	 */
 	Section = context.FirstSection;
-	for (i = 0; i < context.NumberOfSections; i++) {
+	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		if (Section->Characteristics & 0x02000000)
+			/* section has EFI_IMAGE_SCN_MEM_DISCARDABLE attr set */
+			continue;
+
 		size = Section->Misc.VirtualSize;
 
 		if (size > Section->SizeOfRawData)
@@ -1021,8 +1028,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		if (size < Section->Misc.VirtualSize)
 			ZeroMem (base + size, Section->Misc.VirtualSize - size);
-
-		Section += 1;
 	}
 
 	/*
