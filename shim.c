@@ -947,6 +947,20 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	return EFI_SUCCESS;
 }
 
+static const UINT16 machine_type =
+#if defined(__x86_64__)
+	IMAGE_FILE_MACHINE_X64;
+#elif defined(__aarch64__)
+	IMAGE_FILE_MACHINE_ARM64;
+#elif defined(__arm__)
+	IMAGE_FILE_MACHINE_ARMTHUMB_MIXED;
+#elif defined(__i386__) || defined(__i486__) || defined(__i686__)
+	IMAGE_FILE_MACHINE_I386;
+#elif defined(__ia64__)
+	IMAGE_FILE_MACHINE_IA64;
+#else
+#error this architecture is not supported by shim
+#endif
 
 /*
  * Once the image has been loaded it needs to be validated and relocated
@@ -969,6 +983,11 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	if (efi_status != EFI_SUCCESS) {
 		perror(L"Failed to read header: %r\n", efi_status);
 		return efi_status;
+	}
+
+	if (context.PEHdr->Pe32.FileHeader.Machine != machine_type) {
+		perror(L"Image is for a different architecture\n");
+		return EFI_UNSUPPORTED;
 	}
 
 	/*
