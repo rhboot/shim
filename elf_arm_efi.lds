@@ -19,7 +19,7 @@ SECTIONS
    *(.sdata)
    *(.data)
    *(.data1)
-   *(.data)
+   *(.data*)
    *(.got.plt)
    *(.got)
 
