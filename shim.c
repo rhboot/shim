@@ -122,7 +122,7 @@ static void *ImageAddress (void *image, unsigned int size, unsigned int address)
  * Perform the actual relocation
  */
 static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
-				 void *data)
+				 void *orig, void *data)
 {
 	EFI_IMAGE_BASE_RELOCATION *RelocBase, *RelocBaseEnd;
 	UINT64 Adjust;
@@ -132,7 +132,7 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	UINT32 *Fixup32;
 	UINT64 *Fixup64;
 	int size = context->ImageSize;
-	void *ImageEnd = (char *)data + size;
+	void *ImageEnd = (char *)orig + size;
 
 #if __LP64__
 	context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)data;
@@ -140,16 +140,8 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	context->PEHdr->Pe32.OptionalHeader.ImageBase = (UINT32)data;
 #endif
 
-	if (context->NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
-		perror(L"Image has no relocation entry\n");
-		return EFI_UNSUPPORTED;
-	}
-
-	if (!context->RelocDir->Size)
-		return EFI_SUCCESS;
-
-	RelocBase = ImageAddress(data, size, context->RelocDir->VirtualAddress);
-	RelocBaseEnd = ImageAddress(data, size, context->RelocDir->VirtualAddress + context->RelocDir->Size - 1);
+	RelocBase = ImageAddress(orig, size, context->RelocDir->VirtualAddress);
+	RelocBaseEnd = ImageAddress(orig, size, context->RelocDir->VirtualAddress + context->RelocDir->Size - 1);
 
 	if (!RelocBase || !RelocBaseEnd) {
 		perror(L"Reloc table overflows binary\n");
@@ -170,7 +162,7 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		}
 
 		RelocEnd = (UINT16 *) ((char *) RelocBase + RelocBase->SizeOfBlock);
-		if ((void *)RelocEnd < data || (void *)RelocEnd > ImageEnd) {
+		if ((void *)RelocEnd < orig || (void *)RelocEnd > ImageEnd) {
 			perror(L"Reloc entry overflows binary\n");
 			return EFI_UNSUPPORTED;
 		}
@@ -1049,15 +1041,23 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 			ZeroMem (base + size, Section->Misc.VirtualSize - size);
 	}
 
-	/*
-	 * Run the relocation fixups
-	 */
-	efi_status = relocate_coff(&context, buffer);
-
-	if (efi_status != EFI_SUCCESS) {
-		perror(L"Relocation failed: %r\n", efi_status);
+	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
+		perror(L"Image has no relocation entry\n");
 		FreePool(buffer);
-		return efi_status;
+		return EFI_UNSUPPORTED;
+	}
+
+	if (context.RelocDir->Size) {
+		/*
+		 * Run the relocation fixups
+		 */
+		efi_status = relocate_coff(&context, data, buffer);
+
+		if (efi_status != EFI_SUCCESS) {
+			perror(L"Relocation failed: %r\n", efi_status);
+			FreePool(buffer);
+			return efi_status;
+		}
 	}
 
 	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
