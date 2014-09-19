@@ -118,6 +118,106 @@ static void *ImageAddress (void *image, unsigned int size, unsigned int address)
 	return image + address;
 }
 
+/* here's a chart:
+ *		i686	x86_64	aarch64
+ *  64-on-64:	nyet	yes	yes
+ *  64-on-32:	nyet	yes	nyet
+ *  32-on-32:	yes	yes	no
+ */
+static int
+allow_64_bit(void)
+{
+#if defined(__x86_64__) || defined(__aarch64__)
+	return 1;
+#elif defined(__i386__) || defined(__i686__)
+	/* Right now blindly assuming the kernel will correctly detect this
+	 * and /halt the system/ if you're not really on a 64-bit cpu */
+	if (in_protocol)
+		return 1;
+	return 0;
+#else /* assuming everything else is 32-bit... */
+	return 0;
+#endif
+}
+
+static int
+allow_32_bit(void)
+{
+#if defined(__x86_64__)
+#if defined(ALLOW_32BIT_KERNEL_ON_X64)
+	if (in_protocol)
+		return 1;
+	return 0;
+#else
+	return 0;
+#endif
+#elif defined(__i386__) || defined(__i686__)
+	return 1;
+#elif defined(__arch64__)
+	return 0;
+#else /* assuming everything else is 32-bit... */
+	return 1;
+#endif
+}
+
+static int
+image_is_64_bit(EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr)
+{
+	/* .Magic is the same offset in all cases */
+	if (PEHdr->Pe32Plus.OptionalHeader.Magic
+			== EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+		return 1;
+	return 0;
+}
+
+static const UINT16 machine_type =
+#if defined(__x86_64__)
+	IMAGE_FILE_MACHINE_X64;
+#elif defined(__aarch64__)
+	IMAGE_FILE_MACHINE_ARM64;
+#elif defined(__arm__)
+	IMAGE_FILE_MACHINE_ARMTHUMB_MIXED;
+#elif defined(__i386__) || defined(__i486__) || defined(__i686__)
+	IMAGE_FILE_MACHINE_I386;
+#elif defined(__ia64__)
+	IMAGE_FILE_MACHINE_IA64;
+#else
+#error this architecture is not supported by shim
+#endif
+
+static int
+image_is_loadable(EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr)
+{
+	/* If the machine type doesn't match the binary, bail, unless
+	 * we're in an allowed 64-on-32 scenario */
+	if (PEHdr->Pe32.FileHeader.Machine != machine_type) {
+		if (!(machine_type == IMAGE_FILE_MACHINE_I386 &&
+		      PEHdr->Pe32.FileHeader.Machine == IMAGE_FILE_MACHINE_X64 &&
+		      allow_64_bit())) {
+			return 0;
+		}
+	}
+
+	/* If it's not a header type we recognize at all, bail */
+	switch (PEHdr->Pe32Plus.OptionalHeader.Magic) {
+	case EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC:
+	case EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+		break;
+	default:
+		return 0;
+	}
+
+	/* and now just check for general 64-vs-32 compatibility */
+	if (image_is_64_bit(PEHdr)) {
+		if (allow_64_bit())
+			return 1;
+	} else {
+		if (allow_32_bit())
+			return 1;
+	}
+	return 0;
+}
+
 /*
  * Perform the actual relocation
  */
@@ -134,11 +234,10 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	int size = context->ImageSize;
 	void *ImageEnd = (char *)orig + size;
 
-#if __LP64__
-	context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)data;
-#else
-	context->PEHdr->Pe32.OptionalHeader.ImageBase = (UINT32)data;
-#endif
+	if (image_is_64_bit(context->PEHdr))
+		context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)(unsigned long)data;
+	else
+		context->PEHdr->Pe32.OptionalHeader.ImageBase = (UINT32)(unsigned long)data;
 
 	RelocBase = ImageAddress(orig, size, context->RelocDir->VirtualAddress);
 	RelocBaseEnd = ImageAddress(orig, size, context->RelocDir->VirtualAddress + context->RelocDir->Size - 1);
@@ -157,7 +256,7 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		Reloc = (UINT16 *) ((char *) RelocBase + sizeof (EFI_IMAGE_BASE_RELOCATION));
 
 		if ((RelocBase->SizeOfBlock == 0) || (RelocBase->SizeOfBlock > context->RelocDir->Size)) {
-			perror(L"Reloc block size is invalid\n");
+			perror(L"Reloc block size %d is invalid\n", RelocBase->SizeOfBlock);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -498,7 +597,7 @@ static BOOLEAN secure_mode (void)
  * Calculate the SHA1 and SHA256 hashes of a binary
  */
 
-static EFI_STATUS generate_hash (char *data, int datasize_in,
+static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 				 PE_COFF_LOADER_IMAGE_CONTEXT *context,
 				 UINT8 *sha256hash, UINT8 *sha1hash)
 
@@ -572,15 +671,14 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 	}
 
 	/* Hash end of certificate table to end of image header */
-#if __LP64__
-	hashbase = (char *) &context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
-	hashsize = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders -
-		(int) ((char *) (&context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - data);
-#else
-	hashbase = (char *) &context->PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
-	hashsize = context->PEHdr->Pe32.OptionalHeader.SizeOfHeaders -
-		(int) ((char *) (&context->PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1]) - data);
-#endif
+	EFI_IMAGE_DATA_DIRECTORY *dd = context->SecDir + 1;
+	hashbase = (char *)dd;
+	hashsize = context->SizeOfHeaders - (unsigned long)((char *)dd - data);
+	if (hashsize > datasize_in) {
+		perror(L"Data Directory size %d is invalid\n", hashsize);
+		status = EFI_INVALID_PARAMETER;
+		goto done;
+	}
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -590,11 +688,7 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 	}
 
 	/* Sort sections */
-#if __LP64__
-	SumOfBytesHashed = context->PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
-#else
-	SumOfBytesHashed = context->PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
-#endif
+	SumOfBytesHashed = context->SizeOfHeaders;
 
 	/* Validate section locations and sizes */
 	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
@@ -682,14 +776,7 @@ static EFI_STATUS generate_hash (char *data, int datasize_in,
 	/* Hash all remaining data */
 	if (datasize > SumOfBytesHashed) {
 		hashbase = data + SumOfBytesHashed;
-		hashsize = (unsigned int)(
-			datasize -
-#if __LP64__
-			context->PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
-#else
-			context->PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY].Size -
-#endif
-			SumOfBytesHashed);
+		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -843,24 +930,31 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 	unsigned long HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
 
-	if (datasize < sizeof(EFI_IMAGE_DOS_HEADER)) {
+	if (datasize < sizeof (PEHdr->Pe32)) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
-#if __LP64__
-	context->NumberOfRvaAndSizes = PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes;
-	context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
-	context->ImageSize = PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
-	OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
-#else
-	context->NumberOfRvaAndSizes = PEHdr->Pe32.OptionalHeader.NumberOfRvaAndSizes;
-	context->SizeOfHeaders = PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
-	context->ImageSize = (UINT64)PEHdr->Pe32.OptionalHeader.SizeOfImage;
-	OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
-#endif
+
+	if (!image_is_loadable(PEHdr)) {
+		perror(L"Platform does not support this image\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	if (image_is_64_bit(PEHdr)) {
+		context->NumberOfRvaAndSizes = PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes;
+		context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
+		context->ImageSize = PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
+		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
+	} else {
+		context->NumberOfRvaAndSizes = PEHdr->Pe32.OptionalHeader.NumberOfRvaAndSizes;
+		context->SizeOfHeaders = PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
+		context->ImageSize = (UINT64)PEHdr->Pe32.OptionalHeader.SizeOfImage;
+		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
+	}
+
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
 	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < context->NumberOfRvaAndSizes) {
@@ -908,17 +1002,19 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	}
 
 	context->PEHdr = PEHdr;
-#if __LP64__
-	context->ImageAddress = PEHdr->Pe32Plus.OptionalHeader.ImageBase;
-	context->EntryPoint = PEHdr->Pe32Plus.OptionalHeader.AddressOfEntryPoint;
-	context->RelocDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
-	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
-#else
-	context->ImageAddress = PEHdr->Pe32.OptionalHeader.ImageBase;
-	context->EntryPoint = PEHdr->Pe32.OptionalHeader.AddressOfEntryPoint;
-	context->RelocDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
-	context->SecDir = (EFI_IMAGE_DATA_DIRECTORY *) &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
-#endif
+
+	if (image_is_64_bit(PEHdr)) {
+		context->ImageAddress = PEHdr->Pe32Plus.OptionalHeader.ImageBase;
+		context->EntryPoint = PEHdr->Pe32Plus.OptionalHeader.AddressOfEntryPoint;
+		context->RelocDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
+		context->SecDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
+	} else {
+		context->ImageAddress = PEHdr->Pe32.OptionalHeader.ImageBase;
+		context->EntryPoint = PEHdr->Pe32.OptionalHeader.AddressOfEntryPoint;
+		context->RelocDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
+		context->SecDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
+	}
+
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 
 	if (context->ImageSize < context->SizeOfHeaders) {
@@ -938,21 +1034,6 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	}
 	return EFI_SUCCESS;
 }
-
-static const UINT16 machine_type =
-#if defined(__x86_64__)
-	IMAGE_FILE_MACHINE_X64;
-#elif defined(__aarch64__)
-	IMAGE_FILE_MACHINE_ARM64;
-#elif defined(__arm__)
-	IMAGE_FILE_MACHINE_ARMTHUMB_MIXED;
-#elif defined(__i386__) || defined(__i486__) || defined(__i686__)
-	IMAGE_FILE_MACHINE_I386;
-#elif defined(__ia64__)
-	IMAGE_FILE_MACHINE_IA64;
-#else
-#error this architecture is not supported by shim
-#endif
 
 /*
  * Once the image has been loaded it needs to be validated and relocated
@@ -975,11 +1056,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	if (efi_status != EFI_SUCCESS) {
 		perror(L"Failed to read header: %r\n", efi_status);
 		return efi_status;
-	}
-
-	if (context.PEHdr->Pe32.FileHeader.Machine != machine_type) {
-		perror(L"Image is for a different architecture\n");
-		return EFI_UNSUPPORTED;
 	}
 
 	/*
