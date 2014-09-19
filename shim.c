@@ -63,7 +63,7 @@ static UINT8 in_protocol;
 
 #define perror(fmt, ...) ({						\
 		UINTN __perror_ret = 0;					\
-		if (in_protocol)					\
+		if (!in_protocol)					\
 			__perror_ret = Print((fmt), ##__VA_ARGS__);	\
 		__perror_ret;						\
 	})
