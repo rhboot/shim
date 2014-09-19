@@ -923,14 +923,13 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			return status;
 		}
 
-
 		/*
 		 * And finally, check against shim's built-in key
 		 */
-		if (AuthenticodeVerify(cert->CertData,
-			       context->SecDir->Size - sizeof(cert->Hdr),
-			       vendor_cert, vendor_cert_size, sha256hash,
-			       SHA256_DIGEST_SIZE)) {
+		if (vendor_cert_size && AuthenticodeVerify(cert->CertData,
+							context->SecDir->Size - sizeof(cert->Hdr),
+							vendor_cert, vendor_cert_size, sha256hash,
+							SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
 			return status;
 		}
