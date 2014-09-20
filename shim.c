@@ -593,6 +593,22 @@ static BOOLEAN secure_mode (void)
 	return TRUE;
 }
 
+#define check_size_line(data, datasize_in, hashbase, hashsize, l) ({	\
+	if ((unsigned long)hashbase >					\
+			(unsigned long)data + datasize_in) {		\
+		perror(L"shim.c:%d Invalid hash base 0x%016x\n", l,	\
+			hashbase);					\
+		goto done;						\
+	}								\
+	if ((unsigned long)hashbase + hashsize >			\
+			(unsigned long)data + datasize_in) {		\
+		perror(L"shim.c:%d Invalid hash size 0x%016x\n", l,	\
+			hashsize);					\
+		goto done;						\
+	}								\
+})
+#define check_size(d,ds,h,hs) check_size_line(d,ds,h,hs,__LINE__)
+
 /*
  * Calculate the SHA1 and SHA256 hashes of a binary
  */
@@ -650,6 +666,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	hashbase = data;
 	hashsize = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum -
 		hashbase;
+	check_size(data, datasize_in, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -662,6 +679,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	hashbase = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum +
 		sizeof (int);
 	hashsize = (char *)context->SecDir - hashbase;
+	check_size(data, datasize_in, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -679,6 +697,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		status = EFI_INVALID_PARAMETER;
 		goto done;
 	}
+	check_size(data, datasize_in, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -763,6 +782,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 			goto done;
 		}
 		hashsize  = (unsigned int) Section->SizeOfRawData;
+		check_size(data, datasize_in, hashbase, hashsize);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -777,6 +797,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	if (datasize > SumOfBytesHashed) {
 		hashbase = data + SumOfBytesHashed;
 		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
+		check_size(data, datasize_in, hashbase, hashsize);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
