@@ -4,63 +4,60 @@ OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
 SECTIONS
 {
-  . = 0;
-  ImageBase = .;
-  .hash : { *(.hash) }	/* this MUST come first! */
-  . = ALIGN(4096);
-  .eh_frame : 
-  { 
-    *(.eh_frame)
+  .text 0x0 : {
+    *(.text.head)
+    *(.text)
+    *(.text.*)
+    *(.gnu.linkonce.t.*)
+    *(.srodata)
+    *(.rodata*)
+    . = ALIGN(16);
+    _etext = .;
   }
-  . = ALIGN(4096);
-  .text :
-  {
-   *(.text)
-  }
-  . = ALIGN(4096);
-  .reloc :
-  {
-   *(.reloc)
-  }
-  . = ALIGN(4096);
+  .dynamic : { *(.dynamic) }
   .data :
   {
-   *(.rodata*)
-   *(.got.plt)
-   *(.got)
-   *(.data*)
-   *(.sdata)
-   /* the EFI loader doesn't seem to like a .bss section, so we stick
-      it all into .data: */
-   *(.sbss)
-   *(.scommon)
-   *(.dynbss)
-   *(.bss)
-   *(COMMON)
-   *(.rel.local)
+    *(.sdata)
+    *(.data)
+    *(.data1)
+    *(.data.*)
+    *(.got.plt)
+    *(.got)
+
+    /* the EFI loader doesn't seem to like a .bss section, so we stick
+     * it all into .data: */
+    . = ALIGN(16);
+    _bss = .;
+    *(.sbss)
+    *(.scommon)
+    *(.dynbss)
+    *(.bss)
+    *(COMMON)
+    . = ALIGN(16);
+    _bss_end = .;
   }
   . = ALIGN(4096);
   .vendor_cert :
   {
-   *(.vendor_cert)
+    *(.vendor_cert)
   }
+
   . = ALIGN(4096);
-  .dynamic  : { *(.dynamic) }
+  .rela.dyn : { *(.rela.dyn) }
+  .rela.plt : { *(.rela.plt) }
+  .rela.got : { *(.rela.got) }
+  .rela.data : { *(.rela.data) *(.rela.data*) }
+  _edata = .;
+  _data_size = . - _etext;
+
   . = ALIGN(4096);
-  .rela :
+  .dynsym : { *(.dynsym) }
+  . = ALIGN(4096);
+  .dynstr : { *(.dynstr) }
+  . = ALIGN(4096);
+  /DISCARD/ :
   {
-    *(.rela.data*)
-    *(.rela.got)
-    *(.rela.stab)
-  }
-  . = ALIGN(4096);
-  .dynsym   : { *(.dynsym) }
-  . = ALIGN(4096);
-  .dynstr   : { *(.dynstr) }
-  . = ALIGN(4096);
-  .ignored.reloc :
-  {
-    *(.rela.reloc)
+    *(.rel.reloc)
     *(.eh_frame)
     *(.note.GNU-stack)
   }
