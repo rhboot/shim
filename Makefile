@@ -6,19 +6,25 @@ ARCH		= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 
 SUBDIRS		= Cryptlib lib
 
-LIB_PATH	= /usr/lib64
-
 EFI_INCLUDE	:= /usr/include/efi
 EFI_INCLUDES	= -nostdinc -ICryptlib -ICryptlib/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -Iinclude
-EFI_PATH	:= /usr/lib64/gnuefi
+ifeq ($(ARCH),ia32)
+LIB_PATH	:= /usr/lib
+EFI_PATH	:= /usr/lib/gnuefi
+endif
+LIB_PATH	?= /usr/lib64
+EFI_PATH	?= /usr/lib64/gnuefi
 
 LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC) 
 
 ifeq ($(ARCH),x86_64)
 EFI_CRT_OBJS	:= crt0-efi-$(ARCH).o
-endif
+else ifeq ($(ARCH),ia32)
+EFI_CRT_OBJS	:= crt0-efi-$(ARCH).o
+else
 EFI_CRT_OBJS 	?= $(EFI_PATH)/crt0-efi-$(ARCH).o
+endif
 EFI_LDS		= elf_$(ARCH)_efi.lds
 
 DEFAULT_LOADER	:= \\\\grub.efi
@@ -137,9 +143,15 @@ SUBSYSTEM	:= 0xa
 LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 endif
 
+ifeq ($(ARCH),ia32)
+FORMAT		:= -O binary
+SUBSYSTEM	:= 0xa
+LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+endif
+
 FORMAT		?= --target efi-app-$(ARCH)
 
-crt0-efi-x86_64.o : crt0-efi-x86_64.S
+crt0-efi-$(ARCH).o : crt0-efi-$(ARCH).S
 	$(CC) $(CFLAGS) -DEFI_SUBSYSTEM=$(SUBSYSTEM) -c -o $@ $<
 
 %.efi: %.so
