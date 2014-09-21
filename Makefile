@@ -21,6 +21,7 @@ EFI_LDS		= elf_$(ARCH)_efi.lds
 DEFAULT_LOADER	:= \\\\grub.efi
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
+		  -Werror=sign-compare \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 		  $(EFI_INCLUDES)
