@@ -234,7 +234,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 			return FALSE;
 		}
 	}
-	if (end == '\0') {
+	if (*end == '\0') {
 		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
 	}
