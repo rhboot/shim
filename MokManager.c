@@ -192,7 +192,8 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		list[count].Type = CertList->SignatureType;
 
 		/* MOK out of bounds? */
-		if (list[count].MokSize > end - (void *)list[count].Mok) {
+		if (list[count].MokSize > (unsigned long)end -
+					  (unsigned long)list[count].Mok) {
 			FreePool(list);
 			return NULL;
 		}
