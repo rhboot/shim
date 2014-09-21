@@ -436,11 +436,11 @@ static void show_mok_info (void *Mok, UINTN MokSize)
 
 static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 {
-	UINT32 MokNum = 0;
+	INTN MokNum = 0;
 	MokListNode *keys = NULL;
 	INTN key_num = 0;
 	CHAR16 **menu_strings;
-	unsigned int i;
+	int i;
 
 	if (KeyListSize < (sizeof(EFI_SIGNATURE_LIST) +
 			   sizeof(EFI_SIGNATURE_DATA))) {
