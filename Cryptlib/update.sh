@@ -14,13 +14,10 @@ cp $DIR/Cipher/CryptTdes.c Cipher/CryptTdes.c
 cp $DIR/Cipher/CryptArc4.c Cipher/CryptArc4.c
 cp $DIR/Rand/CryptRand.c Rand/CryptRand.c
 cp $DIR/Pk/CryptRsaBasic.c Pk/CryptRsaBasic.c
-cp $DIR/Pk/CryptRsaExt.c Pk/CryptRsaExt.c
 cp $DIR/Pk/CryptRsaExtNull.c Pk/CryptRsaExtNull.c
-cp $DIR/Pk/CryptPkcs7Sign.c Pk/CryptPkcs7Sign.c
 cp $DIR/Pk/CryptPkcs7SignNull.c Pk/CryptPkcs7SignNull.c
 cp $DIR/Pk/CryptPkcs7Verify.c Pk/CryptPkcs7Verify.c
-cp $DIR/Pk/CryptPkcs7VerifyNull.c Pk/CryptPkcs7VerifyNull.c
-cp $DIR/Pk/CryptDh.c Pk/CryptDh.c
+cp $DIR/Pk/CryptDhNull.c Pk/CryptDhNull.c
 cp $DIR/Pk/CryptX509.c Pk/CryptX509.c
 cp $DIR/Pk/CryptAuthenticode.c Pk/CryptAuthenticode.c
 cp $DIR/Pem/CryptPem.c Pem/CryptPem.c
