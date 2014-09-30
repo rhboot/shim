@@ -949,7 +949,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		/*
 		 * Check against the shim build key
 		 */
-		if (AuthenticodeVerify(cert->CertData,
+		if (sizeof(shim_cert) &&
+		    AuthenticodeVerify(cert->CertData,
 			       context->SecDir->Size - sizeof(cert->Hdr),
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
