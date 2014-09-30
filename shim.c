@@ -222,6 +222,7 @@ image_is_loadable(EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr)
  * Perform the actual relocation
  */
 static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
+				 EFI_IMAGE_SECTION_HEADER *Section,
 				 void *orig, void *data)
 {
 	EFI_IMAGE_BASE_RELOCATION *RelocBase, *RelocBaseEnd;
@@ -233,14 +234,46 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	UINT64 *Fixup64;
 	int size = context->ImageSize;
 	void *ImageEnd = (char *)orig + size;
+	int n = 0;
 
 	if (image_is_64_bit(context->PEHdr))
 		context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)(unsigned long)data;
 	else
 		context->PEHdr->Pe32.OptionalHeader.ImageBase = (UINT32)(unsigned long)data;
 
-	RelocBase = ImageAddress(orig, size, context->RelocDir->VirtualAddress);
-	RelocBaseEnd = ImageAddress(orig, size, context->RelocDir->VirtualAddress + context->RelocDir->Size - 1);
+	/* Alright, so here's how this works:
+	 *
+	 * context->RelocDir gives us two things:
+	 * - the VA the table of base relocation blocks are (maybe) to be
+	 *   mapped at (RelocDir->VirtualAddress)
+	 * - the virtual size (RelocDir->Size)
+	 *
+	 * The .reloc section (Section here) gives us some other things:
+	 * - the name! kind of. (Section->Name)
+	 * - the virtual size (Section->VirtualSize), which should be the same
+	 *   as RelocDir->Size
+	 * - the virtual address (Section->VirtualAddress)
+	 * - the file section size (Section->SizeOfRawData), which is
+	 *   a multiple of OptHdr->FileAlignment.  Only useful for image
+	 *   validation, not really useful for iteration bounds.
+	 * - the file address (Section->PointerToRawData)
+	 * - a bunch of stuff we don't use that's 0 in our binaries usually
+	 * - Flags (Section->Characteristics)
+	 *
+	 * and then the thing that's actually at the file address is an array
+	 * of EFI_IMAGE_BASE_RELOCATION structs with some values packed behind
+	 * them.  The SizeOfBlock field of this structure includes the
+	 * structure itself, and adding it to that structure's address will
+	 * yield the next entry in the array.
+	 */
+	RelocBase = ImageAddress(orig, size, Section->PointerToRawData);
+	/* RelocBaseEnd here is the address of the first entry /past/ the
+	 * table.  */
+	RelocBaseEnd = ImageAddress(orig, size, Section->PointerToRawData +
+						Section->Misc.VirtualSize);
+
+	if (!RelocBase && !RelocBaseEnd)
+		return EFI_SUCCESS;
 
 	if (!RelocBase || !RelocBaseEnd) {
 		perror(L"Reloc table overflows binary\n");
@@ -256,19 +289,19 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		Reloc = (UINT16 *) ((char *) RelocBase + sizeof (EFI_IMAGE_BASE_RELOCATION));
 
 		if ((RelocBase->SizeOfBlock == 0) || (RelocBase->SizeOfBlock > context->RelocDir->Size)) {
-			perror(L"Reloc block size %d is invalid\n", RelocBase->SizeOfBlock);
+			perror(L"Reloc %d block size %d is invalid\n", n, RelocBase->SizeOfBlock);
 			return EFI_UNSUPPORTED;
 		}
 
 		RelocEnd = (UINT16 *) ((char *) RelocBase + RelocBase->SizeOfBlock);
 		if ((void *)RelocEnd < orig || (void *)RelocEnd > ImageEnd) {
-			perror(L"Reloc entry overflows binary\n");
+			perror(L"Reloc %d entry overflows binary\n", n);
 			return EFI_UNSUPPORTED;
 		}
 
 		FixupBase = ImageAddress(data, size, RelocBase->VirtualAddress);
 		if (!FixupBase) {
-			perror(L"Invalid fixupbase\n");
+			perror(L"Reloc %d Invalid fixupbase\n", n);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -317,12 +350,13 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 				break;
 
 			default:
-				perror(L"Unknown relocation\n");
+				perror(L"Reloc %d Unknown relocation\n", n);
 				return EFI_UNSUPPORTED;
 			}
 			Reloc += 1;
 		}
 		RelocBase = (EFI_IMAGE_BASE_RELOCATION *) RelocEnd;
+		n++;
 	}
 
 	return EFI_SUCCESS;
@@ -1102,15 +1136,21 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
+	char *RelocBase, *RelocBaseEnd;
+	RelocBase = ImageAddress(buffer, datasize,
+				 context.RelocDir->VirtualAddress);
+	/* RelocBaseEnd here is the address of the last byte of the table */
+	RelocBaseEnd = ImageAddress(buffer, datasize,
+				    context.RelocDir->VirtualAddress +
+				    context.RelocDir->Size - 1);
+
+	EFI_IMAGE_SECTION_HEADER *RelocSection = NULL;
+
 	/*
 	 * Copy the executable's sections to their desired offsets
 	 */
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
-		if (Section->Characteristics & 0x02000000)
-			/* section has EFI_IMAGE_SCN_MEM_DISCARDABLE attr set */
-			continue;
-
 		size = Section->Misc.VirtualSize;
 
 		if (size > Section->SizeOfRawData)
@@ -1118,7 +1158,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		base = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress);
 		end = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress + size - 1);
-
 		if (!base || !end) {
 			perror(L"Invalid section size\n");
 			return EFI_UNSUPPORTED;
@@ -1128,6 +1167,30 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 				Section->PointerToRawData < context.SizeOfHeaders) {
 			perror(L"Section is inside image headers\n");
 			return EFI_UNSUPPORTED;
+		}
+
+		/* We do want to process .reloc, but it's often marked
+		 * discardable, so we don't want to memcpy it. */
+		if (CompareMem(Section->Name, ".reloc\0\0", 8) == 0) {
+			if (RelocSection) {
+				perror(L"Image has multiple relocation sections\n");
+				return EFI_UNSUPPORTED;
+			}
+			/* If it has nonzero sizes, and our bounds check
+			 * made sense, and the VA and size match RelocDir's
+			 * versions, then we believe in this section table. */
+			if (Section->SizeOfRawData &&
+					Section->Misc.VirtualSize &&
+					base && end &&
+					RelocBase == base &&
+					RelocBaseEnd == end) {
+				RelocSection = Section;
+			}
+		}
+
+		if (Section->Characteristics & 0x02000000) {
+			/* section has EFI_IMAGE_SCN_MEM_DISCARDABLE attr set */
+			continue;
 		}
 
 		if (Section->SizeOfRawData > 0)
@@ -1143,11 +1206,12 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	if (context.RelocDir->Size) {
+	if (context.RelocDir->Size && RelocSection) {
 		/*
 		 * Run the relocation fixups
 		 */
-		efi_status = relocate_coff(&context, data, buffer);
+		efi_status = relocate_coff(&context, RelocSection, data,
+					   buffer);
 
 		if (efi_status != EFI_SUCCESS) {
 			perror(L"Relocation failed: %r\n", efi_status);
