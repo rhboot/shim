@@ -6,25 +6,16 @@ ARCH		= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 
 SUBDIRS		= Cryptlib lib
 
+LIB_PATH	= /usr/lib64
+
 EFI_INCLUDE	:= /usr/include/efi
 EFI_INCLUDES	= -nostdinc -ICryptlib -ICryptlib/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -Iinclude
-ifeq ($(ARCH),ia32)
-LIB_PATH	:= /usr/lib
-EFI_PATH	:= /usr/lib/gnuefi
-endif
-LIB_PATH	?= /usr/lib64
-EFI_PATH	?= /usr/lib64/gnuefi
+EFI_PATH	:= /usr/lib64/gnuefi
 
 LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC) 
 
-ifeq ($(ARCH),x86_64)
-EFI_CRT_OBJS	:= crt0-efi-$(ARCH).o
-else ifeq ($(ARCH),ia32)
-EFI_CRT_OBJS	:= crt0-efi-$(ARCH).o
-else
-EFI_CRT_OBJS 	?= $(EFI_PATH)/crt0-efi-$(ARCH).o
-endif
+EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= elf_$(ARCH)_efi.lds
 
 DEFAULT_LOADER	:= \\\\grub.efi
@@ -61,11 +52,11 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
-LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL
+LDFLAGS		= -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS)
 
 VERSION		= 0.7
 
-TARGET	+= shim.efi MokManager.efi.signed fallback.efi.signed
+TARGET	= shim.efi MokManager.efi.signed fallback.efi.signed
 OBJS	= shim.o netboot.o cert.o replacements.o version.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h include/console.h replacements.c replacements.h version.c version.h
@@ -103,17 +94,17 @@ shim.o: $(SOURCES) shim_cert.h
 cert.o : cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a $(EFI_CRT_OBJS)
+shim.so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 fallback.o: $(FALLBACK_SRCS)
 
-fallback.so: $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a $(EFI_CRT_OBJS)
+fallback.so: $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(MOK_SOURCES)
 
-MokManager.so: $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a $(EFI_CRT_OBJS)
+MokManager.so: $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 Cryptlib/libcryptlib.a:
@@ -137,22 +128,7 @@ SUBSYSTEM	:= 0xa
 LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 endif
 
-ifeq ($(ARCH),x86_64)
-FORMAT		:= -O binary
-SUBSYSTEM	:= 0xa
-LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-endif
-
-ifeq ($(ARCH),ia32)
-FORMAT		:= -O binary
-SUBSYSTEM	:= 0xa
-LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-endif
-
 FORMAT		?= --target efi-app-$(ARCH)
-
-crt0-efi-$(ARCH).o : crt0-efi-$(ARCH).S
-	$(CC) $(CFLAGS) -DEFI_SUBSYSTEM=$(SUBSYSTEM) -c -o $@ $<
 
 %.efi: %.so
 	$(OBJCOPY) -j .text -j .sdata -j .data \
