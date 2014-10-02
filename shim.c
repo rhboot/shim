@@ -1698,37 +1698,42 @@ EFI_STATUS mirror_mok_list()
 	if (efi_status != EFI_SUCCESS)
 		DataSize = 0;
 
-	FullDataSize = DataSize
-		     + sizeof (*CertList)
-		     + sizeof (EFI_GUID)
-		     + vendor_cert_size
-		     ;
-	FullData = AllocatePool(FullDataSize);
-	if (!FullData) {
-		perror(L"Failed to allocate space for MokListRT\n");
-		return EFI_OUT_OF_RESOURCES;
+	if (vendor_cert_size) {
+		FullDataSize = DataSize
+			     + sizeof (*CertList)
+			     + sizeof (EFI_GUID)
+			     + vendor_cert_size
+			     ;
+		FullData = AllocatePool(FullDataSize);
+		if (!FullData) {
+			perror(L"Failed to allocate space for MokListRT\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		p = FullData;
+
+		if (efi_status == EFI_SUCCESS && DataSize > 0) {
+			CopyMem(p, Data, DataSize);
+			p += DataSize;
+		}
+		CertList = (EFI_SIGNATURE_LIST *)p;
+		p += sizeof (*CertList);
+		CertData = (EFI_SIGNATURE_DATA *)p;
+		p += sizeof (EFI_GUID);
+
+		CertList->SignatureType = EFI_CERT_X509_GUID;
+		CertList->SignatureListSize = vendor_cert_size
+					      + sizeof (*CertList)
+					      + sizeof (*CertData)
+					      -1;
+		CertList->SignatureHeaderSize = 0;
+		CertList->SignatureSize = vendor_cert_size + sizeof (EFI_GUID);
+
+		CertData->SignatureOwner = SHIM_LOCK_GUID;
+		CopyMem(p, vendor_cert, vendor_cert_size);
+	} else {
+		FullDataSize = DataSize;
+		FullData = Data;
 	}
-	p = FullData;
-
-	if (efi_status == EFI_SUCCESS && DataSize > 0) {
-		CopyMem(p, Data, DataSize);
-		p += DataSize;
-	}
-	CertList = (EFI_SIGNATURE_LIST *)p;
-	p += sizeof (*CertList);
-	CertData = (EFI_SIGNATURE_DATA *)p;
-	p += sizeof (EFI_GUID);
-
-	CertList->SignatureType = EFI_CERT_X509_GUID;
-	CertList->SignatureListSize = vendor_cert_size
-				      + sizeof (*CertList)
-				      + sizeof (*CertData)
-				      -1;
-	CertList->SignatureHeaderSize = 0;
-	CertList->SignatureSize = vendor_cert_size + sizeof (EFI_GUID);
-
-	CertData->SignatureOwner = SHIM_LOCK_GUID;
-	CopyMem(p, vendor_cert, vendor_cert_size);
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
 				       &shim_lock_guid,
