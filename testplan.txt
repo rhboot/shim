@@ -47,27 +47,25 @@ How to test a new shim build for RHEL/fedora:
     fs0:\EFI\test\lockdown.efi
 17) enable secure boot verification
 18) verify it can't run other binaries:
-    fs0:\EFI\redhat\grubx64.efi
+    fs0:\EFI\test\grubx64.efi
     result should be an error, probably similar to:
     "fs0:\...\grubx64.efi is not recognized as an internal or external command"
-19) copy test.efi to grubx64.efi:
-    cp \EFI\test\test.efi \EFI\test\grubx64.efi
-20) in the EFI shell, run fs0:\EFI\test\shim.efi
-21) you should see MokManager.  Enroll the certificate you added in #13, and
+19) in the EFI shell, run fs0:\EFI\test\shim.efi
+20) you should see MokManager.  Enroll the certificate you added in #13, and
     the system will reboot.
-22) reboot to the UEFI shell and run fs0:\EFI\test\shim.efi
+21) reboot to the UEFI shell and run fs0:\EFI\test\shim.efi
     result: "This is a test application that should be completely safe."
   If you get the expected result, shim can run things signed by its internal
   key ring.  Check a box someplace that says it can do that.
-23) from the EFI shell, copy grub to grubx64.efi:
+22) from the EFI shell, copy grub to grubx64.efi:
     cp \EFI\test\grub.efi \EFI\test\grubx64.efi
-24) in the EFI shell, run fs0:\EFI\test\shim.efi
+23) in the EFI shell, run fs0:\EFI\test\shim.efi
     result: this should start grub, which will let you boot a kernel
   If grub starts, it means shim can run things signed by a key in the system's
   db.  Check a box someplace that says it can do that.
   If the kernel boots, it means shim can run things from Mok.  Check a box
   someplace that says it can do that.
-25) remove all boot entries and the BootOrder variable:
+24) remove all boot entries and the BootOrder variable:
     [root@uefi ~]# cd /sys/firmware/efi/efivars/
     [root@uefi efivars]# rm -vf Boot[0123456789]* BootOrder-*
     removed ‘Boot0000-8be4df61-93ca-11d2-aa0d-00e098032b8c’
@@ -76,14 +74,14 @@ How to test a new shim build for RHEL/fedora:
     removed ‘Boot2001-8be4df61-93ca-11d2-aa0d-00e098032b8c’
     removed ‘BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c’
     [root@uefi efivars]# 
-27) reboot
-28) the system should run \EFI\BOOT\BOOTX64.EFI .  If it doesn't, you may just
+25) reboot
+26) the system should run \EFI\BOOT\BOOTX64.EFI .  If it doesn't, you may just
     have an old machine.  In that case, go to the EFI shell and run:
     fs0:\EFI\BOOT\BOOTX64.EFI
   If this works, you should see a bit of output very quickly and then the same
   thing as #24.  This means shim recognized it was in \EFI\BOOT and ran
   fallback.efi, which worked.
-29) copy the unsigned grub into place and reboot:
+27) copy the unsigned grub into place and reboot:
   cp /boot/efi/EFI/test/grubx64-unsigned.efi /boot/efi/EFI/test/grubx64.efi
-30) reboot again.
+28) reboot again.
     result: shim should refuse to load grub.
