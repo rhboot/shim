@@ -12,7 +12,7 @@ How to test a new shim build for RHEL/fedora:
         -s -c "Red Hat Test Certificate"
 6) put pesign-test-app-signed.efi in \EFI\test as grubx64.efi
    cp /usr/share/pesign-test-app-0.4/pesign-test-app-signed.efi \
-	/boot/efi/EFI/test/test.efi
+	/boot/efi/EFI/test/grubx64.efi
 7) sign a copy of grubx64.efi with RHTC and iput it in \EFI\test\ .  Also
    leave an unsigned copy there:
     pesign -i /boot/efi/EFI/redhat/grubx64.efi \
@@ -38,7 +38,9 @@ How to test a new shim build for RHEL/fedora:
 12) put shim.efi there as well
     cp /boot/efi/EFI/test/shim.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
 13) enroll the current kernel's certificate with mokutil:
-    mokutil --import ~/redhatsecurebootca2.cer
+    # this should be a /different/ cert than the one signing pesign-test-app.
+    # for instance use a RHEL cert for p-t-a and a fedora cert+kernel here.
+    mokutil --import ~/fedora-ca.cer
 14) put machine in setup mode
 15) boot to the UEFI shell
 16) run lockdown.efi from #4:
