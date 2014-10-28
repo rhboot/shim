@@ -514,8 +514,8 @@ static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 	UINTN hash_num;
 	UINT8 *hash;
 	CHAR16 **menu_strings;
-	int key_num = 0;
-	int i;
+	UINTN key_num = 0;
+	UINTN i;
 
 	sig_size = sha_size(Type) + sizeof(EFI_GUID);
 	if ((MokSize % sig_size) != 0) {
@@ -593,7 +593,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 {
 	INTN MokNum = 0;
 	MokListNode *keys = NULL;
-	int key_num = 0;
+	UINT32 key_num = 0;
 	CHAR16 **menu_strings;
 	int i;
 
@@ -1119,7 +1119,7 @@ static int match_hash (UINT8 *hash, UINT32 hash_size, int start,
 		       void *hash_list, UINT32 list_num)
 {
 	UINT8 *ptr;
-	int i;
+	UINTN i;
 
 	ptr = hash_list + sizeof(EFI_GUID);
 	for (i = start; i < list_num; i++) {
@@ -1134,7 +1134,7 @@ static int match_hash (UINT8 *hash, UINT32 hash_size, int start,
 static void mem_move (void *dest, void *src, UINTN size)
 {
 	UINT8 *d, *s;
-	int i;
+	UINTN i;
 
 	d = (UINT8 *)dest;
 	s = (UINT8 *)src;
@@ -1191,7 +1191,7 @@ static void delete_hash_list (EFI_GUID Type, void *hash_list, UINT32 list_size,
 	UINT32 hash_num;
 	UINT32 sig_size;
 	UINT8 *hash;
-	int i;
+	UINT32 i;
 
 	hash_size = sha_size (Type);
 	sig_size = hash_size + sizeof(EFI_GUID);
