@@ -5,7 +5,6 @@
  */
 
 #include <guid.h>
-#include <stdio.h>
 
 #ifndef BUILD_EFI
 /* EFI has %g for this, so it's only needed in platform c */
