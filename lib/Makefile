@@ -4,7 +4,7 @@ LIBFILES = simple_file.o guid.o console.o execute.o configtable.o shell.o variab
 
 EFI_INCLUDES    = -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -I../include
 
-CFLAGS          = -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
+CFLAGS          = -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic -nostdinc\
 		  -fshort-wchar -Wall -DBUILD_EFI -fno-builtin -Werror \
 		  $(EFI_INCLUDES)
 
