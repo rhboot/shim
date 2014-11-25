@@ -1682,6 +1682,9 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	if (efi_status != EFI_SUCCESS)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
+	Print(L"start_image() returned %r\n", efi_status);
+	uefi_call_wrapper(BS->Stall, 1, 2000000);
+
 	return efi_status;
 }
 
@@ -1985,6 +1988,10 @@ install_shim_protocols(void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
+
+	if (!secure_mode())
+		return EFI_SUCCESS;
+
 	/*
 	 * Install the protocol
 	 */
@@ -2011,6 +2018,10 @@ void
 uninstall_shim_protocols(void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+
+	if (!secure_mode())
+		return;
+
 #if defined(OVERRIDE_SECURITY_POLICY)
 	/*
 	 * Clean up the security protocol hook
