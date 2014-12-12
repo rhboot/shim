@@ -133,13 +133,13 @@ FORMAT		?= --target efi-app-$(ARCH)
 
 %.efi: %.so
 	$(OBJCOPY) -j .text -j .sdata -j .data \
-		-j .dynamic -j .dynsym  -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame \
+		-j .dynamic -j .dynsym  -j .rel \
+		-j .rela -j .reloc -j .eh_frame \
 		-j .vendor_cert \
 		$(FORMAT)  $^ $@
 	$(OBJCOPY) -j .text -j .sdata -j .data \
-		-j .dynamic -j .dynsym  -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame \
+		-j .dynamic -j .dynsym  -j .rel \
+		-j .rela -j .reloc -j .eh_frame \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		$(FORMAT) $^ $@.debug
