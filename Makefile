@@ -3,6 +3,7 @@ LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 
 ARCH		= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
+OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.* //g' | cut -f1-2 -d.` \>= 2.24)
 
 SUBDIRS		= Cryptlib lib
 
@@ -127,6 +128,9 @@ endif
 FORMAT		?= --target efi-app-$(ARCH)
 
 %.efi: %.so
+ifneq ($(OBJCOPY_GTE224),1)
+	$(error objcopy >= 2.24 is required)
+endif
 	$(OBJCOPY) -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym  -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
