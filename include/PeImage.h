@@ -778,6 +778,7 @@ typedef struct {
 	UINTN SizeOfHeaders;
 	UINT16 ImageType;
 	UINT16 NumberOfSections;
+	UINT32 SectionAlignment;
 	EFI_IMAGE_SECTION_HEADER *FirstSection;
 	EFI_IMAGE_DATA_DIRECTORY *RelocDir;
 	EFI_IMAGE_DATA_DIRECTORY *SecDir;

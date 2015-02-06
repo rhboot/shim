@@ -1002,14 +1002,18 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		context->NumberOfRvaAndSizes = PEHdr->Pe32Plus.OptionalHeader.NumberOfRvaAndSizes;
 		context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
 		context->ImageSize = PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
+		context->SectionAlignment = PEHdr->Pe32Plus.OptionalHeader.SectionAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
 	} else {
 		context->NumberOfRvaAndSizes = PEHdr->Pe32.OptionalHeader.NumberOfRvaAndSizes;
 		context->SizeOfHeaders = PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
 		context->ImageSize = (UINT64)PEHdr->Pe32.OptionalHeader.SizeOfImage;
+		context->SectionAlignment = PEHdr->Pe32.OptionalHeader.SectionAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
 	}
 
+	if (context->SectionAlignment < 0x1000)
+		context->SectionAlignment = 0x1000;
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
 	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < context->NumberOfRvaAndSizes) {
@@ -1128,7 +1132,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		}
 	}
 
-	buffer = AllocatePool(context.ImageSize);
+	buffer = AllocatePool(context.ImageSize + context.SectionAlignment);
+	buffer = ALIGN_POINTER(buffer, context.SectionAlignment);
 
 	if (!buffer) {
 		perror(L"Failed to allocate image buffer\n");
@@ -1159,16 +1164,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		base = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress);
 		end = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress + size - 1);
-		if (!base || !end) {
-			perror(L"Invalid section size\n");
-			return EFI_UNSUPPORTED;
-		}
-
-		if (Section->VirtualAddress < context.SizeOfHeaders ||
-				Section->PointerToRawData < context.SizeOfHeaders) {
-			perror(L"Section is inside image headers\n");
-			return EFI_UNSUPPORTED;
-		}
 
 		/* We do want to process .reloc, but it's often marked
 		 * discardable, so we don't want to memcpy it. */
@@ -1192,6 +1187,17 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		if (Section->Characteristics & 0x02000000) {
 			/* section has EFI_IMAGE_SCN_MEM_DISCARDABLE attr set */
 			continue;
+		}
+
+		if (!base || !end) {
+			perror(L"Section %d has invalid size\n", i);
+			return EFI_UNSUPPORTED;
+		}
+
+		if (Section->VirtualAddress < context.SizeOfHeaders ||
+				Section->PointerToRawData < context.SizeOfHeaders) {
+			perror(L"Section %d is inside image headers\n", i);
+			return EFI_UNSUPPORTED;
 		}
 
 		if (Section->SizeOfRawData > 0)
