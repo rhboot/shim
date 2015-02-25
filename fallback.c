@@ -328,7 +328,7 @@ update_boot_order(void)
 
 #ifdef DEBUG_FALLBACK
 	Print(L"nbootorder: %d\nBootOrder: ", size / sizeof (CHAR16));
-	int j;
+	UINTN j;
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		Print(L"%04x ", newbootorder[j]);
 	Print(L"\n");
@@ -395,7 +395,7 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 #ifdef DEBUG_FALLBACK
 	{
 	UINTN s = DevicePathSize(dp);
-	int i;
+	UINTN i;
 	UINT8 *dpv = (void *)dp;
 	for (i = 0; i < s; i++) {
 		if (i > 0 && i % 16 == 0)
