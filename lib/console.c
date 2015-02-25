@@ -33,7 +33,7 @@ count_lines(CHAR16 *str_arr[])
 static void
 SetMem16(CHAR16 *dst, UINT32 n, CHAR16 c)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < n/2; i++) {
 		dst[i] = c;
@@ -55,9 +55,12 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 }
 
 void
-console_print_box_at(CHAR16 *str_arr[], int highlight, int start_col, int start_row, int size_cols, int size_rows, int offset, int lines)
+console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
+		     unsigned int start_col, unsigned int start_row,
+		     unsigned int size_cols, unsigned int size_rows,
+		     int offset, unsigned int lines)
 {
-	int i;
+	unsigned int i;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	UINTN rows, cols;
 	CHAR16 *Line;
@@ -124,7 +127,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight, int start_col, int start_
 		
 
 	for (i = start_row + 1; i < size_rows + start_row - 1; i++) {
-		int line = i - start;
+		unsigned int line = i - start;
 
 		SetMem16 (Line, size_cols*2, L' ');
 		Line[0] = BOXDRAW_VERTICAL;
@@ -160,7 +163,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight, int start_col, int start_
 }
 
 void
-console_print_box(CHAR16 *str_arr[], int highlight)
+console_print_box(CHAR16 *str_arr[], unsigned int highlight)
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
@@ -181,17 +184,17 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 }
 
 int
-console_select(CHAR16 *title[], CHAR16* selectors[], int start)
+console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	EFI_INPUT_KEY k;
 	EFI_STATUS status;
-	int selector;
-	int selector_lines = count_lines(selectors);
+	unsigned int selector;
+	unsigned int selector_lines = count_lines(selectors);
 	int selector_max_cols = 0;
-	int i, offs_col, offs_row, size_cols, size_rows, lines;
-	int selector_offset;
+	unsigned int i, offs_col, offs_row, size_cols, size_rows, lines;
+	unsigned int selector_offset;
 	UINTN cols, rows;
 
 	uefi_call_wrapper(co->QueryMode, 4, co, co->Mode->Mode, &cols, &rows);

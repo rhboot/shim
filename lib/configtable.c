@@ -14,7 +14,7 @@
 void *
 configtable_get_table(EFI_GUID *guid)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_CONFIGURATION_TABLE *CT = &ST->ConfigurationTable[i];
@@ -82,7 +82,7 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath)
 		}
 		EFI_DEVICE_PATH *dp = (EFI_DEVICE_PATH *)(e->Data + skip), *dpn = dp;
 		if (dp->Type == 0 || dp->Type > 6 || dp->SubType == 0
-		    || (((dp->Length[1] << 8) + dp->Length[0]) > e->InfoSize)) {
+		    || ((unsigned)((dp->Length[1] << 8) + dp->Length[0]) > e->InfoSize)) {
 			/* Parse error, table corrupt, bail */
 			Print(L"Image Execution Information table corrupt\n");
 			break;

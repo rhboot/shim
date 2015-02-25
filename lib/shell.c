@@ -13,7 +13,7 @@
 EFI_STATUS
 argsplit(EFI_HANDLE image, int *argc, CHAR16*** ARGV)
 {
-	int i, count = 1;
+	unsigned int i, count = 1;
 	EFI_STATUS status;
 	EFI_LOADED_IMAGE *info;
 	CHAR16 *start;

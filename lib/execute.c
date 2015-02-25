@@ -51,7 +51,7 @@ generate_path(CHAR16* name, EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **path, CHAR16
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	CHAR16 *devpathstr = DevicePathToStr(li->FilePath),
 		*found = NULL;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < StrLen(devpathstr); i++) {
 		if (devpathstr[i] == '/')
