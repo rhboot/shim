@@ -163,7 +163,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				StrLen(label)*2 + 2 + DevicePathSize(hddp) +
 				StrLen(arguments) * 2;
 
-			CHAR8 *data = AllocateZeroPool(size);
+			CHAR8 *data = AllocateZeroPool(size + 2);
 			CHAR8 *cursor = data;
 			*(UINT32 *)cursor = LOAD_OPTION_ACTIVE;
 			cursor += sizeof (UINT32);
@@ -234,7 +234,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		StrLen(label)*2 + 2 + DevicePathSize(dp) +
 		StrLen(arguments) * 2;
 
-	CHAR8 *data = AllocateZeroPool(size);
+	CHAR8 *data = AllocateZeroPool(size + 2);
 	if (!data)
 		return EFI_OUT_OF_RESOURCES;
 	CHAR8 *cursor = data;
