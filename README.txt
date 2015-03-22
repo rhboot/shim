@@ -16,10 +16,10 @@
 4. Build Linux kernel (Part 6 of the User Guide)
 
 4.1. Unarchive meta-clanton package
-    tar -xf meta-clanton_v1.0.5.tar.gz
+    tar -xf meta-clanton_v*.tar.gz
 
 4.2. Patch the meta-clanton package (Part 6.1 of the User Guide)
-    ./patches_v1.0.5/patch.meta-clanton.sh
+    ./patches_v*/patch.meta-clanton.sh
 
 4.2. Build a small Linux for SPI Flash
     cd meta-clanton_v1.0.5
