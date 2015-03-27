@@ -10,19 +10,19 @@
     cd Galileo-Runtime-1.0.4
 
 3. Unarchive the patches
-    tar -xf patches_v1.0.4.tar.gz
+    tar -xf patches_v1.0.5.tar.gz
 
 
 4. Build Linux kernel (Part 6 of the User Guide)
 
 4.1. Unarchive meta-clanton package
-    tar -xf meta-clanton_v1.0.1.tar.gz
+    tar -xf meta-clanton_v1.0.5.tar.gz
 
 4.2. Patch the meta-clanton package (Part 6.1 of the User Guide)
-    ./patches_v1.0.4/patch.meta-clanton.sh
+    ./patches_v1.0.5/patch.meta-clanton.sh
 
 4.2. Build a small Linux for SPI Flash
-    cd meta-clanton_v1.0.1
+    cd meta-clanton_v1.0.5
     source poky/oe-init-build-env yocto_build
     bitbake image-spi-galileo
 
@@ -33,7 +33,7 @@
     tar -xf Quark_EDKII_v1.0.2.tar.gz
 
 5.2. Patch the Quark_EDKII package
-    ./patches_v1.0.4/patch.Quark_EDKII.sh
+    ./patches_v1.0.5/patch.Quark_EDKII.sh
 
 5.3. Prepare the build environment (Part 4.2.1 of the User Guide)
     cd Quark_EDKII_v1.0.2
@@ -55,7 +55,7 @@
     tar -xf sysimage_v1.0.1.tar.gz
 
 6.2. Patch the sysimage package
-    ./patches_v1.0.4/patch.sysimage.sh
+    ./patches_v1.0.5/patch.sysimage.sh
 
 6.3. Build SPI
     tar -xf spi-flash-tools_v1.0.1.tar.gz
