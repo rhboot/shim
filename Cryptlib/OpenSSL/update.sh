@@ -1,8 +1,9 @@
 #/bin/sh
 DIR=$1
-version="0.9.8zb"
+version="0.9.8zf"
 
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/e_os.h e_os.h
+install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/constant_time_locl.h crypto/constant_time_locl.h
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cryptlib.c crypto/cryptlib.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dyn_lck.c crypto/dyn_lck.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/mem.c crypto/mem.c
