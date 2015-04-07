@@ -34,7 +34,7 @@ typedef VOID  *FILE;
 //
 // Map all va_xxxx elements to VA_xxx defined in MdePkg/Include/Base.h
 //
-#if !defined(__CC_ARM) // if va_list is not already defined
+#if !defined(__CC_ARM) || defined(_STDARG_H) // if va_list is not already defined
 /*
  * These are now unconditionally #defined by GNU_EFI's efistdarg.h,
  * so we should #undef them here before providing a new definition.
@@ -94,7 +94,9 @@ typedef __builtin_va_list VA_LIST;
    portably, hence it is provided by a Standard C header file.
    For pre-Standard C compilers, here is a version that usually works
    (but watch out!): */
+#ifndef offsetof
 #define offsetof(type, member) ( (int) & ((type*)0) -> member )
+#endif
 
 //
 // Basic types from EFI Application Toolkit required to buiild Open SSL

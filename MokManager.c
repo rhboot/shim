@@ -1,5 +1,6 @@
 #include <efi.h>
 #include <efilib.h>
+#include <stdarg.h>
 #include <Library/BaseCryptLib.h>
 #include <openssl/x509.h>
 #include "shim.h"
