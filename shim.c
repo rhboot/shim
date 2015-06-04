@@ -1673,14 +1673,21 @@ done:
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
+	int use_fb = should_use_fallback(image_handle);
 
-	if (should_use_fallback(image_handle))
-		efi_status = start_image(image_handle, FALLBACK);
-	else
-		efi_status = start_image(image_handle, second_stage);
+	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
 
-	if (efi_status != EFI_SUCCESS)
+	if (efi_status == EFI_SECURITY_VIOLATION) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
+		if (efi_status != EFI_SUCCESS) {
+			Print(L"start_image() returned %r\n", efi_status);
+			uefi_call_wrapper(BS->Stall, 1, 2000000);
+			return efi_status;
+		}
+
+		efi_status = start_image(image_handle,
+					 use_fb ? FALLBACK : second_stage);
+	}
 
 	Print(L"start_image() returned %r\n", efi_status);
 	uefi_call_wrapper(BS->Stall, 1, 2000000);
