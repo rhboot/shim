@@ -73,7 +73,6 @@ unhook_system_services(void)
 	if (!systab)
 		return;
 
-	systab->BootServices->Exit = system_exit;
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
@@ -163,17 +162,29 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 
 static EFI_STATUS EFIAPI
 do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
-     UINTN ExitDataSize, CHAR16 *ExitData)
+	UINTN ExitDataSize, CHAR16 *ExitData)
 {
 	EFI_STATUS status;
-	unhook_system_services();
 
-	status = systab->BootServices->Exit(ImageHandle, ExitStatus, ExitDataSize, ExitData);
-	if (EFI_ERROR(status))
-		hook_system_services(systab);
+	shim_fini();
+
+	status = systab->BootServices->Exit(ImageHandle, ExitStatus,
+					    ExitDataSize, ExitData);
+	if (EFI_ERROR(status)) {
+		EFI_STATUS status2 = shim_init();
+
+		if (EFI_ERROR(status2)) {
+			Print(L"Something has gone seriously wrong: %r\n",
+				status2);
+			Print(L"shim cannot continue, sorry.\n");
+			systab->BootServices->Stall(5000000);
+			systab->RuntimeServices->ResetSystem(
+				EfiResetShutdown,
+				EFI_SECURITY_VIOLATION, 0, NULL);
+		}
+	}
 	return status;
 }
-
 
 void
 hook_system_services(EFI_SYSTEM_TABLE *local_systab)
@@ -201,6 +212,18 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 	 * and b) we can unwrap when we're done. */
 	system_exit_boot_services = systab->BootServices->ExitBootServices;
 	systab->BootServices->ExitBootServices = exit_boot_services;
+}
+
+void
+unhook_exit(void)
+{
+	systab->BootServices->Exit = system_exit;
+}
+
+void
+hook_exit(EFI_SYSTEM_TABLE *local_systab)
+{
+	systab = local_systab;
 
 	/* we need to hook Exit() so that we can allow users to quit the
 	 * bootloader and still e.g. start a new one or run an internal

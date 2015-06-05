@@ -54,6 +54,7 @@
 #define MOK_MANAGER L"\\MokManager.efi"
 
 static EFI_SYSTEM_TABLE *systab;
+static EFI_HANDLE image_handle;
 static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
 
 static CHAR16 *second_stage;
@@ -1809,7 +1810,6 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 /*
  * Verify that MokSBState is valid, and if appropriate set insecure mode
  */
-
 static EFI_STATUS check_mok_sb (void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
@@ -2042,7 +2042,62 @@ uninstall_shim_protocols(void)
 			  &shim_lock_guid, &shim_lock_interface);
 }
 
-EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
+EFI_STATUS
+shim_init(void)
+{
+	EFI_STATUS status = EFI_SUCCESS;
+	setup_console(1);
+	setup_verbosity();
+	dprinta(shim_version);
+
+	/* Set the second stage loader */
+	set_second_stage (image_handle);
+
+	if (secure_mode()) {
+		if (vendor_cert_size || vendor_dbx_size) {
+			/*
+			 * If shim includes its own certificates then ensure
+			 * that anything it boots has performed some
+			 * validation of the next image.
+			 */
+			hook_system_services(systab);
+			loader_is_participating = 0;
+		}
+
+		hook_exit(systab);
+
+		status = install_shim_protocols();
+	}
+	return status;
+}
+
+void
+shim_fini(void)
+{
+	if (secure_mode()) {
+		/*
+		 * Remove our protocols
+		 */
+		uninstall_shim_protocols();
+
+		/*
+		 * Remove our hooks from system services.
+		 */
+		unhook_system_services();
+		unhook_exit();
+	}
+
+	/*
+	 * Free the space allocated for the alternative 2nd stage loader
+	 */
+	if (load_options_size > 0 && second_stage)
+		FreePool(second_stage);
+
+	setup_console(0);
+}
+
+EFI_STATUS efi_main (EFI_HANDLE passed_image_handle,
+		     EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
 
@@ -2062,19 +2117,12 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Context = shim_read_header;
 
 	systab = passed_systab;
+	image_handle = passed_image_handle;
 
 	/*
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
-
-	setup_console(1);
-	setup_verbosity();
-
-	dprinta(shim_version);
-
-	/* Set the second stage loader */
-	set_second_stage (image_handle);
 
 	/*
 	 * Check whether the user has configured the system to run in
@@ -2082,27 +2130,23 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	check_mok_sb();
 
+	efi_status = shim_init();
+	if (EFI_ERROR(efi_status)) {
+		Print(L"Something has gone seriously wrong: %r\n", efi_status);
+		Print(L"shim cannot continue, sorry.\n");
+		systab->BootServices->Stall(5000000);
+		systab->RuntimeServices->ResetSystem(EfiResetShutdown,
+						     EFI_SECURITY_VIOLATION,
+						     0, NULL);
+	}
+
 	/*
 	 * Tell the user that we're in insecure mode if necessary
 	 */
 	if (user_insecure_mode) {
 		Print(L"Booting in insecure mode\n");
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
-	} else if (secure_mode()) {
-		if (vendor_cert_size || vendor_dbx_size) {
-			/*
-			 * If shim includes its own certificates then ensure
-			 * that anything it boots has performed some
-			 * validation of the next image.
-			 */
-			hook_system_services(systab);
-			loader_is_participating = 0;
-		}
 	}
-
-	efi_status = install_shim_protocols();
-	if (EFI_ERROR(efi_status))
-		return efi_status;
 
 	/*
 	 * Enter MokManager if necessary
@@ -2110,36 +2154,22 @@ EFI_STATUS efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	efi_status = check_mok_request(image_handle);
 
 	/*
-	 * Copy the MOK list to a runtime variable so the kernel can make
-	 * use of it
+	 * Copy the MOK list to a runtime variable so the kernel can
+	 * make use of it
 	 */
 	efi_status = mirror_mok_list();
 
 	/*
-	 * Create the runtime MokIgnoreDB variable so the kernel can make
-	 * use of it
+	 * Create the runtime MokIgnoreDB variable so the kernel can
+	 * make use of it
 	 */
 	efi_status = mok_ignore_db();
 
 	/*
 	 * Hand over control to the second stage bootloader
 	 */
-
 	efi_status = init_grub(image_handle);
 
-	uninstall_shim_protocols();
-	/*
-	 * Remove our hooks from system services.
-	 */
-	unhook_system_services();
-
-	/*
-	 * Free the space allocated for the alternative 2nd stage loader
-	 */
-	if (load_options_size > 0)
-		FreePool(second_stage);
-
-	setup_console(0);
-
+	shim_fini();
 	return efi_status;
 }

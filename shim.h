@@ -34,3 +34,6 @@ typedef struct _SHIM_LOCK {
 	EFI_SHIM_LOCK_HASH Hash;
 	EFI_SHIM_LOCK_CONTEXT Context;
 } SHIM_LOCK;
+
+extern EFI_STATUS shim_init(void);
+extern void shim_fini(void);
