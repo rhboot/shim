@@ -1521,17 +1521,16 @@ error:
  */
 EFI_STATUS shim_verify (void *buffer, UINT32 size)
 {
-	EFI_STATUS status;
+	EFI_STATUS status = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 
 	loader_is_participating = 1;
 	in_protocol = 1;
 
 	if (!secure_mode())
-		return EFI_SUCCESS;
+		goto done;
 
 	status = read_header(buffer, size, &context);
-
 	if (status != EFI_SUCCESS)
 		goto done;
 
