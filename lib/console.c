@@ -55,12 +55,12 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 }
 
 void
-console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
-		     unsigned int start_col, unsigned int start_row,
-		     unsigned int size_cols, unsigned int size_rows,
-		     int offset, unsigned int lines)
+console_print_box_at(CHAR16 *str_arr[], int highlight,
+		     int start_col, int start_row,
+		     int size_cols, int size_rows,
+		     int offset, int lines)
 {
-	unsigned int i;
+	int i;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	UINTN rows, cols;
 	CHAR16 *Line;
@@ -87,16 +87,16 @@ console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
 	if (start_row < 0)
 		start_row = 0;
 
-	if (start_col > cols || start_row > rows) {
+	if (start_col > (int)cols || start_row > (int)rows) {
 		Print(L"Starting Position (%d,%d) is off screen\n",
 		      start_col, start_row);
 		return;
 	}
-	if (size_cols + start_col > cols)
+	if (size_cols + start_col > (int)cols)
 		size_cols = cols - start_col;
-	if (size_rows + start_row > rows)
+	if (size_rows + start_row > (int)rows)
 		size_rows = rows - start_row;
-	       
+
 	if (lines > size_rows - 2)
 		lines = size_rows - 2;
 
@@ -124,10 +124,9 @@ console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
 	else
 		/* from top */
 		start = start_row + offset;
-		
 
 	for (i = start_row + 1; i < size_rows + start_row - 1; i++) {
-		unsigned int line = i - start;
+		int line = i - start;
 
 		SetMem16 (Line, size_cols*2, L' ');
 		Line[0] = BOXDRAW_VERTICAL;
@@ -143,11 +142,11 @@ console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
 
 			CopyMem(Line + col + 1, s, min(len, size_cols - 2)*2);
 		}
-		if (line >= 0 && line == highlight) 
+		if (line >= 0 && line == highlight)
 			uefi_call_wrapper(co->SetAttribute, 2, co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLACK);
 		uefi_call_wrapper(co->SetCursorPosition, 3, co, start_col, i);
 		uefi_call_wrapper(co->OutputString, 2, co, Line);
-		if (line >= 0 && line == highlight) 
+		if (line >= 0 && line == highlight)
 			uefi_call_wrapper(co->SetAttribute, 2, co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
 
 	}
@@ -163,7 +162,7 @@ console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
 }
 
 void
-console_print_box(CHAR16 *str_arr[], unsigned int highlight)
+console_print_box(CHAR16 *str_arr[], int highlight)
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;

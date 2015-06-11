@@ -4,12 +4,12 @@
 EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key);
 void
-console_print_box_at(CHAR16 *str_arr[], unsigned int highlight,
-		     unsigned int start_col, unsigned int start_row,
-		     unsigned int size_cols, unsigned int size_rows,
-		     int offset, unsigned int lines);
+console_print_box_at(CHAR16 *str_arr[], int highlight,
+		     int start_col, int start_row,
+		     int size_cols, int size_rows,
+		     int offset, int lines);
 void
-console_print_box(CHAR16 *str_arr[], unsigned int highlight);
+console_print_box(CHAR16 *str_arr[], int highlight);
 int
 console_yes_no(CHAR16 *str_arr[]);
 int
