@@ -97,17 +97,14 @@ done:
 	return status;
 }
 
-static BOOLEAN is_sha_hash (EFI_GUID Type)
+static BOOLEAN is_sha2_hash (EFI_GUID Type)
 {
-	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
 	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
 	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
 	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
 	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
 
-	if (CompareGuid(&Type, &Sha1) == 0)
-		return TRUE;
-	else if (CompareGuid(&Type, &Sha224) == 0)
+	if (CompareGuid(&Type, &Sha224) == 0)
 		return TRUE;
 	else if (CompareGuid(&Type, &Sha256) == 0)
 		return TRUE;
@@ -149,7 +146,7 @@ static BOOLEAN is_valid_siglist (EFI_GUID Type, UINT32 SigSize)
 	if (CompareGuid (&Type, &CertType) == 0 && SigSize != 0)
 		return TRUE;
 
-	if (!is_sha_hash (Type))
+	if (!is_sha2_hash (Type))
 		return FALSE;
 
 	hash_sig_size = sha_size (Type) + sizeof(EFI_GUID);
@@ -561,14 +558,14 @@ static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 static void show_mok_info (EFI_GUID Type, void *Mok, UINTN MokSize)
 {
 	EFI_STATUS efi_status;
-	UINT8 hash[SHA1_DIGEST_SIZE];
-	X509 *X509Cert;
 	EFI_GUID CertType = X509_GUID;
 
 	if (!Mok || MokSize == 0)
 		return;
 
 	if (CompareGuid (&Type, &CertType) == 0) {
+		UINT8 hash[SHA1_DIGEST_SIZE];
+		X509 *X509Cert;
 		efi_status = get_sha1sum(Mok, MokSize, hash);
 
 		if (efi_status != EFI_SUCCESS) {
@@ -584,7 +581,7 @@ static void show_mok_info (EFI_GUID Type, void *Mok, UINTN MokSize)
 			console_notify(L"Not a valid X509 certificate");
 			return;
 		}
-	} else if (is_sha_hash(Type)) {
+	} else if (is_sha2_hash(Type)) {
 		show_efi_hash(Type, Mok, MokSize);
 	}
 }
@@ -1328,7 +1325,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		if (CompareGuid(&(del_key[i].Type), &CertType) == 0) {
 			delete_cert(del_key[i].Mok, del_key[i].MokSize,
 				    mok, mok_num);
-		} else if (is_sha_hash(del_key[i].Type)) {
+		} else if (is_sha2_hash(del_key[i].Type)) {
 			delete_hash_list(del_key[i].Type, del_key[i].Mok,
 					 del_key[i].MokSize, mok, mok_num);
 		}
