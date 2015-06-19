@@ -189,10 +189,11 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	EFI_INPUT_KEY k;
 	EFI_STATUS status;
-	unsigned int selector;
+	int selector;
 	unsigned int selector_lines = count_lines(selectors);
 	int selector_max_cols = 0;
-	unsigned int i, offs_col, offs_row, size_cols, size_rows, lines;
+	unsigned int i;
+	int offs_col, offs_row, size_cols, size_rows, lines;
 	unsigned int selector_offset;
 	UINTN cols, rows;
 
@@ -224,7 +225,7 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 		lines = selector_lines;
 	}
 
-	if (start > lines) {
+	if (start > (unsigned)lines) {
 		selector = lines;
 		selector_offset = start - lines;
 	} else {
