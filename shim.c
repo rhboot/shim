@@ -1698,8 +1698,10 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 					 use_fb ? FALLBACK : second_stage);
 	}
 
-	Print(L"start_image() returned %r\n", efi_status);
-	uefi_call_wrapper(BS->Stall, 1, 2000000);
+	if (efi_status != EFI_SUCCESS) {
+		Print(L"start_image() returned %r\n", efi_status);
+		uefi_call_wrapper(BS->Stall, 1, 2000000);
+	}
 
 	return efi_status;
 }
