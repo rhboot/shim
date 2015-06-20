@@ -15,7 +15,9 @@ SECTIONS
   . = ALIGN(4096);
   .text :
   {
+   _text = .;
    *(.text)
+   _etext = .;
   }
   . = ALIGN(4096);
   .reloc :
@@ -25,6 +27,7 @@ SECTIONS
   . = ALIGN(4096);
   .data :
   {
+   _data = .;
    *(.rodata*)
    *(.got.plt)
    *(.got)
@@ -53,6 +56,9 @@ SECTIONS
     *(.rela.got)
     *(.rela.stab)
   }
+  _edata = .;
+  _data_size = . - _data;
+
   . = ALIGN(4096);
   .dynsym   : { *(.dynsym) }
   . = ALIGN(4096);

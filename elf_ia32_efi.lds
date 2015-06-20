@@ -9,9 +9,11 @@ SECTIONS
   . = ALIGN(4096);
   .text :
   {
+   _text = .;
    *(.text)
    *(.text.*)
    *(.gnu.linkonce.t.*)
+   _etext = .;
   }
   .reloc :
   {
@@ -20,6 +22,7 @@ SECTIONS
   . = ALIGN(4096);
   .data :
   {
+   _data = .;
    *(.rodata*)
    *(.data)
    *(.data1)
@@ -54,6 +57,8 @@ SECTIONS
     *(.data.rel.ro)
     *(.data.rel*)
   }
+  _edata = .;
+  _data_size = . - _data;
   . = ALIGN(4096);
   .dynsym   : { *(.dynsym) }
   . = ALIGN(4096);

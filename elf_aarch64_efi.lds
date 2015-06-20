@@ -4,6 +4,7 @@ ENTRY(_start)
 SECTIONS
 {
   .text 0x0 : {
+    _text = .;
     *(.text.head)
     *(.text)
     *(.text.*)
@@ -16,6 +17,7 @@ SECTIONS
   .dynamic  : { *(.dynamic) }
   .data :
   {
+   _data = .;
    *(.sdata)
    *(.data)
    *(.data1)
@@ -48,7 +50,7 @@ SECTIONS
   .rela.got : { *(.rela.got) }
   .rela.data : { *(.rela.data) *(.rela.data*) }
   _edata = .;
-  _data_size = . - _etext;
+  _data_size = . - _data;
 
   . = ALIGN(4096);
   .dynsym   : { *(.dynsym) }

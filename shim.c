@@ -2136,8 +2136,48 @@ shim_fini(void)
 	setup_console(0);
 }
 
-EFI_STATUS efi_main (EFI_HANDLE passed_image_handle,
-		     EFI_SYSTEM_TABLE *passed_systab)
+extern EFI_STATUS
+efi_main(EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab);
+
+static void
+__attribute__((__optimize__("0")))
+debug_hook(void)
+{
+	EFI_GUID guid = SHIM_LOCK_GUID;
+	UINT8 *data = NULL;
+	UINTN dataSize = 0;
+	EFI_STATUS efi_status;
+	volatile register int x = 0;
+	extern char _text, _data;
+
+	if (x)
+		return;
+
+	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize, guid);
+	if (EFI_ERROR(efi_status)) {
+		return;
+	}
+
+	Print(L"add-symbol-file /usr/lib/debug/usr/share/shim/"
+	      EFI_ARCH"/shim.debug 0x%08x -s .data 0x%08x\n", &_text,
+	      &_data);
+
+	Print(L"Pausing for debugger attachment.\n");
+	x = 1;
+	while (x) {
+#if defined(__x86_64__) || defined(__i386__) || defined(__i686__)
+		__asm__ __volatile__("pause");
+#elif defined(__aarch64__)
+		__asm__ __volatile__("wfi");
+#else
+		uefi_call_wrapper(BS->Stall, 1, 50000);
+#endif
+	}
+	x = 1;
+}
+
+EFI_STATUS
+efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
 
@@ -2163,6 +2203,11 @@ EFI_STATUS efi_main (EFI_HANDLE passed_image_handle,
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
+
+	/*
+	 * if SHIM_DEBUG is set, wait for a debugger to attach.
+	 */
+	debug_hook();
 
 	/*
 	 * Check whether the user has configured the system to run in

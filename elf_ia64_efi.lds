@@ -9,14 +9,17 @@ SECTIONS
   . = ALIGN(4096);
   .text :
   {
+   _text = .;
    *(.text)
    *(.text.*)
    *(.gnu.linkonce.t.*)
+   _etext = .;
   }
   . = ALIGN(4096);
   __gp = ALIGN (8) + 0x200000;
   .sdata :
   {
+   _data = .;
    *(.got.plt)
    *(.got)
    *(.srodata)
@@ -56,6 +59,8 @@ SECTIONS
     *(.rela.stab)
     *(.rela.ctors)
   }
+  _edata = .;
+  _data_size = . - _data;
   . = ALIGN(4096);
   .reloc :		/* This is the PECOFF .reloc section! */
   {

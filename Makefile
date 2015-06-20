@@ -35,11 +35,16 @@ endif
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 		-maccumulate-outgoing-args \
-		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
+		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
+		"-DEFI_ARCH=L\"x64\""
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		-maccumulate-outgoing-args -m32
+		-maccumulate-outgoing-args -m32 \
+		"-DEFI_ARCH=L\"ia32\""
+endif
+ifeq ($(ARCH),aarch64)
+	CFLAGS += "-DEFI_ARCH=L\"aa64\""
 endif
 
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
@@ -49,7 +54,7 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS)
+LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
 
 VERSION		= 0.8
 
@@ -141,6 +146,7 @@ endif
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
+		-j .note.gnu.build-id \
 		$(FORMAT) $^ $@.debug
 
 %.efi.signed: %.efi certdb/secmod.db
