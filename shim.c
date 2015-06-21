@@ -613,12 +613,14 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 
 static BOOLEAN secure_mode (void)
 {
+	static int first = 1;
 	if (user_insecure_mode)
 		return FALSE;
 
 	if (variable_is_secureboot() != 1) {
-		if (verbose && !in_protocol)
+		if (verbose && !in_protocol && first)
 			console_notify(L"Secure boot not enabled");
+		first = 0;
 		return FALSE;
 	}
 
@@ -629,11 +631,13 @@ static BOOLEAN secure_mode (void)
 	 * to consider it.
 	 */
 	if (variable_is_setupmode(0) == 1) {
-		if (verbose && !in_protocol)
+		if (verbose && !in_protocol && first)
 			console_notify(L"Platform is in setup mode");
+		first = 0;
 		return FALSE;
 	}
 
+	first = 0;
 	return TRUE;
 }
 
