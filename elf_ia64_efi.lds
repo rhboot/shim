@@ -41,6 +41,7 @@ SECTIONS
    *(.bss)
    *(COMMON)
   }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
   . = ALIGN(4096);
   .vendor_cert :
   {
@@ -77,4 +78,5 @@ SECTIONS
     *(.IA_64.unwind*)
     *(.IA64.unwind*)
   }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
 }

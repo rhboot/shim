@@ -38,6 +38,7 @@ SECTIONS
    *(.bss)
    *(COMMON)
   }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
   . = ALIGN(4096);
   .vendor_cert :
   {

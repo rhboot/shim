@@ -37,6 +37,7 @@ SECTIONS
    . = ALIGN(16);
    _bss_end = .;
   }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
 
   . = ALIGN(4096);
   .vendor_cert :
