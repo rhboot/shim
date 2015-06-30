@@ -816,8 +816,8 @@ debug_hook(void)
 		return;
 
 	x = 1;
-	Print(L"add-symbol-file /usr/lib/debug/usr/share/shim/"
-	      EFI_ARCH"/fallback.debug %p -s .data %p\n", &_etext,
+	Print(L"add-symbol-file "DEBUGDIR
+	      L"fallback.debug %p -s .data %p\n", &_etext,
 	      &_edata);
 }
 

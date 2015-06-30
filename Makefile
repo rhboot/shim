@@ -1,3 +1,9 @@
+VERSION		= 0.8
+RELEASE		:=
+ifneq ($(RELEASE),"")
+	RELEASE="-$(RELEASE)"
+endif
+
 CC		= $(CROSS_COMPILE)gcc
 LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
@@ -36,15 +42,18 @@ ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 		-maccumulate-outgoing-args \
 		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		"-DEFI_ARCH=L\"x64\""
+		"-DEFI_ARCH=L\"x64\"" \
+		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/x64-$(VERSION)$(RELEASE)/\""
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 		-maccumulate-outgoing-args -m32 \
-		"-DEFI_ARCH=L\"ia32\""
+		"-DEFI_ARCH=L\"ia32\"" \
+		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/ia32-$(VERSION)$(RELEASE)/\""
 endif
 ifeq ($(ARCH),aarch64)
 	CFLAGS += "-DEFI_ARCH=L\"aa64\""
+		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/aa64-$(VERSION)$(RELEASE)/\""
 endif
 
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
@@ -55,8 +64,6 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
-
-VERSION		= 0.8
 
 TARGET	= shim.efi MokManager.efi.signed fallback.efi.signed
 OBJS	= shim.o netboot.o cert.o replacements.o version.o

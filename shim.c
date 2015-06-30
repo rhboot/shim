@@ -2151,7 +2151,7 @@ debug_hook(void)
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
-	volatile register int x = 0;
+	volatile register UINTN x = 0;
 	extern char _text, _data;
 
 	if (x)
@@ -2162,19 +2162,28 @@ debug_hook(void)
 		return;
 	}
 
-	Print(L"add-symbol-file /usr/lib/debug/usr/share/shim/"
-	      EFI_ARCH"/shim.debug 0x%08x -s .data 0x%08x\n", &_text,
+	Print(L"add-symbol-file "DEBUGDIR
+	      L"shim.debug 0x%08x -s .data 0x%08x\n", &_text,
 	      &_data);
 
 	Print(L"Pausing for debugger attachment.\n");
+	Print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
+	      &guid);
 	x = 1;
-	while (x) {
+	while (x++) {
+		/* Make this so it can't /totally/ DoS us. */
 #if defined(__x86_64__) || defined(__i386__) || defined(__i686__)
+		if (x > 4294967294)
+			break;
 		__asm__ __volatile__("pause");
 #elif defined(__aarch64__)
+		if (x > 1000)
+			break;
 		__asm__ __volatile__("wfi");
 #else
-		uefi_call_wrapper(BS->Stall, 1, 50000);
+		if (x > 12000)
+			break;
+		uefi_call_wrapper(BS->Stall, 1, 5000);
 #endif
 	}
 	x = 1;
