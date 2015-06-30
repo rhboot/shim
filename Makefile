@@ -52,7 +52,7 @@ ifeq ($(ARCH),ia32)
 		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/ia32-$(VERSION)$(RELEASE)/\""
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS += "-DEFI_ARCH=L\"aa64\""
+	CFLAGS += "-DEFI_ARCH=L\"aa64\"" \
 		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/aa64-$(VERSION)$(RELEASE)/\""
 endif
 
