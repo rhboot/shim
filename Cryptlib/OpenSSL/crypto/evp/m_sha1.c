@@ -63,12 +63,10 @@
 
 # include <openssl/evp.h>
 # include <openssl/objects.h>
-# include <openssl/x509.h>
+# include <openssl/sha.h>
 # ifndef OPENSSL_NO_RSA
 #  include <openssl/rsa.h>
 # endif
-
-# ifndef OPENSSL_FIPS
 
 static int init(EVP_MD_CTX *ctx)
 {
@@ -89,7 +87,7 @@ static const EVP_MD sha1_md = {
     NID_sha1,
     NID_sha1WithRSAEncryption,
     SHA_DIGEST_LENGTH,
-    0,
+    EVP_MD_FLAG_PKEY_METHOD_SIGNATURE | EVP_MD_FLAG_DIGALGID_ABSENT,
     init,
     update,
     final,
@@ -104,8 +102,9 @@ const EVP_MD *EVP_sha1(void)
 {
     return (&sha1_md);
 }
+#endif
 
-#  ifndef OPENSSL_NO_SHA256
+#ifndef OPENSSL_NO_SHA256
 static int init224(EVP_MD_CTX *ctx)
 {
     return SHA224_Init(ctx->md_data);
@@ -135,7 +134,7 @@ static const EVP_MD sha224_md = {
     NID_sha224,
     NID_sha224WithRSAEncryption,
     SHA224_DIGEST_LENGTH,
-    0,
+    EVP_MD_FLAG_PKEY_METHOD_SIGNATURE | EVP_MD_FLAG_DIGALGID_ABSENT,
     init224,
     update256,
     final256,
@@ -155,7 +154,7 @@ static const EVP_MD sha256_md = {
     NID_sha256,
     NID_sha256WithRSAEncryption,
     SHA256_DIGEST_LENGTH,
-    0,
+    EVP_MD_FLAG_PKEY_METHOD_SIGNATURE | EVP_MD_FLAG_DIGALGID_ABSENT,
     init256,
     update256,
     final256,
@@ -170,9 +169,9 @@ const EVP_MD *EVP_sha256(void)
 {
     return (&sha256_md);
 }
-#  endif                        /* ifndef OPENSSL_NO_SHA256 */
+#endif                          /* ifndef OPENSSL_NO_SHA256 */
 
-#  ifndef OPENSSL_NO_SHA512
+#ifndef OPENSSL_NO_SHA512
 static int init384(EVP_MD_CTX *ctx)
 {
     return SHA384_Init(ctx->md_data);
@@ -198,7 +197,7 @@ static const EVP_MD sha384_md = {
     NID_sha384,
     NID_sha384WithRSAEncryption,
     SHA384_DIGEST_LENGTH,
-    0,
+    EVP_MD_FLAG_PKEY_METHOD_SIGNATURE | EVP_MD_FLAG_DIGALGID_ABSENT,
     init384,
     update512,
     final512,
@@ -218,7 +217,7 @@ static const EVP_MD sha512_md = {
     NID_sha512,
     NID_sha512WithRSAEncryption,
     SHA512_DIGEST_LENGTH,
-    0,
+    EVP_MD_FLAG_PKEY_METHOD_SIGNATURE | EVP_MD_FLAG_DIGALGID_ABSENT,
     init512,
     update512,
     final512,
@@ -233,8 +232,4 @@ const EVP_MD *EVP_sha512(void)
 {
     return (&sha512_md);
 }
-#  endif                        /* ifndef OPENSSL_NO_SHA512 */
-
-# endif
-
-#endif
+#endif                          /* ifndef OPENSSL_NO_SHA512 */

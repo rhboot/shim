@@ -67,6 +67,7 @@
 #ifndef HEADER_OCSP_H
 # define HEADER_OCSP_H
 
+# include <openssl/ossl_typ.h>
 # include <openssl/x509.h>
 # include <openssl/x509v3.h>
 # include <openssl/safestack.h>
@@ -387,17 +388,31 @@ typedef struct ocsp_service_locator_st {
 # define ASN1_BIT_STRING_digest(data,type,md,len) \
         ASN1_item_digest(ASN1_ITEM_rptr(ASN1_BIT_STRING),type,data,md,len)
 
-# define OCSP_CERTID_dup(cid) ASN1_dup_of(OCSP_CERTID,i2d_OCSP_CERTID,d2i_OCSP_CERTID,cid)
-
 # define OCSP_CERTSTATUS_dup(cs)\
                 (OCSP_CERTSTATUS*)ASN1_dup((int(*)())i2d_OCSP_CERTSTATUS,\
                 (char *(*)())d2i_OCSP_CERTSTATUS,(char *)(cs))
 
-OCSP_RESPONSE *OCSP_sendreq_bio(BIO *b, char *path, OCSP_REQUEST *req);
-OCSP_REQ_CTX *OCSP_sendreq_new(BIO *io, char *path, OCSP_REQUEST *req,
+OCSP_CERTID *OCSP_CERTID_dup(OCSP_CERTID *id);
+
+OCSP_RESPONSE *OCSP_sendreq_bio(BIO *b, const char *path, OCSP_REQUEST *req);
+OCSP_REQ_CTX *OCSP_sendreq_new(BIO *io, const char *path, OCSP_REQUEST *req,
                                int maxline);
+int OCSP_REQ_CTX_nbio(OCSP_REQ_CTX *rctx);
 int OCSP_sendreq_nbio(OCSP_RESPONSE **presp, OCSP_REQ_CTX *rctx);
+OCSP_REQ_CTX *OCSP_REQ_CTX_new(BIO *io, int maxline);
 void OCSP_REQ_CTX_free(OCSP_REQ_CTX *rctx);
+void OCSP_set_max_response_length(OCSP_REQ_CTX *rctx, unsigned long len);
+int OCSP_REQ_CTX_i2d(OCSP_REQ_CTX *rctx, const ASN1_ITEM *it,
+                     ASN1_VALUE *val);
+int OCSP_REQ_CTX_nbio_d2i(OCSP_REQ_CTX *rctx, ASN1_VALUE **pval,
+                          const ASN1_ITEM *it);
+BIO *OCSP_REQ_CTX_get0_mem_bio(OCSP_REQ_CTX *rctx);
+int OCSP_REQ_CTX_i2d(OCSP_REQ_CTX *rctx, const ASN1_ITEM *it,
+                     ASN1_VALUE *val);
+int OCSP_REQ_CTX_http(OCSP_REQ_CTX *rctx, const char *op, const char *path);
+int OCSP_REQ_CTX_set1_req(OCSP_REQ_CTX *rctx, OCSP_REQUEST *req);
+int OCSP_REQ_CTX_add1_header(OCSP_REQ_CTX *rctx,
+                             const char *name, const char *value);
 
 OCSP_CERTID *OCSP_cert_to_id(const EVP_MD *dgst, X509 *subject, X509 *issuer);
 
@@ -443,7 +458,7 @@ int OCSP_check_validity(ASN1_GENERALIZEDTIME *thisupd,
 int OCSP_request_verify(OCSP_REQUEST *req, STACK_OF(X509) *certs,
                         X509_STORE *store, unsigned long flags);
 
-int OCSP_parse_url(char *url, char **phost, char **pport, char **ppath,
+int OCSP_parse_url(const char *url, char **phost, char **pport, char **ppath,
                    int *pssl);
 
 int OCSP_id_issuer_cmp(OCSP_CERTID *a, OCSP_CERTID *b);
@@ -467,11 +482,6 @@ int OCSP_basic_add1_cert(OCSP_BASICRESP *resp, X509 *cert);
 int OCSP_basic_sign(OCSP_BASICRESP *brsp,
                     X509 *signer, EVP_PKEY *key, const EVP_MD *dgst,
                     STACK_OF(X509) *certs, unsigned long flags);
-
-ASN1_STRING *ASN1_STRING_encode(ASN1_STRING *s, i2d_of_void *i2d,
-                                void *data, STACK_OF(ASN1_OBJECT) *sk);
-# define ASN1_STRING_encode_of(type,s,i2d,data,sk) \
-        ASN1_STRING_encode(s, CHECKED_I2D_OF(type, i2d), data, sk)
 
 X509_EXTENSION *OCSP_crlID_new(char *url, long *n, char *tim);
 
@@ -549,9 +559,9 @@ DECLARE_ASN1_FUNCTIONS(OCSP_REQINFO)
 DECLARE_ASN1_FUNCTIONS(OCSP_CRLID)
 DECLARE_ASN1_FUNCTIONS(OCSP_SERVICELOC)
 
-char *OCSP_response_status_str(long s);
-char *OCSP_cert_status_str(long s);
-char *OCSP_crl_reason_str(long s);
+const char *OCSP_response_status_str(long s);
+const char *OCSP_cert_status_str(long s);
+const char *OCSP_crl_reason_str(long s);
 
 int OCSP_REQUEST_print(BIO *bp, OCSP_REQUEST *a, unsigned long flags);
 int OCSP_RESPONSE_print(BIO *bp, OCSP_RESPONSE *o, unsigned long flags);
@@ -585,7 +595,8 @@ void ERR_load_OCSP_strings(void);
 # define OCSP_F_OCSP_REQUEST_VERIFY                       116
 # define OCSP_F_OCSP_RESPONSE_GET1_BASIC                  111
 # define OCSP_F_OCSP_SENDREQ_BIO                          112
-# define OCSP_F_PARSE_HTTP_LINE1                          117
+# define OCSP_F_OCSP_SENDREQ_NBIO                         117
+# define OCSP_F_PARSE_HTTP_LINE1                          118
 # define OCSP_F_REQUEST_VERIFY                            113
 
 /* Reason codes. */

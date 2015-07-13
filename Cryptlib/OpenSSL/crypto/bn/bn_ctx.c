@@ -155,9 +155,9 @@ static void ctxdbg(BN_CTX *ctx)
     unsigned int bnidx = 0, fpidx = 0;
     BN_POOL_ITEM *item = ctx->pool.head;
     BN_STACK *stack = &ctx->stack;
-    fprintf(stderr, "(%08x): ", (unsigned int)ctx);
+    fprintf(stderr, "(%16p): ", ctx);
     while (bnidx < ctx->used) {
-        fprintf(stderr, "%02x ", item->vals[bnidx++ % BN_CTX_POOL_SIZE].dmax);
+        fprintf(stderr, "%03x ", item->vals[bnidx++ % BN_CTX_POOL_SIZE].dmax);
         if (!(bnidx % BN_CTX_POOL_SIZE))
             item = item->next;
     }
@@ -166,8 +166,8 @@ static void ctxdbg(BN_CTX *ctx)
     fprintf(stderr, "          : ");
     while (fpidx < stack->depth) {
         while (bnidx++ < stack->indexes[fpidx])
-            fprintf(stderr, "   ");
-        fprintf(stderr, "^^ ");
+            fprintf(stderr, "    ");
+        fprintf(stderr, "^^^ ");
         bnidx++;
         fpidx++;
     }

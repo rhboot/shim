@@ -64,11 +64,10 @@
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
 
-static STACK_OF(CONF_VALUE) *i2v_POLICY_CONSTRAINTS(X509V3_EXT_METHOD *method,
-                                                    void *bcons,
-                                                    STACK_OF(CONF_VALUE)
+static STACK_OF(CONF_VALUE) *i2v_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD
+                                                    *method, void *bcons, STACK_OF(CONF_VALUE)
                                                     *extlist);
-static void *v2i_POLICY_CONSTRAINTS(X509V3_EXT_METHOD *method,
+static void *v2i_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD *method,
                                     X509V3_CTX *ctx,
                                     STACK_OF(CONF_VALUE) *values);
 
@@ -90,9 +89,8 @@ ASN1_SEQUENCE(POLICY_CONSTRAINTS) = {
 
 IMPLEMENT_ASN1_ALLOC_FUNCTIONS(POLICY_CONSTRAINTS)
 
-static STACK_OF(CONF_VALUE) *i2v_POLICY_CONSTRAINTS(X509V3_EXT_METHOD *method,
-                                                    void *a,
-                                                    STACK_OF(CONF_VALUE)
+static STACK_OF(CONF_VALUE) *i2v_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD
+                                                    *method, void *a, STACK_OF(CONF_VALUE)
                                                     *extlist)
 {
     POLICY_CONSTRAINTS *pcons = a;
@@ -103,7 +101,7 @@ static STACK_OF(CONF_VALUE) *i2v_POLICY_CONSTRAINTS(X509V3_EXT_METHOD *method,
     return extlist;
 }
 
-static void *v2i_POLICY_CONSTRAINTS(X509V3_EXT_METHOD *method,
+static void *v2i_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD *method,
                                     X509V3_CTX *ctx,
                                     STACK_OF(CONF_VALUE) *values)
 {

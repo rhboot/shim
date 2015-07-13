@@ -19,6 +19,7 @@ OBJS		=   Hash/CryptMd4.o \
 		    Hash/CryptMd5.o \
 		    Hash/CryptSha1.o \
 		    Hash/CryptSha256.o \
+		    Hash/CryptSha512.o \
 		    Hmac/CryptHmacMd5.o \
 		    Hmac/CryptHmacSha1.o \
 		    Cipher/CryptAes.o \
@@ -30,6 +31,7 @@ OBJS		=   Hash/CryptMd4.o \
 		    Pk/CryptPkcs7SignNull.o \
 		    Pk/CryptPkcs7Verify.o \
 		    Pk/CryptDhNull.o \
+		    Pk/CryptTs.o \
 		    Pk/CryptX509.o \
 		    Pk/CryptAuthenticode.o \
 		    Pem/CryptPem.o \

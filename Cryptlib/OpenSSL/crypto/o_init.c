@@ -4,7 +4,7 @@
  * project.
  */
 /* ====================================================================
- * Copyright (c) 2007 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 2011 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,23 +51,13 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  * ====================================================================
  *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
  */
 
 #include <e_os.h>
 #include <openssl/err.h>
-
-/* Internal only functions: only ever used here */
 #ifdef OPENSSL_FIPS
-extern void int_ERR_lib_init(void);
-# ifndef OPENSSL_NO_ENGINE
-extern void int_EVP_MD_init_engine_callbacks(void);
-extern void int_EVP_CIPHER_init_engine_callbacks(void);
-extern void int_RAND_init_engine_callbacks(void);
-# endif
+# include <openssl/fips.h>
+# include <openssl/rand.h>
 #endif
 
 /*
@@ -77,35 +67,17 @@ extern void int_RAND_init_engine_callbacks(void);
 
 void OPENSSL_init(void)
 {
-#ifdef OPENSSL_FIPS
     static int done = 0;
-    if (!done) {
-        int_ERR_lib_init();
-# ifdef CRYPTO_MDEBUG
-        CRYPTO_malloc_debug_init();
-# endif
-# ifndef OPENSSL_NO_ENGINE
-        int_EVP_MD_init_engine_callbacks();
-        int_EVP_CIPHER_init_engine_callbacks();
-        int_RAND_init_engine_callbacks();
-# endif
-        done = 1;
-    }
-#endif
-}
-
+    if (done)
+        return;
+    done = 1;
 #ifdef OPENSSL_FIPS
-
-int CRYPTO_memcmp(const void *in_a, const void *in_b, size_t len)
-{
-    size_t i;
-    const unsigned char *a = in_a;
-    const unsigned char *b = in_b;
-    unsigned char x = 0;
-
-    for (i = 0; i < len; i++)
-        x |= a[i] ^ b[i];
-
-    return x;
-}
+    FIPS_set_locking_callbacks(CRYPTO_lock, CRYPTO_add_lock);
+    FIPS_set_error_callbacks(ERR_put_error, ERR_add_error_vdata);
+    FIPS_set_malloc_callbacks(CRYPTO_malloc, CRYPTO_free);
+    RAND_init_fips();
 #endif
+#if 0
+    fprintf(stderr, "Called OPENSSL_init\n");
+#endif
+}

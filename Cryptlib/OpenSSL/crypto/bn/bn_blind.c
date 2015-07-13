@@ -1,6 +1,6 @@
 /* crypto/bn/bn_blind.c */
 /* ====================================================================
- * Copyright (c) 1998-2005 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -120,8 +120,11 @@ struct bn_blinding_st {
     BIGNUM *Ai;
     BIGNUM *e;
     BIGNUM *mod;                /* just a reference */
+#ifndef OPENSSL_NO_DEPRECATED
     unsigned long thread_id;    /* added in OpenSSL 0.9.6j and 0.9.7b; used
                                  * only by crypto/rsa/rsa_eay.c, rsa_lib.c */
+#endif
+    CRYPTO_THREADID tid;
     int counter;
     unsigned long flags;
     BN_MONT_CTX *m_ctx;
@@ -161,6 +164,7 @@ BN_BLINDING *BN_BLINDING_new(const BIGNUM *A, const BIGNUM *Ai, BIGNUM *mod)
      * use.
      */
     ret->counter = -1;
+    CRYPTO_THREADID_current(&ret->tid);
     return (ret);
  err:
     if (ret != NULL)
@@ -274,6 +278,7 @@ int BN_BLINDING_invert_ex(BIGNUM *n, const BIGNUM *r, BN_BLINDING *b,
     return (ret);
 }
 
+#ifndef OPENSSL_NO_DEPRECATED
 unsigned long BN_BLINDING_get_thread_id(const BN_BLINDING *b)
 {
     return b->thread_id;
@@ -282,6 +287,12 @@ unsigned long BN_BLINDING_get_thread_id(const BN_BLINDING *b)
 void BN_BLINDING_set_thread_id(BN_BLINDING *b, unsigned long n)
 {
     b->thread_id = n;
+}
+#endif
+
+CRYPTO_THREADID *BN_BLINDING_thread_id(BN_BLINDING *b)
+{
+    return &b->tid;
 }
 
 unsigned long BN_BLINDING_get_flags(const BN_BLINDING *b)

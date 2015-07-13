@@ -61,16 +61,10 @@
 #include "cryptlib.h"
 #include <openssl/pkcs12.h>
 
-#ifdef OPENSSL_SYS_NETWARE
-/* Rename these functions to avoid name clashes on NetWare OS */
-# define uni2asc OPENSSL_uni2asc
-# define asc2uni OPENSSL_asc2uni
-#endif
-
 /* Cheap and nasty Unicode stuff */
 
-unsigned char *asc2uni(const char *asc, int asclen, unsigned char **uni,
-                       int *unilen)
+unsigned char *OPENSSL_asc2uni(const char *asc, int asclen,
+                               unsigned char **uni, int *unilen)
 {
     int ulen, i;
     unsigned char *unitmp;
@@ -93,7 +87,7 @@ unsigned char *asc2uni(const char *asc, int asclen, unsigned char **uni,
     return unitmp;
 }
 
-char *uni2asc(unsigned char *uni, int unilen)
+char *OPENSSL_uni2asc(unsigned char *uni, int unilen)
 {
     int asclen, i;
     char *asctmp;

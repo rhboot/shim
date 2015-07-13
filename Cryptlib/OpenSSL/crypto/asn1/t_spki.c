@@ -85,27 +85,7 @@ int NETSCAPE_SPKI_print(BIO *out, NETSCAPE_SPKI *spki)
     if (!pkey)
         BIO_printf(out, "  Unable to load public key\n");
     else {
-#ifndef OPENSSL_NO_RSA
-        if (pkey->type == EVP_PKEY_RSA) {
-            BIO_printf(out, "  RSA Public Key: (%d bit)\n",
-                       BN_num_bits(pkey->pkey.rsa->n));
-            RSA_print(out, pkey->pkey.rsa, 2);
-        } else
-#endif
-#ifndef OPENSSL_NO_DSA
-        if (pkey->type == EVP_PKEY_DSA) {
-            BIO_printf(out, "  DSA Public Key:\n");
-            DSA_print(out, pkey->pkey.dsa, 2);
-        } else
-#endif
-#ifndef OPENSSL_NO_EC
-        if (pkey->type == EVP_PKEY_EC) {
-            BIO_printf(out, "  EC Public Key:\n");
-            EC_KEY_print(out, pkey->pkey.ec, 2);
-        } else
-#endif
-
-            BIO_printf(out, "  Unknown Public Key:\n");
+        EVP_PKEY_print_public(out, pkey, 4, NULL);
         EVP_PKEY_free(pkey);
     }
     chal = spki->spkac->challenge;

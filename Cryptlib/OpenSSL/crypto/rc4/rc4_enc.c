@@ -68,18 +68,18 @@
  * Date: Wed, 14 Sep 1994 06:35:31 GMT
  */
 
-void RC4(RC4_KEY *key, unsigned long len, const unsigned char *indata,
+void RC4(RC4_KEY *key, size_t len, const unsigned char *indata,
          unsigned char *outdata)
 {
     register RC4_INT *d;
     register RC4_INT x, y, tx, ty;
-    int i;
+    size_t i;
 
     x = key->x;
     y = key->y;
     d = key->data;
 
-#if defined(RC4_CHUNK)
+#if defined(RC4_CHUNK) && !defined(PEDANTIC)
     /*-
      * The original reason for implementing this(*) was the fact that
      * pre-21164a Alpha CPUs don't have byte load/store instructions
@@ -121,8 +121,8 @@ void RC4(RC4_KEY *key, unsigned long len, const unsigned char *indata,
                         (RC4_CHUNK)d[(tx+ty)&0xff]\
                         )
 
-    if ((((unsigned long)indata & (sizeof(RC4_CHUNK) - 1)) |
-         ((unsigned long)outdata & (sizeof(RC4_CHUNK) - 1))) == 0) {
+    if ((((size_t)indata & (sizeof(RC4_CHUNK) - 1)) |
+         ((size_t)outdata & (sizeof(RC4_CHUNK) - 1))) == 0) {
         RC4_CHUNK ichunk, otp;
         const union {
             long one;
@@ -161,7 +161,7 @@ void RC4(RC4_KEY *key, unsigned long len, const unsigned char *indata,
          */
         if (!is_endian.little) { /* BIG-ENDIAN CASE */
 # define BESHFT(c)      (((sizeof(RC4_CHUNK)-(c)-1)*8)&(sizeof(RC4_CHUNK)*8-1))
-            for (; len & ~(sizeof(RC4_CHUNK) - 1); len -= sizeof(RC4_CHUNK)) {
+            for (; len & (0 - sizeof(RC4_CHUNK)); len -= sizeof(RC4_CHUNK)) {
                 ichunk = *(RC4_CHUNK *) indata;
                 otp = RC4_STEP << BESHFT(0);
                 otp |= RC4_STEP << BESHFT(1);
@@ -215,7 +215,7 @@ void RC4(RC4_KEY *key, unsigned long len, const unsigned char *indata,
             return;
         } else {                /* LITTLE-ENDIAN CASE */
 # define LESHFT(c)      (((c)*8)&(sizeof(RC4_CHUNK)*8-1))
-            for (; len & ~(sizeof(RC4_CHUNK) - 1); len -= sizeof(RC4_CHUNK)) {
+            for (; len & (0 - sizeof(RC4_CHUNK)); len -= sizeof(RC4_CHUNK)) {
                 ichunk = *(RC4_CHUNK *) indata;
                 otp = RC4_STEP;
                 otp |= RC4_STEP << 8;
@@ -284,7 +284,7 @@ void RC4(RC4_KEY *key, unsigned long len, const unsigned char *indata,
 # define RC4_LOOP(a,b,i) LOOP(a[i],b[i])
 #endif
 
-    i = (int)(len >> 3L);
+    i = len >> 3;
     if (i) {
         for (;;) {
             RC4_LOOP(indata, outdata, 0);
@@ -303,7 +303,7 @@ void RC4(RC4_KEY *key, unsigned long len, const unsigned char *indata,
                 break;
         }
     }
-    i = (int)len & 0x07;
+    i = len & 0x07;
     if (i) {
         for (;;) {
             RC4_LOOP(indata, outdata, 0);

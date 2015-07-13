@@ -56,6 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
+#include <openssl/crypto.h>
 #include <openssl/opensslconf.h>
 #if !defined(OPENSSL_NO_SHA1) && !defined(OPENSSL_NO_SHA)
 
@@ -63,9 +64,6 @@
 # define SHA_1
 
 # include <openssl/opensslv.h>
-# ifdef OPENSSL_FIPS
-#  include <openssl/fips.h>
-# endif
 
 const char SHA1_version[] = "SHA1" OPENSSL_VERSION_PTEXT;
 

@@ -67,6 +67,11 @@ int X509_set_version(X509 *x, long version)
 {
     if (x == NULL)
         return (0);
+    if (version == 0) {
+        M_ASN1_INTEGER_free(x->cert_info->version);
+        x->cert_info->version = NULL;
+        return (1);
+    }
     if (x->cert_info->version == NULL) {
         if ((x->cert_info->version = M_ASN1_INTEGER_new()) == NULL)
             return (0);
@@ -105,7 +110,7 @@ int X509_set_subject_name(X509 *x, X509_NAME *name)
     return (X509_NAME_set(&x->cert_info->subject, name));
 }
 
-int X509_set_notBefore(X509 *x, ASN1_TIME *tm)
+int X509_set_notBefore(X509 *x, const ASN1_TIME *tm)
 {
     ASN1_TIME *in;
 
@@ -122,7 +127,7 @@ int X509_set_notBefore(X509 *x, ASN1_TIME *tm)
     return (in != NULL);
 }
 
-int X509_set_notAfter(X509 *x, ASN1_TIME *tm)
+int X509_set_notAfter(X509 *x, const ASN1_TIME *tm)
 {
     ASN1_TIME *in;
 

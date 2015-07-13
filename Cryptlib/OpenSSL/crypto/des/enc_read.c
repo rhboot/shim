@@ -65,7 +65,7 @@
 /*
  * extern int errno;
  */
-OPENSSL_IMPLEMENT_GLOBAL(int, DES_rw_mode) = DES_PCBC_MODE;
+OPENSSL_IMPLEMENT_GLOBAL(int, DES_rw_mode, DES_PCBC_MODE)
 
 /*-
  * WARNINGS:
@@ -83,10 +83,12 @@ OPENSSL_IMPLEMENT_GLOBAL(int, DES_rw_mode) = DES_PCBC_MODE;
  *  -  This function uses an internal state and thus cannot be
  *     used on multiple files.
  */
-
 int DES_enc_read(int fd, void *buf, int len, DES_key_schedule *sched,
                  DES_cblock *iv)
 {
+#if defined(OPENSSL_NO_POSIX_IO)
+    return (0);
+#else
     /* data to be unencrypted */
     int net_num = 0;
     static unsigned char *net = NULL;
@@ -145,15 +147,15 @@ int DES_enc_read(int fd, void *buf, int len, DES_key_schedule *sched,
 
     /* first - get the length */
     while (net_num < HDRSIZE) {
-#ifndef _WIN32
+# ifndef OPENSSL_SYS_WIN32
         i = read(fd, (void *)&(net[net_num]), HDRSIZE - net_num);
-#else
+# else
         i = _read(fd, (void *)&(net[net_num]), HDRSIZE - net_num);
-#endif
-#ifdef EINTR
+# endif
+# ifdef EINTR
         if ((i == -1) && (errno == EINTR))
             continue;
-#endif
+# endif
         if (i <= 0)
             return (0);
         net_num += i;
@@ -173,11 +175,15 @@ int DES_enc_read(int fd, void *buf, int len, DES_key_schedule *sched,
 
     net_num = 0;
     while (net_num < rnum) {
+# ifndef OPENSSL_SYS_WIN32
         i = read(fd, (void *)&(net[net_num]), rnum - net_num);
-#ifdef EINTR
+# else
+        i = _read(fd, (void *)&(net[net_num]), rnum - net_num);
+# endif
+# ifdef EINTR
         if ((i == -1) && (errno == EINTR))
             continue;
-#endif
+# endif
         if (i <= 0)
             return (0);
         net_num += i;
@@ -225,4 +231,5 @@ int DES_enc_read(int fd, void *buf, int len, DES_key_schedule *sched,
         }
     }
     return num;
+#endif                          /* OPENSSL_NO_POSIX_IO */
 }

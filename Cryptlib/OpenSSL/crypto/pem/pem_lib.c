@@ -57,6 +57,7 @@
  */
 
 #include <stdio.h>
+#include <ctype.h>
 #include "cryptlib.h"
 #include <openssl/buffer.h>
 #include <openssl/objects.h>
@@ -65,8 +66,12 @@
 #include <openssl/x509.h>
 #include <openssl/pem.h>
 #include <openssl/pkcs12.h>
+#include "asn1_locl.h"
 #ifndef OPENSSL_NO_DES
 # include <openssl/des.h>
+#endif
+#ifndef OPENSSL_NO_ENGINE
+# include <openssl/engine.h>
 #endif
 
 const char PEM_version[] = "PEM" OPENSSL_VERSION_PTEXT;
@@ -75,6 +80,7 @@ const char PEM_version[] = "PEM" OPENSSL_VERSION_PTEXT;
 
 static int load_iv(char **fromp, unsigned char *to, int num);
 static int check_pem(const char *nm, const char *name);
+int pem_check_suffix(const char *pem_str, const char *suffix);
 
 int PEM_def_callback(char *buf, int num, int w, void *key)
 {
@@ -99,7 +105,7 @@ int PEM_def_callback(char *buf, int num, int w, void *key)
         prompt = "Enter PEM pass phrase:";
 
     for (;;) {
-        i = EVP_read_pw_string(buf, num, prompt, w);
+        i = EVP_read_pw_string_min(buf, MIN_LENGTH, num, prompt, w);
         if (i != 0) {
             PEMerr(PEM_F_PEM_DEF_CALLBACK, PEM_R_PROBLEMS_GETTING_PASSWORD);
             memset(buf, 0, (unsigned int)num);
@@ -181,22 +187,53 @@ static int check_pem(const char *nm, const char *name)
 
     /* Make PEM_STRING_EVP_PKEY match any private key */
 
-    if (!strcmp(nm, PEM_STRING_PKCS8) && !strcmp(name, PEM_STRING_EVP_PKEY))
+    if (!strcmp(name, PEM_STRING_EVP_PKEY)) {
+        int slen;
+        const EVP_PKEY_ASN1_METHOD *ameth;
+        if (!strcmp(nm, PEM_STRING_PKCS8))
+            return 1;
+        if (!strcmp(nm, PEM_STRING_PKCS8INF))
+            return 1;
+        slen = pem_check_suffix(nm, "PRIVATE KEY");
+        if (slen > 0) {
+            /*
+             * NB: ENGINE implementations wont contain a deprecated old
+             * private key decode function so don't look for them.
+             */
+            ameth = EVP_PKEY_asn1_find_str(NULL, nm, slen);
+            if (ameth && ameth->old_priv_decode)
+                return 1;
+        }
+        return 0;
+    }
+
+    if (!strcmp(name, PEM_STRING_PARAMETERS)) {
+        int slen;
+        const EVP_PKEY_ASN1_METHOD *ameth;
+        slen = pem_check_suffix(nm, "PARAMETERS");
+        if (slen > 0) {
+            ENGINE *e;
+            ameth = EVP_PKEY_asn1_find_str(&e, nm, slen);
+            if (ameth) {
+                int r;
+                if (ameth->param_decode)
+                    r = 1;
+                else
+                    r = 0;
+#ifndef OPENSSL_NO_ENGINE
+                if (e)
+                    ENGINE_finish(e);
+#endif
+                return r;
+            }
+        }
+        return 0;
+    }
+    /* If reading DH parameters handle X9.42 DH format too */
+    if (!strcmp(nm, PEM_STRING_DHXPARAMS) &&
+        !strcmp(name, PEM_STRING_DHPARAMS))
         return 1;
 
-    if (!strcmp(nm, PEM_STRING_PKCS8INF) &&
-        !strcmp(name, PEM_STRING_EVP_PKEY))
-        return 1;
-
-    if (!strcmp(nm, PEM_STRING_RSA) && !strcmp(name, PEM_STRING_EVP_PKEY))
-        return 1;
-
-    if (!strcmp(nm, PEM_STRING_DSA) && !strcmp(name, PEM_STRING_EVP_PKEY))
-        return 1;
-
-    if (!strcmp(nm, PEM_STRING_ECPRIVATEKEY) &&
-        !strcmp(name, PEM_STRING_EVP_PKEY))
-        return 1;
     /* Permit older strings */
 
     if (!strcmp(nm, PEM_STRING_X509_OLD) && !strcmp(name, PEM_STRING_X509))
@@ -222,6 +259,14 @@ static int check_pem(const char *nm, const char *name)
     if (!strcmp(nm, PEM_STRING_PKCS7_SIGNED) &&
         !strcmp(name, PEM_STRING_PKCS7))
         return 1;
+
+#ifndef OPENSSL_NO_CMS
+    if (!strcmp(nm, PEM_STRING_X509) && !strcmp(name, PEM_STRING_CMS))
+        return 1;
+    /* Allow CMS to be read from PKCS#7 headers */
+    if (!strcmp(nm, PEM_STRING_PKCS7) && !strcmp(name, PEM_STRING_CMS))
+        return 1;
+#endif
 
     return 0;
 }
@@ -272,7 +317,7 @@ int PEM_bytes_read_bio(unsigned char **pdata, long *plen, char **pnm,
 
 #ifndef OPENSSL_NO_FP_API
 int PEM_ASN1_write(i2d_of_void *i2d, const char *name, FILE *fp,
-                   char *x, const EVP_CIPHER *enc, unsigned char *kstr,
+                   void *x, const EVP_CIPHER *enc, unsigned char *kstr,
                    int klen, pem_password_cb *callback, void *u)
 {
     BIO *b;
@@ -290,7 +335,7 @@ int PEM_ASN1_write(i2d_of_void *i2d, const char *name, FILE *fp,
 #endif
 
 int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
-                       char *x, const EVP_CIPHER *enc, unsigned char *kstr,
+                       void *x, const EVP_CIPHER *enc, unsigned char *kstr,
                        int klen, pem_password_cb *callback, void *u)
 {
     EVP_CIPHER_CTX ctx;
@@ -348,7 +393,8 @@ int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
          * The 'iv' is used as the iv and as a salt.  It is NOT taken from
          * the BytesToKey function
          */
-        EVP_BytesToKey(enc, EVP_md5(), iv, kstr, klen, 1, key, NULL);
+        if (!EVP_BytesToKey(enc, EVP_md5(), iv, kstr, klen, 1, key, NULL))
+            goto err;
 
         if (kstr == (unsigned char *)buf)
             OPENSSL_cleanse(buf, PEM_BUFSIZE);
@@ -362,12 +408,15 @@ int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
         /* k=strlen(buf); */
 
         EVP_CIPHER_CTX_init(&ctx);
-        EVP_EncryptInit_ex(&ctx, enc, NULL, key, iv);
-        EVP_EncryptUpdate(&ctx, data, &j, data, i);
-        EVP_EncryptFinal_ex(&ctx, &(data[j]), &i);
-        EVP_CIPHER_CTX_cleanup(&ctx);
-        i += j;
         ret = 1;
+        if (!EVP_EncryptInit_ex(&ctx, enc, NULL, key, iv)
+            || !EVP_EncryptUpdate(&ctx, data, &j, data, i)
+            || !EVP_EncryptFinal_ex(&ctx, &(data[j]), &i))
+            ret = 0;
+        EVP_CIPHER_CTX_cleanup(&ctx);
+        if (ret == 0)
+            goto err;
+        i += j;
     } else {
         ret = 1;
         buf[0] = '\0';
@@ -390,7 +439,7 @@ int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
 int PEM_do_header(EVP_CIPHER_INFO *cipher, unsigned char *data, long *plen,
                   pem_password_cb *callback, void *u)
 {
-    int i, j, o, klen;
+    int i = 0, j, o, klen;
     long len;
     EVP_CIPHER_CTX ctx;
     unsigned char key[EVP_MAX_KEY_LENGTH];
@@ -413,19 +462,23 @@ int PEM_do_header(EVP_CIPHER_INFO *cipher, unsigned char *data, long *plen,
     ebcdic2ascii(buf, buf, klen);
 #endif
 
-    EVP_BytesToKey(cipher->cipher, EVP_md5(), &(cipher->iv[0]),
-                   (unsigned char *)buf, klen, 1, key, NULL);
+    if (!EVP_BytesToKey(cipher->cipher, EVP_md5(), &(cipher->iv[0]),
+                        (unsigned char *)buf, klen, 1, key, NULL))
+        return 0;
 
     j = (int)len;
     EVP_CIPHER_CTX_init(&ctx);
-    EVP_DecryptInit_ex(&ctx, cipher->cipher, NULL, key, &(cipher->iv[0]));
-    EVP_DecryptUpdate(&ctx, data, &i, data, j);
-    o = EVP_DecryptFinal_ex(&ctx, &(data[i]), &j);
+    o = EVP_DecryptInit_ex(&ctx, cipher->cipher, NULL, key, &(cipher->iv[0]));
+    if (o)
+        o = EVP_DecryptUpdate(&ctx, data, &i, data, j);
+    if (o)
+        o = EVP_DecryptFinal_ex(&ctx, &(data[i]), &j);
     EVP_CIPHER_CTX_cleanup(&ctx);
     OPENSSL_cleanse((char *)buf, sizeof(buf));
     OPENSSL_cleanse((char *)key, sizeof(key));
-    j += i;
-    if (!o) {
+    if (o)
+        j += i;
+    else {
         PEMerr(PEM_F_PEM_DO_HEADER, PEM_R_BAD_DECRYPT);
         return (0);
     }
@@ -526,8 +579,8 @@ static int load_iv(char **fromp, unsigned char *to, int num)
 }
 
 #ifndef OPENSSL_NO_FP_API
-int PEM_write(FILE *fp, char *name, char *header, unsigned char *data,
-              long len)
+int PEM_write(FILE *fp, const char *name, const char *header,
+              const unsigned char *data, long len)
 {
     BIO *b;
     int ret;
@@ -543,8 +596,8 @@ int PEM_write(FILE *fp, char *name, char *header, unsigned char *data,
 }
 #endif
 
-int PEM_write_bio(BIO *bp, const char *name, char *header,
-                  unsigned char *data, long len)
+int PEM_write_bio(BIO *bp, const char *name, const char *header,
+                  const unsigned char *data, long len)
 {
     int nlen, n, i, j, outl;
     unsigned char *buf = NULL;
@@ -787,4 +840,26 @@ int PEM_read_bio(BIO *bp, char **name, char **header, unsigned char **data,
     BUF_MEM_free(headerB);
     BUF_MEM_free(dataB);
     return (0);
+}
+
+/*
+ * Check pem string and return prefix length. If for example the pem_str ==
+ * "RSA PRIVATE KEY" and suffix = "PRIVATE KEY" the return value is 3 for the
+ * string "RSA".
+ */
+
+int pem_check_suffix(const char *pem_str, const char *suffix)
+{
+    int pem_len = strlen(pem_str);
+    int suffix_len = strlen(suffix);
+    const char *p;
+    if (suffix_len + 1 >= pem_len)
+        return 0;
+    p = pem_str + pem_len - suffix_len;
+    if (strcmp(p, suffix))
+        return 0;
+    p--;
+    if (*p != ' ')
+        return 0;
+    return p - pem_str;
 }

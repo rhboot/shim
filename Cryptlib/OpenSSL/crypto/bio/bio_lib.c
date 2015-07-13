@@ -420,7 +420,7 @@ BIO *BIO_push(BIO *b, BIO *bio)
     if (bio != NULL)
         bio->prev_bio = lb;
     /* called to do internal processing */
-    BIO_ctrl(b, BIO_CTRL_PUSH, 0, NULL);
+    BIO_ctrl(b, BIO_CTRL_PUSH, 0, lb);
     return (b);
 }
 
@@ -433,7 +433,7 @@ BIO *BIO_pop(BIO *b)
         return (NULL);
     ret = b->next_bio;
 
-    BIO_ctrl(b, BIO_CTRL_POP, 0, NULL);
+    BIO_ctrl(b, BIO_CTRL_POP, 0, b);
 
     if (b->prev_bio != NULL)
         b->prev_bio->next_bio = b->next_bio;
@@ -515,42 +515,44 @@ void BIO_free_all(BIO *bio)
 
 BIO *BIO_dup_chain(BIO *in)
 {
-    BIO *ret = NULL, *eoc = NULL, *bio, *new;
+    BIO *ret = NULL, *eoc = NULL, *bio, *new_bio;
 
     for (bio = in; bio != NULL; bio = bio->next_bio) {
-        if ((new = BIO_new(bio->method)) == NULL)
+        if ((new_bio = BIO_new(bio->method)) == NULL)
             goto err;
-        new->callback = bio->callback;
-        new->cb_arg = bio->cb_arg;
-        new->init = bio->init;
-        new->shutdown = bio->shutdown;
-        new->flags = bio->flags;
+        new_bio->callback = bio->callback;
+        new_bio->cb_arg = bio->cb_arg;
+        new_bio->init = bio->init;
+        new_bio->shutdown = bio->shutdown;
+        new_bio->flags = bio->flags;
 
         /* This will let SSL_s_sock() work with stdin/stdout */
-        new->num = bio->num;
+        new_bio->num = bio->num;
 
-        if (!BIO_dup_state(bio, (char *)new)) {
-            BIO_free(new);
+        if (!BIO_dup_state(bio, (char *)new_bio)) {
+            BIO_free(new_bio);
             goto err;
         }
 
         /* copy app data */
-        if (!CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_BIO, &new->ex_data,
-                                &bio->ex_data))
+        if (!CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_BIO, &new_bio->ex_data,
+                                &bio->ex_data)) {
+            BIO_free(new_bio);
             goto err;
+        }
 
         if (ret == NULL) {
-            eoc = new;
+            eoc = new_bio;
             ret = eoc;
         } else {
-            BIO_push(eoc, new);
-            eoc = new;
+            BIO_push(eoc, new_bio);
+            eoc = new_bio;
         }
     }
     return (ret);
  err:
-    if (ret != NULL)
-        BIO_free(ret);
+    BIO_free_all(ret);
+
     return (NULL);
 }
 

@@ -60,9 +60,6 @@
 #include <stdio.h>
 #include "cryptlib.h"
 #include <openssl/pkcs12.h>
-#ifdef OPENSSL_FIPS
-# include <openssl/fips.h>
-#endif
 
 static int pkcs12_add_bag(STACK_OF(PKCS12_SAFEBAG) **pbags,
                           PKCS12_SAFEBAG *bag);

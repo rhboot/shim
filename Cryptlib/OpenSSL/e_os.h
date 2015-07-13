@@ -104,7 +104,6 @@ extern "C" {
 #   ifndef MAC_OS_GUSI_SOURCE
 #    define MAC_OS_pre_X
 #    define NO_SYS_TYPES_H
-typedef long ssize_t;
 #   endif
 #   define NO_SYS_PARAM_H
 #   define NO_CHMOD
@@ -118,7 +117,7 @@ typedef long ssize_t;
  The Microsoft section
  ********************************************************************/
 /*
- * The following is used becaue of the small stack in some Microsoft
+ * The following is used because of the small stack in some Microsoft
  * operating systems
  */
 # if defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYSNAME_WIN32)
@@ -129,9 +128,6 @@ typedef long ssize_t;
 
 # if defined(OPENSSL_SYS_WIN32) && !defined(WIN32)
 #  define WIN32
-# endif
-# if defined(OPENSSL_SYS_WIN16) && !defined(WIN16)
-#  define WIN16
 # endif
 # if defined(OPENSSL_SYS_WINDOWS) && !defined(WINDOWS)
 #  define WINDOWS
@@ -187,6 +183,13 @@ typedef long ssize_t;
 #  define closesocket(s)              close(s)
 #  define readsocket(s,b,n)           read((s),(b),(n))
 #  define writesocket(s,b,n)          write((s),(char *)(b),(n))
+# elif defined(OPENSSL_SYS_BEOS_R5)
+#  define get_last_socket_error() errno
+#  define clear_socket_error()    errno=0
+#  define FIONBIO SO_NONBLOCK
+#  define ioctlsocket(a,b,c)                setsockopt((a),SOL_SOCKET,(b),(c),sizeof(*(c)))
+#  define readsocket(s,b,n)       recv((s),(b),(n),0)
+#  define writesocket(s,b,n)      send((s),(b),(n),0)
 # elif defined(OPENSSL_SYS_NETWARE)
 #  if defined(NETWARE_BSDSOCK)
 #   define get_last_socket_error() errno
@@ -215,7 +218,7 @@ typedef long ssize_t;
 #  define writesocket(s,b,n)      write((s),(b),(n))
 # endif
 
-# ifdef WIN16
+# ifdef WIN16                   /* never the case */
 #  define MS_CALLBACK   _far _loadds
 #  define MS_FAR        _far
 # else
@@ -261,23 +264,38 @@ typedef long ssize_t;
        /*
         * Defining _WIN32_WINNT here in e_os.h implies certain "discipline."
         * Most notably we ought to check for availability of each specific
-        * routine with GetProcAddress() and/or quard NT-specific calls with
+        * routine with GetProcAddress() and/or guard NT-specific calls with
         * GetVersion() < 0x80000000. One can argue that in latter "or" case
         * we ought to /DELAYLOAD some .DLLs in order to protect ourselves
         * against run-time link errors. This doesn't seem to be necessary,
         * because it turned out that already Windows 95, first non-NT Win32
         * implementation, is equipped with at least NT 3.51 stubs, dummy
         * routines with same name, but which do nothing. Meaning that it's
-        * apparently appropriate to guard generic NT calls with GetVersion
-        * alone, while NT 4.0 and above calls ought to be additionally
-        * checked upon with GetProcAddress.
+        * apparently sufficient to guard "vanilla" NT calls with GetVersion
+        * alone, while NT 4.0 and above interfaces ought to be linked with
+        * GetProcAddress at run-time.
         */
 #    define _WIN32_WINNT 0x0400
+#   endif
+#   if !defined(OPENSSL_NO_SOCK) && (defined(_WIN32_WINNT) || defined(_WIN32_WCE))
+       /*
+        * Just like defining _WIN32_WINNT including winsock2.h implies
+        * certain "discipline" for maintaining [broad] binary compatibility.
+        * As long as structures are invariant among Winsock versions,
+        * it's sufficient to check for specific Winsock2 API availability
+        * at run-time [DSO_global_lookup is recommended]...
+        */
+#    include <winsock2.h>
+#    include <ws2tcpip.h>
+       /* yes, they have to be #included prior to <windows.h> */
 #   endif
 #   include <windows.h>
 #   include <stdio.h>
 #   include <stddef.h>
 #   include <errno.h>
+#   if defined(_WIN32_WCE) && !defined(EACCES)
+#    define EACCES   13
+#   endif
 #   include <string.h>
 #   ifdef _WIN64
 #    define strlen(s) _strlen31(s)
@@ -299,8 +317,8 @@ static __inline unsigned int _strlen31(const char *str)
 #    undef isupper
 #    undef isxdigit
 #   endif
-#   if defined(_MSC_VER) && !defined(_DLL) && defined(stdin)
-#    if _MSC_VER>=1300
+#   if defined(_MSC_VER) && !defined(_WIN32_WCE) && !defined(_DLL) && defined(stdin)
+#    if _MSC_VER>=1300 && _MSC_VER<1600
 #     undef stdin
 #     undef stdout
 #     undef stderr
@@ -308,7 +326,7 @@ FILE *__iob_func();
 #     define stdin  (&__iob_func()[0])
 #     define stdout (&__iob_func()[1])
 #     define stderr (&__iob_func()[2])
-#    elif defined(I_CAN_LIVE_WITH_LNK4049)
+#    elif _MSC_VER<1300 && defined(I_CAN_LIVE_WITH_LNK4049)
 #     undef stdin
 #     undef stdout
 #     undef stderr
@@ -330,10 +348,8 @@ extern FILE *_imp___iob;
 #  include <fcntl.h>
 
 #  ifdef OPENSSL_SYS_WINCE
-#   include <winsock_extras.h>
+#   define OPENSSL_NO_POSIX_IO
 #  endif
-
-#  define ssize_t long
 
 #  if defined (__BORLANDC__)
 #   define _setmode setmode
@@ -343,12 +359,7 @@ extern FILE *_imp___iob;
 #   define _kbhit kbhit
 #  endif
 
-#  if defined(WIN16) && defined(SSLEAY) && defined(_WINEXITNOPERSIST)
-#   define EXIT(n) _wsetexit(_WINEXITNOPERSIST)
-#   define OPENSSL_EXIT(n) do { if (n == 0) EXIT(n); return(n); } while(0)
-#  else
-#   define EXIT(n) exit(n)
-#  endif
+#  define EXIT(n) exit(n)
 #  define LIST_SEPARATOR_CHAR ';'
 #  ifndef X_OK
 #   define X_OK        0
@@ -434,7 +445,6 @@ extern FILE *_imp___iob;
 extern int GetThreadID(void);
 /* #      include <conio.h> */
 extern int kbhit(void);
-extern void delay(unsigned milliseconds);
 #   else
 #    include <screen.h>
 #   endif
@@ -468,12 +478,13 @@ extern void delay(unsigned milliseconds);
                                  * -D_POSIX_SOURCE, which doesn't work for
                                  * us) */
 #   endif
-#   if defined(NeXT) || defined(OPENSSL_SYS_NEWS4) || defined(OPENSSL_SYS_SUNOS)
-#    define ssize_t int         /* ditto */
-#   endif
 #   ifdef OPENSSL_SYS_NEWS4     /* setvbuf is missing on mips-sony-bsd */
 #    define setvbuf(a, b, c, d) setbuffer((a), (b), (d))
 typedef unsigned long clock_t;
+#   endif
+#   ifdef OPENSSL_SYS_WIN32_CYGWIN
+#    include <io.h>
+#    include <fcntl.h>
 #   endif
 
 #   define OPENSSL_CONF        "openssl.cnf"
@@ -490,6 +501,10 @@ typedef unsigned long clock_t;
 
 /*************/
 
+# if defined(OPENSSL_NO_SOCK) && !defined(OPENSSL_NO_DGRAM)
+#  define OPENSSL_NO_DGRAM
+# endif
+
 # ifdef USE_SOCKETS
 #  if defined(WINDOWS) || defined(MSDOS)
       /* windows world */
@@ -500,8 +515,19 @@ typedef unsigned long clock_t;
 #    define SHUTDOWN(fd)              close(fd)
 #    define SHUTDOWN2(fd)             close(fd)
 #   elif !defined(__DJGPP__)
-#    include <winsock.h>
-extern HINSTANCE _hInstance;
+#    if defined(_WIN32_WCE) && _WIN32_WCE<410
+#     define getservbyname _masked_declaration_getservbyname
+#    endif
+#    if !defined(IPPROTO_IP)
+         /* winsock[2].h was included already? */
+#     include <winsock.h>
+#    endif
+#    ifdef getservbyname
+#     undef getservbyname
+         /* this is used to be wcecompat/include/winsock_extras.h */
+struct servent *PASCAL getservbyname(const char *, const char *);
+#    endif
+
 #    ifdef _WIN64
 /*
  * Even though sizeof(SOCKET) is 8, it's safe to cast it to int, because
@@ -575,7 +601,9 @@ extern HINSTANCE _hInstance;
 #     include <sys/filio.h>     /* Added for FIONBIO under unixware */
 #    endif
 #    include <netinet/in.h>
-#    include <arpa/inet.h>
+#    if !defined(OPENSSL_SYS_BEOS_R5)
+#     include <arpa/inet.h>
+#    endif
 #   endif
 
 #   if defined(NeXT) || defined(_NEXT_SOURCE)
@@ -619,12 +647,18 @@ extern HINSTANCE _hInstance;
 #    define INVALID_SOCKET      (-1)
 #   endif                       /* INVALID_SOCKET */
 #  endif
-# endif
 
-# if defined(__ultrix)
-#  ifndef ssize_t
-#   define ssize_t int
+/*
+ * Some IPv6 implementations are broken, disable them in known bad versions.
+ */
+#  if !defined(OPENSSL_USE_IPV6)
+#   if defined(AF_INET6) && !defined(OPENSSL_SYS_BEOS_BONE) && !defined(NETWARE_CLIB)
+#    define OPENSSL_USE_IPV6 1
+#   else
+#    define OPENSSL_USE_IPV6 0
+#   endif
 #  endif
+
 # endif
 
 # if defined(sun) && !defined(__svr4__) && !defined(__SVR4)
@@ -652,20 +686,6 @@ extern int sys_nerr;
 # endif
 
 /***********************************************/
-
-/*
- * do we need to do this for getenv. Just define getenv for use under windows
- */
-
-# ifdef WIN16
-/* How to do this needs to be thought out a bit more.... */
-/*
- * char *GETENV(char *); #define Getenv GETENV
- */
-#  define Getenv  getenv
-# else
-#  define Getenv getenv
-# endif
 
 # define DG_GCC_BUG             /* gcc < 2.6.3 on DGUX */
 
@@ -729,6 +749,14 @@ struct servent *getservbyname(const char *name, const char *proto);
 
 # endif
 /* end vxworks */
+
+/* beos */
+# if defined(OPENSSL_SYS_BEOS_R5)
+#  define SO_ERROR 0
+#  define NO_SYS_UN
+#  define IPPROTO_IP 0
+#  include <OS.h>
+# endif
 
 # if !defined(inline) && !defined(__cplusplus)
 #  if defined(__STDC_VERSION__) && __STDC_VERSION__>=199901L

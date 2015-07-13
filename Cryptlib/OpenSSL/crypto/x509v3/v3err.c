@@ -1,6 +1,6 @@
 /* crypto/x509v3/v3err.c */
 /* ====================================================================
- * Copyright (c) 1999-2005 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1999-2014 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -70,6 +70,7 @@
 # define ERR_REASON(reason) ERR_PACK(ERR_LIB_X509V3,0,reason)
 
 static ERR_STRING_DATA X509V3_str_functs[] = {
+    {ERR_FUNC(X509V3_F_A2I_GENERAL_NAME), "a2i_GENERAL_NAME"},
     {ERR_FUNC(X509V3_F_ASIDENTIFIERCHOICE_CANONIZE),
      "ASIDENTIFIERCHOICE_CANONIZE"},
     {ERR_FUNC(X509V3_F_ASIDENTIFIERCHOICE_IS_CANONICAL),
@@ -81,6 +82,7 @@ static ERR_STRING_DATA X509V3_str_functs[] = {
     {ERR_FUNC(X509V3_F_DO_EXT_I2D), "DO_EXT_I2D"},
     {ERR_FUNC(X509V3_F_DO_EXT_NCONF), "DO_EXT_NCONF"},
     {ERR_FUNC(X509V3_F_DO_I2V_NAME_CONSTRAINTS), "DO_I2V_NAME_CONSTRAINTS"},
+    {ERR_FUNC(X509V3_F_GNAMES_FROM_SECTNAME), "GNAMES_FROM_SECTNAME"},
     {ERR_FUNC(X509V3_F_HEX_TO_STRING), "hex_to_string"},
     {ERR_FUNC(X509V3_F_I2S_ASN1_ENUMERATED), "i2s_ASN1_ENUMERATED"},
     {ERR_FUNC(X509V3_F_I2S_ASN1_IA5STRING), "I2S_ASN1_IA5STRING"},
@@ -98,6 +100,7 @@ static ERR_STRING_DATA X509V3_str_functs[] = {
     {ERR_FUNC(X509V3_F_S2I_ASN1_OCTET_STRING), "s2i_ASN1_OCTET_STRING"},
     {ERR_FUNC(X509V3_F_S2I_ASN1_SKEY_ID), "S2I_ASN1_SKEY_ID"},
     {ERR_FUNC(X509V3_F_S2I_SKEY_ID), "S2I_SKEY_ID"},
+    {ERR_FUNC(X509V3_F_SET_DIST_POINT_NAME), "SET_DIST_POINT_NAME"},
     {ERR_FUNC(X509V3_F_STRING_TO_HEX), "string_to_hex"},
     {ERR_FUNC(X509V3_F_SXNET_ADD_ID_ASC), "SXNET_add_id_asc"},
     {ERR_FUNC(X509V3_F_SXNET_ADD_ID_INTEGER), "SXNET_add_id_INTEGER"},
@@ -114,6 +117,7 @@ static ERR_STRING_DATA X509V3_str_functs[] = {
     {ERR_FUNC(X509V3_F_V2I_EXTENDED_KEY_USAGE), "V2I_EXTENDED_KEY_USAGE"},
     {ERR_FUNC(X509V3_F_V2I_GENERAL_NAMES), "v2i_GENERAL_NAMES"},
     {ERR_FUNC(X509V3_F_V2I_GENERAL_NAME_EX), "v2i_GENERAL_NAME_ex"},
+    {ERR_FUNC(X509V3_F_V2I_IDP), "V2I_IDP"},
     {ERR_FUNC(X509V3_F_V2I_IPADDRBLOCKS), "V2I_IPADDRBLOCKS"},
     {ERR_FUNC(X509V3_F_V2I_ISSUER_ALT), "V2I_ISSUER_ALT"},
     {ERR_FUNC(X509V3_F_V2I_NAME_CONSTRAINTS), "V2I_NAME_CONSTRAINTS"},
@@ -128,6 +132,7 @@ static ERR_STRING_DATA X509V3_str_functs[] = {
     {ERR_FUNC(X509V3_F_X509V3_EXT_ADD), "X509V3_EXT_add"},
     {ERR_FUNC(X509V3_F_X509V3_EXT_ADD_ALIAS), "X509V3_EXT_add_alias"},
     {ERR_FUNC(X509V3_F_X509V3_EXT_CONF), "X509V3_EXT_conf"},
+    {ERR_FUNC(X509V3_F_X509V3_EXT_FREE), "X509V3_EXT_free"},
     {ERR_FUNC(X509V3_F_X509V3_EXT_I2D), "X509V3_EXT_i2d"},
     {ERR_FUNC(X509V3_F_X509V3_EXT_NCONF), "X509V3_EXT_nconf"},
     {ERR_FUNC(X509V3_F_X509V3_GET_SECTION), "X509V3_get_section"},
@@ -145,7 +150,10 @@ static ERR_STRING_DATA X509V3_str_reasons[] = {
     {ERR_REASON(X509V3_R_BN_DEC2BN_ERROR), "bn dec2bn error"},
     {ERR_REASON(X509V3_R_BN_TO_ASN1_INTEGER_ERROR),
      "bn to asn1 integer error"},
+    {ERR_REASON(X509V3_R_CANNOT_FIND_FREE_FUNCTION),
+     "cannot find free function"},
     {ERR_REASON(X509V3_R_DIRNAME_ERROR), "dirname error"},
+    {ERR_REASON(X509V3_R_DISTPOINT_ALREADY_SET), "distpoint already set"},
     {ERR_REASON(X509V3_R_DUPLICATE_ZONE_ID), "duplicate zone id"},
     {ERR_REASON(X509V3_R_ERROR_CONVERTING_ZONE), "error converting zone"},
     {ERR_REASON(X509V3_R_ERROR_CREATING_EXTENSION),
@@ -169,6 +177,7 @@ static ERR_STRING_DATA X509V3_str_reasons[] = {
      "invalid extension string"},
     {ERR_REASON(X509V3_R_INVALID_INHERITANCE), "invalid inheritance"},
     {ERR_REASON(X509V3_R_INVALID_IPADDRESS), "invalid ipaddress"},
+    {ERR_REASON(X509V3_R_INVALID_MULTIPLE_RDNS), "invalid multiple rdns"},
     {ERR_REASON(X509V3_R_INVALID_NAME), "invalid name"},
     {ERR_REASON(X509V3_R_INVALID_NULL_ARGUMENT), "invalid null argument"},
     {ERR_REASON(X509V3_R_INVALID_NULL_NAME), "invalid null name"},
@@ -201,11 +210,11 @@ static ERR_STRING_DATA X509V3_str_reasons[] = {
     {ERR_REASON(X509V3_R_ODD_NUMBER_OF_DIGITS), "odd number of digits"},
     {ERR_REASON(X509V3_R_OPERATION_NOT_DEFINED), "operation not defined"},
     {ERR_REASON(X509V3_R_OTHERNAME_ERROR), "othername error"},
-    {ERR_REASON(X509V3_R_POLICY_LANGUAGE_ALREADTY_DEFINED),
-     "policy language alreadty defined"},
+    {ERR_REASON(X509V3_R_POLICY_LANGUAGE_ALREADY_DEFINED),
+     "policy language already defined"},
     {ERR_REASON(X509V3_R_POLICY_PATH_LENGTH), "policy path length"},
-    {ERR_REASON(X509V3_R_POLICY_PATH_LENGTH_ALREADTY_DEFINED),
-     "policy path length alreadty defined"},
+    {ERR_REASON(X509V3_R_POLICY_PATH_LENGTH_ALREADY_DEFINED),
+     "policy path length already defined"},
     {ERR_REASON(X509V3_R_POLICY_SYNTAX_NOT_CURRENTLY_SUPPORTED),
      "policy syntax not currently supported"},
     {ERR_REASON(X509V3_R_POLICY_WHEN_PROXY_LANGUAGE_REQUIRES_NO_POLICY),
@@ -221,6 +230,7 @@ static ERR_STRING_DATA X509V3_str_reasons[] = {
     {ERR_REASON(X509V3_R_UNKNOWN_EXTENSION_NAME), "unknown extension name"},
     {ERR_REASON(X509V3_R_UNKNOWN_OPTION), "unknown option"},
     {ERR_REASON(X509V3_R_UNSUPPORTED_OPTION), "unsupported option"},
+    {ERR_REASON(X509V3_R_UNSUPPORTED_TYPE), "unsupported type"},
     {ERR_REASON(X509V3_R_USER_TOO_LONG), "user too long"},
     {0, NULL}
 };

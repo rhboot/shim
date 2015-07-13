@@ -1,9 +1,9 @@
 
-EFI_INCLUDES	= -I../Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
+EFI_INCLUDES	= -I../Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -Icrypto/asn1 -Icrypto/evp -Icrypto/modes
 
 CFLAGS		= -ggdb -O0 -I. -I.. -I../Include/ -Icrypto -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc \
 		  -ffreestanding -I$(shell $(CC) -print-file-name=include) \
-		  -Wall $(EFI_INCLUDES) -DOPENSSL_SYSNAME_UWIN -DOPENSSL_SYS_UEFI -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DOPENSSL_NO_CAMELLIA -DOPENSSL_NO_SEED -DOPENSSL_NO_RC5 -DOPENSSL_NO_MDC2 -DOPENSSL_NO_SOCK -DOPENSSL_NO_CMS -DOPENSSL_NO_JPAKE -DOPENSSL_NO_CAPIENG -DOPENSSL_NO_ERR -DOPENSSL_NO_KRB5 -DOPENSSL_NO_DYNAMIC_ENGINE -DGETPID_IS_MEANINGLESS -DOPENSSL_NO_STDIO -DOPENSSL_NO_FP_API -DOPENSSL_NO_DGRAM -DOPENSSL_NO_SHA0 -DOPENSSL_NO_LHASH -DOPENSSL_NO_HW -DOPENSSL_NO_OCSP -DOPENSSL_NO_LOCKING -DOPENSSL_NO_DEPRECATED -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
+		  -Wall $(EFI_INCLUDES) -DOPENSSL_SYSNAME_UWIN -DOPENSSL_SYS_UEFI -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DOPENSSL_NO_CAMELLIA -DOPENSSL_NO_SEED -DOPENSSL_NO_RC5 -DOPENSSL_NO_MDC2 -DOPENSSL_NO_SOCK -DOPENSSL_NO_CMS -DOPENSSL_NO_JPAKE -DOPENSSL_NO_CAPIENG -DOPENSSL_NO_ERR -DOPENSSL_NO_KRB5 -DOPENSSL_NO_DYNAMIC_ENGINE -DGETPID_IS_MEANINGLESS -DOPENSSL_NO_STDIO -DOPENSSL_NO_POSIX_IO -DOPENSSL_NO_FP_API -DOPENSSL_NO_DGRAM -DOPENSSL_NO_SHA0 -DOPENSSL_NO_LHASH -DOPENSSL_NO_HW -DOPENSSL_NO_OCSP -DOPENSSL_NO_LOCKING -DOPENSSL_NO_DEPRECATED -DOPENSSL_NO_RIPEMD -DOPENSSL_NO_RC2 -DOPENSSL_NO_IDEA -DOPENSSL_NO_BF -DOPENSSL_NO_CAST -DOPENSSL_NO_WHIRLPOOL -DOPENSSL_NO_DSA -DOPENSSL_NO_EC -DOPENSSL_NO_ECDH -DOPENSSL_NO_ECDSA -DOPENSSL_NO_SRP -DOPENSSL_NO_ENGINE -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
 
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
@@ -23,7 +23,6 @@ LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libopenssl.a
 OBJS		=   crypto/cryptlib.o \
-  crypto/dyn_lck.o \
   crypto/mem.o \
   crypto/mem_clr.o \
   crypto/mem_dbg.o \
@@ -35,10 +34,9 @@ OBJS		=   crypto/cryptlib.o \
   crypto/o_time.o \
   crypto/o_str.o \
   crypto/o_dir.o \
+  crypto/o_fips.o \
   crypto/o_init.o \
-  crypto/fips_err.o \
-  crypto/md2/md2_dgst.o \
-  crypto/md2/md2_one.o \
+  crypto/fips_ers.o \
   crypto/md4/md4_dgst.o \
   crypto/md4/md4_one.o \
   crypto/md5/md5_dgst.o \
@@ -50,9 +48,8 @@ OBJS		=   crypto/cryptlib.o \
   crypto/sha/sha256.o \
   crypto/sha/sha512.o \
   crypto/hmac/hmac.o \
-  crypto/ripemd/rmd_dgst.o \
-  crypto/ripemd/rmd_one.o \
-  crypto/des/des_lib.o \
+  crypto/hmac/hm_ameth.o \
+  crypto/hmac/hm_pmeth.o \
   crypto/des/set_key.o \
   crypto/des/ecb_enc.o \
   crypto/des/cbc_enc.o \
@@ -79,29 +76,9 @@ OBJS		=   crypto/cryptlib.o \
   crypto/des/des_old.o \
   crypto/des/des_old2.o \
   crypto/des/read2pwd.o \
-  crypto/rc2/rc2_ecb.o \
-  crypto/rc2/rc2_skey.o \
-  crypto/rc2/rc2_cbc.o \
-  crypto/rc2/rc2cfb64.o \
-  crypto/rc2/rc2ofb64.o \
   crypto/rc4/rc4_enc.o \
   crypto/rc4/rc4_skey.o \
-  crypto/rc4/rc4_fblk.o \
-  crypto/idea/i_cbc.o \
-  crypto/idea/i_cfb64.o \
-  crypto/idea/i_ofb64.o \
-  crypto/idea/i_ecb.o \
-  crypto/idea/i_skey.o \
-  crypto/bf/bf_skey.o \
-  crypto/bf/bf_ecb.o \
-  crypto/bf/bf_enc.o \
-  crypto/bf/bf_cfb64.o \
-  crypto/bf/bf_ofb64.o \
-  crypto/cast/c_skey.o \
-  crypto/cast/c_ecb.o \
-  crypto/cast/c_enc.o \
-  crypto/cast/c_cfb64.o \
-  crypto/cast/c_ofb64.o \
+  crypto/rc4/rc4_utl.o \
   crypto/aes/aes_misc.o \
   crypto/aes/aes_ecb.o \
   crypto/aes/aes_cfb.o \
@@ -111,6 +88,15 @@ OBJS		=   crypto/cryptlib.o \
   crypto/aes/aes_wrap.o \
   crypto/aes/aes_core.o \
   crypto/aes/aes_cbc.o \
+  crypto/modes/cbc128.o \
+  crypto/modes/ctr128.o \
+  crypto/modes/cts128.o \
+  crypto/modes/cfb128.o \
+  crypto/modes/ofb128.o \
+  crypto/modes/gcm128.o \
+  crypto/modes/ccm128.o \
+  crypto/modes/xts128.o \
+  crypto/modes/wrap128.o \
   crypto/bn/bn_add.o \
   crypto/bn/bn_div.o \
   crypto/bn/bn_exp.o \
@@ -139,7 +125,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/bn/bn_depr.o \
   crypto/bn/bn_x931p.o \
   crypto/bn/bn_const.o \
-  crypto/bn/bn_opt.o \
   crypto/rsa/rsa_eay.o \
   crypto/rsa/rsa_gen.o \
   crypto/rsa/rsa_lib.o \
@@ -154,20 +139,12 @@ OBJS		=   crypto/cryptlib.o \
   crypto/rsa/rsa_null.o \
   crypto/rsa/rsa_pss.o \
   crypto/rsa/rsa_x931.o \
-  crypto/rsa/rsa_x931g.o \
   crypto/rsa/rsa_asn1.o \
   crypto/rsa/rsa_depr.o \
-  crypto/rsa/rsa_eng.o \
-  crypto/dsa/dsa_gen.o \
-  crypto/dsa/dsa_key.o \
-  crypto/dsa/dsa_lib.o \
-  crypto/dsa/dsa_asn1.o \
-  crypto/dsa/dsa_vrf.o \
-  crypto/dsa/dsa_sign.o \
-  crypto/dsa/dsa_err.o \
-  crypto/dsa/dsa_ossl.o \
-  crypto/dsa/dsa_depr.o \
-  crypto/dsa/dsa_utl.o \
+  crypto/rsa/rsa_ameth.o \
+  crypto/rsa/rsa_prn.o \
+  crypto/rsa/rsa_pmeth.o \
+  crypto/rsa/rsa_crpt.o \
   crypto/dso/dso_dl.o \
   crypto/dso/dso_dlfcn.o \
   crypto/dso/dso_err.o \
@@ -176,6 +153,7 @@ OBJS		=   crypto/cryptlib.o \
   crypto/dso/dso_openssl.o \
   crypto/dso/dso_win32.o \
   crypto/dso/dso_vms.o \
+  crypto/dso/dso_beos.o \
   crypto/dh/dh_asn1.o \
   crypto/dh/dh_gen.o \
   crypto/dh/dh_key.o \
@@ -183,30 +161,10 @@ OBJS		=   crypto/cryptlib.o \
   crypto/dh/dh_check.o \
   crypto/dh/dh_err.o \
   crypto/dh/dh_depr.o \
-  crypto/ec/ec_lib.o \
-  crypto/ec/ecp_smpl.o \
-  crypto/ec/ecp_mont.o \
-  crypto/ec/ecp_nist.o \
-  crypto/ec/ec_cvt.o \
-  crypto/ec/ec_mult.o \
-  crypto/ec/ec_err.o \
-  crypto/ec/ec_curve.o \
-  crypto/ec/ec_check.o \
-  crypto/ec/ec_print.o \
-  crypto/ec/ec_asn1.o \
-  crypto/ec/ec_key.o \
-  crypto/ec/ec2_smpl.o \
-  crypto/ec/ec2_mult.o \
-  crypto/ecdh/ech_lib.o \
-  crypto/ecdh/ech_ossl.o \
-  crypto/ecdh/ech_key.o \
-  crypto/ecdh/ech_err.o \
-  crypto/ecdsa/ecs_lib.o \
-  crypto/ecdsa/ecs_asn1.o \
-  crypto/ecdsa/ecs_ossl.o \
-  crypto/ecdsa/ecs_sign.o \
-  crypto/ecdsa/ecs_vrf.o \
-  crypto/ecdsa/ecs_err.o \
+  crypto/dh/dh_ameth.o \
+  crypto/dh/dh_pmeth.o \
+  crypto/dh/dh_prn.o \
+  crypto/dh/dh_rfc5114.o \
   crypto/buffer/buffer.o \
   crypto/buffer/buf_str.o \
   crypto/buffer/buf_err.o \
@@ -217,10 +175,14 @@ OBJS		=   crypto/cryptlib.o \
   crypto/bio/bss_null.o \
   crypto/bio/bss_fd.o \
   crypto/bio/bss_file.o \
+  crypto/bio/bss_sock.o \
+  crypto/bio/bss_conn.o \
   crypto/bio/bf_null.o \
   crypto/bio/bf_buff.o \
   crypto/bio/b_dump.o \
   crypto/bio/b_print.o \
+  crypto/bio/b_sock.o \
+  crypto/bio/bss_acpt.o \
   crypto/bio/bf_nbio.o \
   crypto/bio/bss_log.o \
   crypto/bio/bss_bio.o \
@@ -231,26 +193,18 @@ OBJS		=   crypto/cryptlib.o \
   crypto/rand/md_rand.o \
   crypto/rand/randfile.o \
   crypto/rand/rand_lib.o \
-  crypto/rand/rand_eng.o \
   crypto/rand/rand_err.o \
-  crypto/rand/rand_egd.o \
-  crypto/rand/rand_win.o \
   crypto/rand/rand_unix.o \
-  crypto/rand/rand_os2.o \
-  crypto/rand/rand_nw.o \
   crypto/err/err.o \
-  crypto/err/err_def.o \
   crypto/err/err_all.o \
   crypto/err/err_prn.o \
-  crypto/err/err_str.o \
-  crypto/err/err_bio.o \
   crypto/objects/o_names.o \
   crypto/objects/obj_dat.o \
   crypto/objects/obj_lib.o \
   crypto/objects/obj_err.o \
+  crypto/objects/obj_xref.o \
   crypto/evp/encode.o \
   crypto/evp/digest.o \
-  crypto/evp/dig_eng.o \
   crypto/evp/evp_enc.o \
   crypto/evp/evp_key.o \
   crypto/evp/evp_acnf.o \
@@ -259,22 +213,25 @@ OBJS		=   crypto/cryptlib.o \
   crypto/evp/e_bf.o \
   crypto/evp/e_idea.o \
   crypto/evp/e_des3.o \
+  crypto/evp/e_camellia.o \
   crypto/evp/e_rc4.o \
   crypto/evp/e_aes.o \
   crypto/evp/names.o \
+  crypto/evp/e_seed.o \
   crypto/evp/e_xcbc_d.o \
   crypto/evp/e_rc2.o \
   crypto/evp/e_cast.o \
   crypto/evp/e_rc5.o \
-  crypto/evp/enc_min.o \
   crypto/evp/m_null.o \
   crypto/evp/m_md2.o \
   crypto/evp/m_md4.o \
   crypto/evp/m_md5.o \
   crypto/evp/m_sha.o \
   crypto/evp/m_sha1.o \
+  crypto/evp/m_wp.o \
   crypto/evp/m_dss.o \
   crypto/evp/m_dss1.o \
+  crypto/evp/m_mdc2.o \
   crypto/evp/m_ripemd.o \
   crypto/evp/m_ecdsa.o \
   crypto/evp/p_open.o \
@@ -299,6 +256,13 @@ OBJS		=   crypto/cryptlib.o \
   crypto/evp/p5_crpt.o \
   crypto/evp/p5_crpt2.o \
   crypto/evp/e_old.o \
+  crypto/evp/pmeth_lib.o \
+  crypto/evp/pmeth_fn.o \
+  crypto/evp/pmeth_gn.o \
+  crypto/evp/m_sigver.o \
+  crypto/evp/e_aes_cbc_hmac_sha1.o \
+  crypto/evp/e_aes_cbc_hmac_sha256.o \
+  crypto/evp/e_rc4_hmac_md5.o \
   crypto/asn1/a_object.o \
   crypto/asn1/a_bitstr.o \
   crypto/asn1/a_utctm.o \
@@ -334,6 +298,7 @@ OBJS		=   crypto/cryptlib.o \
   crypto/asn1/x_info.o \
   crypto/asn1/x_spki.o \
   crypto/asn1/nsseq.o \
+  crypto/asn1/x_nx509.o \
   crypto/asn1/d2i_pu.o \
   crypto/asn1/d2i_pr.o \
   crypto/asn1/i2d_pu.o \
@@ -351,20 +316,22 @@ OBJS		=   crypto/cryptlib.o \
   crypto/asn1/tasn_dec.o \
   crypto/asn1/tasn_utl.o \
   crypto/asn1/tasn_typ.o \
+  crypto/asn1/tasn_prn.o \
+  crypto/asn1/ameth_lib.o \
   crypto/asn1/f_int.o \
   crypto/asn1/f_string.o \
   crypto/asn1/n_pkey.o \
   crypto/asn1/f_enum.o \
-  crypto/asn1/a_hdr.o \
   crypto/asn1/x_pkey.o \
   crypto/asn1/a_bool.o \
   crypto/asn1/x_exten.o \
+  crypto/asn1/bio_asn1.o \
+  crypto/asn1/bio_ndef.o \
   crypto/asn1/asn_mime.o \
   crypto/asn1/asn1_gen.o \
   crypto/asn1/asn1_par.o \
   crypto/asn1/asn1_lib.o \
   crypto/asn1/asn1_err.o \
-  crypto/asn1/a_meth.o \
   crypto/asn1/a_bytes.o \
   crypto/asn1/a_strnid.o \
   crypto/asn1/evp_asn1.o \
@@ -384,6 +351,7 @@ OBJS		=   crypto/cryptlib.o \
   crypto/pem/pem_oth.o \
   crypto/pem/pem_pk8.o \
   crypto/pem/pem_pkey.o \
+  crypto/pem/pvkfmt.o \
   crypto/x509/x509_def.o \
   crypto/x509/x509_d2.o \
   crypto/x509/x509_r2x.o \
@@ -405,8 +373,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/x509/x_all.o \
   crypto/x509/x509_txt.o \
   crypto/x509/x509_trs.o \
-  crypto/x509/by_file.o \
-  crypto/x509/by_dir.o \
   crypto/x509/x509_vpm.o \
   crypto/x509v3/v3_bcons.o \
   crypto/x509v3/v3_bitst.o \
@@ -459,6 +425,7 @@ OBJS		=   crypto/cryptlib.o \
   crypto/pkcs7/pk7_smime.o \
   crypto/pkcs7/pk7_attr.o \
   crypto/pkcs7/pk7_mime.o \
+  crypto/pkcs7/bio_pk7.o \
   crypto/pkcs12/p12_add.o \
   crypto/pkcs12/p12_asn.o \
   crypto/pkcs12/p12_attr.o \
@@ -478,29 +445,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/comp/comp_err.o \
   crypto/comp/c_rle.o \
   crypto/comp/c_zlib.o \
-  crypto/engine/eng_err.o \
-  crypto/engine/eng_lib.o \
-  crypto/engine/eng_list.o \
-  crypto/engine/eng_init.o \
-  crypto/engine/eng_ctrl.o \
-  crypto/engine/eng_table.o \
-  crypto/engine/eng_pkey.o \
-  crypto/engine/eng_fat.o \
-  crypto/engine/eng_all.o \
-  crypto/engine/tb_rsa.o \
-  crypto/engine/tb_dsa.o \
-  crypto/engine/tb_ecdsa.o \
-  crypto/engine/tb_dh.o \
-  crypto/engine/tb_ecdh.o \
-  crypto/engine/tb_rand.o \
-  crypto/engine/tb_store.o \
-  crypto/engine/tb_cipher.o \
-  crypto/engine/tb_digest.o \
-  crypto/engine/eng_openssl.o \
-  crypto/engine/eng_cnf.o \
-  crypto/engine/eng_dyn.o \
-  crypto/engine/eng_cryptodev.o \
-  crypto/engine/eng_padlock.o \
   crypto/ocsp/ocsp_asn.o \
   crypto/ocsp/ocsp_ext.o \
   crypto/ocsp/ocsp_ht.o \
@@ -510,18 +454,25 @@ OBJS		=   crypto/cryptlib.o \
   crypto/ocsp/ocsp_prn.o \
   crypto/ocsp/ocsp_vfy.o \
   crypto/ocsp/ocsp_err.o \
-  crypto/ui/ui_err.o \
   crypto/ui/ui_lib.o \
   crypto/ui/ui_util.o \
   crypto/ui/ui_compat.o \
   crypto/krb5/krb5_asn.o \
-  crypto/store/str_err.o \
-  crypto/store/str_lib.o \
-  crypto/store/str_meth.o \
-  crypto/store/str_mem.o \
   crypto/pqueue/pqueue.o \
-
-
+  crypto/ts/ts_err.o \
+  crypto/ts/ts_req_utils.o \
+  crypto/ts/ts_req_print.o \
+  crypto/ts/ts_rsp_utils.o \
+  crypto/ts/ts_rsp_print.o \
+  crypto/ts/ts_rsp_sign.o \
+  crypto/ts/ts_rsp_verify.o \
+  crypto/ts/ts_verify_ctx.o \
+  crypto/ts/ts_lib.o \
+  crypto/ts/ts_conf.o \
+  crypto/ts/ts_asn1.o \
+  crypto/cmac/cmac.o \
+  crypto/cmac/cm_ameth.o \
+  crypto/cmac/cm_pmeth.o \
 
 all: $(TARGET)
 

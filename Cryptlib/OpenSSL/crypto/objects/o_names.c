@@ -24,7 +24,8 @@
  * I use the ex_data stuff to manage the identifiers for the obj_name_types
  * that applications may define.  I only really use the free function field.
  */
-static LHASH *names_lh = NULL;
+DECLARE_LHASH_OF(OBJ_NAME);
+static LHASH_OF(OBJ_NAME) *names_lh = NULL;
 static int names_type_num = OBJ_NAME_TYPE_NUM;
 
 typedef struct name_funcs_st {
@@ -49,12 +50,15 @@ static unsigned long obj_name_hash(const void *a_void);
 /* static int obj_name_cmp(OBJ_NAME *a,OBJ_NAME *b); */
 static int obj_name_cmp(const void *a_void, const void *b_void);
 
+static IMPLEMENT_LHASH_HASH_FN(obj_name, OBJ_NAME)
+static IMPLEMENT_LHASH_COMP_FN(obj_name, OBJ_NAME)
+
 int OBJ_NAME_init(void)
 {
     if (names_lh != NULL)
         return (1);
     MemCheck_off();
-    names_lh = lh_new(obj_name_hash, obj_name_cmp);
+    names_lh = lh_OBJ_NAME_new();
     MemCheck_on();
     return (names_lh != NULL);
 }
@@ -72,7 +76,7 @@ int OBJ_NAME_new_index(unsigned long (*hash_func) (const char *),
         name_funcs_stack = sk_NAME_FUNCS_new_null();
         MemCheck_on();
     }
-    if ((name_funcs_stack == NULL)) {
+    if (name_funcs_stack == NULL) {
         /* ERROR */
         return (0);
     }
@@ -160,7 +164,7 @@ const char *OBJ_NAME_get(const char *name, int type)
     on.type = type;
 
     for (;;) {
-        ret = (OBJ_NAME *)lh_retrieve(names_lh, &on);
+        ret = lh_OBJ_NAME_retrieve(names_lh, &on);
         if (ret == NULL)
             return (NULL);
         if ((ret->alias) && !alias) {
@@ -195,7 +199,7 @@ int OBJ_NAME_add(const char *name, int type, const char *data)
     onp->type = type;
     onp->data = data;
 
-    ret = (OBJ_NAME *)lh_insert(names_lh, onp);
+    ret = lh_OBJ_NAME_insert(names_lh, onp);
     if (ret != NULL) {
         /* free things */
         if ((name_funcs_stack != NULL)
@@ -210,7 +214,7 @@ int OBJ_NAME_add(const char *name, int type, const char *data)
         }
         OPENSSL_free(ret);
     } else {
-        if (lh_error(names_lh)) {
+        if (lh_OBJ_NAME_error(names_lh)) {
             /* ERROR */
             return (0);
         }
@@ -228,7 +232,7 @@ int OBJ_NAME_remove(const char *name, int type)
     type &= ~OBJ_NAME_ALIAS;
     on.name = name;
     on.type = type;
-    ret = (OBJ_NAME *)lh_delete(names_lh, &on);
+    ret = lh_OBJ_NAME_delete(names_lh, &on);
     if (ret != NULL) {
         /* free things */
         if ((name_funcs_stack != NULL)
@@ -253,14 +257,13 @@ struct doall {
     void *arg;
 };
 
-static void do_all_fn(const OBJ_NAME *name, struct doall *d)
+static void do_all_fn_doall_arg(const OBJ_NAME *name, struct doall *d)
 {
     if (name->type == d->type)
         d->fn(name, d->arg);
 }
 
-static IMPLEMENT_LHASH_DOALL_ARG_FN(do_all_fn, const OBJ_NAME *,
-                                    struct doall *)
+static IMPLEMENT_LHASH_DOALL_ARG_FN(do_all_fn, const OBJ_NAME, struct doall)
 
 void OBJ_NAME_do_all(int type, void (*fn) (const OBJ_NAME *, void *arg),
                      void *arg)
@@ -271,7 +274,8 @@ void OBJ_NAME_do_all(int type, void (*fn) (const OBJ_NAME *, void *arg),
     d.fn = fn;
     d.arg = arg;
 
-    lh_doall_arg(names_lh, LHASH_DOALL_ARG_FN(do_all_fn), &d);
+    lh_OBJ_NAME_doall_arg(names_lh, LHASH_DOALL_ARG_FN(do_all_fn),
+                          struct doall, &d);
 }
 
 struct doall_sorted {
@@ -306,31 +310,34 @@ void OBJ_NAME_do_all_sorted(int type,
     int n;
 
     d.type = type;
-    d.names = OPENSSL_malloc(lh_num_items(names_lh) * sizeof *d.names);
-    d.n = 0;
-    OBJ_NAME_do_all(type, do_all_sorted_fn, &d);
+    d.names =
+        OPENSSL_malloc(lh_OBJ_NAME_num_items(names_lh) * sizeof *d.names);
+    /* Really should return an error if !d.names...but its a void function! */
+    if (d.names) {
+        d.n = 0;
+        OBJ_NAME_do_all(type, do_all_sorted_fn, &d);
 
-    qsort((void *)d.names, d.n, sizeof *d.names, do_all_sorted_cmp);
+        qsort((void *)d.names, d.n, sizeof *d.names, do_all_sorted_cmp);
 
-    for (n = 0; n < d.n; ++n)
-        fn(d.names[n], arg);
+        for (n = 0; n < d.n; ++n)
+            fn(d.names[n], arg);
 
-    OPENSSL_free((void *)d.names);
+        OPENSSL_free((void *)d.names);
+    }
 }
 
 static int free_type;
 
-static void names_lh_free(OBJ_NAME *onp)
+static void names_lh_free_doall(OBJ_NAME *onp)
 {
     if (onp == NULL)
         return;
 
-    if ((free_type < 0) || (free_type == onp->type)) {
+    if (free_type < 0 || free_type == onp->type)
         OBJ_NAME_remove(onp->name, onp->type);
-    }
 }
 
-static IMPLEMENT_LHASH_DOALL_FN(names_lh_free, OBJ_NAME *)
+static IMPLEMENT_LHASH_DOALL_FN(names_lh_free, OBJ_NAME)
 
 static void name_funcs_free(NAME_FUNCS *ptr)
 {
@@ -345,15 +352,15 @@ void OBJ_NAME_cleanup(int type)
         return;
 
     free_type = type;
-    down_load = names_lh->down_load;
-    names_lh->down_load = 0;
+    down_load = lh_OBJ_NAME_down_load(names_lh);
+    lh_OBJ_NAME_down_load(names_lh) = 0;
 
-    lh_doall(names_lh, LHASH_DOALL_FN(names_lh_free));
+    lh_OBJ_NAME_doall(names_lh, LHASH_DOALL_FN(names_lh_free));
     if (type < 0) {
-        lh_free(names_lh);
+        lh_OBJ_NAME_free(names_lh);
         sk_NAME_FUNCS_pop_free(name_funcs_stack, name_funcs_free);
         names_lh = NULL;
         name_funcs_stack = NULL;
     } else
-        names_lh->down_load = down_load;
+        lh_OBJ_NAME_down_load(names_lh) = down_load;
 }

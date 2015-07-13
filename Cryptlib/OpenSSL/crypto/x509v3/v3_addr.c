@@ -239,7 +239,7 @@ static int i2r_IPAddressOrRanges(BIO *out,
 /*
  * i2r handler for an IPAddrBlocks extension.
  */
-static int i2r_IPAddrBlocks(X509V3_EXT_METHOD *method,
+static int i2r_IPAddrBlocks(const X509V3_EXT_METHOD *method,
                             void *ext, BIO *out, int indent)
 {
     const IPAddrBlocks *addr = ext;
@@ -321,8 +321,7 @@ static int IPAddressOrRange_cmp(const IPAddressOrRange *a,
                                 const IPAddressOrRange *b, const int length)
 {
     unsigned char addr_a[ADDR_RAW_BUF_LEN], addr_b[ADDR_RAW_BUF_LEN];
-    int prefixlen_a = 0;
-    int prefixlen_b = 0;
+    int prefixlen_a = 0, prefixlen_b = 0;
     int r;
 
     switch (a->type) {
@@ -879,7 +878,7 @@ static int IPAddressOrRanges_canonize(IPAddressOrRanges *aors,
             IPAddressOrRange *merged;
             if (!make_addressRange(&merged, a_min, b_max, length))
                 return 0;
-            sk_IPAddressOrRange_set(aors, i, merged);
+            (void)sk_IPAddressOrRange_set(aors, i, merged);
             (void)sk_IPAddressOrRange_delete(aors, i + 1);
             IPAddressOrRange_free(a);
             IPAddressOrRange_free(b);
@@ -928,7 +927,7 @@ int v3_addr_canonize(IPAddrBlocks *addr)
 /*
  * v2i handler for the IPAddrBlocks extension.
  */
-static void *v2i_IPAddrBlocks(struct v3_ext_method *method,
+static void *v2i_IPAddrBlocks(const struct v3_ext_method *method,
                               struct v3_ext_ctx *ctx,
                               STACK_OF(CONF_VALUE) *values)
 {
@@ -1219,7 +1218,7 @@ static int v3_addr_validate_path_internal(X509_STORE_CTX *ctx,
 {
     IPAddrBlocks *child = NULL;
     int i, j, ret = 1;
-    X509 *x = NULL;
+    X509 *x;
 
     OPENSSL_assert(chain != NULL && sk_X509_num(chain) > 0);
     OPENSSL_assert(ctx != NULL || ext != NULL);
@@ -1232,6 +1231,7 @@ static int v3_addr_validate_path_internal(X509_STORE_CTX *ctx,
      */
     if (ext != NULL) {
         i = -1;
+        x = NULL;
     } else {
         i = 0;
         x = sk_X509_value(chain, i);
@@ -1299,6 +1299,7 @@ static int v3_addr_validate_path_internal(X509_STORE_CTX *ctx,
     /*
      * Trust anchor can't inherit.
      */
+    OPENSSL_assert(x != NULL);
     if (x->rfc3779_addr != NULL) {
         for (j = 0; j < sk_IPAddressFamily_num(x->rfc3779_addr); j++) {
             IPAddressFamily *fp =

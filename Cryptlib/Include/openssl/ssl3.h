@@ -123,7 +123,6 @@
 # include <openssl/buffer.h>
 # include <openssl/evp.h>
 # include <openssl/ssl.h>
-# include <openssl/pq_compat.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -160,11 +159,17 @@ extern "C" {
 # define SSL3_CK_DH_RSA_DES_192_CBC3_SHA         0x03000010
 
 # define SSL3_CK_EDH_DSS_DES_40_CBC_SHA          0x03000011
+# define SSL3_CK_DHE_DSS_DES_40_CBC_SHA          SSL3_CK_EDH_DSS_DES_40_CBC_SHA
 # define SSL3_CK_EDH_DSS_DES_64_CBC_SHA          0x03000012
+# define SSL3_CK_DHE_DSS_DES_64_CBC_SHA          SSL3_CK_EDH_DSS_DES_64_CBC_SHA
 # define SSL3_CK_EDH_DSS_DES_192_CBC3_SHA        0x03000013
+# define SSL3_CK_DHE_DSS_DES_192_CBC3_SHA        SSL3_CK_EDH_DSS_DES_192_CBC3_SHA
 # define SSL3_CK_EDH_RSA_DES_40_CBC_SHA          0x03000014
+# define SSL3_CK_DHE_RSA_DES_40_CBC_SHA          SSL3_CK_EDH_RSA_DES_40_CBC_SHA
 # define SSL3_CK_EDH_RSA_DES_64_CBC_SHA          0x03000015
+# define SSL3_CK_DHE_RSA_DES_64_CBC_SHA          SSL3_CK_EDH_RSA_DES_64_CBC_SHA
 # define SSL3_CK_EDH_RSA_DES_192_CBC3_SHA        0x03000016
+# define SSL3_CK_DHE_RSA_DES_192_CBC3_SHA        SSL3_CK_EDH_RSA_DES_192_CBC3_SHA
 
 # define SSL3_CK_ADH_RC4_40_MD5                  0x03000017
 # define SSL3_CK_ADH_RC4_128_MD5                 0x03000018
@@ -172,14 +177,16 @@ extern "C" {
 # define SSL3_CK_ADH_DES_64_CBC_SHA              0x0300001A
 # define SSL3_CK_ADH_DES_192_CBC_SHA             0x0300001B
 
-# define SSL3_CK_FZA_DMS_NULL_SHA                0x0300001C
-# define SSL3_CK_FZA_DMS_FZA_SHA                 0x0300001D
-# if 0                          /* Because it clashes with KRB5, is never
+# if 0
+#  define SSL3_CK_FZA_DMS_NULL_SHA                0x0300001C
+#  define SSL3_CK_FZA_DMS_FZA_SHA                 0x0300001D
+#  if 0                         /* Because it clashes with KRB5, is never
                                  * used any more, and is safe to remove
                                  * according to David Hopwood
                                  * <david.hopwood@zetnet.co.uk> of the
                                  * ietf-tls list */
-#  define SSL3_CK_FZA_DMS_RC4_SHA                 0x0300001E
+#   define SSL3_CK_FZA_DMS_RC4_SHA                 0x0300001E
+#  endif
 # endif
 
 /*
@@ -219,6 +226,18 @@ extern "C" {
 # define SSL3_TXT_DH_RSA_DES_64_CBC_SHA          "DH-RSA-DES-CBC-SHA"
 # define SSL3_TXT_DH_RSA_DES_192_CBC3_SHA        "DH-RSA-DES-CBC3-SHA"
 
+# define SSL3_TXT_DHE_DSS_DES_40_CBC_SHA         "EXP-DHE-DSS-DES-CBC-SHA"
+# define SSL3_TXT_DHE_DSS_DES_64_CBC_SHA         "DHE-DSS-DES-CBC-SHA"
+# define SSL3_TXT_DHE_DSS_DES_192_CBC3_SHA       "DHE-DSS-DES-CBC3-SHA"
+# define SSL3_TXT_DHE_RSA_DES_40_CBC_SHA         "EXP-DHE-RSA-DES-CBC-SHA"
+# define SSL3_TXT_DHE_RSA_DES_64_CBC_SHA         "DHE-RSA-DES-CBC-SHA"
+# define SSL3_TXT_DHE_RSA_DES_192_CBC3_SHA       "DHE-RSA-DES-CBC3-SHA"
+
+/*
+ * This next block of six "EDH" labels is for backward compatibility with
+ * older versions of OpenSSL.  New code should use the six "DHE" labels above
+ * instead:
+ */
 # define SSL3_TXT_EDH_DSS_DES_40_CBC_SHA         "EXP-EDH-DSS-DES-CBC-SHA"
 # define SSL3_TXT_EDH_DSS_DES_64_CBC_SHA         "EDH-DSS-DES-CBC-SHA"
 # define SSL3_TXT_EDH_DSS_DES_192_CBC3_SHA       "EDH-DSS-DES-CBC3-SHA"
@@ -232,9 +251,11 @@ extern "C" {
 # define SSL3_TXT_ADH_DES_64_CBC_SHA             "ADH-DES-CBC-SHA"
 # define SSL3_TXT_ADH_DES_192_CBC_SHA            "ADH-DES-CBC3-SHA"
 
-# define SSL3_TXT_FZA_DMS_NULL_SHA               "FZA-NULL-SHA"
-# define SSL3_TXT_FZA_DMS_FZA_SHA                "FZA-FZA-CBC-SHA"
-# define SSL3_TXT_FZA_DMS_RC4_SHA                "FZA-RC4-SHA"
+# if 0
+#  define SSL3_TXT_FZA_DMS_NULL_SHA               "FZA-NULL-SHA"
+#  define SSL3_TXT_FZA_DMS_FZA_SHA                "FZA-FZA-CBC-SHA"
+#  define SSL3_TXT_FZA_DMS_RC4_SHA                "FZA-RC4-SHA"
+# endif
 
 # define SSL3_TXT_KRB5_DES_64_CBC_SHA            "KRB5-DES-CBC-SHA"
 # define SSL3_TXT_KRB5_DES_192_CBC3_SHA          "KRB5-DES-CBC3-SHA"
@@ -260,23 +281,73 @@ extern "C" {
 # define SSL3_SESSION_ID_SIZE                    32
 # define SSL3_RT_HEADER_LENGTH                   5
 
-/* Due to MS stuffing up, this can change.... */
-# if defined(OPENSSL_SYS_WIN16) || \
-        (defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_WIN32))
-#  define SSL3_RT_MAX_EXTRA                       (14000)
+# define SSL3_HM_HEADER_LENGTH                  4
+
+# ifndef SSL3_ALIGN_PAYLOAD
+ /*
+  * Some will argue that this increases memory footprint, but it's not
+  * actually true. Point is that malloc has to return at least 64-bit aligned
+  * pointers, meaning that allocating 5 bytes wastes 3 bytes in either case.
+  * Suggested pre-gaping simply moves these wasted bytes from the end of
+  * allocated region to its front, but makes data payload aligned, which
+  * improves performance:-)
+  */
+#  define SSL3_ALIGN_PAYLOAD                     8
 # else
-#  define SSL3_RT_MAX_EXTRA                       (16384)
+#  if (SSL3_ALIGN_PAYLOAD&(SSL3_ALIGN_PAYLOAD-1))!=0
+#   error "insane SSL3_ALIGN_PAYLOAD"
+#   undef SSL3_ALIGN_PAYLOAD
+#  endif
 # endif
 
+/*
+ * This is the maximum MAC (digest) size used by the SSL library. Currently
+ * maximum of 20 is used by SHA1, but we reserve for future extension for
+ * 512-bit hashes.
+ */
+
+# define SSL3_RT_MAX_MD_SIZE                     64
+
+/*
+ * Maximum block size used in all ciphersuites. Currently 16 for AES.
+ */
+
+# define SSL_RT_MAX_CIPHER_BLOCK_SIZE            16
+
+# define SSL3_RT_MAX_EXTRA                       (16384)
+
+/* Maximum plaintext length: defined by SSL/TLS standards */
 # define SSL3_RT_MAX_PLAIN_LENGTH                16384
+/* Maximum compression overhead: defined by SSL/TLS standards */
+# define SSL3_RT_MAX_COMPRESSED_OVERHEAD         1024
+
+/*
+ * The standards give a maximum encryption overhead of 1024 bytes. In
+ * practice the value is lower than this. The overhead is the maximum number
+ * of padding bytes (256) plus the mac size.
+ */
+# define SSL3_RT_MAX_ENCRYPTED_OVERHEAD  (256 + SSL3_RT_MAX_MD_SIZE)
+
+/*
+ * OpenSSL currently only uses a padding length of at most one block so the
+ * send overhead is smaller.
+ */
+
+# define SSL3_RT_SEND_MAX_ENCRYPTED_OVERHEAD \
+                        (SSL_RT_MAX_CIPHER_BLOCK_SIZE + SSL3_RT_MAX_MD_SIZE)
+
+/* If compression isn't used don't include the compression overhead */
+
 # ifdef OPENSSL_NO_COMP
-#  define SSL3_RT_MAX_COMPRESSED_LENGTH   SSL3_RT_MAX_PLAIN_LENGTH
+#  define SSL3_RT_MAX_COMPRESSED_LENGTH           SSL3_RT_MAX_PLAIN_LENGTH
 # else
-#  define SSL3_RT_MAX_COMPRESSED_LENGTH   (1024+SSL3_RT_MAX_PLAIN_LENGTH)
+#  define SSL3_RT_MAX_COMPRESSED_LENGTH   \
+                (SSL3_RT_MAX_PLAIN_LENGTH+SSL3_RT_MAX_COMPRESSED_OVERHEAD)
 # endif
-# define SSL3_RT_MAX_ENCRYPTED_LENGTH    (1024+SSL3_RT_MAX_COMPRESSED_LENGTH)
-# define SSL3_RT_MAX_PACKET_SIZE         (SSL3_RT_MAX_ENCRYPTED_LENGTH+SSL3_RT_HEADER_LENGTH)
-# define SSL3_RT_MAX_DATA_SIZE                   (1024*1024)
+# define SSL3_RT_MAX_ENCRYPTED_LENGTH    \
+                (SSL3_RT_MAX_ENCRYPTED_OVERHEAD+SSL3_RT_MAX_COMPRESSED_LENGTH)
+# define SSL3_RT_MAX_PACKET_SIZE         \
+                (SSL3_RT_MAX_ENCRYPTED_LENGTH+SSL3_RT_HEADER_LENGTH)
 
 # define SSL3_MD_CLIENT_FINISHED_CONST   "\x43\x4C\x4E\x54"
 # define SSL3_MD_SERVER_FINISHED_CONST   "\x53\x52\x56\x52"
@@ -289,6 +360,24 @@ extern "C" {
 # define SSL3_RT_ALERT                   21
 # define SSL3_RT_HANDSHAKE               22
 # define SSL3_RT_APPLICATION_DATA        23
+# define TLS1_RT_HEARTBEAT               24
+
+/* Pseudo content types to indicate additional parameters */
+# define TLS1_RT_CRYPTO                  0x1000
+# define TLS1_RT_CRYPTO_PREMASTER        (TLS1_RT_CRYPTO | 0x1)
+# define TLS1_RT_CRYPTO_CLIENT_RANDOM    (TLS1_RT_CRYPTO | 0x2)
+# define TLS1_RT_CRYPTO_SERVER_RANDOM    (TLS1_RT_CRYPTO | 0x3)
+# define TLS1_RT_CRYPTO_MASTER           (TLS1_RT_CRYPTO | 0x4)
+
+# define TLS1_RT_CRYPTO_READ             0x0000
+# define TLS1_RT_CRYPTO_WRITE            0x0100
+# define TLS1_RT_CRYPTO_MAC              (TLS1_RT_CRYPTO | 0x5)
+# define TLS1_RT_CRYPTO_KEY              (TLS1_RT_CRYPTO | 0x6)
+# define TLS1_RT_CRYPTO_IV               (TLS1_RT_CRYPTO | 0x7)
+# define TLS1_RT_CRYPTO_FIXED_IV         (TLS1_RT_CRYPTO | 0x8)
+
+/* Pseudo content type for SSL/TLS header info */
+# define SSL3_RT_HEADER                  0x100
 
 # define SSL3_AL_WARNING                 1
 # define SSL3_AL_FATAL                   2
@@ -305,6 +394,11 @@ extern "C" {
 # define SSL3_AD_CERTIFICATE_EXPIRED     45
 # define SSL3_AD_CERTIFICATE_UNKNOWN     46
 # define SSL3_AD_ILLEGAL_PARAMETER       47/* fatal */
+
+# define TLS1_HB_REQUEST         1
+# define TLS1_HB_RESPONSE        2
+
+# ifndef OPENSSL_NO_SSL_INTERN
 
 typedef struct ssl3_record_st {
     /* type of record */
@@ -338,7 +432,7 @@ typedef struct ssl3_record_st {
     /* sequence number, needed by DTLS1 */
     /*
      * r
-     */ PQ_64BIT seq_num;
+     */ unsigned char seq_num[8];
 } SSL3_RECORD;
 
 typedef struct ssl3_buffer_st {
@@ -352,6 +446,8 @@ typedef struct ssl3_buffer_st {
     int left;
 } SSL3_BUFFER;
 
+# endif
+
 # define SSL3_CT_RSA_SIGN                        1
 # define SSL3_CT_DSS_SIGN                        2
 # define SSL3_CT_RSA_FIXED_DH                    3
@@ -363,36 +459,41 @@ typedef struct ssl3_buffer_st {
  * SSL3_CT_NUMBER is used to size arrays and it must be large enough to
  * contain all of the cert types defined either for SSLv3 and TLSv1.
  */
-# define SSL3_CT_NUMBER                  7
+# define SSL3_CT_NUMBER                  9
 
 # define SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS       0x0001
 # define SSL3_FLAGS_DELAY_CLIENT_FINISHED        0x0002
 # define SSL3_FLAGS_POP_BUFFER                   0x0004
 # define TLS1_FLAGS_TLS_PADDING_BUG              0x0008
+# define TLS1_FLAGS_SKIP_CERT_VERIFY             0x0010
+# define TLS1_FLAGS_KEEP_HANDSHAKE               0x0020
+/*
+ * Set when the handshake is ready to process peer's ChangeCipherSpec message.
+ * Cleared after the message has been processed.
+ */
 # define SSL3_FLAGS_CCS_OK                       0x0080
 
-/*
- * SSL3_FLAGS_SGC_RESTART_DONE is set when we restart a handshake because of
- * MS SGC and so prevents us from restarting the handshake in a loop. It's
- * reset on a renegotiation, so effectively limits the client to one restart
- * per negotiation. This limits the possibility of a DDoS attack where the
- * client handshakes in a loop using SGC to restart. Servers which permit
- * renegotiation can still be effected, but we can't prevent that.
- */
+/* SSL3_FLAGS_SGC_RESTART_DONE is no longer used */
 # define SSL3_FLAGS_SGC_RESTART_DONE             0x0040
+
+# ifndef OPENSSL_NO_SSL_INTERN
 
 typedef struct ssl3_state_st {
     long flags;
     int delay_buf_pop_ret;
     unsigned char read_sequence[8];
+    int read_mac_secret_size;
     unsigned char read_mac_secret[EVP_MAX_MD_SIZE];
     unsigned char write_sequence[8];
+    int write_mac_secret_size;
     unsigned char write_mac_secret[EVP_MAX_MD_SIZE];
     unsigned char server_random[SSL3_RANDOM_SIZE];
     unsigned char client_random[SSL3_RANDOM_SIZE];
     /* flags for countermeasure against known-IV weakness */
     int need_empty_fragments;
     int empty_fragment_done;
+    /* The value of 'extra' when the buffers were initialized */
+    int init_extra;
     SSL3_BUFFER rbuf;           /* read IO goes into here */
     SSL3_BUFFER wbuf;           /* write IO goes into here */
     SSL3_RECORD rrec;           /* each decoded record goes in here */
@@ -412,11 +513,16 @@ typedef struct ssl3_state_st {
     int wpend_ret;              /* number of bytes submitted */
     const unsigned char *wpend_buf;
     /* used during startup, digest all incoming/outgoing packets */
-    EVP_MD_CTX finish_dgst1;
-    EVP_MD_CTX finish_dgst2;
+    BIO *handshake_buffer;
     /*
-     * this is set whenerver we see a change_cipher_spec message come in when
-     * we are not looking for one
+     * When set of handshake digests is determined, buffer is hashed and
+     * freed and MD_CTX-es for all required digests are stored in this array
+     */
+    EVP_MD_CTX **handshake_dgst;
+    /*
+     * Set whenever an expected ChangeCipherSpec message is processed.
+     * Unset when the peer's Finished message is received.
+     * Unexpected ChangeCipherSpec messages trigger a fatal alert.
      */
     int change_cipher_spec;
     int warn_alert;
@@ -435,6 +541,15 @@ typedef struct ssl3_state_st {
     int total_renegotiations;
     int num_renegotiations;
     int in_read_app_data;
+    /*
+     * Opaque PRF input as used for the current handshake. These fields are
+     * used only if TLSEXT_TYPE_opaque_prf_input is defined (otherwise, they
+     * are merely present to improve binary compatibility)
+     */
+    void *client_opaque_prf_input;
+    size_t client_opaque_prf_input_len;
+    void *server_opaque_prf_input;
+    size_t server_opaque_prf_input_len;
     struct {
         /* actually only needs to be 16+20 */
         unsigned char cert_verify_md[EVP_MAX_MD_SIZE * 2];
@@ -446,13 +561,13 @@ typedef struct ssl3_state_st {
         unsigned long message_size;
         int message_type;
         /* used to hold the new cipher we are going to use */
-        SSL_CIPHER *new_cipher;
-# ifndef OPENSSL_NO_DH
+        const SSL_CIPHER *new_cipher;
+#  ifndef OPENSSL_NO_DH
         DH *dh;
-# endif
-# ifndef OPENSSL_NO_ECDH
+#  endif
+#  ifndef OPENSSL_NO_ECDH
         EC_KEY *ecdh;           /* holds short lived ECDH key */
-# endif
+#  endif
         /* used when SSL_ST_FLUSH_DATA is entered */
         int next_state;
         int reuse_message;
@@ -466,11 +581,13 @@ typedef struct ssl3_state_st {
         unsigned char *key_block;
         const EVP_CIPHER *new_sym_enc;
         const EVP_MD *new_hash;
-# ifndef OPENSSL_NO_COMP
+        int new_mac_pkey_type;
+        int new_mac_secret_size;
+#  ifndef OPENSSL_NO_COMP
         const SSL_COMP *new_compression;
-# else
+#  else
         char *new_compression;
-# endif
+#  endif
         int cert_request;
     } tmp;
 
@@ -481,17 +598,39 @@ typedef struct ssl3_state_st {
     unsigned char previous_server_finished_len;
     int send_connection_binding; /* TODOEKR */
 
-# ifndef OPENSSL_NO_TLSEXT
-#  ifndef OPENSSL_NO_EC
+#  ifndef OPENSSL_NO_NEXTPROTONEG
+    /*
+     * Set if we saw the Next Protocol Negotiation extension from our peer.
+     */
+    int next_proto_neg_seen;
+#  endif
+
+#  ifndef OPENSSL_NO_TLSEXT
+#   ifndef OPENSSL_NO_EC
     /*
      * This is set to true if we believe that this is a version of Safari
      * running on OS X 10.6 or newer. We wish to know this because Safari on
      * 10.8 .. 10.8.3 has broken ECDHE-ECDSA support.
      */
     char is_probably_safari;
-#  endif                        /* !OPENSSL_NO_EC */
-# endif                         /* !OPENSSL_NO_TLSEXT */
+#   endif                       /* !OPENSSL_NO_EC */
+
+    /*
+     * ALPN information (we are in the process of transitioning from NPN to
+     * ALPN.)
+     */
+
+    /*
+     * In a server these point to the selected ALPN protocol after the
+     * ClientHello has been processed. In a client these contain the protocol
+     * that the server selected once the ServerHello has been processed.
+     */
+    unsigned char *alpn_selected;
+    unsigned alpn_selected_len;
+#  endif                        /* OPENSSL_NO_TLSEXT */
 } SSL3_STATE;
+
+# endif
 
 /* SSLv3 */
 /*
@@ -499,6 +638,10 @@ typedef struct ssl3_state_st {
  */
 /* extra state */
 # define SSL3_ST_CW_FLUSH                (0x100|SSL_ST_CONNECT)
+# ifndef OPENSSL_NO_SCTP
+#  define DTLS1_SCTP_ST_CW_WRITE_SOCK                     (0x310|SSL_ST_CONNECT)
+#  define DTLS1_SCTP_ST_CR_READ_SOCK                      (0x320|SSL_ST_CONNECT)
+# endif
 /* write to server */
 # define SSL3_ST_CW_CLNT_HELLO_A         (0x110|SSL_ST_CONNECT)
 # define SSL3_ST_CW_CLNT_HELLO_B         (0x111|SSL_ST_CONNECT)
@@ -526,6 +669,10 @@ typedef struct ssl3_state_st {
 # define SSL3_ST_CW_CERT_VRFY_B          (0x191|SSL_ST_CONNECT)
 # define SSL3_ST_CW_CHANGE_A             (0x1A0|SSL_ST_CONNECT)
 # define SSL3_ST_CW_CHANGE_B             (0x1A1|SSL_ST_CONNECT)
+# ifndef OPENSSL_NO_NEXTPROTONEG
+#  define SSL3_ST_CW_NEXT_PROTO_A         (0x200|SSL_ST_CONNECT)
+#  define SSL3_ST_CW_NEXT_PROTO_B         (0x201|SSL_ST_CONNECT)
+# endif
 # define SSL3_ST_CW_FINISHED_A           (0x1B0|SSL_ST_CONNECT)
 # define SSL3_ST_CW_FINISHED_B           (0x1B1|SSL_ST_CONNECT)
 /* read from server */
@@ -541,11 +688,16 @@ typedef struct ssl3_state_st {
 /* server */
 /* extra state */
 # define SSL3_ST_SW_FLUSH                (0x100|SSL_ST_ACCEPT)
+# ifndef OPENSSL_NO_SCTP
+#  define DTLS1_SCTP_ST_SW_WRITE_SOCK                     (0x310|SSL_ST_ACCEPT)
+#  define DTLS1_SCTP_ST_SR_READ_SOCK                      (0x320|SSL_ST_ACCEPT)
+# endif
 /* read from client */
 /* Do not change the number values, they do matter */
 # define SSL3_ST_SR_CLNT_HELLO_A         (0x110|SSL_ST_ACCEPT)
 # define SSL3_ST_SR_CLNT_HELLO_B         (0x111|SSL_ST_ACCEPT)
 # define SSL3_ST_SR_CLNT_HELLO_C         (0x112|SSL_ST_ACCEPT)
+# define SSL3_ST_SR_CLNT_HELLO_D         (0x115|SSL_ST_ACCEPT)
 /* write to client */
 # define DTLS1_ST_SW_HELLO_VERIFY_REQUEST_A (0x113|SSL_ST_ACCEPT)
 # define DTLS1_ST_SW_HELLO_VERIFY_REQUEST_B (0x114|SSL_ST_ACCEPT)
@@ -571,6 +723,10 @@ typedef struct ssl3_state_st {
 # define SSL3_ST_SR_CERT_VRFY_B          (0x1A1|SSL_ST_ACCEPT)
 # define SSL3_ST_SR_CHANGE_A             (0x1B0|SSL_ST_ACCEPT)
 # define SSL3_ST_SR_CHANGE_B             (0x1B1|SSL_ST_ACCEPT)
+# ifndef OPENSSL_NO_NEXTPROTONEG
+#  define SSL3_ST_SR_NEXT_PROTO_A         (0x210|SSL_ST_ACCEPT)
+#  define SSL3_ST_SR_NEXT_PROTO_B         (0x211|SSL_ST_ACCEPT)
+# endif
 # define SSL3_ST_SR_FINISHED_A           (0x1C0|SSL_ST_ACCEPT)
 # define SSL3_ST_SR_FINISHED_B           (0x1C1|SSL_ST_ACCEPT)
 /* write to client */
@@ -595,6 +751,9 @@ typedef struct ssl3_state_st {
 # define SSL3_MT_CLIENT_KEY_EXCHANGE             16
 # define SSL3_MT_FINISHED                        20
 # define SSL3_MT_CERTIFICATE_STATUS              22
+# ifndef OPENSSL_NO_NEXTPROTONEG
+#  define SSL3_MT_NEXT_PROTO                      67
+# endif
 # define DTLS1_MT_HELLO_VERIFY_REQUEST    3
 
 # define SSL3_MT_CCS                             1
