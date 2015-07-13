@@ -60,7 +60,7 @@
 #include "cryptlib.h"
 #include <openssl/evp.h>
 #include <openssl/objects.h>
-#include <openssl/x509.h>
+#include <openssl/sha.h>
 #ifndef OPENSSL_NO_DSA
 # include <openssl/dsa.h>
 #endif
@@ -86,7 +86,7 @@ static const EVP_MD dsa_md = {
     NID_dsaWithSHA,
     NID_dsaWithSHA,
     SHA_DIGEST_LENGTH,
-    EVP_MD_FLAG_FIPS,
+    EVP_MD_FLAG_PKEY_DIGEST,
     init,
     update,
     final,

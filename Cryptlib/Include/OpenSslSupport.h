@@ -133,6 +133,11 @@ struct tm {
   char  *tm_zone;   /* timezone abbreviation */
 };
 
+struct timeval {
+  long tv_sec;      /* time value, in seconds */
+  long tv_usec;     /* time value, in microseconds */
+} timeval;
+
 struct dirent {
   UINT32  d_fileno;         /* file number of entry */
   UINT16  d_reclen;         /* length of this record */
@@ -267,5 +272,6 @@ extern FILE  *stdout;
 #define assert(expression)
 #define localtime(timer)                  NULL
 #define gmtime_r(timer,result)            (result = NULL)
+#define atoi(nptr)                        Atoi(nptr)
 
 #endif

@@ -56,6 +56,59 @@
  * [including the GNU Public Licence.]
  */
 /* ====================================================================
+ * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * 3. All advertising materials mentioning features or use of this
+ *    software must display the following acknowledgment:
+ *    "This product includes software developed by the OpenSSL Project
+ *    for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
+ *
+ * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission. For written permission, please contact
+ *    openssl-core@openssl.org.
+ *
+ * 5. Products derived from this software may not be called "OpenSSL"
+ *    nor may "OpenSSL" appear in their names without prior written
+ *    permission of the OpenSSL Project.
+ *
+ * 6. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by the OpenSSL Project
+ *    for use in the OpenSSL Toolkit (http://www.openssl.org/)"
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
+ * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
+ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ * ====================================================================
+ *
+ * This product includes cryptographic software written by Eric Young
+ * (eay@cryptsoft.com).  This product includes software written by Tim
+ * Hudson (tjh@cryptsoft.com).
+ *
+ */
+/* ====================================================================
  * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
  *
  * Portions of the attached software ("Contribution") are developed by
@@ -77,6 +130,7 @@
 #  include <stdio.h>            /* FILE */
 # endif
 # include <openssl/ossl_typ.h>
+# include <openssl/crypto.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -94,9 +148,11 @@ extern "C" {
 /* #define BN_DEBUG */
 /* #define BN_DEBUG_RAND */
 
-# define BN_MUL_COMBA
-# define BN_SQR_COMBA
-# define BN_RECURSION
+# ifndef OPENSSL_SMALL_FOOTPRINT
+#  define BN_MUL_COMBA
+#  define BN_SQR_COMBA
+#  define BN_RECURSION
+# endif
 
 /*
  * This next option uses the C libraries (2 word)/(1 word) function. If it is
@@ -139,6 +195,8 @@ extern "C" {
 #  define BN_DEC_FMT1     "%lu"
 #  define BN_DEC_FMT2     "%019lu"
 #  define BN_DEC_NUM      19
+#  define BN_HEX_FMT1     "%lX"
+#  define BN_HEX_FMT2     "%016lX"
 # endif
 
 /*
@@ -165,83 +223,37 @@ extern "C" {
 #  define BN_DEC_FMT1     "%llu"
 #  define BN_DEC_FMT2     "%019llu"
 #  define BN_DEC_NUM      19
+#  define BN_HEX_FMT1     "%llX"
+#  define BN_HEX_FMT2     "%016llX"
 # endif
 
 # ifdef THIRTY_TWO_BIT
 #  ifdef BN_LLONG
-#   if defined(OPENSSL_SYS_WIN32) && !defined(__GNUC__)
+#   if defined(_WIN32) && !defined(__GNUC__)
 #    define BN_ULLONG     unsigned __int64
+#    define BN_MASK       (0xffffffffffffffffI64)
 #   else
 #    define BN_ULLONG     unsigned long long
+#    define BN_MASK       (0xffffffffffffffffLL)
 #   endif
 #  endif
-#  define BN_ULONG        unsigned long
-#  define BN_LONG         long
+#  define BN_ULONG        unsigned int
+#  define BN_LONG         int
 #  define BN_BITS         64
 #  define BN_BYTES        4
 #  define BN_BITS2        32
 #  define BN_BITS4        16
-#  ifdef OPENSSL_SYS_WIN32
-/* VC++ doesn't like the LL suffix */
-#   define BN_MASK         (0xffffffffffffffffL)
-#  else
-#   define BN_MASK         (0xffffffffffffffffLL)
-#  endif
 #  define BN_MASK2        (0xffffffffL)
 #  define BN_MASK2l       (0xffff)
 #  define BN_MASK2h1      (0xffff8000L)
 #  define BN_MASK2h       (0xffff0000L)
 #  define BN_TBIT         (0x80000000L)
 #  define BN_DEC_CONV     (1000000000L)
-#  define BN_DEC_FMT1     "%lu"
-#  define BN_DEC_FMT2     "%09lu"
+#  define BN_DEC_FMT1     "%u"
+#  define BN_DEC_FMT2     "%09u"
 #  define BN_DEC_NUM      9
-# endif
-
-# ifdef SIXTEEN_BIT
-#  ifndef BN_DIV2W
-#   define BN_DIV2W
-#  endif
-#  define BN_ULLONG       unsigned long
-#  define BN_ULONG        unsigned short
-#  define BN_LONG         short
-#  define BN_BITS         32
-#  define BN_BYTES        2
-#  define BN_BITS2        16
-#  define BN_BITS4        8
-#  define BN_MASK         (0xffffffff)
-#  define BN_MASK2        (0xffff)
-#  define BN_MASK2l       (0xff)
-#  define BN_MASK2h1      (0xff80)
-#  define BN_MASK2h       (0xff00)
-#  define BN_TBIT         (0x8000)
-#  define BN_DEC_CONV     (100000)
-#  define BN_DEC_FMT1     "%u"
-#  define BN_DEC_FMT2     "%05u"
-#  define BN_DEC_NUM      5
-# endif
-
-# ifdef EIGHT_BIT
-#  ifndef BN_DIV2W
-#   define BN_DIV2W
-#  endif
-#  define BN_ULLONG       unsigned short
-#  define BN_ULONG        unsigned char
-#  define BN_LONG         char
-#  define BN_BITS         16
-#  define BN_BYTES        1
-#  define BN_BITS2        8
-#  define BN_BITS4        4
-#  define BN_MASK         (0xffff)
-#  define BN_MASK2        (0xff)
-#  define BN_MASK2l       (0xf)
-#  define BN_MASK2h1      (0xf8)
-#  define BN_MASK2h       (0xf0)
-#  define BN_TBIT         (0x80)
-#  define BN_DEC_CONV     (100)
-#  define BN_DEC_FMT1     "%u"
-#  define BN_DEC_FMT2     "%02u"
-#  define BN_DEC_NUM      2
+#  define BN_HEX_FMT1     "%X"
+#  define BN_HEX_FMT2     "%08X"
 # endif
 
 # define BN_DEFAULT_BITS 1280
@@ -314,12 +326,9 @@ struct bn_mont_ctx_st {
     BIGNUM N;                   /* The modulus */
     BIGNUM Ni;                  /* R*(1/R mod N) - N*Ni = 1 (Ni is only
                                  * stored for bignum algorithm) */
-# if 0
-    /* OpenSSL 0.9.9 preview: */
-    BN_ULONG n0[2];             /* least significant word(s) of Ni */
-# else
-    BN_ULONG n0;                /* least significant word of Ni */
-# endif
+    BN_ULONG n0[2];             /* least significant word(s) of Ni; (type
+                                 * changed with 0.9.9, was "BN_ULONG n0;"
+                                 * before) */
     int flags;
 };
 
@@ -522,6 +531,7 @@ char *BN_bn2hex(const BIGNUM *a);
 char *BN_bn2dec(const BIGNUM *a);
 int BN_hex2bn(BIGNUM **a, const char *str);
 int BN_dec2bn(BIGNUM **a, const char *str);
+int BN_asc2bn(BIGNUM **a, const char *str);
 int BN_gcd(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
 int BN_kronecker(const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx); /* returns
                                                                   * -2 for
@@ -589,8 +599,11 @@ int BN_BLINDING_invert(BIGNUM *n, BN_BLINDING *b, BN_CTX *ctx);
 int BN_BLINDING_convert_ex(BIGNUM *n, BIGNUM *r, BN_BLINDING *b, BN_CTX *);
 int BN_BLINDING_invert_ex(BIGNUM *n, const BIGNUM *r, BN_BLINDING *b,
                           BN_CTX *);
+# ifndef OPENSSL_NO_DEPRECATED
 unsigned long BN_BLINDING_get_thread_id(const BN_BLINDING *);
 void BN_BLINDING_set_thread_id(BN_BLINDING *, unsigned long);
+# endif
+CRYPTO_THREADID *BN_BLINDING_thread_id(BN_BLINDING *);
 unsigned long BN_BLINDING_get_flags(const BN_BLINDING *);
 void BN_BLINDING_set_flags(BN_BLINDING *, unsigned long);
 BN_BLINDING *BN_BLINDING_create_param(BN_BLINDING *b,
@@ -619,6 +632,8 @@ int BN_mod_exp_recp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
 int BN_div_recp(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m,
                 BN_RECP_CTX *recp, BN_CTX *ctx);
 
+# ifndef OPENSSL_NO_EC2M
+
 /*
  * Functions for arithmetic over binary polynomials represented by BIGNUMs.
  * The BIGNUM::neg property of BIGNUMs representing binary polynomials is
@@ -630,7 +645,7 @@ int BN_div_recp(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m,
  * r = a + b
  */
 int BN_GF2m_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);
-# define BN_GF2m_sub(r, a, b) BN_GF2m_add(r, a, b)
+#  define BN_GF2m_sub(r, a, b) BN_GF2m_add(r, a, b)
 /*
  * r=a mod p
  */
@@ -654,7 +669,7 @@ int BN_GF2m_mod_sqrt(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
 /* r^2 + r = a mod p */
 int BN_GF2m_mod_solve_quad(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
                            BN_CTX *ctx);
-# define BN_GF2m_cmp(a, b) BN_ucmp((a), (b))
+#  define BN_GF2m_cmp(a, b) BN_ucmp((a), (b))
 /*-
  * Some functions allow for representation of the irreducible polynomials
  * as an unsigned int[], say p.  The irreducible f(t) is then of the form:
@@ -662,30 +677,32 @@ int BN_GF2m_mod_solve_quad(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
  * where m = p[0] > p[1] > ... > p[k] = 0.
  */
 /* r = a mod p */
-int BN_GF2m_mod_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[]);
+int BN_GF2m_mod_arr(BIGNUM *r, const BIGNUM *a, const int p[]);
 /* r = (a * b) mod p */
 int BN_GF2m_mod_mul_arr(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-                        const unsigned int p[], BN_CTX *ctx);
+                        const int p[], BN_CTX *ctx);
 /* r = (a * a) mod p */
-int BN_GF2m_mod_sqr_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[],
+int BN_GF2m_mod_sqr_arr(BIGNUM *r, const BIGNUM *a, const int p[],
                         BN_CTX *ctx);
 /* r = (1 / b) mod p */
-int BN_GF2m_mod_inv_arr(BIGNUM *r, const BIGNUM *b, const unsigned int p[],
+int BN_GF2m_mod_inv_arr(BIGNUM *r, const BIGNUM *b, const int p[],
                         BN_CTX *ctx);
 /* r = (a / b) mod p */
 int BN_GF2m_mod_div_arr(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-                        const unsigned int p[], BN_CTX *ctx);
+                        const int p[], BN_CTX *ctx);
 /* r = (a ^ b) mod p */
 int BN_GF2m_mod_exp_arr(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-                        const unsigned int p[], BN_CTX *ctx);
+                        const int p[], BN_CTX *ctx);
 /* r = sqrt(a) mod p */
 int BN_GF2m_mod_sqrt_arr(BIGNUM *r, const BIGNUM *a,
-                         const unsigned int p[], BN_CTX *ctx);
+                         const int p[], BN_CTX *ctx);
 /* r^2 + r = a mod p */
 int BN_GF2m_mod_solve_quad_arr(BIGNUM *r, const BIGNUM *a,
-                               const unsigned int p[], BN_CTX *ctx);
-int BN_GF2m_poly2arr(const BIGNUM *a, unsigned int p[], int max);
-int BN_GF2m_arr2poly(const unsigned int p[], BIGNUM *a);
+                               const int p[], BN_CTX *ctx);
+int BN_GF2m_poly2arr(const BIGNUM *a, int p[], int max);
+int BN_GF2m_arr2poly(const int p[], BIGNUM *a);
+
+# endif
 
 /*
  * faster mod functions for the 'NIST primes' 0 <= a < p^2
@@ -762,6 +779,7 @@ int RAND_pseudo_bytes(unsigned char *buf, int num);
                          * wouldn't be constructed with top!=dmax. */ \
                         BN_ULONG *_not_const; \
                         memcpy(&_not_const, &_bnum1->d, sizeof(BN_ULONG*)); \
+                        /* Debug only - safe to ignore error return */ \
                         RAND_pseudo_bytes(&_tmp_char, 1); \
                         memset((unsigned char *)(_not_const + _bnum1->top), _tmp_char, \
                                 (_bnum1->dmax - _bnum1->top) * sizeof(BN_ULONG)); \
@@ -789,7 +807,9 @@ int RAND_pseudo_bytes(unsigned char *buf, int num);
 #  define bn_wcheck_size(bn, words) \
         do { \
                 const BIGNUM *_bnum2 = (bn); \
-                assert(words <= (_bnum2)->dmax && words >= (_bnum2)->top); \
+                assert((words) <= (_bnum2)->dmax && (words) >= (_bnum2)->top); \
+                /* avoid unused variable warning with NDEBUG */ \
+                (void)(_bnum2); \
         } while(0)
 
 # else                          /* !BN_DEBUG */
@@ -805,10 +825,12 @@ int RAND_pseudo_bytes(unsigned char *buf, int num);
 # define bn_correct_top(a) \
         { \
         BN_ULONG *ftl; \
-        if ((a)->top > 0) \
+        int tmp_top = (a)->top; \
+        if (tmp_top > 0) \
                 { \
-                for (ftl= &((a)->d[(a)->top-1]); (a)->top > 0; (a)->top--) \
-                if (*(ftl--)) break; \
+                for (ftl= &((a)->d[tmp_top-1]); tmp_top > 0; tmp_top--) \
+                        if (*(ftl--)) break; \
+                (a)->top = tmp_top; \
                 } \
         bn_pollute(a); \
         }
@@ -871,6 +893,7 @@ void ERR_load_BN_strings(void);
 # define BN_F_BN_GF2M_MOD_SOLVE_QUAD_ARR                  135
 # define BN_F_BN_GF2M_MOD_SQR                             136
 # define BN_F_BN_GF2M_MOD_SQRT                            137
+# define BN_F_BN_LSHIFT                                   145
 # define BN_F_BN_MOD_EXP2_MONT                            118
 # define BN_F_BN_MOD_EXP_MONT                             109
 # define BN_F_BN_MOD_EXP_MONT_CONSTTIME                   124
@@ -886,12 +909,14 @@ void ERR_load_BN_strings(void);
 # define BN_F_BN_NEW                                      113
 # define BN_F_BN_RAND                                     114
 # define BN_F_BN_RAND_RANGE                               122
+# define BN_F_BN_RSHIFT                                   146
 # define BN_F_BN_USUB                                     115
 
 /* Reason codes. */
 # define BN_R_ARG2_LT_ARG3                                100
 # define BN_R_BAD_RECIPROCAL                              101
 # define BN_R_BIGNUM_TOO_LONG                             114
+# define BN_R_BITS_TOO_SMALL                              118
 # define BN_R_CALLED_WITH_EVEN_MODULUS                    102
 # define BN_R_DIV_BY_ZERO                                 103
 # define BN_R_ENCODING_ERROR                              104
@@ -899,6 +924,7 @@ void ERR_load_BN_strings(void);
 # define BN_R_INPUT_NOT_REDUCED                           110
 # define BN_R_INVALID_LENGTH                              106
 # define BN_R_INVALID_RANGE                               115
+# define BN_R_INVALID_SHIFT                               119
 # define BN_R_NOT_A_SQUARE                                111
 # define BN_R_NOT_INITIALIZED                             107
 # define BN_R_NO_INVERSE                                  108

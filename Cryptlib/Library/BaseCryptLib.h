@@ -4,7 +4,7 @@
   primitives (Hash Serials, HMAC, RSA, Diffie-Hellman, etc) for UEFI security
   functionality enabling.
 
-Copyright (c) 2009 - 2012, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2009 - 2015, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -43,6 +43,16 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #define SHA256_DIGEST_SIZE  32
 
 ///
+/// SHA-384 digest size in bytes
+///
+#define SHA384_DIGEST_SIZE  48
+
+///
+/// SHA-512 digest size in bytes
+///
+#define SHA512_DIGEST_SIZE  64
+
+///
 /// TDES block size in bytes
 ///
 #define TDES_BLOCK_SIZE     8
@@ -73,7 +83,10 @@ typedef enum {
 /**
   Retrieves the size, in bytes, of the context buffer required for MD4 hash operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for MD4 hash operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -87,11 +100,13 @@ Md4GetContextSize (
   subsequent use.
 
   If Md4Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  Md4Context  Pointer to MD4 context being initialized.
 
   @retval TRUE   MD4 context initialization succeeded.
   @retval FALSE  MD4 context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -105,12 +120,14 @@ Md4Init (
 
   If Md4Context is NULL, then return FALSE.
   If NewMd4Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  Md4Context     Pointer to MD4 context being copied.
   @param[out] NewMd4Context  Pointer to new MD4 context.
 
   @retval TRUE   MD4 context copy succeeded.
   @retval FALSE  MD4 context copy failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -129,6 +146,7 @@ Md4Duplicate (
   by Md4Final(). Behavior with invalid context is undefined.
 
   If Md4Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Md4Context  Pointer to the MD4 context.
   @param[in]       Data        Pointer to the buffer containing the data to be hashed.
@@ -136,6 +154,7 @@ Md4Duplicate (
 
   @retval TRUE   MD4 data digest succeeded.
   @retval FALSE  MD4 data digest failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -157,6 +176,7 @@ Md4Update (
 
   If Md4Context is NULL, then return FALSE.
   If HashValue is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Md4Context  Pointer to the MD4 context.
   @param[out]      HashValue   Pointer to a buffer that receives the MD4 digest
@@ -164,6 +184,7 @@ Md4Update (
 
   @retval TRUE   MD4 digest computation succeeded.
   @retval FALSE  MD4 digest computation failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -176,7 +197,10 @@ Md4Final (
 /**
   Retrieves the size, in bytes, of the context buffer required for MD5 hash operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for MD5 hash operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -190,11 +214,13 @@ Md5GetContextSize (
   subsequent use.
 
   If Md5Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  Md5Context  Pointer to MD5 context being initialized.
 
   @retval TRUE   MD5 context initialization succeeded.
   @retval FALSE  MD5 context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -208,12 +234,14 @@ Md5Init (
 
   If Md5Context is NULL, then return FALSE.
   If NewMd5Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  Md5Context     Pointer to MD5 context being copied.
   @param[out] NewMd5Context  Pointer to new MD5 context.
 
   @retval TRUE   MD5 context copy succeeded.
   @retval FALSE  MD5 context copy failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -232,6 +260,7 @@ Md5Duplicate (
   by Md5Final(). Behavior with invalid context is undefined.
 
   If Md5Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Md5Context  Pointer to the MD5 context.
   @param[in]       Data        Pointer to the buffer containing the data to be hashed.
@@ -239,6 +268,7 @@ Md5Duplicate (
 
   @retval TRUE   MD5 data digest succeeded.
   @retval FALSE  MD5 data digest failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -260,6 +290,7 @@ Md5Update (
 
   If Md5Context is NULL, then return FALSE.
   If HashValue is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Md5Context  Pointer to the MD5 context.
   @param[out]      HashValue   Pointer to a buffer that receives the MD5 digest
@@ -267,6 +298,7 @@ Md5Update (
 
   @retval TRUE   MD5 digest computation succeeded.
   @retval FALSE  MD5 digest computation failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -279,7 +311,10 @@ Md5Final (
 /**
   Retrieves the size, in bytes, of the context buffer required for SHA-1 hash operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for SHA-1 hash operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -293,11 +328,13 @@ Sha1GetContextSize (
   subsequent use.
 
   If Sha1Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  Sha1Context  Pointer to SHA-1 context being initialized.
 
   @retval TRUE   SHA-1 context initialization succeeded.
   @retval FALSE  SHA-1 context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -311,12 +348,14 @@ Sha1Init (
 
   If Sha1Context is NULL, then return FALSE.
   If NewSha1Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  Sha1Context     Pointer to SHA-1 context being copied.
   @param[out] NewSha1Context  Pointer to new SHA-1 context.
 
   @retval TRUE   SHA-1 context copy succeeded.
   @retval FALSE  SHA-1 context copy failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -335,6 +374,7 @@ Sha1Duplicate (
   by Sha1Final(). Behavior with invalid context is undefined.
 
   If Sha1Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Sha1Context  Pointer to the SHA-1 context.
   @param[in]       Data         Pointer to the buffer containing the data to be hashed.
@@ -342,6 +382,7 @@ Sha1Duplicate (
 
   @retval TRUE   SHA-1 data digest succeeded.
   @retval FALSE  SHA-1 data digest failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -363,6 +404,7 @@ Sha1Update (
 
   If Sha1Context is NULL, then return FALSE.
   If HashValue is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Sha1Context  Pointer to the SHA-1 context.
   @param[out]      HashValue    Pointer to a buffer that receives the SHA-1 digest
@@ -370,6 +412,7 @@ Sha1Update (
 
   @retval TRUE   SHA-1 digest computation succeeded.
   @retval FALSE  SHA-1 digest computation failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -414,12 +457,14 @@ Sha256Init (
 
   If Sha256Context is NULL, then return FALSE.
   If NewSha256Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  Sha256Context     Pointer to SHA-256 context being copied.
   @param[out] NewSha256Context  Pointer to new SHA-256 context.
 
   @retval TRUE   SHA-256 context copy succeeded.
   @retval FALSE  SHA-256 context copy failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -482,6 +527,215 @@ Sha256Final (
   OUT     UINT8  *HashValue
   );
 
+/**
+  Retrieves the size, in bytes, of the context buffer required for SHA-384 hash operations.
+
+  @return  The size, in bytes, of the context buffer required for SHA-384 hash operations.
+
+**/
+UINTN
+EFIAPI
+Sha384GetContextSize (
+  VOID
+  );
+
+/**
+  Initializes user-supplied memory pointed by Sha384Context as SHA-384 hash context for
+  subsequent use.
+
+  If Sha384Context is NULL, then return FALSE.
+
+  @param[out]  Sha384Context  Pointer to SHA-384 context being initialized.
+
+  @retval TRUE   SHA-384 context initialization succeeded.
+  @retval FALSE  SHA-384 context initialization failed.
+
+**/
+BOOLEAN
+EFIAPI
+Sha384Init (
+  OUT  VOID  *Sha384Context
+  );
+
+/**
+  Makes a copy of an existing SHA-384 context.
+
+  If Sha384Context is NULL, then return FALSE.
+  If NewSha384Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
+  @param[in]  Sha384Context     Pointer to SHA-384 context being copied.
+  @param[out] NewSha384Context  Pointer to new SHA-384 context.
+
+  @retval TRUE   SHA-384 context copy succeeded.
+  @retval FALSE  SHA-384 context copy failed.
+  @retval FALSE  This interface is not supported.
+
+**/
+BOOLEAN
+EFIAPI
+Sha384Duplicate (
+  IN   CONST VOID  *Sha384Context,
+  OUT  VOID        *NewSha384Context
+  );
+
+/**
+  Digests the input data and updates SHA-384 context.
+
+  This function performs SHA-384 digest on a data buffer of the specified size.
+  It can be called multiple times to compute the digest of long or discontinuous data streams.
+  SHA-384 context should be already correctly intialized by Sha384Init(), and should not be finalized
+  by Sha384Final(). Behavior with invalid context is undefined.
+
+  If Sha384Context is NULL, then return FALSE.
+
+  @param[in, out]  Sha384Context  Pointer to the SHA-384 context.
+  @param[in]       Data           Pointer to the buffer containing the data to be hashed.
+  @param[in]       DataSize       Size of Data buffer in bytes.
+
+  @retval TRUE   SHA-384 data digest succeeded.
+  @retval FALSE  SHA-384 data digest failed.
+
+**/
+BOOLEAN
+EFIAPI
+Sha384Update (
+  IN OUT  VOID        *Sha384Context,
+  IN      CONST VOID  *Data,
+  IN      UINTN       DataSize
+  );
+
+/**
+  Completes computation of the SHA-384 digest value.
+
+  This function completes SHA-384 hash computation and retrieves the digest value into
+  the specified memory. After this function has been called, the SHA-384 context cannot
+  be used again.
+  SHA-384 context should be already correctly intialized by Sha384Init(), and should not be
+  finalized by Sha384Final(). Behavior with invalid SHA-384 context is undefined.
+
+  If Sha384Context is NULL, then return FALSE.
+  If HashValue is NULL, then return FALSE.
+
+  @param[in, out]  Sha384Context  Pointer to the SHA-384 context.
+  @param[out]      HashValue      Pointer to a buffer that receives the SHA-384 digest
+                                  value (48 bytes).
+
+  @retval TRUE   SHA-384 digest computation succeeded.
+  @retval FALSE  SHA-384 digest computation failed.
+
+**/
+BOOLEAN
+EFIAPI
+Sha384Final (
+  IN OUT  VOID   *Sha384Context,
+  OUT     UINT8  *HashValue
+  );
+
+/**
+  Retrieves the size, in bytes, of the context buffer required for SHA-512 hash operations.
+
+  @return  The size, in bytes, of the context buffer required for SHA-512 hash operations.
+
+**/
+UINTN
+EFIAPI
+Sha512GetContextSize (
+  VOID
+  );
+
+/**
+  Initializes user-supplied memory pointed by Sha512Context as SHA-512 hash context for
+  subsequent use.
+
+  If Sha512Context is NULL, then return FALSE.
+
+  @param[out]  Sha512Context  Pointer to SHA-512 context being initialized.
+
+  @retval TRUE   SHA-512 context initialization succeeded.
+  @retval FALSE  SHA-512 context initialization failed.
+
+**/
+BOOLEAN
+EFIAPI
+Sha512Init (
+  OUT  VOID  *Sha512Context
+  );
+
+/**
+  Makes a copy of an existing SHA-512 context.
+
+  If Sha512Context is NULL, then return FALSE.
+  If NewSha512Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
+  @param[in]  Sha512Context     Pointer to SHA-512 context being copied.
+  @param[out] NewSha512Context  Pointer to new SHA-512 context.
+
+  @retval TRUE   SHA-512 context copy succeeded.
+  @retval FALSE  SHA-512 context copy failed.
+  @retval FALSE  This interface is not supported.
+
+**/
+BOOLEAN
+EFIAPI
+Sha512Duplicate (
+  IN   CONST VOID  *Sha512Context,
+  OUT  VOID        *NewSha512Context
+  );
+
+/**
+  Digests the input data and updates SHA-512 context.
+
+  This function performs SHA-512 digest on a data buffer of the specified size.
+  It can be called multiple times to compute the digest of long or discontinuous data streams.
+  SHA-512 context should be already correctly intialized by Sha512Init(), and should not be finalized
+  by Sha512Final(). Behavior with invalid context is undefined.
+
+  If Sha512Context is NULL, then return FALSE.
+
+  @param[in, out]  Sha512Context  Pointer to the SHA-512 context.
+  @param[in]       Data           Pointer to the buffer containing the data to be hashed.
+  @param[in]       DataSize       Size of Data buffer in bytes.
+
+  @retval TRUE   SHA-512 data digest succeeded.
+  @retval FALSE  SHA-512 data digest failed.
+
+**/
+BOOLEAN
+EFIAPI
+Sha512Update (
+  IN OUT  VOID        *Sha512Context,
+  IN      CONST VOID  *Data,
+  IN      UINTN       DataSize
+  );
+
+/**
+  Completes computation of the SHA-512 digest value.
+
+  This function completes SHA-512 hash computation and retrieves the digest value into
+  the specified memory. After this function has been called, the SHA-512 context cannot
+  be used again.
+  SHA-512 context should be already correctly intialized by Sha512Init(), and should not be
+  finalized by Sha512Final(). Behavior with invalid SHA-512 context is undefined.
+
+  If Sha512Context is NULL, then return FALSE.
+  If HashValue is NULL, then return FALSE.
+
+  @param[in, out]  Sha512Context  Pointer to the SHA-512 context.
+  @param[out]      HashValue      Pointer to a buffer that receives the SHA-512 digest
+                                  value (64 bytes).
+
+  @retval TRUE   SHA-512 digest computation succeeded.
+  @retval FALSE  SHA-512 digest computation failed.
+
+**/
+BOOLEAN
+EFIAPI
+Sha512Final (
+  IN OUT  VOID   *Sha512Context,
+  OUT     UINT8  *HashValue
+  );
 
 //=====================================================================================
 //    MAC (Message Authentication Code) Primitive
@@ -490,7 +744,10 @@ Sha256Final (
 /**
   Retrieves the size, in bytes, of the context buffer required for HMAC-MD5 operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for HMAC-MD5 operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -504,6 +761,7 @@ HmacMd5GetContextSize (
   subsequent use.
 
   If HmacMd5Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  HmacMd5Context  Pointer to HMAC-MD5 context being initialized.
   @param[in]   Key             Pointer to the user-supplied key.
@@ -511,6 +769,7 @@ HmacMd5GetContextSize (
 
   @retval TRUE   HMAC-MD5 context initialization succeeded.
   @retval FALSE  HMAC-MD5 context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -526,12 +785,14 @@ HmacMd5Init (
 
   If HmacMd5Context is NULL, then return FALSE.
   If NewHmacMd5Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  HmacMd5Context     Pointer to HMAC-MD5 context being copied.
   @param[out] NewHmacMd5Context  Pointer to new HMAC-MD5 context.
 
   @retval TRUE   HMAC-MD5 context copy succeeded.
   @retval FALSE  HMAC-MD5 context copy failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -550,6 +811,7 @@ HmacMd5Duplicate (
   finalized by HmacMd5Final(). Behavior with invalid context is undefined.
 
   If HmacMd5Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  HmacMd5Context  Pointer to the HMAC-MD5 context.
   @param[in]       Data            Pointer to the buffer containing the data to be digested.
@@ -557,6 +819,7 @@ HmacMd5Duplicate (
 
   @retval TRUE   HMAC-MD5 data digest succeeded.
   @retval FALSE  HMAC-MD5 data digest failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -578,6 +841,7 @@ HmacMd5Update (
 
   If HmacMd5Context is NULL, then return FALSE.
   If HashValue is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  HmacMd5Context  Pointer to the HMAC-MD5 context.
   @param[out]      HashValue       Pointer to a buffer that receives the HMAC-MD5 digest
@@ -585,6 +849,7 @@ HmacMd5Update (
 
   @retval TRUE   HMAC-MD5 digest computation succeeded.
   @retval FALSE  HMAC-MD5 digest computation failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -597,7 +862,10 @@ HmacMd5Final (
 /**
   Retrieves the size, in bytes, of the context buffer required for HMAC-SHA1 operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for HMAC-SHA1 operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -611,6 +879,7 @@ HmacSha1GetContextSize (
   subsequent use.
 
   If HmacSha1Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  HmacSha1Context  Pointer to HMAC-SHA1 context being initialized.
   @param[in]   Key              Pointer to the user-supplied key.
@@ -618,6 +887,7 @@ HmacSha1GetContextSize (
 
   @retval TRUE   HMAC-SHA1 context initialization succeeded.
   @retval FALSE  HMAC-SHA1 context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -633,12 +903,14 @@ HmacSha1Init (
 
   If HmacSha1Context is NULL, then return FALSE.
   If NewHmacSha1Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  HmacSha1Context     Pointer to HMAC-SHA1 context being copied.
   @param[out] NewHmacSha1Context  Pointer to new HMAC-SHA1 context.
 
   @retval TRUE   HMAC-SHA1 context copy succeeded.
   @retval FALSE  HMAC-SHA1 context copy failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -657,6 +929,7 @@ HmacSha1Duplicate (
   be finalized by HmacSha1Final(). Behavior with invalid context is undefined.
 
   If HmacSha1Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  HmacSha1Context Pointer to the HMAC-SHA1 context.
   @param[in]       Data            Pointer to the buffer containing the data to be digested.
@@ -664,6 +937,7 @@ HmacSha1Duplicate (
 
   @retval TRUE   HMAC-SHA1 data digest succeeded.
   @retval FALSE  HMAC-SHA1 data digest failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -685,6 +959,7 @@ HmacSha1Update (
 
   If HmacSha1Context is NULL, then return FALSE.
   If HashValue is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  HmacSha1Context  Pointer to the HMAC-SHA1 context.
   @param[out]      HashValue        Pointer to a buffer that receives the HMAC-SHA1 digest
@@ -692,6 +967,7 @@ HmacSha1Update (
 
   @retval TRUE   HMAC-SHA1 digest computation succeeded.
   @retval FALSE  HMAC-SHA1 digest computation failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -701,7 +977,6 @@ HmacSha1Final (
   OUT     UINT8  *HmacValue
   );
 
-
 //=====================================================================================
 //    Symmetric Cryptography Primitive
 //=====================================================================================
@@ -709,7 +984,10 @@ HmacSha1Final (
 /**
   Retrieves the size, in bytes, of the context buffer required for TDES operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for TDES operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -722,7 +1000,7 @@ TdesGetContextSize (
   Initializes user-supplied memory as TDES context for subsequent use.
 
   This function initializes user-supplied memory pointed by TdesContext as TDES context.
-  In addtion, it sets up all TDES key materials for subsequent encryption and decryption
+  In addition, it sets up all TDES key materials for subsequent encryption and decryption
   operations.
   There are 3 key options as follows:
   KeyLength = 64,  Keying option 1: K1 == K2 == K3 (Backward compatibility with DES)
@@ -732,6 +1010,7 @@ TdesGetContextSize (
   If TdesContext is NULL, then return FALSE.
   If Key is NULL, then return FALSE.
   If KeyLength is not valid, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  TdesContext  Pointer to TDES context being initialized.
   @param[in]   Key          Pointer to the user-supplied TDES key.
@@ -739,6 +1018,7 @@ TdesGetContextSize (
 
   @retval TRUE   TDES context initialization succeeded.
   @retval FALSE  TDES context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -763,6 +1043,7 @@ TdesInit (
   If Input is NULL, then return FALSE.
   If InputSize is not multiple of block size (8 bytes), then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   TdesContext  Pointer to the TDES context.
   @param[in]   Input        Pointer to the buffer containing the data to be encrypted.
@@ -771,6 +1052,7 @@ TdesInit (
 
   @retval TRUE   TDES encryption succeeded.
   @retval FALSE  TDES encryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -796,6 +1078,7 @@ TdesEcbEncrypt (
   If Input is NULL, then return FALSE.
   If InputSize is not multiple of block size (8 bytes), then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   TdesContext  Pointer to the TDES context.
   @param[in]   Input        Pointer to the buffer containing the data to be decrypted.
@@ -804,6 +1087,7 @@ TdesEcbEncrypt (
 
   @retval TRUE   TDES decryption succeeded.
   @retval FALSE  TDES decryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -831,6 +1115,7 @@ TdesEcbDecrypt (
   If InputSize is not multiple of block size (8 bytes), then return FALSE.
   If Ivec is NULL, then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   TdesContext  Pointer to the TDES context.
   @param[in]   Input        Pointer to the buffer containing the data to be encrypted.
@@ -840,6 +1125,7 @@ TdesEcbDecrypt (
 
   @retval TRUE   TDES encryption succeeded.
   @retval FALSE  TDES encryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -868,6 +1154,7 @@ TdesCbcEncrypt (
   If InputSize is not multiple of block size (8 bytes), then return FALSE.
   If Ivec is NULL, then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   TdesContext  Pointer to the TDES context.
   @param[in]   Input        Pointer to the buffer containing the data to be encrypted.
@@ -877,6 +1164,7 @@ TdesCbcEncrypt (
 
   @retval TRUE   TDES decryption succeeded.
   @retval FALSE  TDES decryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -892,7 +1180,10 @@ TdesCbcDecrypt (
 /**
   Retrieves the size, in bytes, of the context buffer required for AES operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for AES operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -905,13 +1196,14 @@ AesGetContextSize (
   Initializes user-supplied memory as AES context for subsequent use.
 
   This function initializes user-supplied memory pointed by AesContext as AES context.
-  In addtion, it sets up all AES key materials for subsequent encryption and decryption
+  In addition, it sets up all AES key materials for subsequent encryption and decryption
   operations.
   There are 3 options for key length, 128 bits, 192 bits, and 256 bits.
 
   If AesContext is NULL, then return FALSE.
   If Key is NULL, then return FALSE.
   If KeyLength is not valid, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  AesContext  Pointer to AES context being initialized.
   @param[in]   Key         Pointer to the user-supplied AES key.
@@ -919,6 +1211,7 @@ AesGetContextSize (
 
   @retval TRUE   AES context initialization succeeded.
   @retval FALSE  AES context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -943,6 +1236,7 @@ AesInit (
   If Input is NULL, then return FALSE.
   If InputSize is not multiple of block size (16 bytes), then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   AesContext  Pointer to the AES context.
   @param[in]   Input       Pointer to the buffer containing the data to be encrypted.
@@ -951,6 +1245,7 @@ AesInit (
 
   @retval TRUE   AES encryption succeeded.
   @retval FALSE  AES encryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -976,6 +1271,7 @@ AesEcbEncrypt (
   If Input is NULL, then return FALSE.
   If InputSize is not multiple of block size (16 bytes), then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   AesContext  Pointer to the AES context.
   @param[in]   Input       Pointer to the buffer containing the data to be decrypted.
@@ -984,6 +1280,7 @@ AesEcbEncrypt (
 
   @retval TRUE   AES decryption succeeded.
   @retval FALSE  AES decryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1011,6 +1308,7 @@ AesEcbDecrypt (
   If InputSize is not multiple of block size (16 bytes), then return FALSE.
   If Ivec is NULL, then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   AesContext  Pointer to the AES context.
   @param[in]   Input       Pointer to the buffer containing the data to be encrypted.
@@ -1020,6 +1318,7 @@ AesEcbDecrypt (
 
   @retval TRUE   AES encryption succeeded.
   @retval FALSE  AES encryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1048,6 +1347,7 @@ AesCbcEncrypt (
   If InputSize is not multiple of block size (16 bytes), then return FALSE.
   If Ivec is NULL, then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   AesContext  Pointer to the AES context.
   @param[in]   Input       Pointer to the buffer containing the data to be encrypted.
@@ -1057,6 +1357,7 @@ AesCbcEncrypt (
 
   @retval TRUE   AES decryption succeeded.
   @retval FALSE  AES decryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1072,7 +1373,10 @@ AesCbcDecrypt (
 /**
   Retrieves the size, in bytes, of the context buffer required for ARC4 operations.
 
+  If this interface is not supported, then return zero.
+
   @return  The size, in bytes, of the context buffer required for ARC4 operations.
+  @retval  0   This interface is not supported.
 
 **/
 UINTN
@@ -1085,12 +1389,13 @@ Arc4GetContextSize (
   Initializes user-supplied memory as ARC4 context for subsequent use.
 
   This function initializes user-supplied memory pointed by Arc4Context as ARC4 context.
-  In addtion, it sets up all ARC4 key materials for subsequent encryption and decryption
+  In addition, it sets up all ARC4 key materials for subsequent encryption and decryption
   operations.
 
   If Arc4Context is NULL, then return FALSE.
   If Key is NULL, then return FALSE.
   If KeySize does not in the range of [5, 256] bytes, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  Arc4Context  Pointer to ARC4 context being initialized.
   @param[in]   Key          Pointer to the user-supplied ARC4 key.
@@ -1098,6 +1403,7 @@ Arc4GetContextSize (
 
   @retval TRUE   ARC4 context initialization succeeded.
   @retval FALSE  ARC4 context initialization failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1119,6 +1425,7 @@ Arc4Init (
   If Arc4Context is NULL, then return FALSE.
   If Input is NULL, then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   Arc4Context  Pointer to the ARC4 context.
   @param[in]   Input        Pointer to the buffer containing the data to be encrypted.
@@ -1127,6 +1434,7 @@ Arc4Init (
 
   @retval TRUE   ARC4 encryption succeeded.
   @retval FALSE  ARC4 encryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1149,6 +1457,7 @@ Arc4Encrypt (
   If Arc4Context is NULL, then return FALSE.
   If Input is NULL, then return FALSE.
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]   Arc4Context  Pointer to the ARC4 context.
   @param[in]   Input        Pointer to the buffer containing the data to be decrypted.
@@ -1157,6 +1466,7 @@ Arc4Encrypt (
 
   @retval TRUE   ARC4 decryption succeeded.
   @retval FALSE  ARC4 decryption failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1177,11 +1487,13 @@ Arc4Decrypt (
   should be already correctly initialized by ARC4Init().
 
   If Arc4Context is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  Arc4Context  Pointer to the ARC4 context.
 
   @retval TRUE   ARC4 reset succeeded.
   @retval FALSE  ARC4 reset failed.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1266,6 +1578,7 @@ RsaSetKey (
   If RsaContext is NULL, then return FALSE.
   If BnSize is NULL, then return FALSE.
   If BnSize is large enough but BigNumber is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  RsaContext  Pointer to RSA context being set.
   @param[in]       KeyTag      Tag of RSA key component being set.
@@ -1276,6 +1589,7 @@ RsaSetKey (
   @retval  TRUE   RSA key component was retrieved successfully.
   @retval  FALSE  Invalid RSA key component tag.
   @retval  FALSE  BnSize is too small.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1298,14 +1612,16 @@ RsaGetKey (
   initialized by RandomSeed().
 
   If RsaContext is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  RsaContext           Pointer to RSA context being set.
   @param[in]       ModulusLength        Length of RSA modulus N in bits.
   @param[in]       PublicExponent       Pointer to RSA public exponent.
-  @param[in]       PublicExponentSize   Size of RSA public exponent buffer in bytes. 
+  @param[in]       PublicExponentSize   Size of RSA public exponent buffer in bytes.
 
   @retval  TRUE   RSA key component was generated successfully.
   @retval  FALSE  Invalid RSA key component tag.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1319,6 +1635,8 @@ RsaGenerateKey (
 
 /**
   Validates key components of RSA context.
+  NOTE: This function performs integrity checks on all the RSA key material, so
+        the RSA key structure must contain all the private key data.
 
   This function validates key compoents of RSA context in following aspects:
   - Whether p is a prime
@@ -1327,11 +1645,13 @@ RsaGenerateKey (
   - Whether d*e = 1  mod lcm(p-1,q-1)
 
   If RsaContext is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  RsaContext  Pointer to RSA context to check.
 
   @retval  TRUE   RSA key components are valid.
   @retval  FALSE  RSA key components are not valid.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1352,6 +1672,7 @@ RsaCheckKey (
   If MessageHash is NULL, then return FALSE.
   If HashSize is not equal to the size of MD5, SHA-1 or SHA-256 digest, then return FALSE.
   If SigSize is large enough but Signature is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]      RsaContext   Pointer to RSA context for signature generation.
   @param[in]      MessageHash  Pointer to octet message hash to be signed.
@@ -1363,6 +1684,7 @@ RsaCheckKey (
   @retval  TRUE   Signature successfully generated in PKCS1-v1_5.
   @retval  FALSE  Signature generation failed.
   @retval  FALSE  SigSize is too small.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1407,6 +1729,10 @@ RsaPkcs1Verify (
 /**
   Retrieve the RSA Private Key from the password-protected PEM key data.
 
+  If PemData is NULL, then return FALSE.
+  If RsaContext is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
   @param[in]  PemData      Pointer to the PEM-encoded key data to be retrieved.
   @param[in]  PemSize      Size of the PEM key data in bytes.
   @param[in]  Password     NULL-terminated passphrase used for encrypted PEM key data.
@@ -1414,11 +1740,9 @@ RsaPkcs1Verify (
                            RSA private key component. Use RsaFree() function to free the
                            resource.
 
-  If PemData is NULL, then return FALSE.
-  If RsaContext is NULL, then return FALSE.
-
   @retval  TRUE   RSA Private Key was retrieved successfully.
   @retval  FALSE  Invalid PEM key data or incorrect password.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1433,17 +1757,19 @@ RsaGetPrivateKeyFromPem (
 /**
   Retrieve the RSA Public Key from one DER-encoded X509 certificate.
 
+  If Cert is NULL, then return FALSE.
+  If RsaContext is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
   @param[in]  Cert         Pointer to the DER-encoded X509 certificate.
   @param[in]  CertSize     Size of the X509 certificate in bytes.
   @param[out] RsaContext   Pointer to new-generated RSA context which contain the retrieved
                            RSA public key component. Use RsaFree() function to free the
                            resource.
 
-  If Cert is NULL, then return FALSE.
-  If RsaContext is NULL, then return FALSE.
-
   @retval  TRUE   RSA Public Key was retrieved successfully.
   @retval  FALSE  Fail to retrieve RSA public key from X509 certificate.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1457,18 +1783,20 @@ RsaGetPublicKeyFromX509 (
 /**
   Retrieve the subject bytes from one X.509 certificate.
 
+  If Cert is NULL, then return FALSE.
+  If SubjectSize is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
   @param[in]      Cert         Pointer to the DER-encoded X509 certificate.
   @param[in]      CertSize     Size of the X509 certificate in bytes.
   @param[out]     CertSubject  Pointer to the retrieved certificate subject bytes.
   @param[in, out] SubjectSize  The size in bytes of the CertSubject buffer on input,
                                and the size of buffer returned CertSubject on output.
 
-  If Cert is NULL, then return FALSE.
-  If SubjectSize is NULL, then return FALSE.
-
   @retval  TRUE   The certificate subject retrieved successfully.
   @retval  FALSE  Invalid certificate, or the SubjectSize is too small for the result.
                   The SubjectSize will be updated with the required size.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1483,17 +1811,19 @@ X509GetSubjectName (
 /**
   Verify one X509 certificate was issued by the trusted CA.
 
+  If Cert is NULL, then return FALSE.
+  If CACert is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
   @param[in]      Cert         Pointer to the DER-encoded X509 certificate to be verified.
   @param[in]      CertSize     Size of the X509 certificate in bytes.
   @param[in]      CACert       Pointer to the DER-encoded trusted CA certificate.
   @param[in]      CACertSize   Size of the CA Certificate in bytes.
 
-  If Cert is NULL, then return FALSE.
-  If CACert is NULL, then return FALSE.
-
   @retval  TRUE   The certificate was issued by the trusted CA.
   @retval  FALSE  Invalid certificate or the certificate was not issued by the given
                   trusted CA.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1510,6 +1840,7 @@ X509VerifyCert (
 
   If Cert is NULL, then return FALSE.
   If SingleX509Cert is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  Cert            Pointer to the DER-encoded certificate data.
   @param[in]  CertSize        The size of certificate data in bytes.
@@ -1517,6 +1848,7 @@ X509VerifyCert (
 
   @retval     TRUE            The X509 object generation succeeded.
   @retval     FALSE           The operation failed.
+  @retval     FALSE           This interface is not supported.
 
 **/
 BOOLEAN
@@ -1531,29 +1863,31 @@ X509ConstructCertificate (
   Construct a X509 stack object from a list of DER-encoded certificate data.
 
   If X509Stack is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
-  @param[in, out]  X509Stack  On input, pointer to an existing X509 stack object.
+  @param[in, out]  X509Stack  On input, pointer to an existing or NULL X509 stack object.
                               On output, pointer to the X509 stack object with new
                               inserted X509 certificate.
   @param           ...        A list of DER-encoded single certificate data followed
                               by certificate size. A NULL terminates the list. The
                               pairs are the arguments to X509ConstructCertificate().
-                                 
+
   @retval     TRUE            The X509 stack construction succeeded.
   @retval     FALSE           The construction operation failed.
+  @retval     FALSE           This interface is not supported.
 
 **/
 BOOLEAN
 EFIAPI
 X509ConstructCertificateStack (
   IN OUT  UINT8  **X509Stack,
-  ...  
+  ...
   );
 
 /**
   Release the specified X509 object.
 
-  If X509Cert is NULL, then return FALSE.
+  If the interface is not supported, then ASSERT().
 
   @param[in]  X509Cert  Pointer to the X509 object to be released.
 
@@ -1567,7 +1901,7 @@ X509Free (
 /**
   Release the specified X509 stack object.
 
-  If X509Stack is NULL, then return FALSE.
+  If the interface is not supported, then ASSERT().
 
   @param[in]  X509Stack  Pointer to the X509 stack object to be released.
 
@@ -1579,12 +1913,39 @@ X509StackFree (
   );
 
 /**
+  Retrieve the TBSCertificate from one given X.509 certificate.
+
+  @param[in]      Cert         Pointer to the given DER-encoded X509 certificate.
+  @param[in]      CertSize     Size of the X509 certificate in bytes.
+  @param[out]     TBSCert      DER-Encoded To-Be-Signed certificate.
+  @param[out]     TBSCertSize  Size of the TBS certificate in bytes.
+
+  If Cert is NULL, then return FALSE.
+  If TBSCert is NULL, then return FALSE.
+  If TBSCertSize is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
+  @retval  TRUE   The TBSCertificate was retrieved successfully.
+  @retval  FALSE  Invalid X.509 certificate.
+
+**/
+BOOLEAN
+EFIAPI
+X509GetTBSCert (
+  IN  CONST UINT8  *Cert,
+  IN  UINTN        CertSize,
+  OUT UINT8        **TBSCert,
+  OUT UINTN        *TBSCertSize
+  );
+
+/**
   Get the signer's certificates from PKCS#7 signed data as described in "PKCS #7:
   Cryptographic Message Syntax Standard". The input signed data could be wrapped
   in a ContentInfo structure.
 
   If P7Data, CertStack, StackLength, TrustedCert or CertLength is NULL, then
   return FALSE. If P7Length overflow, then return FAlSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  P7Data       Pointer to the PKCS#7 message to verify.
   @param[in]  P7Length     Length of the PKCS#7 message in bytes.
@@ -1597,6 +1958,7 @@ X509StackFree (
 
   @retval  TRUE            The operation is finished successfully.
   @retval  FALSE           Error occurs during the operation.
+  @retval  FALSE           This interface is not supported.
 
 **/
 BOOLEAN
@@ -1613,6 +1975,8 @@ Pkcs7GetSigners (
 /**
   Wrap function to use free() to free allocated memory for certificates.
 
+  If this interface is not supported, then ASSERT().
+
   @param[in]  Certs        Pointer to the certificates to be freed.
 
 **/
@@ -1626,6 +1990,8 @@ Pkcs7FreeSigners (
   Creates a PKCS#7 signedData as described in "PKCS #7: Cryptographic Message
   Syntax Standard, version 1.5". This interface is only intended to be used for
   application to perform PKCS#7 functionality validation.
+
+  If this interface is not supported, then return FALSE.
 
   @param[in]  PrivateKey       Pointer to the PEM-formatted private key data for
                                data signing.
@@ -1643,6 +2009,7 @@ Pkcs7FreeSigners (
 
   @retval     TRUE             PKCS#7 data signing succeeded.
   @retval     FALSE            PKCS#7 data signing failed.
+  @retval     FALSE            This interface is not supported.
 
 **/
 BOOLEAN
@@ -1666,6 +2033,7 @@ Pkcs7Sign (
 
   If P7Data, TrustedCert or InData is NULL, then return FALSE.
   If P7Length, CertLength or DataLength overflow, then return FAlSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  P7Data       Pointer to the PKCS#7 message to verify.
   @param[in]  P7Length     Length of the PKCS#7 message in bytes.
@@ -1677,6 +2045,7 @@ Pkcs7Sign (
 
   @retval  TRUE  The specified PKCS#7 signed data is valid.
   @retval  FALSE Invalid PKCS#7 signed data.
+  @retval  FALSE This interface is not supported.
 
 **/
 BOOLEAN
@@ -1691,11 +2060,41 @@ Pkcs7Verify (
   );
 
 /**
+  Extracts the attached content from a PKCS#7 signed data if existed. The input signed
+  data could be wrapped in a ContentInfo structure.
+
+  If P7Data, Content, or ContentSize is NULL, then return FALSE. If P7Length overflow,
+  then return FAlSE. If the P7Data is not correctly formatted, then return FALSE.
+
+  Caution: This function may receive untrusted input. So this function will do
+           basic check for PKCS#7 data structure.
+
+  @param[in]   P7Data       Pointer to the PKCS#7 signed data to process.
+  @param[in]   P7Length     Length of the PKCS#7 signed data in bytes.
+  @param[out]  Content      Pointer to the extracted content from the PKCS#7 signedData.
+                            It's caller's responsiblity to free the buffer.
+  @param[out]  ContentSize  The size of the extracted content in bytes.
+
+  @retval     TRUE          The P7Data was correctly formatted for processing.
+  @retval     FALSE         The P7Data was not correctly formatted for processing.
+
+*/
+BOOLEAN
+EFIAPI
+Pkcs7GetAttachedContent (
+  IN  CONST UINT8  *P7Data,
+  IN  UINTN        P7Length,
+  OUT VOID         **Content,
+  OUT UINTN        *ContentSize
+  );
+
+/**
   Verifies the validility of a PE/COFF Authenticode Signature as described in "Windows
   Authenticode Portable Executable Signature Format".
 
   If AuthData is NULL, then return FALSE.
   If ImageHash is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  AuthData     Pointer to the Authenticode Signature retrieved from signed
                            PE/COFF image to be verified.
@@ -1710,6 +2109,7 @@ Pkcs7Verify (
 
   @retval  TRUE   The specified Authenticode Signature is valid.
   @retval  FALSE  Invalid Authenticode Signature.
+  @retval  FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1723,6 +2123,36 @@ AuthenticodeVerify (
   IN  UINTN        HashSize
   );
 
+/**
+  Verifies the validility of a RFC3161 Timestamp CounterSignature embedded in PE/COFF Authenticode
+  signature.
+
+  If AuthData is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
+
+  @param[in]  AuthData     Pointer to the Authenticode Signature retrieved from signed
+                           PE/COFF image to be verified.
+  @param[in]  DataSize     Size of the Authenticode Signature in bytes.
+  @param[in]  TsaCert      Pointer to a trusted/root TSA certificate encoded in DER, which
+                           is used for TSA certificate chain verification.
+  @param[in]  CertSize     Size of the trusted certificate in bytes.
+  @param[out] SigningTime  Return the time of timestamp generation time if the timestamp
+                           signature is valid.
+
+  @retval  TRUE   The specified Authenticode includes a valid RFC3161 Timestamp CounterSignature.
+  @retval  FALSE  No valid RFC3161 Timestamp CounterSignature in the specified Authenticode data.
+
+**/
+BOOLEAN
+EFIAPI
+ImageTimestampVerify (
+  IN  CONST UINT8  *AuthData,
+  IN  UINTN        DataSize,
+  IN  CONST UINT8  *TsaCert,
+  IN  UINTN        CertSize,
+  OUT EFI_TIME     *SigningTime
+  );
+
 //=====================================================================================
 //    DH Key Exchange Primitive
 //=====================================================================================
@@ -1732,6 +2162,7 @@ AuthenticodeVerify (
 
   @return  Pointer to the Diffie-Hellman Context that has been initialized.
            If the allocations fails, DhNew() returns NULL.
+           If the interface is not supported, DhNew() returns NULL.
 
 **/
 VOID *
@@ -1743,7 +2174,7 @@ DhNew (
 /**
   Release the specified DH context.
 
-  If DhContext is NULL, then return FALSE.
+  If the interface is not supported, then ASSERT().
 
   @param[in]  DhContext  Pointer to the DH context to be released.
 
@@ -1759,12 +2190,13 @@ DhFree (
 
   Given generator g, and length of prime number p in bits, this function generates p,
   and sets DH context according to value of g and p.
-  
+
   Before this function can be invoked, pseudorandom number generator must be correctly
   initialized by RandomSeed().
 
   If DhContext is NULL, then return FALSE.
   If Prime is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  DhContext    Pointer to the DH context.
   @param[in]       Generator    Value of generator.
@@ -1774,6 +2206,7 @@ DhFree (
   @retval TRUE   DH pamameter generation succeeded.
   @retval FALSE  Value of Generator is not supported.
   @retval FALSE  PRNG fails to generate random prime number with PrimeLength.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1793,6 +2226,7 @@ DhGenerateParameter (
 
   If DhContext is NULL, then return FALSE.
   If Prime is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  DhContext    Pointer to the DH context.
   @param[in]       Generator    Value of generator.
@@ -1804,6 +2238,7 @@ DhGenerateParameter (
   @retval FALSE  Value of Generator is not suitable for the Prime.
   @retval FALSE  Value of Prime is not a prime number.
   @retval FALSE  Value of Prime is not a safe prime number.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1818,7 +2253,7 @@ DhSetParameter (
 /**
   Generates DH public key.
 
-  This function generates random secret exponent, and computes the public key, which is 
+  This function generates random secret exponent, and computes the public key, which is
   returned via parameter PublicKey and PublicKeySize. DH context is updated accordingly.
   If the PublicKey buffer is too small to hold the public key, FALSE is returned and
   PublicKeySize is set to the required buffer size to obtain the public key.
@@ -1826,6 +2261,7 @@ DhSetParameter (
   If DhContext is NULL, then return FALSE.
   If PublicKeySize is NULL, then return FALSE.
   If PublicKeySize is large enough but PublicKey is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  DhContext      Pointer to the DH context.
   @param[out]      PublicKey      Pointer to the buffer to receive generated public key.
@@ -1835,6 +2271,7 @@ DhSetParameter (
   @retval TRUE   DH public key generation succeeded.
   @retval FALSE  DH public key generation failed.
   @retval FALSE  PublicKeySize is not large enough.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1849,12 +2286,14 @@ DhGenerateKey (
   Computes exchanged common key.
 
   Given peer's public key, this function computes the exchanged common key, based on its own
-  context including value of prime modulus and random secret exponent. 
+  context including value of prime modulus and random secret exponent.
 
   If DhContext is NULL, then return FALSE.
   If PeerPublicKey is NULL, then return FALSE.
   If KeySize is NULL, then return FALSE.
-  If KeySize is large enough but Key is NULL, then return FALSE.
+  If Key is NULL, then return FALSE.
+  If KeySize is not large enough, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[in, out]  DhContext          Pointer to the DH context.
   @param[in]       PeerPublicKey      Pointer to the peer's public key.
@@ -1866,6 +2305,7 @@ DhGenerateKey (
   @retval TRUE   DH exchanged key generation succeeded.
   @retval FALSE  DH exchanged key generation failed.
   @retval FALSE  KeySize is not large enough.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1888,6 +2328,7 @@ DhComputeKey (
   This function sets up the seed value for the pseudorandom number generator.
   If Seed is not NULL, then the seed passed in is used.
   If Seed is NULL, then default seed is used.
+  If this interface is not supported, then return FALSE.
 
   @param[in]  Seed      Pointer to seed value.
                         If NULL, default seed is used.
@@ -1896,6 +2337,7 @@ DhComputeKey (
 
   @retval TRUE   Pseudorandom number generator has enough entropy for random generation.
   @retval FALSE  Pseudorandom number generator does not have enough entropy for random generation.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN
@@ -1909,12 +2351,14 @@ RandomSeed (
   Generates a pseudorandom byte stream of the specified size.
 
   If Output is NULL, then return FALSE.
+  If this interface is not supported, then return FALSE.
 
   @param[out]  Output  Pointer to buffer to receive random value.
   @param[in]   Size    Size of randome bytes to generate.
 
   @retval TRUE   Pseudorandom byte stream generated successfully.
   @retval FALSE  Pseudorandom number generator fails to generate due to lack of entropy.
+  @retval FALSE  This interface is not supported.
 
 **/
 BOOLEAN

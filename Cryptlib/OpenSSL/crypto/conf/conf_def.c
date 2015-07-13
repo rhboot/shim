@@ -130,7 +130,7 @@ static CONF *def_create(CONF_METHOD *meth)
 {
     CONF *ret;
 
-    ret = (CONF *)OPENSSL_malloc(sizeof(CONF) + sizeof(unsigned short *));
+    ret = OPENSSL_malloc(sizeof(CONF) + sizeof(unsigned short *));
     if (ret)
         if (meth->init(ret) == 0) {
             OPENSSL_free(ret);
@@ -145,7 +145,7 @@ static int def_init_default(CONF *conf)
         return 0;
 
     conf->meth = &default_method;
-    conf->meth_data = (void *)CONF_type_default;
+    conf->meth_data = CONF_type_default;
     conf->data = NULL;
 
     return 1;
@@ -217,8 +217,6 @@ static int def_load_bio(CONF *conf, BIO *in, long *line)
     CONF_VALUE *v = NULL, *tv;
     CONF_VALUE *sv = NULL;
     char *section = NULL, *buf;
-/*      STACK_OF(CONF_VALUE) *section_sk=NULL;*/
-/*      STACK_OF(CONF_VALUE) *ts=NULL;*/
     char *start, *psection, *pname;
     void *h = (void *)(conf->data);
 
@@ -244,7 +242,6 @@ static int def_load_bio(CONF *conf, BIO *in, long *line)
         CONFerr(CONF_F_DEF_LOAD_BIO, CONF_R_UNABLE_TO_CREATE_NEW_SECTION);
         goto err;
     }
-/*      section_sk=(STACK_OF(CONF_VALUE) *)sv->value;*/
 
     bufnum = 0;
     again = 0;
@@ -332,7 +329,6 @@ static int def_load_bio(CONF *conf, BIO *in, long *line)
                         CONF_R_UNABLE_TO_CREATE_NEW_SECTION);
                 goto err;
             }
-/*                      section_sk=(STACK_OF(CONF_VALUE) *)sv->value;*/
             continue;
         } else {
             pname = s;
@@ -386,11 +382,8 @@ static int def_load_bio(CONF *conf, BIO *in, long *line)
                             CONF_R_UNABLE_TO_CREATE_NEW_SECTION);
                     goto err;
                 }
-/*                              ts=(STACK_OF(CONF_VALUE) *)tv->value;*/
-            } else {
+            } else
                 tv = sv;
-/*                              ts=section_sk;*/
-            }
 #if 1
             if (_CONF_add_string(conf, tv, v) == 0) {
                 CONFerr(CONF_F_DEF_LOAD_BIO, ERR_R_MALLOC_FAILURE);
@@ -592,7 +585,11 @@ static int str_copy(CONF *conf, char *section, char **pto, char *from)
                 CONFerr(CONF_F_STR_COPY, CONF_R_VARIABLE_HAS_NO_VALUE);
                 goto err;
             }
-            BUF_MEM_grow_clean(buf, (strlen(p) + buf->length - (e - from)));
+            if (!BUF_MEM_grow_clean(buf,
+                        (strlen(p) + buf->length - (e - from)))) {
+                CONFerr(CONF_F_STR_COPY, ERR_R_MALLOC_FAILURE);
+                goto err;
+            }
             while (*p)
                 buf->data[to++] = *(p++);
 
@@ -682,7 +679,7 @@ static char *scan_dquote(CONF *conf, char *p)
     return (p);
 }
 
-static void dump_value(CONF_VALUE *a, BIO *out)
+static void dump_value_doall_arg(CONF_VALUE *a, BIO *out)
 {
     if (a->name)
         BIO_printf(out, "[%s] %s=%s\n", a->section, a->name, a->value);
@@ -690,11 +687,12 @@ static void dump_value(CONF_VALUE *a, BIO *out)
         BIO_printf(out, "[[%s]]\n", a->section);
 }
 
-static IMPLEMENT_LHASH_DOALL_ARG_FN(dump_value, CONF_VALUE *, BIO *)
+static IMPLEMENT_LHASH_DOALL_ARG_FN(dump_value, CONF_VALUE, BIO)
 
 static int def_dump(const CONF *conf, BIO *out)
 {
-    lh_doall_arg(conf->data, LHASH_DOALL_ARG_FN(dump_value), out);
+    lh_CONF_VALUE_doall_arg(conf->data, LHASH_DOALL_ARG_FN(dump_value),
+                            BIO, out);
     return 1;
 }
 

@@ -333,20 +333,30 @@ int asn1_GetSequence(ASN1_const_CTX *c, long *length)
     return (1);
 }
 
-ASN1_STRING *ASN1_STRING_dup(ASN1_STRING *str)
+int ASN1_STRING_copy(ASN1_STRING *dst, const ASN1_STRING *str)
+{
+    if (str == NULL)
+        return 0;
+    dst->type = str->type;
+    if (!ASN1_STRING_set(dst, str->data, str->length))
+        return 0;
+    dst->flags = str->flags;
+    return 1;
+}
+
+ASN1_STRING *ASN1_STRING_dup(const ASN1_STRING *str)
 {
     ASN1_STRING *ret;
-
-    if (str == NULL)
-        return (NULL);
-    if ((ret = ASN1_STRING_type_new(str->type)) == NULL)
-        return (NULL);
-    if (!ASN1_STRING_set(ret, str->data, str->length)) {
+    if (!str)
+        return NULL;
+    ret = ASN1_STRING_new();
+    if (!ret)
+        return NULL;
+    if (!ASN1_STRING_copy(ret, str)) {
         ASN1_STRING_free(ret);
-        return (NULL);
+        return NULL;
     }
-    ret->flags = str->flags;
-    return (ret);
+    return ret;
 }
 
 int ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len)
@@ -415,12 +425,19 @@ void ASN1_STRING_free(ASN1_STRING *a)
 {
     if (a == NULL)
         return;
-    if (a->data != NULL)
+    if (a->data && !(a->flags & ASN1_STRING_FLAG_NDEF))
         OPENSSL_free(a->data);
     OPENSSL_free(a);
 }
 
-int ASN1_STRING_cmp(ASN1_STRING *a, ASN1_STRING *b)
+void ASN1_STRING_clear_free(ASN1_STRING *a)
+{
+    if (a && a->data && !(a->flags & ASN1_STRING_FLAG_NDEF))
+        OPENSSL_cleanse(a->data, a->length);
+    ASN1_STRING_free(a);
+}
+
+int ASN1_STRING_cmp(const ASN1_STRING *a, const ASN1_STRING *b)
 {
     int i;
 
@@ -444,7 +461,7 @@ void asn1_add_error(const unsigned char *address, int offset)
     ERR_add_error_data(4, "address=", buf1, " offset=", buf2);
 }
 
-int ASN1_STRING_length(ASN1_STRING *x)
+int ASN1_STRING_length(const ASN1_STRING *x)
 {
     return M_ASN1_STRING_length(x);
 }

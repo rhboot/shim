@@ -99,8 +99,8 @@ STACK_OF(X509_INFO) *PEM_X509_INFO_read_bio(BIO *bp, STACK_OF(X509_INFO) *sk,
     long len, error = 0;
     int ok = 0;
     STACK_OF(X509_INFO) *ret = NULL;
-    unsigned int i, raw;
-    d2i_of_void *d2i;
+    unsigned int i, raw, ptype;
+    d2i_of_void *d2i = 0;
 
     if (sk == NULL) {
         if ((ret = sk_X509_INFO_new_null()) == NULL) {
@@ -114,6 +114,7 @@ STACK_OF(X509_INFO) *PEM_X509_INFO_read_bio(BIO *bp, STACK_OF(X509_INFO) *sk,
         goto err;
     for (;;) {
         raw = 0;
+        ptype = 0;
         i = PEM_read_bio(bp, &name, &header, &data, &len);
         if (i == 0) {
             error = ERR_GET_REASON(ERR_peek_last_error());
@@ -171,10 +172,8 @@ STACK_OF(X509_INFO) *PEM_X509_INFO_read_bio(BIO *bp, STACK_OF(X509_INFO) *sk,
             xi->enc_len = 0;
 
             xi->x_pkey = X509_PKEY_new();
-            if ((xi->x_pkey->dec_pkey = EVP_PKEY_new()) == NULL)
-                goto err;
-            xi->x_pkey->dec_pkey->type = EVP_PKEY_RSA;
-            pp = &(xi->x_pkey->dec_pkey->pkey.rsa);
+            ptype = EVP_PKEY_RSA;
+            pp = &xi->x_pkey->dec_pkey;
             if ((int)strlen(header) > 10) /* assume encrypted */
                 raw = 1;
         } else
@@ -194,10 +193,8 @@ STACK_OF(X509_INFO) *PEM_X509_INFO_read_bio(BIO *bp, STACK_OF(X509_INFO) *sk,
             xi->enc_len = 0;
 
             xi->x_pkey = X509_PKEY_new();
-            if ((xi->x_pkey->dec_pkey = EVP_PKEY_new()) == NULL)
-                goto err;
-            xi->x_pkey->dec_pkey->type = EVP_PKEY_DSA;
-            pp = &xi->x_pkey->dec_pkey->pkey.dsa;
+            ptype = EVP_PKEY_DSA;
+            pp = &xi->x_pkey->dec_pkey;
             if ((int)strlen(header) > 10) /* assume encrypted */
                 raw = 1;
         } else
@@ -217,10 +214,8 @@ STACK_OF(X509_INFO) *PEM_X509_INFO_read_bio(BIO *bp, STACK_OF(X509_INFO) *sk,
             xi->enc_len = 0;
 
             xi->x_pkey = X509_PKEY_new();
-            if ((xi->x_pkey->dec_pkey = EVP_PKEY_new()) == NULL)
-                goto err;
-            xi->x_pkey->dec_pkey->type = EVP_PKEY_EC;
-            pp = &(xi->x_pkey->dec_pkey->pkey.ec);
+            ptype = EVP_PKEY_EC;
+            pp = &xi->x_pkey->dec_pkey;
             if ((int)strlen(header) > 10) /* assume encrypted */
                 raw = 1;
         } else
@@ -239,7 +234,12 @@ STACK_OF(X509_INFO) *PEM_X509_INFO_read_bio(BIO *bp, STACK_OF(X509_INFO) *sk,
                 if (!PEM_do_header(&cipher, data, &len, cb, u))
                     goto err;
                 p = data;
-                if (d2i(pp, &p, len) == NULL) {
+                if (ptype) {
+                    if (!d2i_PrivateKey(ptype, pp, &p, len)) {
+                        PEMerr(PEM_F_PEM_X509_INFO_READ_BIO, ERR_R_ASN1_LIB);
+                        goto err;
+                    }
+                } else if (d2i(pp, &p, len) == NULL) {
                     PEMerr(PEM_F_PEM_X509_INFO_READ_BIO, ERR_R_ASN1_LIB);
                     goto err;
                 }
@@ -324,6 +324,11 @@ int PEM_X509_INFO_write_bio(BIO *bp, X509_INFO *xi, EVP_CIPHER *enc,
      */
     if (xi->x_pkey != NULL) {
         if ((xi->enc_data != NULL) && (xi->enc_len > 0)) {
+            if (enc == NULL) {
+                PEMerr(PEM_F_PEM_X509_INFO_WRITE_BIO, PEM_R_CIPHER_IS_NULL);
+                goto err;
+            }
+
             /* copy from weirdo names into more normal things */
             iv = xi->enc_cipher.iv;
             data = (unsigned char *)xi->enc_data;

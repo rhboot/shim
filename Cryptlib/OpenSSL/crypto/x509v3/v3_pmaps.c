@@ -63,11 +63,10 @@
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
 
-static void *v2i_POLICY_MAPPINGS(X509V3_EXT_METHOD *method,
+static void *v2i_POLICY_MAPPINGS(const X509V3_EXT_METHOD *method,
                                  X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *nval);
-static STACK_OF(CONF_VALUE) *i2v_POLICY_MAPPINGS(X509V3_EXT_METHOD *method,
-                                                 void *pmps,
-                                                 STACK_OF(CONF_VALUE)
+static STACK_OF(CONF_VALUE) *i2v_POLICY_MAPPINGS(const X509V3_EXT_METHOD
+                                                 *method, void *pmps, STACK_OF(CONF_VALUE)
                                                  *extlist);
 
 const X509V3_EXT_METHOD v3_policy_mappings = {
@@ -93,8 +92,8 @@ ASN1_ITEM_TEMPLATE_END(POLICY_MAPPINGS)
 
 IMPLEMENT_ASN1_ALLOC_FUNCTIONS(POLICY_MAPPING)
 
-static STACK_OF(CONF_VALUE) *i2v_POLICY_MAPPINGS(X509V3_EXT_METHOD *method,
-                                                 void *a, STACK_OF(CONF_VALUE)
+static STACK_OF(CONF_VALUE) *i2v_POLICY_MAPPINGS(const X509V3_EXT_METHOD
+                                                 *method, void *a, STACK_OF(CONF_VALUE)
                                                  *ext_list)
 {
     POLICY_MAPPINGS *pmaps = a;
@@ -111,7 +110,7 @@ static STACK_OF(CONF_VALUE) *i2v_POLICY_MAPPINGS(X509V3_EXT_METHOD *method,
     return ext_list;
 }
 
-static void *v2i_POLICY_MAPPINGS(X509V3_EXT_METHOD *method,
+static void *v2i_POLICY_MAPPINGS(const X509V3_EXT_METHOD *method,
                                  X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *nval)
 {
     POLICY_MAPPINGS *pmaps;

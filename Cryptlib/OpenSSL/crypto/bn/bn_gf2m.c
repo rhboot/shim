@@ -95,146 +95,47 @@
 #include "cryptlib.h"
 #include "bn_lcl.h"
 
+#ifndef OPENSSL_NO_EC2M
+
 /*
  * Maximum number of iterations before BN_GF2m_mod_solve_quad_arr should
  * fail.
  */
-#define MAX_ITERATIONS 50
+# define MAX_ITERATIONS 50
 
 static const BN_ULONG SQR_tb[16] = { 0, 1, 4, 5, 16, 17, 20, 21,
     64, 65, 68, 69, 80, 81, 84, 85
 };
 
 /* Platform-specific macros to accelerate squaring. */
-#if defined(SIXTY_FOUR_BIT) || defined(SIXTY_FOUR_BIT_LONG)
-# define SQR1(w) \
+# if defined(SIXTY_FOUR_BIT) || defined(SIXTY_FOUR_BIT_LONG)
+#  define SQR1(w) \
     SQR_tb[(w) >> 60 & 0xF] << 56 | SQR_tb[(w) >> 56 & 0xF] << 48 | \
     SQR_tb[(w) >> 52 & 0xF] << 40 | SQR_tb[(w) >> 48 & 0xF] << 32 | \
     SQR_tb[(w) >> 44 & 0xF] << 24 | SQR_tb[(w) >> 40 & 0xF] << 16 | \
     SQR_tb[(w) >> 36 & 0xF] <<  8 | SQR_tb[(w) >> 32 & 0xF]
-# define SQR0(w) \
+#  define SQR0(w) \
     SQR_tb[(w) >> 28 & 0xF] << 56 | SQR_tb[(w) >> 24 & 0xF] << 48 | \
     SQR_tb[(w) >> 20 & 0xF] << 40 | SQR_tb[(w) >> 16 & 0xF] << 32 | \
     SQR_tb[(w) >> 12 & 0xF] << 24 | SQR_tb[(w) >>  8 & 0xF] << 16 | \
     SQR_tb[(w) >>  4 & 0xF] <<  8 | SQR_tb[(w)       & 0xF]
-#endif
-#ifdef THIRTY_TWO_BIT
-# define SQR1(w) \
+# endif
+# ifdef THIRTY_TWO_BIT
+#  define SQR1(w) \
     SQR_tb[(w) >> 28 & 0xF] << 24 | SQR_tb[(w) >> 24 & 0xF] << 16 | \
     SQR_tb[(w) >> 20 & 0xF] <<  8 | SQR_tb[(w) >> 16 & 0xF]
-# define SQR0(w) \
+#  define SQR0(w) \
     SQR_tb[(w) >> 12 & 0xF] << 24 | SQR_tb[(w) >>  8 & 0xF] << 16 | \
     SQR_tb[(w) >>  4 & 0xF] <<  8 | SQR_tb[(w)       & 0xF]
-#endif
-#ifdef SIXTEEN_BIT
-# define SQR1(w) \
-    SQR_tb[(w) >> 12 & 0xF] <<  8 | SQR_tb[(w) >>  8 & 0xF]
-# define SQR0(w) \
-    SQR_tb[(w) >>  4 & 0xF] <<  8 | SQR_tb[(w)       & 0xF]
-#endif
-#ifdef EIGHT_BIT
-# define SQR1(w) \
-    SQR_tb[(w) >>  4 & 0xF]
-# define SQR0(w) \
-    SQR_tb[(w)       & 15]
-#endif
+# endif
 
+# if !defined(OPENSSL_BN_ASM_GF2m)
 /*
  * Product of two polynomials a, b each with degree < BN_BITS2 - 1, result is
  * a polynomial r with degree < 2 * BN_BITS - 1 The caller MUST ensure that
  * the variables have the right amount of space allocated.
  */
-#ifdef EIGHT_BIT
-static void bn_GF2m_mul_1x1(BN_ULONG *r1, BN_ULONG *r0, const BN_ULONG a,
-                            const BN_ULONG b)
-{
-    register BN_ULONG h, l, s;
-    BN_ULONG tab[4], top1b = a >> 7;
-    register BN_ULONG a1, a2;
-
-    a1 = a & (0x7F);
-    a2 = a1 << 1;
-
-    tab[0] = 0;
-    tab[1] = a1;
-    tab[2] = a2;
-    tab[3] = a1 ^ a2;
-
-    s = tab[b & 0x3];
-    l = s;
-    s = tab[b >> 2 & 0x3];
-    l ^= s << 2;
-    h = s >> 6;
-    s = tab[b >> 4 & 0x3];
-    l ^= s << 4;
-    h ^= s >> 4;
-    s = tab[b >> 6];
-    l ^= s << 6;
-    h ^= s >> 2;
-
-    /* compensate for the top bit of a */
-
-    if (top1b & 01) {
-        l ^= b << 7;
-        h ^= b >> 1;
-    }
-
-    *r1 = h;
-    *r0 = l;
-}
-#endif
-#ifdef SIXTEEN_BIT
-static void bn_GF2m_mul_1x1(BN_ULONG *r1, BN_ULONG *r0, const BN_ULONG a,
-                            const BN_ULONG b)
-{
-    register BN_ULONG h, l, s;
-    BN_ULONG tab[4], top1b = a >> 15;
-    register BN_ULONG a1, a2;
-
-    a1 = a & (0x7FFF);
-    a2 = a1 << 1;
-
-    tab[0] = 0;
-    tab[1] = a1;
-    tab[2] = a2;
-    tab[3] = a1 ^ a2;
-
-    s = tab[b & 0x3];
-    l = s;
-    s = tab[b >> 2 & 0x3];
-    l ^= s << 2;
-    h = s >> 14;
-    s = tab[b >> 4 & 0x3];
-    l ^= s << 4;
-    h ^= s >> 12;
-    s = tab[b >> 6 & 0x3];
-    l ^= s << 6;
-    h ^= s >> 10;
-    s = tab[b >> 8 & 0x3];
-    l ^= s << 8;
-    h ^= s >> 8;
-    s = tab[b >> 10 & 0x3];
-    l ^= s << 10;
-    h ^= s >> 6;
-    s = tab[b >> 12 & 0x3];
-    l ^= s << 12;
-    h ^= s >> 4;
-    s = tab[b >> 14];
-    l ^= s << 14;
-    h ^= s >> 2;
-
-    /* compensate for the top bit of a */
-
-    if (top1b & 01) {
-        l ^= b << 15;
-        h ^= b >> 1;
-    }
-
-    *r1 = h;
-    *r0 = l;
-}
-#endif
-#ifdef THIRTY_TWO_BIT
+#  ifdef THIRTY_TWO_BIT
 static void bn_GF2m_mul_1x1(BN_ULONG *r1, BN_ULONG *r0, const BN_ULONG a,
                             const BN_ULONG b)
 {
@@ -302,8 +203,8 @@ static void bn_GF2m_mul_1x1(BN_ULONG *r1, BN_ULONG *r0, const BN_ULONG a,
     *r1 = h;
     *r0 = l;
 }
-#endif
-#if defined(SIXTY_FOUR_BIT) || defined(SIXTY_FOUR_BIT_LONG)
+#  endif
+#  if defined(SIXTY_FOUR_BIT) || defined(SIXTY_FOUR_BIT_LONG)
 static void bn_GF2m_mul_1x1(BN_ULONG *r1, BN_ULONG *r0, const BN_ULONG a,
                             const BN_ULONG b)
 {
@@ -399,7 +300,7 @@ static void bn_GF2m_mul_1x1(BN_ULONG *r1, BN_ULONG *r0, const BN_ULONG a,
     *r1 = h;
     *r0 = l;
 }
-#endif
+#  endif
 
 /*
  * Product of two polynomials a, b each with degree < 2 * BN_BITS2 - 1,
@@ -418,6 +319,10 @@ static void bn_GF2m_mul_2x2(BN_ULONG *r, const BN_ULONG a1, const BN_ULONG a0,
     r[2] ^= m1 ^ r[1] ^ r[3];   /* h0 ^= m1 ^ l1 ^ h1; */
     r[1] = r[3] ^ r[2] ^ r[0] ^ m1 ^ m0; /* l1 ^= l0 ^ h0 ^ m0; */
 }
+# else
+void bn_GF2m_mul_2x2(BN_ULONG *r, BN_ULONG a1, BN_ULONG a0, BN_ULONG b1,
+                     BN_ULONG b0);
+# endif
 
 /*
  * Add polynomials a and b and store result in r; r could be a or b, a and b
@@ -463,7 +368,7 @@ int BN_GF2m_add(BIGNUM *r, const BIGNUM *a, const BIGNUM *b)
  */
 
 /* Performs modular reduction of a and store result in r.  r could be a. */
-int BN_GF2m_mod_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[])
+int BN_GF2m_mod_arr(BIGNUM *r, const BIGNUM *a, const int p[])
 {
     int j, k;
     int n, dN, d0, d1;
@@ -545,8 +450,7 @@ int BN_GF2m_mod_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[])
             d0 = p[k] % BN_BITS2;
             d1 = BN_BITS2 - d0;
             z[n] ^= (zz << d0);
-            tmp_ulong = zz >> d1;
-            if (d0 && tmp_ulong)
+            if (d0 && (tmp_ulong = zz >> d1))
                 z[n + 1] ^= tmp_ulong;
         }
 
@@ -565,23 +469,16 @@ int BN_GF2m_mod_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[])
 int BN_GF2m_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *p)
 {
     int ret = 0;
-    const int max = BN_num_bits(p);
-    unsigned int *arr = NULL;
+    int arr[6];
     bn_check_top(a);
     bn_check_top(p);
-    if ((arr =
-         (unsigned int *)OPENSSL_malloc(sizeof(unsigned int) * max)) == NULL)
-        goto err;
-    ret = BN_GF2m_poly2arr(p, arr, max);
-    if (!ret || ret > max) {
+    ret = BN_GF2m_poly2arr(p, arr, sizeof(arr) / sizeof(arr[0]));
+    if (!ret || ret > (int)(sizeof(arr) / sizeof(arr[0]))) {
         BNerr(BN_F_BN_GF2M_MOD, BN_R_INVALID_LENGTH);
-        goto err;
+        return 0;
     }
     ret = BN_GF2m_mod_arr(r, a, arr);
     bn_check_top(r);
- err:
-    if (arr)
-        OPENSSL_free(arr);
     return ret;
 }
 
@@ -590,7 +487,7 @@ int BN_GF2m_mod(BIGNUM *r, const BIGNUM *a, const BIGNUM *p)
  * the result in r.  r could be a or b; a could be b.
  */
 int BN_GF2m_mod_mul_arr(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-                        const unsigned int p[], BN_CTX *ctx)
+                        const int p[], BN_CTX *ctx)
 {
     int zlen, i, j, k, ret = 0;
     BIGNUM *s;
@@ -648,13 +545,12 @@ int BN_GF2m_mod_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
                     const BIGNUM *p, BN_CTX *ctx)
 {
     int ret = 0;
-    const int max = BN_num_bits(p);
-    unsigned int *arr = NULL;
+    const int max = BN_num_bits(p) + 1;
+    int *arr = NULL;
     bn_check_top(a);
     bn_check_top(b);
     bn_check_top(p);
-    if ((arr =
-         (unsigned int *)OPENSSL_malloc(sizeof(unsigned int) * max)) == NULL)
+    if ((arr = (int *)OPENSSL_malloc(sizeof(int) * max)) == NULL)
         goto err;
     ret = BN_GF2m_poly2arr(p, arr, max);
     if (!ret || ret > max) {
@@ -670,7 +566,7 @@ int BN_GF2m_mod_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
 }
 
 /* Square a, reduce the result mod p, and store it in a.  r could be a. */
-int BN_GF2m_mod_sqr_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[],
+int BN_GF2m_mod_sqr_arr(BIGNUM *r, const BIGNUM *a, const int p[],
                         BN_CTX *ctx)
 {
     int i, ret = 0;
@@ -708,13 +604,12 @@ int BN_GF2m_mod_sqr_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[],
 int BN_GF2m_mod_sqr(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 {
     int ret = 0;
-    const int max = BN_num_bits(p);
-    unsigned int *arr = NULL;
+    const int max = BN_num_bits(p) + 1;
+    int *arr = NULL;
 
     bn_check_top(a);
     bn_check_top(p);
-    if ((arr =
-         (unsigned int *)OPENSSL_malloc(sizeof(unsigned int) * max)) == NULL)
+    if ((arr = (int *)OPENSSL_malloc(sizeof(int) * max)) == NULL)
         goto err;
     ret = BN_GF2m_poly2arr(p, arr, max);
     if (!ret || ret > max) {
@@ -737,7 +632,7 @@ int BN_GF2m_mod_sqr(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
  */
 int BN_GF2m_mod_inv(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 {
-    BIGNUM *b, *c, *u, *v, *tmp;
+    BIGNUM *b, *c = NULL, *u = NULL, *v = NULL, *tmp;
     int ret = 0;
 
     bn_check_top(a);
@@ -745,21 +640,24 @@ int BN_GF2m_mod_inv(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 
     BN_CTX_start(ctx);
 
-    b = BN_CTX_get(ctx);
-    c = BN_CTX_get(ctx);
-    u = BN_CTX_get(ctx);
-    v = BN_CTX_get(ctx);
-    if (v == NULL)
+    if ((b = BN_CTX_get(ctx)) == NULL)
+        goto err;
+    if ((c = BN_CTX_get(ctx)) == NULL)
+        goto err;
+    if ((u = BN_CTX_get(ctx)) == NULL)
+        goto err;
+    if ((v = BN_CTX_get(ctx)) == NULL)
         goto err;
 
-    if (!BN_one(b))
-        goto err;
     if (!BN_GF2m_mod(u, a, p))
         goto err;
-    if (!BN_copy(v, p))
+    if (BN_is_zero(u))
         goto err;
 
-    if (BN_is_zero(u))
+    if (!BN_copy(v, p))
+        goto err;
+# if 0
+    if (!BN_one(b))
         goto err;
 
     while (1) {
@@ -793,6 +691,93 @@ int BN_GF2m_mod_inv(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
         if (!BN_GF2m_add(b, b, c))
             goto err;
     }
+# else
+    {
+        int i;
+        int ubits = BN_num_bits(u);
+        int vbits = BN_num_bits(v); /* v is copy of p */
+        int top = p->top;
+        BN_ULONG *udp, *bdp, *vdp, *cdp;
+
+        bn_wexpand(u, top);
+        udp = u->d;
+        for (i = u->top; i < top; i++)
+            udp[i] = 0;
+        u->top = top;
+        bn_wexpand(b, top);
+        bdp = b->d;
+        bdp[0] = 1;
+        for (i = 1; i < top; i++)
+            bdp[i] = 0;
+        b->top = top;
+        bn_wexpand(c, top);
+        cdp = c->d;
+        for (i = 0; i < top; i++)
+            cdp[i] = 0;
+        c->top = top;
+        vdp = v->d;             /* It pays off to "cache" *->d pointers,
+                                 * because it allows optimizer to be more
+                                 * aggressive. But we don't have to "cache"
+                                 * p->d, because *p is declared 'const'... */
+        while (1) {
+            while (ubits && !(udp[0] & 1)) {
+                BN_ULONG u0, u1, b0, b1, mask;
+
+                u0 = udp[0];
+                b0 = bdp[0];
+                mask = (BN_ULONG)0 - (b0 & 1);
+                b0 ^= p->d[0] & mask;
+                for (i = 0; i < top - 1; i++) {
+                    u1 = udp[i + 1];
+                    udp[i] = ((u0 >> 1) | (u1 << (BN_BITS2 - 1))) & BN_MASK2;
+                    u0 = u1;
+                    b1 = bdp[i + 1] ^ (p->d[i + 1] & mask);
+                    bdp[i] = ((b0 >> 1) | (b1 << (BN_BITS2 - 1))) & BN_MASK2;
+                    b0 = b1;
+                }
+                udp[i] = u0 >> 1;
+                bdp[i] = b0 >> 1;
+                ubits--;
+            }
+
+            if (ubits <= BN_BITS2) {
+                if (udp[0] == 0) /* poly was reducible */
+                    goto err;
+                if (udp[0] == 1)
+                    break;
+            }
+
+            if (ubits < vbits) {
+                i = ubits;
+                ubits = vbits;
+                vbits = i;
+                tmp = u;
+                u = v;
+                v = tmp;
+                tmp = b;
+                b = c;
+                c = tmp;
+                udp = vdp;
+                vdp = v->d;
+                bdp = cdp;
+                cdp = c->d;
+            }
+            for (i = 0; i < top; i++) {
+                udp[i] ^= vdp[i];
+                bdp[i] ^= cdp[i];
+            }
+            if (ubits == vbits) {
+                BN_ULONG ul;
+                int utop = (ubits - 1) / BN_BITS2;
+
+                while ((ul = udp[utop]) == 0 && utop)
+                    utop--;
+                ubits = utop * BN_BITS2 + BN_num_bits_word(ul);
+            }
+        }
+        bn_correct_top(b);
+    }
+# endif
 
     if (!BN_copy(r, b))
         goto err;
@@ -800,6 +785,12 @@ int BN_GF2m_mod_inv(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
     ret = 1;
 
  err:
+# ifdef BN_DEBUG                /* BN_CTX_end would complain about the
+                                 * expanded form */
+    bn_correct_top(c);
+    bn_correct_top(u);
+    bn_correct_top(v);
+# endif
     BN_CTX_end(ctx);
     return ret;
 }
@@ -810,7 +801,7 @@ int BN_GF2m_mod_inv(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
  * wrapper function is only provided for convenience; for best performance,
  * use the BN_GF2m_mod_inv function.
  */
-int BN_GF2m_mod_inv_arr(BIGNUM *r, const BIGNUM *xx, const unsigned int p[],
+int BN_GF2m_mod_inv_arr(BIGNUM *r, const BIGNUM *xx, const int p[],
                         BN_CTX *ctx)
 {
     BIGNUM *field;
@@ -831,7 +822,7 @@ int BN_GF2m_mod_inv_arr(BIGNUM *r, const BIGNUM *xx, const unsigned int p[],
     return ret;
 }
 
-#ifndef OPENSSL_SUN_GF2M_DIV
+# ifndef OPENSSL_SUN_GF2M_DIV
 /*
  * Divide y by x, reduce modulo p, and store the result in r. r could be x
  * or y, x could equal y.
@@ -862,7 +853,7 @@ int BN_GF2m_mod_div(BIGNUM *r, const BIGNUM *y, const BIGNUM *x,
     BN_CTX_end(ctx);
     return ret;
 }
-#else
+# else
 /*
  * Divide y by x, reduce modulo p, and store the result in r. r could be x
  * or y, x could equal y. Uses algorithm Modular_Division_GF(2^m) from
@@ -949,7 +940,7 @@ int BN_GF2m_mod_div(BIGNUM *r, const BIGNUM *y, const BIGNUM *x,
     BN_CTX_end(ctx);
     return ret;
 }
-#endif
+# endif
 
 /*
  * Divide yy by xx, reduce modulo p, and store the result in r. r could be xx
@@ -958,7 +949,7 @@ int BN_GF2m_mod_div(BIGNUM *r, const BIGNUM *y, const BIGNUM *x,
  * convenience; for best performance, use the BN_GF2m_mod_div function.
  */
 int BN_GF2m_mod_div_arr(BIGNUM *r, const BIGNUM *yy, const BIGNUM *xx,
-                        const unsigned int p[], BN_CTX *ctx)
+                        const int p[], BN_CTX *ctx)
 {
     BIGNUM *field;
     int ret = 0;
@@ -986,7 +977,7 @@ int BN_GF2m_mod_div_arr(BIGNUM *r, const BIGNUM *yy, const BIGNUM *xx,
  * P1363.
  */
 int BN_GF2m_mod_exp_arr(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-                        const unsigned int p[], BN_CTX *ctx)
+                        const int p[], BN_CTX *ctx)
 {
     int ret = 0, i, n;
     BIGNUM *u;
@@ -1035,13 +1026,12 @@ int BN_GF2m_mod_exp(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
                     const BIGNUM *p, BN_CTX *ctx)
 {
     int ret = 0;
-    const int max = BN_num_bits(p);
-    unsigned int *arr = NULL;
+    const int max = BN_num_bits(p) + 1;
+    int *arr = NULL;
     bn_check_top(a);
     bn_check_top(b);
     bn_check_top(p);
-    if ((arr =
-         (unsigned int *)OPENSSL_malloc(sizeof(unsigned int) * max)) == NULL)
+    if ((arr = (int *)OPENSSL_malloc(sizeof(int) * max)) == NULL)
         goto err;
     ret = BN_GF2m_poly2arr(p, arr, max);
     if (!ret || ret > max) {
@@ -1060,7 +1050,7 @@ int BN_GF2m_mod_exp(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
  * Compute the square root of a, reduce modulo p, and store the result in r.
  * r could be a. Uses exponentiation as in algorithm A.4.1 from IEEE P1363.
  */
-int BN_GF2m_mod_sqrt_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[],
+int BN_GF2m_mod_sqrt_arr(BIGNUM *r, const BIGNUM *a, const int p[],
                          BN_CTX *ctx)
 {
     int ret = 0;
@@ -1097,12 +1087,11 @@ int BN_GF2m_mod_sqrt_arr(BIGNUM *r, const BIGNUM *a, const unsigned int p[],
 int BN_GF2m_mod_sqrt(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 {
     int ret = 0;
-    const int max = BN_num_bits(p);
-    unsigned int *arr = NULL;
+    const int max = BN_num_bits(p) + 1;
+    int *arr = NULL;
     bn_check_top(a);
     bn_check_top(p);
-    if ((arr =
-         (unsigned int *)OPENSSL_malloc(sizeof(unsigned int) * max)) == NULL)
+    if ((arr = (int *)OPENSSL_malloc(sizeof(int) * max)) == NULL)
         goto err;
     ret = BN_GF2m_poly2arr(p, arr, max);
     if (!ret || ret > max) {
@@ -1121,11 +1110,10 @@ int BN_GF2m_mod_sqrt(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
  * Find r such that r^2 + r = a mod p.  r could be a. If no r exists returns
  * 0. Uses algorithms A.4.7 and A.4.6 from IEEE P1363.
  */
-int BN_GF2m_mod_solve_quad_arr(BIGNUM *r, const BIGNUM *a_,
-                               const unsigned int p[], BN_CTX *ctx)
+int BN_GF2m_mod_solve_quad_arr(BIGNUM *r, const BIGNUM *a_, const int p[],
+                               BN_CTX *ctx)
 {
-    int ret = 0, count = 0;
-    unsigned int j;
+    int ret = 0, count = 0, j;
     BIGNUM *a, *z, *rho, *w, *w2, *tmp;
 
     bn_check_top(a_);
@@ -1230,12 +1218,11 @@ int BN_GF2m_mod_solve_quad(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
                            BN_CTX *ctx)
 {
     int ret = 0;
-    const int max = BN_num_bits(p);
-    unsigned int *arr = NULL;
+    const int max = BN_num_bits(p) + 1;
+    int *arr = NULL;
     bn_check_top(a);
     bn_check_top(p);
-    if ((arr = (unsigned int *)OPENSSL_malloc(sizeof(unsigned int) *
-                                              max)) == NULL)
+    if ((arr = (int *)OPENSSL_malloc(sizeof(int) * max)) == NULL)
         goto err;
     ret = BN_GF2m_poly2arr(p, arr, max);
     if (!ret || ret > max) {
@@ -1252,21 +1239,17 @@ int BN_GF2m_mod_solve_quad(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
 
 /*
  * Convert the bit-string representation of a polynomial ( \sum_{i=0}^n a_i *
- * x^i , where a_0 is *not* zero) into an array of integers corresponding to
- * the bits with non-zero coefficient. Up to max elements of the array will
- * be filled.  Return value is total number of coefficients that would be
- * extracted if array was large enough.
+ * x^i) into an array of integers corresponding to the bits with non-zero
+ * coefficient.  Array is terminated with -1. Up to max elements of the array
+ * will be filled.  Return value is total number of array elements that would
+ * be filled if array was large enough.
  */
-int BN_GF2m_poly2arr(const BIGNUM *a, unsigned int p[], int max)
+int BN_GF2m_poly2arr(const BIGNUM *a, int p[], int max)
 {
     int i, j, k = 0;
     BN_ULONG mask;
 
-    if (BN_is_zero(a) || !BN_is_bit_set(a, 0))
-        /*
-         * a_0 == 0 => return error (the unsigned int array must be
-         * terminated by 0)
-         */
+    if (BN_is_zero(a))
         return 0;
 
     for (i = a->top - 1; i >= 0; i--) {
@@ -1284,86 +1267,31 @@ int BN_GF2m_poly2arr(const BIGNUM *a, unsigned int p[], int max)
         }
     }
 
+    if (k < max) {
+        p[k] = -1;
+        k++;
+    }
+
     return k;
 }
 
 /*
  * Convert the coefficient array representation of a polynomial to a
- * bit-string.  The array must be terminated by 0.
+ * bit-string.  The array must be terminated by -1.
  */
-int BN_GF2m_arr2poly(const unsigned int p[], BIGNUM *a)
+int BN_GF2m_arr2poly(const int p[], BIGNUM *a)
 {
     int i;
 
     bn_check_top(a);
     BN_zero(a);
-    for (i = 0; p[i] != 0; i++) {
+    for (i = 0; p[i] != -1; i++) {
         if (BN_set_bit(a, p[i]) == 0)
             return 0;
     }
-    BN_set_bit(a, 0);
     bn_check_top(a);
 
     return 1;
 }
 
-/*
- * Constant-time conditional swap of a and b.
- * a and b are swapped if condition is not 0.  The code assumes that at most one bit of condition is set.
- * nwords is the number of words to swap.  The code assumes that at least nwords are allocated in both a and b,
- * and that no more than nwords are used by either a or b.
- * a and b cannot be the same number
- */
-void BN_consttime_swap(BN_ULONG condition, BIGNUM *a, BIGNUM *b, int nwords)
-{
-    BN_ULONG t;
-    int i;
-
-    bn_wcheck_size(a, nwords);
-    bn_wcheck_size(b, nwords);
-
-    assert(a != b);
-    assert((condition & (condition - 1)) == 0);
-    assert(sizeof(BN_ULONG) >= sizeof(int));
-
-    condition = ((condition - 1) >> (BN_BITS2 - 1)) - 1;
-
-    t = (a->top ^ b->top) & condition;
-    a->top ^= t;
-    b->top ^= t;
-
-#define BN_CONSTTIME_SWAP(ind) \
-        do { \
-                t = (a->d[ind] ^ b->d[ind]) & condition; \
-                a->d[ind] ^= t; \
-                b->d[ind] ^= t; \
-        } while (0)
-
-    switch (nwords) {
-    default:
-        for (i = 10; i < nwords; i++)
-            BN_CONSTTIME_SWAP(i);
-        /* Fallthrough */
-    case 10:
-        BN_CONSTTIME_SWAP(9);   /* Fallthrough */
-    case 9:
-        BN_CONSTTIME_SWAP(8);   /* Fallthrough */
-    case 8:
-        BN_CONSTTIME_SWAP(7);   /* Fallthrough */
-    case 7:
-        BN_CONSTTIME_SWAP(6);   /* Fallthrough */
-    case 6:
-        BN_CONSTTIME_SWAP(5);   /* Fallthrough */
-    case 5:
-        BN_CONSTTIME_SWAP(4);   /* Fallthrough */
-    case 4:
-        BN_CONSTTIME_SWAP(3);   /* Fallthrough */
-    case 3:
-        BN_CONSTTIME_SWAP(2);   /* Fallthrough */
-    case 2:
-        BN_CONSTTIME_SWAP(1);   /* Fallthrough */
-    case 1:
-        BN_CONSTTIME_SWAP(0);
-    }
-#undef BN_CONSTTIME_SWAP
-}
+#endif

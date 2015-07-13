@@ -83,6 +83,7 @@ int OCSP_basic_verify(OCSP_BASICRESP *bs, STACK_OF(X509) *certs,
 {
     X509 *signer, *x;
     STACK_OF(X509) *chain = NULL;
+    STACK_OF(X509) *untrusted = NULL;
     X509_STORE_CTX ctx;
     int i, ret = 0;
     ret = ocsp_find_signer(&signer, bs, certs, st, flags);
@@ -107,10 +108,20 @@ int OCSP_basic_verify(OCSP_BASICRESP *bs, STACK_OF(X509) *certs,
     }
     if (!(flags & OCSP_NOVERIFY)) {
         int init_res;
-        if (flags & OCSP_NOCHAIN)
-            init_res = X509_STORE_CTX_init(&ctx, st, signer, NULL);
-        else
-            init_res = X509_STORE_CTX_init(&ctx, st, signer, bs->certs);
+        if (flags & OCSP_NOCHAIN) {
+            untrusted = NULL;
+        } else if (bs->certs && certs) {
+            untrusted = sk_X509_dup(bs->certs);
+            for (i = 0; i < sk_X509_num(certs); i++) {
+                if (!sk_X509_push(untrusted, sk_X509_value(certs, i))) {
+                    OCSPerr(OCSP_F_OCSP_BASIC_VERIFY, ERR_R_MALLOC_FAILURE);
+                    goto end;
+                }
+            }
+        } else {
+            untrusted = bs->certs;
+        }
+        init_res = X509_STORE_CTX_init(&ctx, st, signer, untrusted);
         if (!init_res) {
             ret = -1;
             OCSPerr(OCSP_F_OCSP_BASIC_VERIFY, ERR_R_X509_LIB);
@@ -161,6 +172,8 @@ int OCSP_basic_verify(OCSP_BASICRESP *bs, STACK_OF(X509) *certs,
  end:
     if (chain)
         sk_X509_pop_free(chain, X509_free);
+    if (bs->certs && certs)
+        sk_X509_free(untrusted);
     return ret;
 }
 
@@ -308,6 +321,8 @@ static int ocsp_match_issuerid(X509 *cert, OCSP_CERTID *cid,
         }
 
         mdlen = EVP_MD_size(dgst);
+        if (mdlen < 0)
+            return -1;
         if ((cid->issuerNameHash->length != mdlen) ||
             (cid->issuerKeyHash->length != mdlen))
             return 0;
@@ -316,7 +331,7 @@ static int ocsp_match_issuerid(X509 *cert, OCSP_CERTID *cid,
             return -1;
         if (memcmp(md, cid->issuerNameHash->data, mdlen))
             return 0;
-        X509_pubkey_digest(cert, EVP_sha1(), md, NULL);
+        X509_pubkey_digest(cert, dgst, md, NULL);
         if (memcmp(md, cid->issuerKeyHash->data, mdlen))
             return 0;
 
@@ -424,8 +439,10 @@ static int ocsp_req_find_signer(X509 **psigner, OCSP_REQUEST *req,
     X509 *signer;
     if (!(flags & OCSP_NOINTERN)) {
         signer = X509_find_by_subject(req->optionalSignature->certs, nm);
-        *psigner = signer;
-        return 1;
+        if (signer) {
+            *psigner = signer;
+            return 1;
+        }
     }
 
     signer = X509_find_by_subject(certs, nm);

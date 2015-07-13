@@ -101,13 +101,19 @@ extern "C" {
 #  undef OPENSSL_SYS_UNIX
 #  define OPENSSL_SYS_WIN32_UWIN
 # else
-#  if defined(__CYGWIN32__) || defined(OPENSSL_SYSNAME_CYGWIN32)
+#  if defined(__CYGWIN__) || defined(OPENSSL_SYSNAME_CYGWIN)
 #   undef OPENSSL_SYS_UNIX
 #   define OPENSSL_SYS_WIN32_CYGWIN
 #  else
 #   if defined(_WIN32) || defined(OPENSSL_SYSNAME_WIN32)
 #    undef OPENSSL_SYS_UNIX
 #    define OPENSSL_SYS_WIN32
+#   endif
+#   if defined(_WIN64) || defined(OPENSSL_SYSNAME_WIN64)
+#    undef OPENSSL_SYS_UNIX
+#    if !defined(OPENSSL_SYS_WIN64)
+#     define OPENSSL_SYS_WIN64
+#    endif
 #   endif
 #   if defined(OPENSSL_SYSNAME_WINNT)
 #    undef OPENSSL_SYS_UNIX
@@ -121,7 +127,7 @@ extern "C" {
 # endif
 
 /* Anything that tries to look like Microsoft is "Windows" */
-# if defined(OPENSSL_SYS_WIN32) || defined(OPENSSL_SYS_WINNT) || defined(OPENSSL_SYS_WINCE)
+# if defined(OPENSSL_SYS_WIN32) || defined(OPENSSL_SYS_WIN64) || defined(OPENSSL_SYS_WINNT) || defined(OPENSSL_SYS_WINCE)
 #  undef OPENSSL_SYS_UNIX
 #  define OPENSSL_SYS_WINDOWS
 #  ifndef OPENSSL_SYS_MSDOS
@@ -199,13 +205,30 @@ extern "C" {
 # endif
 
 /* -------------------------------- VOS ----------------------------------- */
-# ifdef OPENSSL_SYSNAME_VOS
+# if defined(__VOS__) || defined(OPENSSL_SYSNAME_VOS)
 #  define OPENSSL_SYS_VOS
+#  ifdef __HPPA__
+#   define OPENSSL_SYS_VOS_HPPA
+#  endif
+#  ifdef __IA32__
+#   define OPENSSL_SYS_VOS_IA32
+#  endif
 # endif
 
 /* ------------------------------ VxWorks --------------------------------- */
 # ifdef OPENSSL_SYSNAME_VXWORKS
 #  define OPENSSL_SYS_VXWORKS
+# endif
+
+/* -------------------------------- BeOS ---------------------------------- */
+# if defined(__BEOS__)
+#  define OPENSSL_SYS_BEOS
+#  include <sys/socket.h>
+#  if defined(BONE_VERSION)
+#   define OPENSSL_SYS_BEOS_BONE
+#  else
+#   define OPENSSL_SYS_BEOS_R5
+#  endif
 # endif
 
 /**
@@ -268,16 +291,35 @@ extern "C" {
  *      #define foobar OPENSSL_GLOBAL_REF(foobar)
  */
 # ifdef OPENSSL_EXPORT_VAR_AS_FUNCTION
-#  define OPENSSL_IMPLEMENT_GLOBAL(type,name)                         \
-        extern type _hide_##name;                                    \
-        type *_shadow_##name(void) { return &_hide_##name; }         \
-        static type _hide_##name
+#  define OPENSSL_IMPLEMENT_GLOBAL(type,name,value)                      \
+        type *_shadow_##name(void)                                      \
+        { static type _hide_##name=value; return &_hide_##name; }
 #  define OPENSSL_DECLARE_GLOBAL(type,name) type *_shadow_##name(void)
 #  define OPENSSL_GLOBAL_REF(name) (*(_shadow_##name()))
 # else
-#  define OPENSSL_IMPLEMENT_GLOBAL(type,name) OPENSSL_GLOBAL type _shadow_##name
+#  define OPENSSL_IMPLEMENT_GLOBAL(type,name,value) OPENSSL_GLOBAL type _shadow_##name=value;
 #  define OPENSSL_DECLARE_GLOBAL(type,name) OPENSSL_EXPORT type _shadow_##name
 #  define OPENSSL_GLOBAL_REF(name) _shadow_##name
+# endif
+
+# if defined(OPENSSL_SYS_MACINTOSH_CLASSIC) && macintosh==1 && !defined(MAC_OS_GUSI_SOURCE)
+#  define ossl_ssize_t long
+# endif
+
+# ifdef OPENSSL_SYS_MSDOS
+#  define ossl_ssize_t long
+# endif
+
+# if defined(NeXT) || defined(OPENSSL_SYS_NEWS4) || defined(OPENSSL_SYS_SUNOS)
+#  define ssize_t int
+# endif
+
+# if defined(__ultrix) && !defined(ssize_t)
+#  define ossl_ssize_t int
+# endif
+
+# ifndef ossl_ssize_t
+#  define ossl_ssize_t ssize_t
 # endif
 
 #ifdef  __cplusplus

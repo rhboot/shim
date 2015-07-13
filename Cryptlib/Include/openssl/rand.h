@@ -72,7 +72,7 @@ extern "C" {
 #endif
 
 # if defined(OPENSSL_FIPS)
-#  define FIPS_RAND_SIZE_T int
+#  define FIPS_RAND_SIZE_T size_t
 # endif
 
 /* Already defined in ossl_typ.h */
@@ -110,22 +110,17 @@ int RAND_query_egd_bytes(const char *path, unsigned char *buf, int bytes);
 int RAND_egd(const char *path);
 int RAND_egd_bytes(const char *path, int bytes);
 int RAND_poll(void);
-# ifndef OPENSSL_NO_ENGINE
-#  ifdef OPENSSL_FIPS
-void int_RAND_init_engine_callbacks(void);
-void int_RAND_set_callbacks(int (*set_rand_func) (const RAND_METHOD *meth,
-                                                  const RAND_METHOD **pmeth),
-                            const RAND_METHOD *(*get_rand_func) (const
-                                                                 RAND_METHOD
-                                                                 **pmeth));
-#  endif
-# endif
 
 # if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32)
 
 void RAND_screen(void);
 int RAND_event(UINT, WPARAM, LPARAM);
 
+# endif
+
+# ifdef OPENSSL_FIPS
+void RAND_set_fips_drbg_type(int type, int flags);
+int RAND_init_fips(void);
 # endif
 
 /* BEGIN ERROR CODES */
@@ -138,29 +133,16 @@ void ERR_load_RAND_strings(void);
 /* Error codes for the RAND functions. */
 
 /* Function codes. */
-# define RAND_F_ENG_RAND_GET_RAND_METHOD                  108
-# define RAND_F_FIPS_RAND                                 103
-# define RAND_F_FIPS_RAND_BYTES                           102
-# define RAND_F_FIPS_RAND_GET_RAND_METHOD                 109
-# define RAND_F_FIPS_RAND_SET_DT                          106
-# define RAND_F_FIPS_SET_DT                               104
-# define RAND_F_FIPS_SET_PRNG_SEED                        107
-# define RAND_F_FIPS_SET_TEST_MODE                        105
 # define RAND_F_RAND_GET_RAND_METHOD                      101
+# define RAND_F_RAND_INIT_FIPS                            102
 # define RAND_F_SSLEAY_RAND_BYTES                         100
 
 /* Reason codes. */
-# define RAND_R_NON_FIPS_METHOD                           105
-# define RAND_R_NOT_IN_TEST_MODE                          106
-# define RAND_R_NO_KEY_SET                                107
-# define RAND_R_PRNG_ASKING_FOR_TOO_MUCH                  101
-# define RAND_R_PRNG_ERROR                                108
-# define RAND_R_PRNG_KEYED                                109
-# define RAND_R_PRNG_NOT_REKEYED                          102
-# define RAND_R_PRNG_NOT_RESEEDED                         103
+# define RAND_R_DUAL_EC_DRBG_DISABLED                     104
+# define RAND_R_ERROR_INITIALISING_DRBG                   102
+# define RAND_R_ERROR_INSTANTIATING_DRBG                  103
+# define RAND_R_NO_FIPS_RANDOM_METHOD_SET                 101
 # define RAND_R_PRNG_NOT_SEEDED                           100
-# define RAND_R_PRNG_SEED_MUST_NOT_MATCH_KEY              110
-# define RAND_R_PRNG_STUCK                                104
 
 #ifdef  __cplusplus
 }

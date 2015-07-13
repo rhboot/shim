@@ -60,6 +60,31 @@
 #include <errno.h>
 #define USE_SOCKETS
 #include "cryptlib.h"
+
+#if defined(OPENSSL_NO_POSIX_IO)
+/*
+ * Dummy placeholder for BIO_s_fd...
+ */
+BIO *BIO_new_fd(int fd, int close_flag)
+{
+    return NULL;
+}
+
+int BIO_fd_non_fatal_error(int err)
+{
+    return 0;
+}
+
+int BIO_fd_should_retry(int i)
+{
+    return 0;
+}
+
+BIO_METHOD *BIO_s_fd(void)
+{
+    return NULL;
+}
+#else
 /*
  * As for unconditional usage of "UPLINK" interface in this module.
  * Trouble is that unlike Unix file descriptors [which are indexes
@@ -72,11 +97,12 @@
  * file descriptors can only be provided by application. Therefore
  * "UPLINK" calls are due...
  */
-#include "bio_lcl.h"
+# include "bio_lcl.h"
 
 static int fd_write(BIO *h, const char *buf, int num);
 static int fd_read(BIO *h, char *buf, int size);
 static int fd_puts(BIO *h, const char *str);
+static int fd_gets(BIO *h, char *buf, int size);
 static long fd_ctrl(BIO *h, int cmd, long arg1, void *arg2);
 static int fd_new(BIO *h);
 static int fd_free(BIO *data);
@@ -87,7 +113,7 @@ static BIO_METHOD methods_fdp = {
     fd_write,
     fd_read,
     fd_puts,
-    NULL,                       /* fd_gets, */
+    fd_gets,
     fd_ctrl,
     fd_new,
     fd_free,
@@ -221,6 +247,22 @@ static int fd_puts(BIO *bp, const char *str)
     return (ret);
 }
 
+static int fd_gets(BIO *bp, char *buf, int size)
+{
+    int ret = 0;
+    char *ptr = buf;
+    char *end = buf + size - 1;
+
+    while ((ptr < end) && (fd_read(bp, ptr, 1) > 0) && (ptr[0] != '\n'))
+        ptr++;
+
+    ptr[0] = '\0';
+
+    if (buf[0] != '\0')
+        ret = strlen(buf);
+    return (ret);
+}
+
 int BIO_fd_should_retry(int i)
 {
     int err;
@@ -228,11 +270,11 @@ int BIO_fd_should_retry(int i)
     if ((i == 0) || (i == -1)) {
         err = get_last_sys_error();
 
-#if defined(OPENSSL_SYS_WINDOWS) && 0 /* more microsoft stupidity? perhaps
+# if defined(OPENSSL_SYS_WINDOWS) && 0/* more microsoft stupidity? perhaps
                                        * not? Ben 4/1/99 */
         if ((i == -1) && (err == 0))
             return (1);
-#endif
+# endif
 
         return (BIO_fd_non_fatal_error(err));
     }
@@ -243,41 +285,41 @@ int BIO_fd_non_fatal_error(int err)
 {
     switch (err) {
 
-#ifdef EWOULDBLOCK
-# ifdef WSAEWOULDBLOCK
-#  if WSAEWOULDBLOCK != EWOULDBLOCK
+# ifdef EWOULDBLOCK
+#  ifdef WSAEWOULDBLOCK
+#   if WSAEWOULDBLOCK != EWOULDBLOCK
+    case EWOULDBLOCK:
+#   endif
+#  else
     case EWOULDBLOCK:
 #  endif
-# else
-    case EWOULDBLOCK:
 # endif
-#endif
 
-#if defined(ENOTCONN)
+# if defined(ENOTCONN)
     case ENOTCONN:
-#endif
-
-#ifdef EINTR
-    case EINTR:
-#endif
-
-#ifdef EAGAIN
-# if EWOULDBLOCK != EAGAIN
-    case EAGAIN:
 # endif
-#endif
 
-#ifdef EPROTO
+# ifdef EINTR
+    case EINTR:
+# endif
+
+# ifdef EAGAIN
+#  if EWOULDBLOCK != EAGAIN
+    case EAGAIN:
+#  endif
+# endif
+
+# ifdef EPROTO
     case EPROTO:
-#endif
+# endif
 
-#ifdef EINPROGRESS
+# ifdef EINPROGRESS
     case EINPROGRESS:
-#endif
+# endif
 
-#ifdef EALREADY
+# ifdef EALREADY
     case EALREADY:
-#endif
+# endif
         return (1);
         /* break; */
     default:
@@ -285,3 +327,4 @@ int BIO_fd_non_fatal_error(int err)
     }
     return (0);
 }
+#endif

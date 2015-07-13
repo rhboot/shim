@@ -71,7 +71,12 @@ char *BN_bn2hex(const BIGNUM *a)
     char *buf;
     char *p;
 
-    buf = (char *)OPENSSL_malloc(a->top * BN_BYTES * 2 + 2);
+    if (a->neg && BN_is_zero(a)) {
+        /* "-0" == 3 bytes including NULL terminator */
+        buf = OPENSSL_malloc(3);
+    } else {
+        buf = OPENSSL_malloc(a->top * BN_BYTES * 2 + 2);
+    }
     if (buf == NULL) {
         BNerr(BN_F_BN_BN2HEX, ERR_R_MALLOC_FAILURE);
         goto err;
@@ -304,6 +309,24 @@ int BN_dec2bn(BIGNUM **bn, const char *a)
     return (0);
 }
 
+int BN_asc2bn(BIGNUM **bn, const char *a)
+{
+    const char *p = a;
+    if (*p == '-')
+        p++;
+
+    if (p[0] == '0' && (p[1] == 'X' || p[1] == 'x')) {
+        if (!BN_hex2bn(bn, p + 2))
+            return 0;
+    } else {
+        if (!BN_dec2bn(bn, p))
+            return 0;
+    }
+    if (*a == '-')
+        (*bn)->neg = 1;
+    return 1;
+}
+
 #ifndef OPENSSL_NO_BIO
 # ifndef OPENSSL_NO_FP_API
 int BN_print_fp(FILE *fp, const BIGNUM *a)
@@ -345,3 +368,21 @@ int BN_print(BIO *bp, const BIGNUM *a)
     return (ret);
 }
 #endif
+
+char *BN_options(void)
+{
+    static int init = 0;
+    static char data[16];
+
+    if (!init) {
+        init++;
+#ifdef BN_LLONG
+        BIO_snprintf(data, sizeof data, "bn(%d,%d)",
+                     (int)sizeof(BN_ULLONG) * 8, (int)sizeof(BN_ULONG) * 8);
+#else
+        BIO_snprintf(data, sizeof data, "bn(%d,%d)",
+                     (int)sizeof(BN_ULONG) * 8, (int)sizeof(BN_ULONG) * 8);
+#endif
+    }
+    return (data);
+}

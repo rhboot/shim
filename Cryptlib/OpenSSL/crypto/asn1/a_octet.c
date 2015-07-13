@@ -60,12 +60,13 @@
 #include "cryptlib.h"
 #include <openssl/asn1.h>
 
-ASN1_OCTET_STRING *ASN1_OCTET_STRING_dup(ASN1_OCTET_STRING *x)
+ASN1_OCTET_STRING *ASN1_OCTET_STRING_dup(const ASN1_OCTET_STRING *x)
 {
     return M_ASN1_OCTET_STRING_dup(x);
 }
 
-int ASN1_OCTET_STRING_cmp(ASN1_OCTET_STRING *a, ASN1_OCTET_STRING *b)
+int ASN1_OCTET_STRING_cmp(const ASN1_OCTET_STRING *a,
+                          const ASN1_OCTET_STRING *b)
 {
     return M_ASN1_OCTET_STRING_cmp(a, b);
 }

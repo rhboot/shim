@@ -81,7 +81,8 @@ IMPLEMENT_ASN1_FUNCTIONS(X509_CINF)
 
 extern void policy_cache_free(X509_POLICY_CACHE *cache);
 
-static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it)
+static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
+                   void *exarg)
 {
     X509 *ret = (X509 *)*pval;
 
@@ -99,6 +100,7 @@ static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it)
         ret->rfc3779_asid = NULL;
 #endif
         ret->aux = NULL;
+        ret->crldp = NULL;
         CRYPTO_new_ex_data(CRYPTO_EX_INDEX_X509, ret, &ret->ex_data);
         break;
 
@@ -113,7 +115,10 @@ static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it)
         X509_CERT_AUX_free(ret->aux);
         ASN1_OCTET_STRING_free(ret->skid);
         AUTHORITY_KEYID_free(ret->akid);
+        CRL_DIST_POINTS_free(ret->crldp);
         policy_cache_free(ret->policy_cache);
+        GENERAL_NAMES_free(ret->altname);
+        NAME_CONSTRAINTS_free(ret->nc);
 #ifndef OPENSSL_NO_RFC3779
         sk_IPAddressFamily_pop_free(ret->rfc3779_addr, IPAddressFamily_free);
         ASIdentifiers_free(ret->rfc3779_asid);
@@ -138,18 +143,6 @@ ASN1_SEQUENCE_ref(X509, x509_cb, CRYPTO_LOCK_X509) = {
 IMPLEMENT_ASN1_FUNCTIONS(X509)
 
 IMPLEMENT_ASN1_DUP_FUNCTION(X509)
-
-static ASN1_METHOD meth = {
-    (I2D_OF(void)) i2d_X509,
-    (D2I_OF(void)) d2i_X509,
-    (void *(*)(void))X509_new,
-    (void (*)(void *))X509_free
-};
-
-ASN1_METHOD *X509_asn1_meth(void)
-{
-    return (&meth);
-}
 
 int X509_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
                           CRYPTO_EX_dup *dup_func, CRYPTO_EX_free *free_func)
@@ -184,7 +177,7 @@ X509 *d2i_X509_AUX(X509 **a, const unsigned char **pp, long length)
     /* Save start position */
     q = *pp;
 
-    if(!a || *a == NULL) {
+    if (!a || *a == NULL) {
         freeret = 1;
     }
     ret = d2i_X509(a, pp, length);
@@ -199,7 +192,7 @@ X509 *d2i_X509_AUX(X509 **a, const unsigned char **pp, long length)
         goto err;
     return ret;
  err:
-    if(freeret) {
+    if (freeret) {
         X509_free(ret);
         if (a)
             *a = NULL;
@@ -214,4 +207,24 @@ int i2d_X509_AUX(X509 *a, unsigned char **pp)
     if (a)
         length += i2d_X509_CERT_AUX(a->aux, pp);
     return length;
+}
+
+int i2d_re_X509_tbs(X509 *x, unsigned char **pp)
+{
+    x->cert_info->enc.modified = 1;
+    return i2d_X509_CINF(x->cert_info, pp);
+}
+
+void X509_get0_signature(ASN1_BIT_STRING **psig, X509_ALGOR **palg,
+                         const X509 *x)
+{
+    if (psig)
+        *psig = x->signature;
+    if (palg)
+        *palg = x->sig_alg;
+}
+
+int X509_get_signature_nid(const X509 *x)
+{
+    return OBJ_obj2nid(x->sig_alg->algorithm);
 }

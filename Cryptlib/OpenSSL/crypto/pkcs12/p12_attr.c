@@ -61,12 +61,6 @@
 #include "cryptlib.h"
 #include <openssl/pkcs12.h>
 
-#ifdef OPENSSL_SYS_NETWARE
-/* Rename these functions to avoid name clashes on NetWare OS */
-# define uni2asc OPENSSL_uni2asc
-# define asc2uni OPENSSL_asc2uni
-#endif
-
 /* Add a local keyid to a safebag */
 
 int PKCS12_add_localkeyid(PKCS12_SAFEBAG *bag, unsigned char *name,
@@ -148,6 +142,6 @@ char *PKCS12_get_friendlyname(PKCS12_SAFEBAG *bag)
         return NULL;
     if (atype->type != V_ASN1_BMPSTRING)
         return NULL;
-    return uni2asc(atype->value.bmpstring->data,
-                   atype->value.bmpstring->length);
+    return OPENSSL_uni2asc(atype->value.bmpstring->data,
+                           atype->value.bmpstring->length);
 }

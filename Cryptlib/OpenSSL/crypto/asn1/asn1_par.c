@@ -70,9 +70,8 @@ static int asn1_print_info(BIO *bp, int tag, int xclass, int constructed,
                            int indent)
 {
     static const char fmt[] = "%-18s";
-    static const char fmt2[] = "%2d %-15s";
     char str[128];
-    const char *p, *p2 = NULL;
+    const char *p;
 
     if (constructed & V_ASN1_CONSTRUCTED)
         p = "cons: ";
@@ -94,13 +93,8 @@ static int asn1_print_info(BIO *bp, int tag, int xclass, int constructed,
     else
         p = ASN1_tag2str(tag);
 
-    if (p2 != NULL) {
-        if (BIO_printf(bp, fmt2, tag, p2) <= 0)
-            goto err;
-    } else {
-        if (BIO_printf(bp, fmt, p) <= 0)
-            goto err;
-    }
+    if (BIO_printf(bp, fmt, p) <= 0)
+        goto err;
     return (1);
  err:
     return (0);
@@ -343,7 +337,7 @@ static int asn1_parse2(BIO *bp, const unsigned char **pp, long length,
                             goto end;
                     }
                 } else {
-                    if (BIO_write(bp, "BAD ENUMERATED", 11) <= 0)
+                    if (BIO_write(bp, "BAD ENUMERATED", 14) <= 0)
                         goto end;
                 }
                 M_ASN1_ENUMERATED_free(bs);
@@ -383,7 +377,7 @@ static int asn1_parse2(BIO *bp, const unsigned char **pp, long length,
 
 const char *ASN1_tag2str(int tag)
 {
-    static const char *tag2str[] = {
+    static const char *const tag2str[] = {
         /* 0-4 */
         "EOC", "BOOLEAN", "INTEGER", "BIT STRING", "OCTET STRING",
         /* 5-9 */

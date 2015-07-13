@@ -80,10 +80,13 @@
 int DES_enc_write(int fd, const void *_buf, int len,
                   DES_key_schedule *sched, DES_cblock *iv)
 {
-#ifdef _LIBC
+#if defined(OPENSSL_NO_POSIX_IO)
+    return (-1);
+#else
+# ifdef _LIBC
     extern unsigned long time();
     extern int write();
-#endif
+# endif
     const unsigned char *buf = _buf;
     long rnum;
     int i, j, k, outnum;
@@ -92,6 +95,9 @@ int DES_enc_write(int fd, const void *_buf, int len,
     unsigned char *p;
     const unsigned char *cp;
     static int start = 1;
+
+    if (len < 0)
+        return -1;
 
     if (outbuf == NULL) {
         outbuf = OPENSSL_malloc(BSIZE + HDRSIZE);
@@ -129,7 +135,9 @@ int DES_enc_write(int fd, const void *_buf, int len,
     if (len < 8) {
         cp = shortbuf;
         memcpy(shortbuf, buf, len);
-        RAND_pseudo_bytes(shortbuf + len, 8 - len);
+        if (RAND_pseudo_bytes(shortbuf + len, 8 - len) < 0) {
+            return -1;
+        }
         rnum = 8;
     } else {
         cp = buf;
@@ -150,17 +158,17 @@ int DES_enc_write(int fd, const void *_buf, int len,
         /*
          * eay 26/08/92 I was not doing writing from where we got up to.
          */
-#ifndef _WIN32
+# ifndef _WIN32
         i = write(fd, (void *)&(outbuf[j]), outnum - j);
-#else
+# else
         i = _write(fd, (void *)&(outbuf[j]), outnum - j);
-#endif
+# endif
         if (i == -1) {
-#ifdef EINTR
+# ifdef EINTR
             if (errno == EINTR)
                 i = 0;
             else
-#endif
+# endif
                 /*
                  * This is really a bad error - very bad It will stuff-up
                  * both ends.
@@ -170,4 +178,5 @@ int DES_enc_write(int fd, const void *_buf, int len,
     }
 
     return (len);
+#endif                          /* OPENSSL_NO_POSIX_IO */
 }

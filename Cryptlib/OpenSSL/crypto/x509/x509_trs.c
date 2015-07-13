@@ -89,7 +89,9 @@ static X509_TRUST trstandard[] = {
      NULL},
     {X509_TRUST_OCSP_SIGN, 0, trust_1oid, "OCSP responder", NID_OCSP_sign,
      NULL},
-    {X509_TRUST_OCSP_REQUEST, 0, trust_1oid, "OCSP request", NID_ad_OCSP, NULL}
+    {X509_TRUST_OCSP_REQUEST, 0, trust_1oid, "OCSP request", NID_ad_OCSP,
+     NULL},
+    {X509_TRUST_TSA, 0, trust_1oidany, "TSA server", NID_time_stamp, NULL}
 };
 
 #define X509_TRUST_COUNT        (sizeof(trstandard)/sizeof(X509_TRUST))
@@ -117,6 +119,14 @@ int X509_check_trust(X509 *x, int id, int flags)
     int idx;
     if (id == -1)
         return 1;
+    /* We get this as a default value */
+    if (id == 0) {
+        int rv;
+        rv = obj_trust(NID_anyExtendedKeyUsage, x, 0);
+        if (rv != X509_TRUST_UNTRUSTED)
+            return rv;
+        return trust_compat(NULL, x, 0);
+    }
     idx = X509_TRUST_get_by_id(id);
     if (idx == -1)
         return default_trust(id, x, flags);

@@ -82,7 +82,7 @@ int X509_CRL_set_issuer_name(X509_CRL *x, X509_NAME *name)
     return (X509_NAME_set(&x->crl->issuer, name));
 }
 
-int X509_CRL_set_lastUpdate(X509_CRL *x, ASN1_TIME *tm)
+int X509_CRL_set_lastUpdate(X509_CRL *x, const ASN1_TIME *tm)
 {
     ASN1_TIME *in;
 
@@ -99,7 +99,7 @@ int X509_CRL_set_lastUpdate(X509_CRL *x, ASN1_TIME *tm)
     return (in != NULL);
 }
 
-int X509_CRL_set_nextUpdate(X509_CRL *x, ASN1_TIME *tm)
+int X509_CRL_set_nextUpdate(X509_CRL *x, const ASN1_TIME *tm)
 {
     ASN1_TIME *in;
 

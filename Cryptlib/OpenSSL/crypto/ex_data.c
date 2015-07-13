@@ -250,30 +250,33 @@ typedef struct st_ex_class_item {
 static int ex_class = CRYPTO_EX_INDEX_USER;
 
 /* The global hash table of EX_CLASS_ITEM items */
-static LHASH *ex_data = NULL;
+DECLARE_LHASH_OF(EX_CLASS_ITEM);
+static LHASH_OF(EX_CLASS_ITEM) *ex_data = NULL;
 
 /* The callbacks required in the "ex_data" hash table */
-static unsigned long ex_hash_cb(const void *a_void)
+static unsigned long ex_class_item_hash(const EX_CLASS_ITEM *a)
 {
-    return ((const EX_CLASS_ITEM *)a_void)->class_index;
+    return a->class_index;
 }
 
-static int ex_cmp_cb(const void *a_void, const void *b_void)
+static IMPLEMENT_LHASH_HASH_FN(ex_class_item, EX_CLASS_ITEM)
+
+static int ex_class_item_cmp(const EX_CLASS_ITEM *a, const EX_CLASS_ITEM *b)
 {
-    return (((const EX_CLASS_ITEM *)a_void)->class_index -
-            ((const EX_CLASS_ITEM *)b_void)->class_index);
+    return a->class_index - b->class_index;
 }
+
+static IMPLEMENT_LHASH_COMP_FN(ex_class_item, EX_CLASS_ITEM)
 
 /*
  * Internal functions used by the "impl_default" implementation to access the
  * state
  */
-
 static int ex_data_check(void)
 {
     int toret = 1;
     CRYPTO_w_lock(CRYPTO_LOCK_EX_DATA);
-    if (!ex_data && ((ex_data = lh_new(ex_hash_cb, ex_cmp_cb)) == NULL))
+    if (!ex_data && (ex_data = lh_EX_CLASS_ITEM_new()) == NULL)
         toret = 0;
     CRYPTO_w_unlock(CRYPTO_LOCK_EX_DATA);
     return toret;
@@ -313,7 +316,7 @@ static EX_CLASS_ITEM *def_get_class(int class_index)
     EX_DATA_CHECK(return NULL;)
         d.class_index = class_index;
     CRYPTO_w_lock(CRYPTO_LOCK_EX_DATA);
-    p = lh_retrieve(ex_data, &d);
+    p = lh_EX_CLASS_ITEM_retrieve(ex_data, &d);
     if (!p) {
         gen = OPENSSL_malloc(sizeof(EX_CLASS_ITEM));
         if (gen) {
@@ -327,7 +330,7 @@ static EX_CLASS_ITEM *def_get_class(int class_index)
                  * Because we're inside the ex_data lock, the return value
                  * from the insert will be NULL
                  */
-                lh_insert(ex_data, gen);
+                (void)lh_EX_CLASS_ITEM_insert(ex_data, gen);
                 p = gen;
             }
         }
@@ -388,8 +391,8 @@ static int int_new_class(void)
 static void int_cleanup(void)
 {
     EX_DATA_CHECK(return;)
-        lh_doall(ex_data, def_cleanup_cb);
-    lh_free(ex_data);
+        lh_EX_CLASS_ITEM_doall(ex_data, def_cleanup_cb);
+    lh_EX_CLASS_ITEM_free(ex_data);
     ex_data = NULL;
     impl = NULL;
 }
@@ -462,7 +465,7 @@ static int int_dup_ex_data(int class_index, CRYPTO_EX_DATA *to,
         return 0;
     CRYPTO_r_lock(CRYPTO_LOCK_EX_DATA);
     mx = sk_CRYPTO_EX_DATA_FUNCS_num(item->meth);
-    j = sk_num(from->sk);
+    j = sk_void_num(from->sk);
     if (j < mx)
         mx = j;
     if (mx > 0) {
@@ -497,6 +500,8 @@ static void int_free_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad)
     EX_CLASS_ITEM *item;
     void *ptr;
     CRYPTO_EX_DATA_FUNCS **storage = NULL;
+    if (ex_data == NULL)
+        return;
     if ((item = def_get_class(class_index)) == NULL)
         return;
     CRYPTO_r_lock(CRYPTO_LOCK_EX_DATA);
@@ -524,7 +529,7 @@ static void int_free_ex_data(int class_index, void *obj, CRYPTO_EX_DATA *ad)
     if (storage)
         OPENSSL_free(storage);
     if (ad->sk) {
-        sk_free(ad->sk);
+        sk_void_free(ad->sk);
         ad->sk = NULL;
     }
 }
@@ -606,21 +611,21 @@ int CRYPTO_set_ex_data(CRYPTO_EX_DATA *ad, int idx, void *val)
     int i;
 
     if (ad->sk == NULL) {
-        if ((ad->sk = sk_new_null()) == NULL) {
+        if ((ad->sk = sk_void_new_null()) == NULL) {
             CRYPTOerr(CRYPTO_F_CRYPTO_SET_EX_DATA, ERR_R_MALLOC_FAILURE);
             return (0);
         }
     }
-    i = sk_num(ad->sk);
+    i = sk_void_num(ad->sk);
 
     while (i <= idx) {
-        if (!sk_push(ad->sk, NULL)) {
+        if (!sk_void_push(ad->sk, NULL)) {
             CRYPTOerr(CRYPTO_F_CRYPTO_SET_EX_DATA, ERR_R_MALLOC_FAILURE);
             return (0);
         }
         i++;
     }
-    sk_set(ad->sk, idx, val);
+    sk_void_set(ad->sk, idx, val);
     return (1);
 }
 
@@ -632,10 +637,10 @@ void *CRYPTO_get_ex_data(const CRYPTO_EX_DATA *ad, int idx)
 {
     if (ad->sk == NULL)
         return (0);
-    else if (idx >= sk_num(ad->sk))
+    else if (idx >= sk_void_num(ad->sk))
         return (0);
     else
-        return (sk_value(ad->sk, idx));
+        return (sk_void_value(ad->sk, idx));
 }
 
 IMPLEMENT_STACK_OF(CRYPTO_EX_DATA_FUNCS)
