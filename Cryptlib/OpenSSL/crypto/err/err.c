@@ -1085,7 +1085,11 @@ void ERR_add_error_data(int num, ...)
     va_end(args);
 }
 
+#if defined(OPENSSL_SYS_UEFI)
+void EFIAPI ERR_add_error_vdata(int num, va_list args)
+#else
 void ERR_add_error_vdata(int num, va_list args)
+#endif
 {
     int i, n, s;
     char *str, *p, *a;
