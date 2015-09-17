@@ -1,7 +1,7 @@
 VERSION		= 0.9
 RELEASE		:=
 ifneq ($(RELEASE),"")
-	RELEASE="-$(RELEASE)"
+	RELEASE:="-$(RELEASE)"
 endif
 
 CC		= $(CROSS_COMPILE)gcc
