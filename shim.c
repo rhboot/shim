@@ -41,6 +41,7 @@
 #include "netboot.h"
 #include "shim_cert.h"
 #include "replacements.h"
+#include "tpm.h"
 #include "ucs2.h"
 
 #include "guid.h"
@@ -1663,6 +1664,10 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 	}
 
+	/* Measure the binary into the TPM */
+	tpm_log_event((EFI_PHYSICAL_ADDRESS)data, datasize, 9,
+		      (CHAR8 *)"Second stage bootloader");
+
 	/*
 	 * We need to modify the loaded image protocol entry before running
 	 * the new binary, so back it up
@@ -1728,6 +1733,42 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		Print(L"start_image() returned %r\n", efi_status);
 		uefi_call_wrapper(BS->Stall, 1, 2000000);
 	}
+
+	return efi_status;
+}
+
+/*
+ * Measure some of the MOK variables into the TPM
+ */
+EFI_STATUS measure_mok()
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINT8 *Data = NULL;
+	UINTN DataSize = 0;
+
+	efi_status = get_variable(L"MokList", &Data, &DataSize, shim_lock_guid);
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)Data, DataSize, 14,
+				   (CHAR8 *)"MokList");
+
+	FreePool(Data);
+
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	efi_status = get_variable(L"MokSBState", &Data, &DataSize,
+				  shim_lock_guid);
+
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)Data, DataSize, 14,
+				   (CHAR8 *)"MokSBState");
+
+	FreePool(Data);
 
 	return efi_status;
 }
@@ -2494,6 +2535,19 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
 	 */
 	debug_hook();
+
+	/*
+	 * Measure the MOK variables
+	 */
+	efi_status = measure_mok();
+	if (efi_status != EFI_SUCCESS && efi_status != EFI_NOT_FOUND) {
+		Print(L"Something has gone seriously wrong: %r\n", efi_status);
+		Print(L"Shim was unable to measure state into the TPM\n");
+		systab->BootServices->Stall(5000000);
+		systab->RuntimeServices->ResetSystem(EfiResetShutdown,
+						     EFI_SECURITY_VIOLATION,
+						     0, NULL);
+	}
 
 	/*
 	 * Check whether the user has configured the system to run in
