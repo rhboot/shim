@@ -42,4 +42,24 @@ strcata(CHAR8 *dest, const CHAR8 *src)
 	return dest;
 }
 
+static inline
+__attribute__((unused))
+CHAR8 *
+translate_slashes(char *str)
+{
+	int i;
+	int j;
+	if (str == NULL)
+		return (CHAR8 *)str;
+
+	for (i = 0, j = 0; str[i] != '\0'; i++, j++) {
+		if (str[i] == '\\') {
+			str[j] = '/';
+			if (str[i+1] == '\\')
+				i++;
+		}
+	}
+	return (CHAR8 *)str;
+}
+
 #endif /* SHIM_STR_H */
