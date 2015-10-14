@@ -38,6 +38,10 @@ ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
 endif
 
+ifneq ($(origin ENABLE_HTTPBOOT), undefined)
+	CFLAGS	+= -DENABLE_HTTPBOOT
+endif
+
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 		-maccumulate-outgoing-args \
@@ -74,6 +78,11 @@ MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
 MOK_SOURCES = MokManager.c shim.h include/console.h PasswordCrypt.c PasswordCrypt.h crypt_blowfish.c crypt_blowfish.h
 FALLBACK_OBJS = fallback.o
 FALLBACK_SRCS = fallback.c
+
+ifneq ($(origin ENABLE_HTTPBOOT), undefined)
+	OBJS += httpboot.o
+	SOURCES += httpboot.c httpboot.h
+endif
 
 all: $(TARGET)
 

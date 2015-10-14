@@ -39,6 +39,7 @@
 #include "PeImage.h"
 #include "shim.h"
 #include "netboot.h"
+#include "httpboot.h"
 #include "shim_cert.h"
 #include "replacements.h"
 #include "ucs2.h"
@@ -1651,6 +1652,17 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 		data = sourcebuffer;
 		datasize = sourcesize;
+#if  defined(ENABLE_HTTPBOOT)
+	} else if (find_httpboot(li->DeviceHandle)) {
+		efi_status = httpboot_fetch_buffer (image_handle, &sourcebuffer,
+						    &sourcesize);
+		if (efi_status != EFI_SUCCESS) {
+			perror(L"Unable to fetch HTTP image: %r\n", efi_status);
+			return efi_status;
+		}
+		data = sourcebuffer;
+		datasize = sourcesize;
+#endif
 	} else {
 		/*
 		 * Read the new executable off disk
