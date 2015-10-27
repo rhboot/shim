@@ -751,7 +751,11 @@ doapr_outch(char **sbuffer,
 
 /***************************************************************************/
 
+#if defined(OPENSSL_SYS_UEFI)
+int EFIAPI BIO_printf(BIO *bio, const char *format, ...)
+#else
 int BIO_printf(BIO *bio, const char *format, ...)
+#endif
 {
     va_list args;
     int ret;
@@ -795,7 +799,11 @@ int BIO_vprintf(BIO *bio, const char *format, va_list args)
  * closely related to BIO_printf, and we need *some* name prefix ... (XXX the
  * function should be renamed, but to what?)
  */
+#if defined(OPENSSL_SYS_UEFI)
+int EFIAPI BIO_snprintf(char *buf, size_t n, const char *format, ...)
+#else
 int BIO_snprintf(char *buf, size_t n, const char *format, ...)
+#endif
 {
     va_list args;
     int ret;

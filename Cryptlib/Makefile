@@ -7,7 +7,7 @@ CFLAGS		= -ggdb -O0 -I. -fno-stack-protector -fno-strict-aliasing -fpic -fshort-
 
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args \
-		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI
+		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -DNO_BUILTIN_VA_FUNCS
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args -m32

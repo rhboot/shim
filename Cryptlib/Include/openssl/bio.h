@@ -787,11 +787,19 @@ void BIO_copy_next_retry(BIO *b);
 # else
 #  define __bio_h__attr__(x)
 # endif
+# if defined(OPENSSL_SYS_UEFI)
+int EFIAPI BIO_printf(BIO *bio, const char *format, ...)
+# else
 int BIO_printf(BIO *bio, const char *format, ...)
+# endif
 __bio_h__attr__((__format__(__printf__, 2, 3)));
 int BIO_vprintf(BIO *bio, const char *format, va_list args)
 __bio_h__attr__((__format__(__printf__, 2, 0)));
+# if defined(OPENSSL_SYS_UEFI)
+int EFIAPI BIO_snprintf(char *buf, size_t n, const char *format, ...)
+# else
 int BIO_snprintf(char *buf, size_t n, const char *format, ...)
+# endif
 __bio_h__attr__((__format__(__printf__, 3, 4)));
 int BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
 __bio_h__attr__((__format__(__printf__, 3, 0)));

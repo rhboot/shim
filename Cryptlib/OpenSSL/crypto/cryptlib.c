@@ -962,7 +962,11 @@ void OPENSSL_showfatal(const char *fmta, ...)
         MessageBox(NULL, buf, _T("OpenSSL: FATAL"), MB_OK | MB_ICONSTOP);
 }
 #else
+# if defined(OPENSSL_SYS_UEFI)
+void EFIAPI OPENSSL_showfatal(const char *fmta, ...)
+# else
 void OPENSSL_showfatal(const char *fmta, ...)
+# endif
 {
     va_list ap;
 
