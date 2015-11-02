@@ -608,7 +608,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 		fi = buffer;
 
-		if (!StrCaseCmp(fi->FileName, L"boot.csv")) {
+		if (!StrCaseCmp(fi->FileName, L"boot.csv")
+		    || !StrCaseCmp(fi->FileName, L"boot" EFI_ARCH L".csv")) {
 			EFI_FILE_HANDLE fh2;
 			rc = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
 						fi->FileName,
@@ -817,7 +818,7 @@ debug_hook(void)
 
 	x = 1;
 	Print(L"add-symbol-file "DEBUGDIR
-	      L"fallback.debug %p -s .data %p\n", &_etext,
+	      L"fb" EFI_ARCH L".efi.debug %p -s .data %p\n", &_etext,
 	      &_edata);
 }
 

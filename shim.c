@@ -51,8 +51,8 @@
 #include "console.h"
 #include "version.h"
 
-#define FALLBACK L"\\fallback.efi"
-#define MOK_MANAGER L"\\MokManager.efi"
+#define FALLBACK L"\\fb" EFI_ARCH L".efi"
+#define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
 static EFI_SYSTEM_TABLE *systab;
 static EFI_HANDLE image_handle;
@@ -2527,7 +2527,7 @@ debug_hook(void)
 	}
 
 	Print(L"add-symbol-file "DEBUGDIR
-	      L"shim.debug 0x%08x -s .data 0x%08x\n", &_text,
+	      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n", &_text,
 	      &_data);
 
 	Print(L"Pausing for debugger attachment.\n");
