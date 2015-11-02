@@ -2173,7 +2173,7 @@ debug_hook(void)
 	while (x++) {
 		/* Make this so it can't /totally/ DoS us. */
 #if defined(__x86_64__) || defined(__i386__) || defined(__i686__)
-		if (x > 4294967294)
+		if (x > 4294967294ULL)
 			break;
 		__asm__ __volatile__("pause");
 #elif defined(__aarch64__)
