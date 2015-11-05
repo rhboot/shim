@@ -1347,6 +1347,24 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	CHAR16 *bootpath;
 
+	/*
+	 * Suuuuper lazy technique here, but check and see if this is a full
+	 * path to something on the ESP.  Backwards compatibility demands
+	 * that we don't just use \\, becuase we (not particularly brightly)
+	 * used to require that the relative file path started with that.
+	 *
+	 * If it is a full path, don't try to merge it with the directory
+	 * from our Loaded Image handle.
+	 */
+	if (StrSize(ImagePath) > 5 && StrnCmp(ImagePath, L"\\EFI\\", 5) == 0) {
+		*PathName = StrDuplicate(ImagePath);
+		if (!*PathName) {
+			perror(L"Failed to allocate path buffer\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		return EFI_SUCCESS;
+	}
+
 	devpath = li->FilePath;
 
 	bootpath = DevicePathToStr(devpath);
