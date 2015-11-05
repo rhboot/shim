@@ -89,4 +89,33 @@ StrCSpn(const CHAR16 *s, const CHAR16 *reject)
 	return ret;
 }
 
+static inline UINTN
+__attribute__((__unused__))
+count_ucs2_strings(UINT8 *data, UINTN data_size)
+{
+	UINTN pos = 0;
+	UINTN last_nul_pos = 0;
+	UINTN num_nuls = 0;
+	UINTN i;
+
+	if (data_size % 2 != 0)
+		return 0;
+
+	for (i = pos; i < data_size; i++) {
+		if (i % 2 != 0) {
+			if (data[i] != 0)
+				return 0;
+		} else if (data[i] == 0) {
+			if (i+1 >= data_size || data[i+1] != 0)
+				return 0;
+			last_nul_pos = i;
+			num_nuls++;
+		}
+		pos = i;
+	}
+	if (num_nuls > 0 && last_nul_pos != pos - 1)
+		return 0;
+	return num_nuls;
+}
+
 #endif /* SHIM_UCS2_H */

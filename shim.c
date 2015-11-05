@@ -1951,6 +1951,118 @@ static EFI_STATUS mok_ignore_db()
 
 }
 
+EFI_GUID bds_guid = { 0x8108ac4e, 0x9f11, 0x4d59, { 0x85, 0x0e, 0xe2, 0x1a, 0x52, 0x2c, 0x59, 0xb2 } };
+
+static inline EFI_STATUS
+get_load_option_optional_data(UINT8 *data, UINTN data_size,
+			      UINT8 **od, UINTN *ods)
+{
+	/*
+	 * If it's not at least Attributes + FilePathListLength +
+	 * Description=L"" + 0x7fff0400 (EndEntrireDevicePath), it can't
+	 * be valid.
+	 */
+	if (data_size < (sizeof(UINT32) + sizeof(UINT16) + 2 + 4))
+		return EFI_INVALID_PARAMETER;
+
+	UINT8 *cur = data + sizeof(UINT32);
+	UINT16 fplistlen = *(UINT16 *)cur;
+	/*
+	 * If there's not enough space for the file path list and the
+	 * smallest possible description (L""), it's not valid.
+	 */
+	if (fplistlen > data_size - (sizeof(UINT32) + 2 + 4))
+		return EFI_INVALID_PARAMETER;
+
+	cur += sizeof(UINT16);
+	UINTN limit = data_size - (cur - data) - fplistlen;
+	UINTN i;
+	for (i = 0; i < limit ; i++) {
+		/* If the description isn't valid UCS2-LE, it's not valid. */
+		if (i % 2 != 0) {
+			if (cur[i] != 0)
+				return EFI_INVALID_PARAMETER;
+		} else if (cur[i] == 0) {
+			/* we've found the end */
+			i++;
+			if (i >= limit || cur[i] != 0)
+				return EFI_INVALID_PARAMETER;
+			break;
+		}
+	}
+	i++;
+	if (i > limit)
+		return EFI_INVALID_PARAMETER;
+
+	/*
+	 * If i is limit, we know the rest of this is the FilePathList and
+	 * there's no optional data.  So just bail now.
+	 */
+	if (i == limit) {
+		*od = NULL;
+		*ods = 0;
+		return EFI_SUCCESS;
+	}
+
+	cur += i;
+	limit -= i;
+	limit += fplistlen;
+	i = 0;
+	while (limit - i >= 4) {
+		struct {
+			UINT8 type;
+			UINT8 subtype;
+			UINT16 len;
+		} dp = {
+			.type = cur[i],
+			.subtype = cur[i+1],
+			/*
+			 * it's a little endian UINT16, but we're not
+			 * guaranteed alignment is sane, so we can't just
+			 * typecast it directly.
+			 */
+			.len = (cur[i+3] << 8) | cur[i+2],
+		};
+
+		/*
+		 * We haven't found an EndEntire, so this has to be a valid
+		 * EFI_DEVICE_PATH in order for the data to be valid.  That
+		 * means it has to fit, and it can't be smaller than 4 bytes.
+		 */
+		if (dp.len < 4 || dp.len > limit)
+			return EFI_INVALID_PARAMETER;
+
+		/*
+		 * see if this is an EndEntire node...
+		 */
+		if (dp.type == 0x7f && dp.subtype == 0xff) {
+			/*
+			 * if we've found the EndEntire node, it must be 4
+			 * bytes
+			 */
+			if (dp.len != 4)
+				return EFI_INVALID_PARAMETER;
+
+			i += dp.len;
+			break;
+		}
+
+		/*
+		 * It's just some random DP node; skip it.
+		 */
+		i += dp.len;
+	}
+	if (i != fplistlen)
+		return EFI_INVALID_PARAMETER;
+
+	/*
+	 * if there's any space left, it's "optional data"
+	 */
+	*od = cur + i;
+	*ods = limit - i;
+	return EFI_SUCCESS;
+}
+
 /*
  * Check the load options to specify the second stage loader
  */
@@ -1958,11 +2070,11 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS status;
 	EFI_LOADED_IMAGE *li;
-	CHAR16 *start = NULL, *c;
-	unsigned int i;
+	CHAR16 *start = NULL;
 	int remaining_size = 0;
 	CHAR16 *loader_str = NULL;
-	unsigned int loader_len = 0;
+	UINTN loader_len = 0;
+	unsigned int i;
 
 	second_stage = DEFAULT_LOADER;
 	load_options = NULL;
@@ -1975,55 +2087,151 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		return status;
 	}
 
-	/* Expect a CHAR16 string with at least one CHAR16 */
-	if (li->LoadOptionsSize < 4 || li->LoadOptionsSize % 2 != 0) {
+	/* So, load options are a giant pain in the ass.  If we're invoked
+	 * from the EFI shell, we get something like this:
+
+00000000  5c 00 45 00 36 00 49 00  5c 00 66 00 65 00 64 00  |\.E.F.I.\.f.e.d.|
+00000010  6f 00 72 00 61 00 5c 00  73 00 68 00 69 00 6d 00  |o.r.a.\.s.h.i.m.|
+00000020  78 00 36 00 34 00 2e 00  64 00 66 00 69 00 20 00  |x.6.4...e.f.i. .|
+00000030  5c 00 45 00 46 00 49 00  5c 00 66 00 65 00 64 00  |\.E.F.I.\.f.e.d.|
+00000040  6f 00 72 00 61 00 5c 00  66 00 77 00 75 00 70 00  |o.r.a.\.f.w.u.p.|
+00000050  64 00 61 00 74 00 65 00  2e 00 65 00 66 00 20 00  |d.a.t.e.e.f.i. .|
+00000060  00 00 66 00 73 00 30 00  3a 00 5c 00 00 00        |..f.s.0.:.\...|
+
+	*
+	* which is just some paths rammed together separated by a UCS-2 NUL.
+	* But if we're invoked from BDS, we get something more like:
+	*
+
+00000000  01 00 00 00 62 00 4c 00  69 00 6e 00 75 00 78 00  |....b.L.i.n.u.x.|
+00000010  20 00 46 00 69 00 72 00  6d 00 77 00 61 00 72 00  | .F.i.r.m.w.a.r.|
+00000020  65 00 20 00 55 00 70 00  64 00 61 00 74 00 65 00  |e. .U.p.d.a.t.e.|
+00000030  72 00 00 00 40 01 2a 00  01 00 00 00 00 08 00 00  |r.....*.........|
+00000040  00 00 00 00 00 40 06 00  00 00 00 00 1a 9e 55 bf  |.....@........U.|
+00000050  04 57 f2 4f b4 4a ed 26  4a 40 6a 94 02 02 04 04  |.W.O.:.&J@j.....|
+00000060  34 00 5c 00 45 00 46 00  49 00 5c 00 66 00 65 00  |4.\.E.F.I.f.e.d.|
+00000070  64 00 6f 00 72 00 61 00  5c 00 73 00 68 00 69 00  |o.r.a.\.s.h.i.m.|
+00000080  6d 00 78 00 36 00 34 00  2e 00 65 00 66 00 69 00  |x.6.4...e.f.i...|
+00000090  00 00 7f ff 40 00 20 00  5c 00 66 00 77 00 75 00  |...... .\.f.w.u.|
+000000a0  70 00 78 00 36 00 34 00  2e 00 65 00 66 00 69 00  |p.x.6.4...e.f.i.|
+000000b0  00 00                                             |..|
+
+	*
+	* which is clearly an EFI_LOAD_OPTION filled in halfway reasonably.
+	* In short, the UEFI shell is still a useless piece of junk.
+	*/
+
+	/*
+	 * In either case, we've got to have at least a UCS2 NUL...
+	 */
+	if (li->LoadOptionsSize < 2)
 		return EFI_BAD_BUFFER_SIZE;
-	}
-	c = (CHAR16 *)(li->LoadOptions + (li->LoadOptionsSize - 2));
-	if (*c != L'\0') {
-		return EFI_BAD_BUFFER_SIZE;
+
+	/*
+	 * Some awesome versions of BDS will add entries for Linux.  On top
+	 * of that, some versions of BDS will "tag" any Boot#### entries they
+	 * create by putting a GUID at the very end of the optional data in
+	 * the EFI_LOAD_OPTIONS, thus screwing things up for everybody who
+	 * tries to actually *use* the optional data for anything.  Why they
+	 * did this instead of adding a flag to the spec to /say/ it's
+	 * created by BDS, I do not know.  For shame.
+	 *
+	 * Anyway, just nerf that out from the start.  It's always just
+	 * garbage at the end.
+	 */
+	if (li->LoadOptionsSize > 16) {
+		if (CompareGuid((EFI_GUID *)(li->LoadOptions
+					     + (li->LoadOptionsSize - 16)),
+				&bds_guid) == 0)
+			li->LoadOptionsSize -= 16;
 	}
 
 	/*
-	 * UEFI shell copies the whole line of the command into LoadOptions.
-	 * We ignore the string before the first L' ', i.e. the name of this
-	 * program.
+	 * Check and see if this is just a list of strings.  If it's an
+	 * EFI_LOAD_OPTION, it'll be 0, since we know EndEntire device path
+	 * won't pass muster as UCS2-LE.
+	 *
+	 * If there are 3 strings, we're launched from the shell most likely,
+	 * But we actually only care about the second one.
 	 */
-	for (i = 0; i < li->LoadOptionsSize; i += 2) {
-		c = (CHAR16 *)(li->LoadOptions + i);
-		if (*c == L' ') {
-			*c = L'\0';
-			start = c + 1;
-			remaining_size = li->LoadOptionsSize - i - 2;
-			break;
+	UINTN strings = count_ucs2_strings(li->LoadOptions,
+					   li->LoadOptionsSize);
+	/*
+	 * If it's not string data, try it as an EFI_LOAD_OPTION.
+	 */
+	if (strings == 0) {
+		/*
+		 * We at least didn't find /enough/ strings.  See if it works
+		 * as an EFI_LOAD_OPTION.
+		 */
+		status = get_load_option_optional_data(li->LoadOptions,
+						       li->LoadOptionsSize,
+						       (UINT8 **)&start,
+						       &loader_len);
+		if (status != EFI_SUCCESS)
+			return EFI_SUCCESS;
+
+		remaining_size = 0;
+	} else if (strings >= 2) {
+		/*
+		 * UEFI shell copies the whole line of the command into
+		 * LoadOptions.  We ignore the string before the first L' ',
+		 * i.e. the name of this program.
+		 * Counting by two bytes is safe, because we know the size is
+		 * compatible with a UCS2-LE string.
+		 */
+		UINT8 *cur = li->LoadOptions;
+		for (i = 0; i < li->LoadOptionsSize - 2; i += 2) {
+			CHAR16 c = (cur[i+1] << 8) | cur[i];
+			if (c == L' ') {
+				start = (CHAR16 *)&cur[i+2];
+				remaining_size = li->LoadOptionsSize - i - 2;
+				break;
+			}
 		}
+
+		if (!start || remaining_size <= 0 || start[0] == L'\0')
+			return EFI_SUCCESS;
+
+		for (i = 0; start[i] != '\0'; i++) {
+			if (start[i] == L' ')
+				start[i] = L'\0';
+			if (start[i] == L'\0') {
+				loader_len = 2 * i + 2;
+				break;
+			}
+		}
+		if (loader_len)
+			remaining_size -= loader_len;
 	}
 
-	if (!start || remaining_size <= 0)
+	/*
+	 * Just to be sure all that math is right...
+	 */
+	if (loader_len % 2 != 0)
+		return EFI_INVALID_PARAMETER;
+
+	strings = count_ucs2_strings((UINT8 *)start, loader_len);
+	if (strings < 1)
 		return EFI_SUCCESS;
 
-	for (i = 0; start[i] != '\0'; i++) {
-		if (start[i] == L' ' || start[i] == L'\0')
-			break;
-		loader_len++;
-	}
-
 	/*
-	 * Setup the name of the alternative loader and the LoadOptions for
+	 * Set up the name of the alternative loader and the LoadOptions for
 	 * the loader
 	 */
 	if (loader_len > 0) {
-		loader_str = AllocatePool((loader_len + 1) * sizeof(CHAR16));
+		loader_str = AllocatePool(loader_len);
 		if (!loader_str) {
 			perror(L"Failed to allocate loader string\n");
 			return EFI_OUT_OF_RESOURCES;
 		}
-		for (i = 0; i < loader_len; i++)
+
+		for (i = 0; i < loader_len / 2; i++)
 			loader_str[i] = start[i];
-		loader_str[loader_len] = L'\0';
+		loader_str[loader_len/2-1] = L'\0';
 
 		second_stage = loader_str;
-		load_options = start;
+		load_options = remaining_size ? start + loader_len : NULL;
 		load_options_size = remaining_size;
 	}
 
