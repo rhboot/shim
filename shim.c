@@ -2440,10 +2440,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Something has gone seriously wrong: %r\n", efi_status);
 		Print(L"shim cannot continue, sorry.\n");
-		systab->BootServices->Stall(5000000);
-		systab->RuntimeServices->ResetSystem(EfiResetShutdown,
-						     EFI_SECURITY_VIOLATION,
-						     0, NULL);
+		uefi_call_wrapper(BS->Stall, 1, 5000000);
+		uefi_call_wrapper(systab->RuntimeServices->ResetSystem, 4,
+				  EfiResetShutdown, EFI_SECURITY_VIOLATION,
+				  0, NULL);
 	}
 
 	/*
