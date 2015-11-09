@@ -1290,7 +1290,9 @@ should_use_fallback(EFI_HANDLE image_handle)
 	 * L"\\EFI\\BOOT\\/BOOTX64.EFI".  So just handle that here...
 	 */
 	if (StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\BOOT", 14) &&
-			StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\/BOOT", 15))
+			StrnCaseCmp(bootpath, L"\\EFI\\BOOT\\/BOOT", 15) &&
+			StrnCaseCmp(bootpath, L"EFI\\BOOT\\BOOT", 13) &&
+			StrnCaseCmp(bootpath, L"EFI\\BOOT\\/BOOT", 14))
 		goto error;
 
 	pathlen = StrLen(bootpath);
