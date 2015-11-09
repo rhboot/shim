@@ -100,6 +100,7 @@ certdb/secmod.db: shim.crt
 	certutil -d certdb/ -A -i shim.crt -n shim -t u
 
 shim.o: $(SOURCES) shim_cert.h
+shim.o: $(wildcard *.h)
 
 cert.o : cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
