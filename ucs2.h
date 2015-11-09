@@ -106,8 +106,6 @@ count_ucs2_strings(UINT8 *data, UINTN data_size)
 			if (data[i] != 0)
 				return 0;
 		} else if (data[i] == 0) {
-			if (i+1 >= data_size || data[i+1] != 0)
-				return 0;
 			last_nul_pos = i;
 			num_nuls++;
 		}
