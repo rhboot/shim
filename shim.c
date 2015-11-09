@@ -1270,8 +1270,8 @@ should_use_fallback(EFI_HANDLE image_handle)
 	unsigned int pathlen = 0;
 	CHAR16 *bootpath = NULL;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
-	EFI_FILE *vh;
-	EFI_FILE *fh;
+	EFI_FILE *vh = NULL;
+	EFI_FILE *fh = NULL;
 	EFI_STATUS rc;
 	int ret = 0;
 
@@ -1322,11 +1322,13 @@ should_use_fallback(EFI_HANDLE image_handle)
 		uefi_call_wrapper(vh->Close, 1, vh);
 		goto error;
 	}
-	uefi_call_wrapper(fh->Close, 1, fh);
-	uefi_call_wrapper(vh->Close, 1, vh);
 
 	ret = 1;
 error:
+	if (fh)
+		uefi_call_wrapper(fh->Close, 1, fh);
+	if (vh)
+	    uefi_call_wrapper(vh->Close, 1, vh);
 	if (bootpath)
 		FreePool(bootpath);
 
