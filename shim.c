@@ -1998,13 +1998,15 @@ EFI_STATUS mirror_mok_list()
 		FullData = Data;
 	}
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
-				       &shim_lock_guid,
-				       EFI_VARIABLE_BOOTSERVICE_ACCESS
-				       | EFI_VARIABLE_RUNTIME_ACCESS,
-				       FullDataSize, FullData);
-	if (efi_status != EFI_SUCCESS) {
-		perror(L"Failed to set MokListRT: %r\n", efi_status);
+	if (FullDataSize) {
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS
+					       | EFI_VARIABLE_RUNTIME_ACCESS,
+					       FullDataSize, FullData);
+		if (efi_status != EFI_SUCCESS) {
+			perror(L"Failed to set MokListRT: %r\n", efi_status);
+		}
 	}
 
 	return efi_status;
