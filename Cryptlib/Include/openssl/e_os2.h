@@ -97,7 +97,14 @@ extern "C" {
  * For 32 bit environment, there seems to be the CygWin environment and then
  * all the others that try to do the same thing Microsoft does...
  */
-# if defined(OPENSSL_SYSNAME_UWIN)
+/*
+ * UEFI lives here because it might be built with a Microsoft toolchain and
+ * we need to avoid the false positive match on Windows.
+ */
+# if defined(OPENSSL_SYSNAME_UEFI)
+#  undef OPENSSL_SYS_UNIX
+#  define OPENSSL_SYS_UEFI
+# elif defined(OPENSSL_SYSNAME_UWIN)
 #  undef OPENSSL_SYS_UNIX
 #  define OPENSSL_SYS_WIN32_UWIN
 # else

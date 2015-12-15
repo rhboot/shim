@@ -344,14 +344,7 @@ void ERR_print_errors_fp(FILE *fp);
 # ifndef OPENSSL_NO_BIO
 void ERR_print_errors(BIO *bp);
 # endif
-
-/* Add EFIAPI for UEFI version. */
-#if defined(OPENSSL_SYS_UEFI)
-void EFIAPI ERR_add_error_data(int num, ...);
-#else
 void ERR_add_error_data(int num, ...);
-#endif
-
 void ERR_add_error_vdata(int num, va_list args);
 void ERR_load_strings(int lib, ERR_STRING_DATA str[]);
 void ERR_unload_strings(int lib, ERR_STRING_DATA str[]);
