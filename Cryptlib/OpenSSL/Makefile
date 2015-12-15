@@ -3,22 +3,22 @@ EFI_INCLUDES	= -I../Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_IN
 
 CFLAGS		= -ggdb -O0 -I. -I.. -I../Include/ -Icrypto -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc \
 		  -ffreestanding -std=gnu89 -I$(shell $(CC) -print-file-name=include) \
-		  -Wall $(EFI_INCLUDES) -DOPENSSL_SYSNAME_UWIN -DOPENSSL_SYS_UEFI -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DOPENSSL_NO_CAMELLIA -DOPENSSL_NO_SEED -DOPENSSL_NO_RC5 -DOPENSSL_NO_MDC2 -DOPENSSL_NO_SOCK -DOPENSSL_NO_CMS -DOPENSSL_NO_JPAKE -DOPENSSL_NO_CAPIENG -DOPENSSL_NO_ERR -DOPENSSL_NO_KRB5 -DOPENSSL_NO_DYNAMIC_ENGINE -DGETPID_IS_MEANINGLESS -DOPENSSL_NO_STDIO -DOPENSSL_NO_POSIX_IO -DOPENSSL_NO_FP_API -DOPENSSL_NO_DGRAM -DOPENSSL_NO_SHA0 -DOPENSSL_NO_LHASH -DOPENSSL_NO_HW -DOPENSSL_NO_OCSP -DOPENSSL_NO_LOCKING -DOPENSSL_NO_DEPRECATED -DOPENSSL_NO_RIPEMD -DOPENSSL_NO_RC2 -DOPENSSL_NO_IDEA -DOPENSSL_NO_BF -DOPENSSL_NO_CAST -DOPENSSL_NO_WHIRLPOOL -DOPENSSL_NO_DSA -DOPENSSL_NO_EC -DOPENSSL_NO_ECDH -DOPENSSL_NO_ECDSA -DOPENSSL_NO_SRP -DOPENSSL_NO_ENGINE -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
+		  -Wall $(EFI_INCLUDES) -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
 
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
-		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -DSIXTY_FOUR_BIT_LONG \
-		-DNO_BUILTIN_VA_FUNCS
+		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
+		-UNO_BUILTIN_VA_FUNCS -DMDE_CPU_IA64
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
-		-m32 -DTHIRTY_TWO_BIT
+		-m32 -DMDE_CPU_IA32
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS	+= -O2 -DSIXTY_FOUR_BIT_LONG
+	CFLAGS	+= -O2 -DMDE_CPU_AARCH64
 endif
 ifeq ($(ARCH),arm)
-	CFLAGS	+= -O2 -DTHIRTY_TWO_BIT
+	CFLAGS	+= -O2 -DMDE_CPU_ARM
 endif
 LDFLAGS		= -nostdlib -znocombreloc
 
@@ -459,18 +459,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/ui/ui_util.o \
   crypto/ui/ui_compat.o \
   crypto/krb5/krb5_asn.o \
-  crypto/pqueue/pqueue.o \
-  crypto/ts/ts_err.o \
-  crypto/ts/ts_req_utils.o \
-  crypto/ts/ts_req_print.o \
-  crypto/ts/ts_rsp_utils.o \
-  crypto/ts/ts_rsp_print.o \
-  crypto/ts/ts_rsp_sign.o \
-  crypto/ts/ts_rsp_verify.o \
-  crypto/ts/ts_verify_ctx.o \
-  crypto/ts/ts_lib.o \
-  crypto/ts/ts_conf.o \
-  crypto/ts/ts_asn1.o \
   crypto/cmac/cmac.o \
   crypto/cmac/cm_ameth.o \
   crypto/cmac/cm_pmeth.o \

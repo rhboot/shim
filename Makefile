@@ -43,17 +43,20 @@ ifeq ($(ARCH),x86_64)
 		-maccumulate-outgoing-args \
 		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
 		-DNO_BUILTIN_VA_FUNCS \
+		-DMDE_CPU_X64 \
 		"-DEFI_ARCH=L\"x64\"" \
 		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/x64-$(VERSION)$(RELEASE)/\""
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 		-maccumulate-outgoing-args -m32 \
+		-DMDE_CPU_IA32 \
 		"-DEFI_ARCH=L\"ia32\"" \
 		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/ia32-$(VERSION)$(RELEASE)/\""
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS += "-DEFI_ARCH=L\"aa64\"" \
+	CFLAGS += -DMDE_CPU_AARCH64 \
+		"-DEFI_ARCH=L\"aa64\"" \
 		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/aa64-$(VERSION)$(RELEASE)/\""
 endif
 

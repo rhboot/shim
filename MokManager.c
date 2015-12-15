@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <Library/BaseCryptLib.h>
 #include <openssl/x509.h>
+#include <openssl/bn.h>
 #include "shim.h"
 #include "PeImage.h"
 #include "PasswordCrypt.h"
