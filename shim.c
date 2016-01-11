@@ -1829,6 +1829,33 @@ EFI_STATUS mirror_mok_list_x()
 }
 
 /*
+ * Copy the boot-services only MokSBState variable to the runtime-accessible
+ * MokSBStateRT variable. It's not marked NV, so the OS can't modify it.
+ */
+EFI_STATUS mirror_mok_sb_state()
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS efi_status;
+	UINT8 *Data = NULL;
+	UINTN DataSize = 0;
+
+	efi_status = get_variable(L"MokSBState", &Data, &DataSize, shim_lock_guid);
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokSBStateRT",
+				       &shim_lock_guid,
+				       EFI_VARIABLE_BOOTSERVICE_ACCESS
+				       | EFI_VARIABLE_RUNTIME_ACCESS,
+				       DataSize, Data);
+	if (efi_status != EFI_SUCCESS) {
+		console_error(L"Failed to set MokSBStateRT", efi_status);
+	}
+
+	return efi_status;
+}
+
+/*
  * Check if a variable exists
  */
 static BOOLEAN check_var(CHAR16 *varname)
@@ -2488,6 +2515,12 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	efi_status = mirror_mok_list();
 
 	efi_status = mirror_mok_list_x();
+
+	/*
+	 * Copy the MOK SB State to a runtime variable so the kernel can
+	 * make use of it
+	 */
+	efi_status = mirror_mok_sb_state();
 
 	/*
 	 * Create the runtime MokIgnoreDB variable so the kernel can
