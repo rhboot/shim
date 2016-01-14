@@ -1,0 +1,59 @@
+Somebody mailed me this:
+
+> I am trying to understand how fallback.efi works.  I have been reading
+> shim.c and see that fallback is called when
+> should_use_fallback(EFI_HANDLE image_handle) returns a 1.  But in
+> should_use_fallback(EFI_HANDLE image_handle), there is a comparison of
+> bootpath to \\EFI\\BOOT\\BOOT.  Why is it compare to \\EFI\\BOOT\\BOOT
+> since bootpath always return \EFI\Boot\shim.efi?
+
+And it seems like a common enough question that we need some
+documentation of how to properly use shim and fallback.  Here's the
+basics of it:
+
+It doesn't always return \EFI\boot\shim.efi - in fact, not ever if
+installed correctly.  The FS layouts are like this:
+
+for removable media:
+\EFI\BOOT\BOOTX64.EFI <-- shim
+\EFI\BOOT\MokManager.efi
+\EFI\BOOT\grubx64.efi
+\EFI\BOOT\grub.cfg
+
+for an installed system:
+\EFI\BOOT\BOOTX64.EFI    <-- shim
+\EFI\BOOT\MokManager.efi
+\EFI\BOOT\fallback.efi
+\EFI\BOOT\BOOT.CSV
+\EFI\fedora\shim.efi
+\EFI\fedora\MokManager.efi
+\EFI\fedora\grubx64.efi
+\EFI\fedora\grub.cfg
+
+When you boot removable media, it'll be in \EFI\BOOT , but fallback.efi
+won't be there, so it goes ahead and boots the normal bootloader
+(grubx64.efi).  When you boot a normal system through a boot variable,
+the boot variable is configured to start \EFI\fedora\shim.efi (or
+whatever your distro's EFI directory is.)  In that case it won't try to
+invoke fallback.  But if the boot variables are missing or corrupted,
+the firmware will eventually try to boot the hard disk as removable
+media.  In that case, it'll invoke \EFI\BOOT\BOOTX64.EFI (or whatever
+filename is right for your architecture.)  In that case it'll be in
+\EFI\BOOT, so it'll check for fallback.efi , and it'll find it and run
+it.  When it runs, fallback will look for every directory in \EFI\ with
+a BOOT.CSV in it, and it'll parse that, and create new boot variables
+from what it finds.  Then it'll try to boot one of them.
+
+BOOT.CSV is a UCS-2 LE formatted CSV file.  So it has the LE byte order
+marker, and after that it's just a series of lines, each having
+comma-separated date.  It looks like this on Fedora:
+
+shim.efi,Fedora,,This is the boot entry for Fedora
+
+so basically it's:
+
+$FILENAME,$LABEL,$LOADER_DATA,$COMMENT0[,$COMMENT1[,...]]
+
+Where $FILENAME has to be the name of a file in the same directory as
+BOOT.CSV .
+
