@@ -4,13 +4,13 @@
     Note: Be sure to install IASL 5.0A or higher to build EDKII
 
 
-2. Download Galileo Runtime 1.0.4 and unarchive (Part 3 of the User Guide)
-    https://github.com/01org/Galileo-Runtime/archive/1.0.4.tar.gz
-    tar -xf Galileo-Runtime-1.0.4.tar.gz
-    cd Galileo-Runtime-1.0.4
+2. Download Galileo Runtime 1.0.6 and unarchive (Part 3 of the User Guide)
+    https://github.com/01org/Galileo-Runtime/archive/1.0.6.tar.gz
+    tar -xf Galileo-Runtime-1.0.6.tar.gz
+    cd Galileo-Runtime-1.0.6
 
 3. Unarchive the patches
-    tar -xf patches_v1.0.5.tar.gz
+    tar -xf patches_v*.tar.gz
 
 
 4. Build Linux kernel (Part 6 of the User Guide)
@@ -22,7 +22,7 @@
     ./patches_v*/patch.meta-clanton.sh
 
 4.2. Build a small Linux for SPI Flash
-    cd meta-clanton_v1.0.5
+    cd meta-clanton_v*
     source poky/oe-init-build-env yocto_build
     bitbake image-spi-galileo
 
@@ -33,7 +33,7 @@
     tar -xf Quark_EDKII_v1.0.2.tar.gz
 
 5.2. Patch the Quark_EDKII package
-    ./patches_v1.0.5/patch.Quark_EDKII.sh
+    ./patches_v*/patch.Quark_EDKII.sh
 
 5.3. Prepare the build environment (Part 4.2.1 of the User Guide)
     cd Quark_EDKII_v1.0.2
@@ -55,7 +55,7 @@
     tar -xf sysimage_v1.0.1.tar.gz
 
 6.2. Patch the sysimage package
-    ./patches_v1.0.5/patch.sysimage.sh
+    ./patches_v*/patch.sysimage.sh
 
 6.3. Build SPI
     tar -xf spi-flash-tools_v1.0.1.tar.gz
