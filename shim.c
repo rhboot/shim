@@ -2070,7 +2070,7 @@ static EFI_STATUS check_mok_db (void)
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
 	UINT8 MokDBState;
-	UINTN MokDBStateSize = sizeof(MokDBStateSize);
+	UINTN MokDBStateSize = sizeof(MokDBState);
 	UINT32 attributes;
 
 	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDBState", &shim_lock_guid,
