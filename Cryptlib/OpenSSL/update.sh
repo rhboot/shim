@@ -1,6 +1,6 @@
 #/bin/sh
 DIR=$1
-version="1.0.2e"
+version="1.0.2g"
 
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/e_os.h e_os.h
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/constant_time_locl.h crypto/constant_time_locl.h
