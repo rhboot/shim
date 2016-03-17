@@ -263,7 +263,7 @@ int CRYPTO_get_new_dynlockid(void)
         return (0);
     }
     pointer->references = 1;
-    pointer->data = dynlock_create_callback(__FILE__, __LINE__);
+    pointer->data = dynlock_create_callback(OPENSSL_FILE, OPENSSL_LINE);
     if (pointer->data == NULL) {
         OPENSSL_free(pointer);
         CRYPTOerr(CRYPTO_F_CRYPTO_GET_NEW_DYNLOCKID, ERR_R_MALLOC_FAILURE);
@@ -289,7 +289,7 @@ int CRYPTO_get_new_dynlockid(void)
     CRYPTO_w_unlock(CRYPTO_LOCK_DYNLOCK);
 
     if (i == -1) {
-        dynlock_destroy_callback(pointer->data, __FILE__, __LINE__);
+        dynlock_destroy_callback(pointer->data, OPENSSL_FILE, OPENSSL_LINE);
         OPENSSL_free(pointer);
     } else
         i += 1;                 /* to avoid 0 */
@@ -328,7 +328,7 @@ void CRYPTO_destroy_dynlockid(int i)
     CRYPTO_w_unlock(CRYPTO_LOCK_DYNLOCK);
 
     if (pointer) {
-        dynlock_destroy_callback(pointer->data, __FILE__, __LINE__);
+        dynlock_destroy_callback(pointer->data, OPENSSL_FILE, OPENSSL_LINE);
         OPENSSL_free(pointer);
     }
 }
@@ -670,6 +670,7 @@ unsigned long *OPENSSL_ia32cap_loc(void)
 }
 
 # if defined(OPENSSL_CPUID_OBJ) && !defined(OPENSSL_NO_ASM) && !defined(I386_ONLY)
+#include <stdio.h>
 #  define OPENSSL_CPUID_SETUP
 #  if defined(_WIN32)
 typedef unsigned __int64 IA32CAP;
@@ -980,11 +981,13 @@ void OPENSSL_showfatal(const char *fmta, ...)
 #else
 void OPENSSL_showfatal(const char *fmta, ...)
 {
+#ifndef OPENSSL_NO_STDIO
     va_list ap;
 
     va_start(ap, fmta);
     vfprintf(stderr, fmta, ap);
     va_end(ap);
+#endif
 }
 
 int OPENSSL_isservice(void)
@@ -1011,16 +1014,18 @@ void OpenSSLDie(const char *file, int line, const char *assertion)
 #endif
 }
 
+#ifndef OPENSSL_NO_STDIO
 void *OPENSSL_stderr(void)
 {
     return stderr;
 }
+#endif
 
-int CRYPTO_memcmp(const void *in_a, const void *in_b, size_t len)
+int CRYPTO_memcmp(const volatile void *in_a, const volatile void *in_b, size_t len)
 {
     size_t i;
-    const unsigned char *a = in_a;
-    const unsigned char *b = in_b;
+    const volatile unsigned char *a = in_a;
+    const volatile unsigned char *b = in_b;
     unsigned char x = 0;
 
     for (i = 0; i < len; i++)
