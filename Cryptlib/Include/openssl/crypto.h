@@ -235,15 +235,15 @@ typedef struct openssl_item_st {
 # ifndef OPENSSL_NO_LOCKING
 #  ifndef CRYPTO_w_lock
 #   define CRYPTO_w_lock(type)     \
-        CRYPTO_lock(CRYPTO_LOCK|CRYPTO_WRITE,type,NULL,0)
+        CRYPTO_lock(CRYPTO_LOCK|CRYPTO_WRITE,type,OPENSSL_FILE,OPENSSL_LINE)
 #   define CRYPTO_w_unlock(type)   \
-        CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_WRITE,type,NULL,0)
+        CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_WRITE,type,OPENSSL_FILE,OPENSSL_LINE)
 #   define CRYPTO_r_lock(type)     \
-        CRYPTO_lock(CRYPTO_LOCK|CRYPTO_READ,type,NULL,0)
+        CRYPTO_lock(CRYPTO_LOCK|CRYPTO_READ,type,OPENSSL_FILE,OPENSSL_LINE)
 #   define CRYPTO_r_unlock(type)   \
-        CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_READ,type,NULL,0)
+        CRYPTO_lock(CRYPTO_UNLOCK|CRYPTO_READ,type,OPENSSL_FILE,OPENSSL_LINE)
 #   define CRYPTO_add(addr,amount,type)    \
-        CRYPTO_add_lock(addr,amount,type,NULL,0)
+        CRYPTO_add_lock(addr,amount,type,OPENSSL_FILE,OPENSSL_LINE)
 #  endif
 # else
 #  define CRYPTO_w_lock(a)
@@ -378,19 +378,19 @@ int CRYPTO_is_mem_check_on(void);
 # define MemCheck_off()  CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_DISABLE)
 # define is_MemCheck_on() CRYPTO_is_mem_check_on()
 
-# define OPENSSL_malloc(num)     CRYPTO_malloc((int)num,NULL,0)
-# define OPENSSL_strdup(str)     CRYPTO_strdup((str),NULL,0)
+# define OPENSSL_malloc(num)     CRYPTO_malloc((int)num,OPENSSL_FILE,OPENSSL_LINE)
+# define OPENSSL_strdup(str)     CRYPTO_strdup((str),OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_realloc(addr,num) \
-        CRYPTO_realloc((char *)addr,(int)num,NULL,0)
+        CRYPTO_realloc((char *)addr,(int)num,OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_realloc_clean(addr,old_num,num) \
-        CRYPTO_realloc_clean(addr,old_num,num,NULL,0)
+        CRYPTO_realloc_clean(addr,old_num,num,OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_remalloc(addr,num) \
-        CRYPTO_remalloc((char **)addr,(int)num,NULL,0)
+        CRYPTO_remalloc((char **)addr,(int)num,OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_freeFunc        CRYPTO_free
 # define OPENSSL_free(addr)      CRYPTO_free(addr)
 
 # define OPENSSL_malloc_locked(num) \
-        CRYPTO_malloc_locked((int)num,NULL,0)
+        CRYPTO_malloc_locked((int)num,OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_free_locked(addr) CRYPTO_free_locked(addr)
 
 const char *SSLeay_version(int type);
@@ -545,7 +545,7 @@ void CRYPTO_set_mem_debug_options(long bits);
 long CRYPTO_get_mem_debug_options(void);
 
 # define CRYPTO_push_info(info) \
-        CRYPTO_push_info_(info, NULL, 0);
+        CRYPTO_push_info_(info, OPENSSL_FILE, OPENSSL_LINE);
 int CRYPTO_push_info_(const char *info, const char *file, int line);
 int CRYPTO_pop_info(void);
 int CRYPTO_remove_all_info(void);
@@ -588,7 +588,7 @@ void CRYPTO_mem_leaks_cb(CRYPTO_MEM_LEAK_CB *cb);
 
 /* die if we have to */
 void OpenSSLDie(const char *file, int line, const char *assertion);
-# define OPENSSL_assert(e)       (void)((e) ? 0 : (OpenSSLDie(NULL, 0, #e),1))
+# define OPENSSL_assert(e)       (void)((e) ? 0 : (OpenSSLDie(OPENSSL_FILE, OPENSSL_LINE, #e),1))
 
 unsigned long *OPENSSL_ia32cap_loc(void);
 # define OPENSSL_ia32cap (*(OPENSSL_ia32cap_loc()))
@@ -605,14 +605,14 @@ void OPENSSL_init(void);
 #  define fips_md_init_ctx(alg, cx) \
         int alg##_Init(cx##_CTX *c) \
         { \
-        if (FIPS_mode()) OpenSSLDie(NULL, 0, \
+        if (FIPS_mode()) OpenSSLDie(OPENSSL_FILE, OPENSSL_LINE, \
                 "Low level API call to digest " #alg " forbidden in FIPS mode!"); \
         return private_##alg##_Init(c); \
         } \
         int private_##alg##_Init(cx##_CTX *c)
 
 #  define fips_cipher_abort(alg) \
-        if (FIPS_mode()) OpenSSLDie(NULL, 0, \
+        if (FIPS_mode()) OpenSSLDie(OPENSSL_FILE, OPENSSL_LINE, \
                 "Low level API call to cipher " #alg " forbidden in FIPS mode!")
 
 # else
@@ -628,7 +628,7 @@ void OPENSSL_init(void);
  * into a defined order as the return value when a != b is undefined, other
  * than to be non-zero.
  */
-int CRYPTO_memcmp(const void *a, const void *b, size_t len);
+int CRYPTO_memcmp(const volatile void *a, const volatile void *b, size_t len);
 
 /* BEGIN ERROR CODES */
 /*

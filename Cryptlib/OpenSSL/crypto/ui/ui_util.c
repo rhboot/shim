@@ -1,4 +1,4 @@
-/* crypto/ui/ui_util.c -*- mode:C; c-file-style: "eay" -*- */
+/* crypto/ui/ui_util.c */
 /* ====================================================================
  * Copyright (c) 2001-2002 The OpenSSL Project.  All rights reserved.
  *
@@ -55,6 +55,10 @@
 
 #include <string.h>
 #include "ui_locl.h"
+
+#ifndef BUFSIZ
+#define BUFSIZ 256
+#endif
 
 int UI_UTIL_read_pw_string(char *buf, int length, const char *prompt,
                            int verify)

@@ -70,7 +70,7 @@ extern "C" {
 # endif
 
 # define ASN1_MAC_H_err(f,r,line) \
-        ERR_PUT_error(ASN1_MAC_ERR_LIB,(f),(r),__FILE__,(line))
+        ERR_PUT_error(ASN1_MAC_ERR_LIB,(f),(r),OPENSSL_FILE,(line))
 
 # define M_ASN1_D2I_vars(a,type,func) \
         ASN1_const_CTX c; \
@@ -81,7 +81,7 @@ extern "C" {
         c.error=ERR_R_NESTED_ASN1_ERROR; \
         if ((a == NULL) || ((*a) == NULL)) \
                 { if ((ret=(type)func()) == NULL) \
-                        { c.line=__LINE__; goto err; } } \
+                        { c.line=OPENSSL_LINE; goto err; } } \
         else    ret=(*a);
 
 # define M_ASN1_D2I_Init() \
@@ -90,7 +90,7 @@ extern "C" {
 
 # define M_ASN1_D2I_Finish_2(a) \
         if (!asn1_const_Finish(&c)) \
-                { c.line=__LINE__; goto err; } \
+                { c.line=OPENSSL_LINE; goto err; } \
         *(const unsigned char **)pp=c.p; \
         if (a != NULL) (*a)=ret; \
         return(ret);
@@ -105,7 +105,7 @@ err:\
 
 # define M_ASN1_D2I_start_sequence() \
         if (!asn1_GetSequence(&c,&length)) \
-                { c.line=__LINE__; goto err; }
+                { c.line=OPENSSL_LINE; goto err; }
 /* Begin reading ASN1 without a surrounding sequence */
 # define M_ASN1_D2I_begin() \
         c.slen = length;
@@ -129,21 +129,21 @@ err:\
 # define M_ASN1_D2I_get(b, func) \
         c.q=c.p; \
         if (func(&(b),&c.p,c.slen) == NULL) \
-                {c.line=__LINE__; goto err; } \
+                {c.line=OPENSSL_LINE; goto err; } \
         c.slen-=(c.p-c.q);
 
 /* Don't use this with d2i_ASN1_BOOLEAN() */
 # define M_ASN1_D2I_get_x(type,b,func) \
         c.q=c.p; \
         if (((D2I_OF(type))func)(&(b),&c.p,c.slen) == NULL) \
-                {c.line=__LINE__; goto err; } \
+                {c.line=OPENSSL_LINE; goto err; } \
         c.slen-=(c.p-c.q);
 
 /* use this instead () */
 # define M_ASN1_D2I_get_int(b,func) \
         c.q=c.p; \
         if (func(&(b),&c.p,c.slen) < 0) \
-                {c.line=__LINE__; goto err; } \
+                {c.line=OPENSSL_LINE; goto err; } \
         c.slen-=(c.p-c.q);
 
 # define M_ASN1_D2I_get_opt(b,func,type) \
@@ -164,7 +164,7 @@ err:\
         M_ASN1_next=(_tmp& V_ASN1_CONSTRUCTED)|type; \
         c.q=c.p; \
         if (func(&(b),&c.p,c.slen) == NULL) \
-                {c.line=__LINE__; M_ASN1_next_prev = _tmp; goto err; } \
+                {c.line=OPENSSL_LINE; M_ASN1_next_prev = _tmp; goto err; } \
         c.slen-=(c.p-c.q);\
         M_ASN1_next_prev=_tmp;
 
@@ -258,20 +258,20 @@ err:\
         c.q=c.p; \
         if (d2i_ASN1_SET(&(r),&c.p,c.slen,(char *(*)())func,\
                 (void (*)())free_func,a,b) == NULL) \
-                { c.line=__LINE__; goto err; } \
+                { c.line=OPENSSL_LINE; goto err; } \
         c.slen-=(c.p-c.q);
 
 # define M_ASN1_D2I_get_imp_set_type(type,r,func,free_func,a,b) \
         c.q=c.p; \
         if (d2i_ASN1_SET_OF_##type(&(r),&c.p,c.slen,func,\
                                    free_func,a,b) == NULL) \
-                { c.line=__LINE__; goto err; } \
+                { c.line=OPENSSL_LINE; goto err; } \
         c.slen-=(c.p-c.q);
 
 # define M_ASN1_D2I_get_set_strings(r,func,a,b) \
         c.q=c.p; \
         if (d2i_ASN1_STRING_SET(&(r),&c.p,c.slen,a,b) == NULL) \
-                { c.line=__LINE__; goto err; } \
+                { c.line=OPENSSL_LINE; goto err; } \
         c.slen-=(c.p-c.q);
 
 # define M_ASN1_D2I_get_EXP_opt(r,func,tag) \
@@ -285,16 +285,16 @@ err:\
                 Tinf=ASN1_get_object(&c.p,&Tlen,&Ttag,&Tclass,c.slen); \
                 if (Tinf & 0x80) \
                         { c.error=ERR_R_BAD_ASN1_OBJECT_HEADER; \
-                        c.line=__LINE__; goto err; } \
+                        c.line=OPENSSL_LINE; goto err; } \
                 if (Tinf == (V_ASN1_CONSTRUCTED+1)) \
                                         Tlen = c.slen - (c.p - c.q) - 2; \
                 if (func(&(r),&c.p,Tlen) == NULL) \
-                        { c.line=__LINE__; goto err; } \
+                        { c.line=OPENSSL_LINE; goto err; } \
                 if (Tinf == (V_ASN1_CONSTRUCTED+1)) { \
                         Tlen = c.slen - (c.p - c.q); \
                         if(!ASN1_const_check_infinite_end(&c.p, Tlen)) \
                                 { c.error=ERR_R_MISSING_ASN1_EOS; \
-                                c.line=__LINE__; goto err; } \
+                                c.line=OPENSSL_LINE; goto err; } \
                 }\
                 c.slen-=(c.p-c.q); \
                 }
@@ -310,18 +310,18 @@ err:\
                 Tinf=ASN1_get_object(&c.p,&Tlen,&Ttag,&Tclass,c.slen); \
                 if (Tinf & 0x80) \
                         { c.error=ERR_R_BAD_ASN1_OBJECT_HEADER; \
-                        c.line=__LINE__; goto err; } \
+                        c.line=OPENSSL_LINE; goto err; } \
                 if (Tinf == (V_ASN1_CONSTRUCTED+1)) \
                                         Tlen = c.slen - (c.p - c.q) - 2; \
                 if (d2i_ASN1_SET(&(r),&c.p,Tlen,(char *(*)())func, \
                         (void (*)())free_func, \
                         b,V_ASN1_UNIVERSAL) == NULL) \
-                        { c.line=__LINE__; goto err; } \
+                        { c.line=OPENSSL_LINE; goto err; } \
                 if (Tinf == (V_ASN1_CONSTRUCTED+1)) { \
                         Tlen = c.slen - (c.p - c.q); \
                         if(!ASN1_check_infinite_end(&c.p, Tlen)) \
                                 { c.error=ERR_R_MISSING_ASN1_EOS; \
-                                c.line=__LINE__; goto err; } \
+                                c.line=OPENSSL_LINE; goto err; } \
                 }\
                 c.slen-=(c.p-c.q); \
                 }
@@ -337,17 +337,17 @@ err:\
                 Tinf=ASN1_get_object(&c.p,&Tlen,&Ttag,&Tclass,c.slen); \
                 if (Tinf & 0x80) \
                         { c.error=ERR_R_BAD_ASN1_OBJECT_HEADER; \
-                        c.line=__LINE__; goto err; } \
+                        c.line=OPENSSL_LINE; goto err; } \
                 if (Tinf == (V_ASN1_CONSTRUCTED+1)) \
                                         Tlen = c.slen - (c.p - c.q) - 2; \
                 if (d2i_ASN1_SET_OF_##type(&(r),&c.p,Tlen,func, \
                         free_func,b,V_ASN1_UNIVERSAL) == NULL) \
-                        { c.line=__LINE__; goto err; } \
+                        { c.line=OPENSSL_LINE; goto err; } \
                 if (Tinf == (V_ASN1_CONSTRUCTED+1)) { \
                         Tlen = c.slen - (c.p - c.q); \
                         if(!ASN1_check_infinite_end(&c.p, Tlen)) \
                                 { c.error=ERR_R_MISSING_ASN1_EOS; \
-                                c.line=__LINE__; goto err; } \
+                                c.line=OPENSSL_LINE; goto err; } \
                 }\
                 c.slen-=(c.p-c.q); \
                 }
@@ -355,7 +355,7 @@ err:\
 /* New macros */
 # define M_ASN1_New_Malloc(ret,type) \
         if ((ret=(type *)OPENSSL_malloc(sizeof(type))) == NULL) \
-                { c.line=__LINE__; goto err2; }
+                { c.line=OPENSSL_LINE; goto err2; }
 
 # define M_ASN1_New(arg,func) \
         if (((arg)=func()) == NULL) return(NULL)
