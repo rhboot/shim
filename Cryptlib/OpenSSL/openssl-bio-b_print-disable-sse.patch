@@ -1,18 +1,18 @@
 diff --git a/Cryptlib/OpenSSL/crypto/bio/b_print.c b/Cryptlib/OpenSSL/crypto/bio/b_print.c
-index 7c81e25..9091d56 100644
+index 90248fa..dfc26bc 100644
 --- a/Cryptlib/OpenSSL/crypto/bio/b_print.c
 +++ b/Cryptlib/OpenSSL/crypto/bio/b_print.c
-@@ -129,8 +129,10 @@ static void fmtstr(char **, char **, size_t *, size_t *,
-                    const char *, int, int, int);
- static void fmtint(char **, char **, size_t *, size_t *,
-                    LLONG, int, int, int, int);
+@@ -129,8 +129,10 @@ static int fmtstr(char **, char **, size_t *, size_t *,
+                   const char *, int, int, int);
+ static int fmtint(char **, char **, size_t *, size_t *,
+                   LLONG, int, int, int, int);
 +#ifndef OPENSSL_SYS_UEFI
- static void fmtfp(char **, char **, size_t *, size_t *,
-                   LDOUBLE, int, int, int);
+ static int fmtfp(char **, char **, size_t *, size_t *,
+                  LDOUBLE, int, int, int);
 +#endif
- static void doapr_outch(char **, char **, size_t *, size_t *, int);
- static void _dopr(char **sbuffer, char **buffer,
-                   size_t *maxlen, size_t *retlen, int *truncated,
+ static int doapr_outch(char **, char **, size_t *, size_t *, int);
+ static int _dopr(char **sbuffer, char **buffer,
+                  size_t *maxlen, size_t *retlen, int *truncated,
 @@ -173,7 +175,9 @@ _dopr(char **sbuffer,
  {
      char ch;
@@ -23,7 +23,7 @@ index 7c81e25..9091d56 100644
      char *strvalue;
      int min;
      int max;
-@@ -275,10 +279,12 @@ _dopr(char **sbuffer,
+@@ -276,10 +280,12 @@ _dopr(char **sbuffer,
                  cflags = DP_C_LLONG;
                  ch = *format++;
                  break;
@@ -36,35 +36,35 @@ index 7c81e25..9091d56 100644
              default:
                  break;
              }
-@@ -330,6 +336,7 @@ _dopr(char **sbuffer,
-                        ch == 'o' ? 8 : (ch == 'u' ? 10 : 16),
-                        min, max, flags);
+@@ -333,6 +339,7 @@ _dopr(char **sbuffer,
+                             min, max, flags))
+                     return 0;
                  break;
 +#ifndef OPENSSL_SYS_UEFI
              case 'f':
                  if (cflags == DP_C_LDOUBLE)
                      fvalue = va_arg(args, LDOUBLE);
-@@ -354,6 +361,7 @@ _dopr(char **sbuffer,
+@@ -358,6 +365,7 @@ _dopr(char **sbuffer,
                  else
                      fvalue = va_arg(args, double);
                  break;
 +#endif
              case 'c':
-                 doapr_outch(sbuffer, buffer, &currlen, maxlen,
-                             va_arg(args, int));
-@@ -550,6 +558,7 @@ fmtint(char **sbuffer,
-     return;
+                 if(!doapr_outch(sbuffer, buffer, &currlen, maxlen,
+                             va_arg(args, int)))
+@@ -575,6 +583,7 @@ fmtint(char **sbuffer,
+     return 1;
  }
  
 +#ifndef OPENSSL_SYS_UEFI
  static LDOUBLE abs_val(LDOUBLE value)
  {
      LDOUBLE result = value;
-@@ -696,6 +705,7 @@ fmtfp(char **sbuffer,
-         ++padlen;
+@@ -733,6 +742,7 @@ fmtfp(char **sbuffer,
      }
+     return 1;
  }
 +#endif
  
- static void
- doapr_outch(char **sbuffer,
+ #define BUFFER_INC  1024
+ 
