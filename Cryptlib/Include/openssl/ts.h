@@ -281,8 +281,10 @@ TS_REQ *d2i_TS_REQ(TS_REQ **a, const unsigned char **pp, long length);
 
 TS_REQ *TS_REQ_dup(TS_REQ *a);
 
+#ifndef OPENSSL_NO_FP_API
 TS_REQ *d2i_TS_REQ_fp(FILE *fp, TS_REQ **a);
 int i2d_TS_REQ_fp(FILE *fp, TS_REQ *a);
+#endif
 TS_REQ *d2i_TS_REQ_bio(BIO *fp, TS_REQ **a);
 int i2d_TS_REQ_bio(BIO *fp, TS_REQ *a);
 
@@ -294,10 +296,12 @@ TS_MSG_IMPRINT *d2i_TS_MSG_IMPRINT(TS_MSG_IMPRINT **a,
 
 TS_MSG_IMPRINT *TS_MSG_IMPRINT_dup(TS_MSG_IMPRINT *a);
 
+#ifndef OPENSSL_NO_FP_API
 TS_MSG_IMPRINT *d2i_TS_MSG_IMPRINT_fp(FILE *fp, TS_MSG_IMPRINT **a);
 int i2d_TS_MSG_IMPRINT_fp(FILE *fp, TS_MSG_IMPRINT *a);
-TS_MSG_IMPRINT *d2i_TS_MSG_IMPRINT_bio(BIO *fp, TS_MSG_IMPRINT **a);
-int i2d_TS_MSG_IMPRINT_bio(BIO *fp, TS_MSG_IMPRINT *a);
+#endif
+TS_MSG_IMPRINT *d2i_TS_MSG_IMPRINT_bio(BIO *bio, TS_MSG_IMPRINT **a);
+int i2d_TS_MSG_IMPRINT_bio(BIO *bio, TS_MSG_IMPRINT *a);
 
 TS_RESP *TS_RESP_new(void);
 void TS_RESP_free(TS_RESP *a);
@@ -306,10 +310,12 @@ TS_RESP *d2i_TS_RESP(TS_RESP **a, const unsigned char **pp, long length);
 TS_TST_INFO *PKCS7_to_TS_TST_INFO(PKCS7 *token);
 TS_RESP *TS_RESP_dup(TS_RESP *a);
 
+#ifndef OPENSSL_NO_FP_API
 TS_RESP *d2i_TS_RESP_fp(FILE *fp, TS_RESP **a);
 int i2d_TS_RESP_fp(FILE *fp, TS_RESP *a);
-TS_RESP *d2i_TS_RESP_bio(BIO *fp, TS_RESP **a);
-int i2d_TS_RESP_bio(BIO *fp, TS_RESP *a);
+#endif
+TS_RESP *d2i_TS_RESP_bio(BIO *bio, TS_RESP **a);
+int i2d_TS_RESP_bio(BIO *bio, TS_RESP *a);
 
 TS_STATUS_INFO *TS_STATUS_INFO_new(void);
 void TS_STATUS_INFO_free(TS_STATUS_INFO *a);
@@ -325,10 +331,12 @@ TS_TST_INFO *d2i_TS_TST_INFO(TS_TST_INFO **a, const unsigned char **pp,
                              long length);
 TS_TST_INFO *TS_TST_INFO_dup(TS_TST_INFO *a);
 
+#ifndef OPENSSL_NO_FP_API
 TS_TST_INFO *d2i_TS_TST_INFO_fp(FILE *fp, TS_TST_INFO **a);
 int i2d_TS_TST_INFO_fp(FILE *fp, TS_TST_INFO *a);
-TS_TST_INFO *d2i_TS_TST_INFO_bio(BIO *fp, TS_TST_INFO **a);
-int i2d_TS_TST_INFO_bio(BIO *fp, TS_TST_INFO *a);
+#endif
+TS_TST_INFO *d2i_TS_TST_INFO_bio(BIO *bio, TS_TST_INFO **a);
+int i2d_TS_TST_INFO_bio(BIO *bio, TS_TST_INFO *a);
 
 TS_ACCURACY *TS_ACCURACY_new(void);
 void TS_ACCURACY_free(TS_ACCURACY *a);
@@ -728,15 +736,18 @@ int TS_MSG_IMPRINT_print_bio(BIO *bio, TS_MSG_IMPRINT *msg);
  * ts/ts_conf.c
  */
 
+#ifndef OPENSSL_NO_STDIO
 X509 *TS_CONF_load_cert(const char *file);
 STACK_OF(X509) *TS_CONF_load_certs(const char *file);
 EVP_PKEY *TS_CONF_load_key(const char *file, const char *pass);
+#endif
 const char *TS_CONF_get_tsa_section(CONF *conf, const char *section);
 int TS_CONF_set_serial(CONF *conf, const char *section, TS_serial_cb cb,
                        TS_RESP_CTX *ctx);
 int TS_CONF_set_crypto_device(CONF *conf, const char *section,
                               const char *device);
 int TS_CONF_set_default_engine(const char *name);
+#ifndef OPENSSL_NO_STDIO
 int TS_CONF_set_signer_cert(CONF *conf, const char *section,
                             const char *cert, TS_RESP_CTX *ctx);
 int TS_CONF_set_certs(CONF *conf, const char *section, const char *certs,
@@ -744,6 +755,7 @@ int TS_CONF_set_certs(CONF *conf, const char *section, const char *certs,
 int TS_CONF_set_signer_key(CONF *conf, const char *section,
                            const char *key, const char *pass,
                            TS_RESP_CTX *ctx);
+#endif
 int TS_CONF_set_def_policy(CONF *conf, const char *section,
                            const char *policy, TS_RESP_CTX *ctx);
 int TS_CONF_set_policies(CONF *conf, const char *section, TS_RESP_CTX *ctx);
@@ -784,6 +796,11 @@ void ERR_load_TS_strings(void);
 # define TS_F_TS_CHECK_SIGNING_CERTS                      103
 # define TS_F_TS_CHECK_STATUS_INFO                        104
 # define TS_F_TS_COMPUTE_IMPRINT                          145
+# define TS_F_TS_CONF_INVALID                             151
+# define TS_F_TS_CONF_LOAD_CERT                           153
+# define TS_F_TS_CONF_LOAD_CERTS                          154
+# define TS_F_TS_CONF_LOAD_KEY                            155
+# define TS_F_TS_CONF_LOOKUP_FAIL                         152
 # define TS_F_TS_CONF_SET_DEFAULT_ENGINE                  146
 # define TS_F_TS_GET_STATUS_TEXT                          105
 # define TS_F_TS_MSG_IMPRINT_SET_ALGO                     118
@@ -822,6 +839,8 @@ void ERR_load_TS_strings(void);
 /* Reason codes. */
 # define TS_R_BAD_PKCS7_TYPE                              132
 # define TS_R_BAD_TYPE                                    133
+# define TS_R_CANNOT_LOAD_CERT                            137
+# define TS_R_CANNOT_LOAD_KEY                             138
 # define TS_R_CERTIFICATE_VERIFY_ERROR                    100
 # define TS_R_COULD_NOT_SET_ENGINE                        127
 # define TS_R_COULD_NOT_SET_TIME                          115
@@ -854,6 +873,8 @@ void ERR_load_TS_strings(void);
 # define TS_R_UNACCEPTABLE_POLICY                         125
 # define TS_R_UNSUPPORTED_MD_ALGORITHM                    126
 # define TS_R_UNSUPPORTED_VERSION                         113
+# define TS_R_VAR_BAD_VALUE                               135
+# define TS_R_VAR_LOOKUP_FAILURE                          136
 # define TS_R_WRONG_CONTENT_TYPE                          114
 
 #ifdef  __cplusplus

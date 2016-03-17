@@ -92,6 +92,9 @@ extern "C" {
 #ifndef OPENSSL_NO_POSIX_IO
 # define OPENSSL_NO_POSIX_IO
 #endif
+#ifndef OPENSSL_NO_PQUEUE
+# define OPENSSL_NO_PQUEUE
+#endif
 #ifndef OPENSSL_NO_RC2
 # define OPENSSL_NO_RC2
 #endif
@@ -143,11 +146,17 @@ extern "C" {
 #ifndef OPENSSL_NO_STORE
 # define OPENSSL_NO_STORE
 #endif
+#ifndef OPENSSL_NO_TS
+# define OPENSSL_NO_TS
+#endif
 #ifndef OPENSSL_NO_UI
 # define OPENSSL_NO_UI
 #endif
 #ifndef OPENSSL_NO_UNIT_TEST
 # define OPENSSL_NO_UNIT_TEST
+#endif
+#ifndef OPENSSL_NO_WEAK_SSL_CIPHERS
+# define OPENSSL_NO_WEAK_SSL_CIPHERS
 #endif
 #ifndef OPENSSL_NO_WHIRLPOOL
 # define OPENSSL_NO_WHIRLPOOL
@@ -254,6 +263,9 @@ extern "C" {
 # if defined(OPENSSL_NO_POSIX_IO) && !defined(NO_POSIX_IO)
 #  define NO_POSIX_IO
 # endif
+# if defined(OPENSSL_NO_PQUEUE) && !defined(NO_PQUEUE)
+#  define NO_PQUEUE
+# endif
 # if defined(OPENSSL_NO_RC2) && !defined(NO_RC2)
 #  define NO_RC2
 # endif
@@ -305,11 +317,17 @@ extern "C" {
 # if defined(OPENSSL_NO_STORE) && !defined(NO_STORE)
 #  define NO_STORE
 # endif
+# if defined(OPENSSL_NO_TS) && !defined(NO_TS)
+#  define NO_TS
+# endif
 # if defined(OPENSSL_NO_UI) && !defined(NO_UI)
 #  define NO_UI
 # endif
 # if defined(OPENSSL_NO_UNIT_TEST) && !defined(NO_UNIT_TEST)
 #  define NO_UNIT_TEST
+# endif
+# if defined(OPENSSL_NO_WEAK_SSL_CIPHERS) && !defined(NO_WEAK_SSL_CIPHERS)
+#  define NO_WEAK_SSL_CIPHERS
 # endif
 # if defined(OPENSSL_NO_WHIRLPOOL) && !defined(NO_WHIRLPOOL)
 #  define NO_WHIRLPOOL
@@ -317,6 +335,16 @@ extern "C" {
 #endif
 
 /* crypto/opensslconf.h.in */
+
+#ifndef OPENSSL_FILE
+#ifdef OPENSSL_NO_FILENAMES
+#define OPENSSL_FILE ""
+#define OPENSSL_LINE 0
+#else
+#define OPENSSL_FILE __FILE__
+#define OPENSSL_LINE __LINE__
+#endif
+#endif
 
 /* Generate 80386 code? */
 #undef I386_ONLY

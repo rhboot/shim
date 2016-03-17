@@ -159,6 +159,7 @@ int CONF_modules_load(const CONF *cnf, const char *appname,
 
 }
 
+#ifndef OPENSSL_NO_STDIO
 int CONF_modules_load_file(const char *filename, const char *appname,
                            unsigned long flags)
 {
@@ -194,6 +195,7 @@ int CONF_modules_load_file(const char *filename, const char *appname,
 
     return ret;
 }
+#endif
 
 static int module_run(const CONF *cnf, char *name, char *value,
                       unsigned long flags)

@@ -182,6 +182,10 @@ static int def_destroy_data(CONF *conf)
 
 static int def_load(CONF *conf, const char *name, long *line)
 {
+#ifdef OPENSSL_NO_STDIO
+    CONFerr(CONF_F_DEF_LOAD, ERR_R_SYS_LIB);
+    return 0;
+#else
     int ret;
     BIO *in = NULL;
 
@@ -202,6 +206,7 @@ static int def_load(CONF *conf, const char *name, long *line)
     BIO_free(in);
 
     return ret;
+#endif
 }
 
 static int def_load_bio(CONF *conf, BIO *in, long *line)
