@@ -13,11 +13,8 @@ OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 
 
 SUBDIRS		= Cryptlib lib
 
-LIB_PATH	= /usr/lib64
-
 EFI_INCLUDE	:= /usr/include/efi
 EFI_INCLUDES	= -nostdinc -ICryptlib -ICryptlib/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -I$(shell pwd)/include
-EFI_PATH	:= /usr/lib64/gnuefi
 
 LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC) 
@@ -51,6 +48,9 @@ ifeq ($(ARCH),x86_64)
 	MMNAME	= mmx64
 	FBNAME	= fbx64
 	SHIMNAME= shimx64
+	EFI_PATH:=/usr/lib64/gnuefi
+	LIB_PATH:=/usr/lib64
+
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
@@ -60,6 +60,8 @@ ifeq ($(ARCH),ia32)
 	MMNAME	= mmia32
 	FBNAME	= fbia32
 	SHIMNAME= shimia32
+	EFI_PATH:=/usr/lib/gnuefi
+	LIB_PATH:=/usr/lib
 endif
 ifeq ($(ARCH),aarch64)
 	CFLAGS += "-DEFI_ARCH=L\"aa64\"" \
@@ -67,6 +69,8 @@ ifeq ($(ARCH),aarch64)
 	MMNAME	= mmaa64
 	FBNAME	= fbaa64
 	SHIMNAME= shimaa64
+	EFI_PATH:=/usr/lib64/gnuefi
+	LIB_PATH:=/usr/lib64
 endif
 
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
