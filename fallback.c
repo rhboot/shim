@@ -579,6 +579,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	FreePool(buffer);
 	buffer = NULL;
 
+	CHAR16 *bootcsv=NULL, *bootarchcsv=NULL;
+
 	bs = 0;
 	do {
 		bs = 0;
@@ -608,27 +610,42 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 		fi = buffer;
 
-		if (!StrCaseCmp(fi->FileName, L"boot.csv")
-		    || !StrCaseCmp(fi->FileName, L"boot" EFI_ARCH L".csv")) {
-			EFI_FILE_HANDLE fh2;
-			rc = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
-						fi->FileName,
-						EFI_FILE_READ_ONLY, 0);
-			if (EFI_ERROR(rc) || fh2 == NULL) {
-				Print(L"Couldn't open \\EFI\\%s\\%s: %d\n",
-					dirname, fi->FileName, rc);
-				FreePool(buffer);
-				buffer = NULL;
-				continue;
-			}
-			rc = try_boot_csv(fh2, dirname, fi->FileName);
-			uefi_call_wrapper(fh2->Close, 1, fh2);
-		}
+		if (!bootcsv && !StrCaseCmp(fi->FileName, L"boot.csv"))
+			bootcsv = StrDuplicate(fi->FileName);
+
+		if (!bootarchcsv &&
+		    !StrCaseCmp(fi->FileName, L"boot" EFI_ARCH L".csv"))
+			bootarchcsv = StrDuplicate(fi->FileName);
 
 		FreePool(buffer);
 		buffer = NULL;
 	} while (bs != 0);
 
+	rc = EFI_SUCCESS;
+	if (bootarchcsv) {
+		EFI_FILE_HANDLE fh2;
+		rc = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
+				       bootarchcsv, EFI_FILE_READ_ONLY, 0);
+		if (EFI_ERROR(rc) || fh2 == NULL) {
+			Print(L"Couldn't open \\EFI\\%s\\%s: %d\n",
+			      dirname, bootarchcsv, rc);
+		} else {
+			rc = try_boot_csv(fh2, dirname, bootarchcsv);
+			uefi_call_wrapper(fh2->Close, 1, fh2);
+		}
+	}
+	if ((EFI_ERROR(rc) || !bootarchcsv) && bootcsv) {
+		EFI_FILE_HANDLE fh2;
+		rc = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
+				       bootcsv, EFI_FILE_READ_ONLY, 0);
+		if (EFI_ERROR(rc) || fh2 == NULL) {
+			Print(L"Couldn't open \\EFI\\%s\\%s: %d\n",
+			      dirname, bootcsv, rc);
+		} else {
+			rc = try_boot_csv(fh2, dirname, bootcsv);
+			uefi_call_wrapper(fh2->Close, 1, fh2);
+		}
+	}
 	rc = EFI_SUCCESS;
 
 	return rc;

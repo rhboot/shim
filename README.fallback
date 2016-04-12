@@ -41,8 +41,9 @@ media.  In that case, it'll invoke \EFI\BOOT\BOOTX64.EFI (or whatever
 filename is right for your architecture.)  In that case it'll be in
 \EFI\BOOT, so it'll check for fallback.efi , and it'll find it and run
 it.  When it runs, fallback will look for every directory in \EFI\ with
-a BOOT.CSV in it, and it'll parse that, and create new boot variables
-from what it finds.  Then it'll try to boot one of them.
+a BOOT${ARCH}.CSV in it, or BOOT.CSV if that's not found.  It'll parse that,
+and create new boot variables from what it finds.  Then it'll try to boot one
+of them.
 
 BOOT.CSV is a UCS-2 LE formatted CSV file.  So it has the LE byte order
 marker, and after that it's just a series of lines, each having
