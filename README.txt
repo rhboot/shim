@@ -4,10 +4,10 @@
     Note: Be sure to install IASL 5.0A or higher to build EDKII
 
 
-2. Download Galileo Runtime 1.0.6 and unarchive (Part 3 of the User Guide)
-    https://github.com/01org/Galileo-Runtime/archive/1.0.6.tar.gz
-    tar -xf Galileo-Runtime-1.0.6.tar.gz
-    cd Galileo-Runtime-1.0.6
+2. Download Galileo Runtime 1.0.7 and unarchive (Part 3 of the User Guide)
+    https://github.com/01org/Galileo-Runtime/archive/1.0.7.tar.gz
+    tar -xf Galileo-Runtime-*.tar.gz
+    cd Galileo-Runtime-*
 
 3. Unarchive the patches
     tar -xf patches_v*.tar.gz
