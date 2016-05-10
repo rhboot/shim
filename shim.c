@@ -2168,6 +2168,18 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	*
 	* which is clearly an EFI_LOAD_OPTION filled in halfway reasonably.
 	* In short, the UEFI shell is still a useless piece of junk.
+	*
+	* But then on some versions of BDS, we get:
+
+00000000  5c 00 66 00 77 00 75 00  70 00 78 00 36 00 34 00  |\.f.w.u.p.x.6.4.|
+00000010  2e 00 65 00 66 00 69 00  00 00                    |..e.f.i...|
+0000001a
+
+	* which as you can see is one perfectly normal UCS2-EL string
+	* containing the load option from the Boot#### variable.
+	*
+	* We also sometimes find a guid or partial guid at the end, because
+	* BDS will add that, but we ignore that here.
 	*/
 
 	/*
@@ -2252,6 +2264,10 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		}
 		if (loader_len)
 			remaining_size -= loader_len;
+	} else {
+		/* only find one string */
+		start = li->LoadOptions;
+		loader_len = li->LoadOptionsSize;
 	}
 
 	/*
