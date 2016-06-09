@@ -1,9 +1,9 @@
-/* v3_pci.c -*- mode:C; c-file-style: "eay" -*- */
+/* v3_pci.c */
 /*
  * Contributed to the OpenSSL Project 2004 by Richard Levitte
  * (richard@levitte.org)
  */
-/* Copyright (c) 2004 Kungliga Tekniska Högskolan
+/* Copyright (c) 2004 Kungliga Tekniska HÃ¶gskolan
  * (Royal Institute of Technology, Stockholm, Sweden).
  * All rights reserved.
  *
@@ -149,6 +149,7 @@ static int process_pci_value(CONF_VALUE *val,
                 goto err;
             }
             OPENSSL_free(tmp_data2);
+#ifndef OPENSSL_NO_STDIO
         } else if (strncmp(val->value, "file:", 5) == 0) {
             unsigned char buf[2048];
             int n;
@@ -181,6 +182,7 @@ static int process_pci_value(CONF_VALUE *val,
                 X509V3_conf_err(val);
                 goto err;
             }
+#endif /* !OPENSSL_NO_STDIO */
         } else if (strncmp(val->value, "text:", 5) == 0) {
             val_len = strlen(val->value + 5);
             tmp_data = OPENSSL_realloc((*policy)->data,

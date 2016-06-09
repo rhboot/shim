@@ -193,7 +193,12 @@ int i2d_RSA_NET(const RSA *a, unsigned char **pp,
     OPENSSL_cleanse(pkey->private_key->data, rsalen);
 
     if (cb == NULL)
+#ifndef OPENSSL_NO_UI
         cb = EVP_read_pw_string;
+#else
+        i = 1;
+    else
+#endif
     i = cb((char *)buf, 256, "Enter Private Key password:", 1);
     if (i != 0) {
         ASN1err(ASN1_F_I2D_RSA_NET, ASN1_R_BAD_PASSWORD_READ);
@@ -264,7 +269,11 @@ RSA *d2i_RSA_NET(RSA **a, const unsigned char **pp, long length,
         goto err;
     }
     if (cb == NULL)
+#ifndef OPENSSL_NO_UI
         cb = EVP_read_pw_string;
+#else
+        goto err;
+#endif
     if ((ret = d2i_RSA_NET_2(a, enckey->enckey->digest, cb, sgckey)) == NULL)
         goto err;
 

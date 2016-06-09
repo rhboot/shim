@@ -100,12 +100,10 @@ extern "C" {
 
 void OPENSSL_cpuid_setup(void);
 extern unsigned int OPENSSL_ia32cap_P[];
-# if defined(OPENSSL_SYS_UEFI)
-void EFIAPI OPENSSL_showfatal(const char *fmta, ...);
-# else
 void OPENSSL_showfatal(const char *fmta, ...);
-# endif
+#ifndef OPENSSL_NO_STDIO
 void *OPENSSL_stderr(void);
+#endif
 extern int OPENSSL_NONPIC_relocated;
 
 #ifdef  __cplusplus

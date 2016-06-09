@@ -84,7 +84,7 @@ int pem_check_suffix(const char *pem_str, const char *suffix);
 
 int PEM_def_callback(char *buf, int num, int w, void *key)
 {
-#ifdef OPENSSL_NO_FP_API
+#if defined(OPENSSL_NO_FP_API) || defined(OPENSSL_NO_UI)
     /*
      * We should not ever call the default callback routine from windows.
      */
