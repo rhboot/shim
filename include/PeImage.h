@@ -306,35 +306,35 @@ typedef struct {
 /// Size of EFI_IMAGE_SECTION_HEADER.
 ///
 #define EFI_IMAGE_SIZEOF_SECTION_HEADER       40
-         
+
 //
 // Section Flags Values
 //
-#define EFI_IMAGE_SCN_TYPE_NO_PAD                  BIT3   ///< 0x00000008  ///< Reserved.
-#define EFI_IMAGE_SCN_CNT_CODE                     BIT5   ///< 0x00000020
-#define EFI_IMAGE_SCN_CNT_INITIALIZED_DATA         BIT6   ///< 0x00000040
-#define EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA       BIT7   ///< 0x00000080
-                                                   
-#define EFI_IMAGE_SCN_LNK_OTHER                    BIT8   ///< 0x00000100  ///< Reserved.
-#define EFI_IMAGE_SCN_LNK_INFO                     BIT9   ///< 0x00000200  ///< Section contains comments or some other type of information.
-#define EFI_IMAGE_SCN_LNK_REMOVE                   BIT11  ///< 0x00000800  ///< Section contents will not become part of image.
-#define EFI_IMAGE_SCN_LNK_COMDAT                   BIT12  ///< 0x00001000
-                                                   
-#define EFI_IMAGE_SCN_ALIGN_1BYTES                 BIT20  ///< 0x00100000
-#define EFI_IMAGE_SCN_ALIGN_2BYTES                 BIT21  ///< 0x00200000
-#define EFI_IMAGE_SCN_ALIGN_4BYTES          (BIT20|BIT21) ///< 0x00300000
-#define EFI_IMAGE_SCN_ALIGN_8BYTES                 BIT22  ///< 0x00400000
-#define EFI_IMAGE_SCN_ALIGN_16BYTES         (BIT20|BIT22) ///< 0x00500000
-#define EFI_IMAGE_SCN_ALIGN_32BYTES         (BIT21|BIT22) ///< 0x00600000
-#define EFI_IMAGE_SCN_ALIGN_64BYTES   (BIT20|BIT21|BIT22) ///< 0x00700000
-                                              
-#define EFI_IMAGE_SCN_MEM_DISCARDABLE              BIT25  ///< 0x02000000
-#define EFI_IMAGE_SCN_MEM_NOT_CACHED               BIT26  ///< 0x04000000
-#define EFI_IMAGE_SCN_MEM_NOT_PAGED                BIT27  ///< 0x08000000
-#define EFI_IMAGE_SCN_MEM_SHARED                   BIT28  ///< 0x10000000
-#define EFI_IMAGE_SCN_MEM_EXECUTE                  BIT29  ///< 0x20000000
-#define EFI_IMAGE_SCN_MEM_READ                     BIT30  ///< 0x40000000
-#define EFI_IMAGE_SCN_MEM_WRITE                    BIT31  ///< 0x80000000
+#define EFI_IMAGE_SCN_TYPE_NO_PAD                  0x00000008  ///< Reserved.
+#define EFI_IMAGE_SCN_CNT_CODE                     0x00000020
+#define EFI_IMAGE_SCN_CNT_INITIALIZED_DATA         0x00000040
+#define EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA       0x00000080
+
+#define EFI_IMAGE_SCN_LNK_OTHER                    0x00000100  ///< Reserved.
+#define EFI_IMAGE_SCN_LNK_INFO                     0x00000200  ///< Section contains comments or some other type of information.
+#define EFI_IMAGE_SCN_LNK_REMOVE                   0x00000800  ///< Section contents will not become part of image.
+#define EFI_IMAGE_SCN_LNK_COMDAT                   0x00001000
+
+#define EFI_IMAGE_SCN_ALIGN_1BYTES                 0x00100000
+#define EFI_IMAGE_SCN_ALIGN_2BYTES                 0x00200000
+#define EFI_IMAGE_SCN_ALIGN_4BYTES                 0x00300000
+#define EFI_IMAGE_SCN_ALIGN_8BYTES                 0x00400000
+#define EFI_IMAGE_SCN_ALIGN_16BYTES                0x00500000
+#define EFI_IMAGE_SCN_ALIGN_32BYTES                0x00600000
+#define EFI_IMAGE_SCN_ALIGN_64BYTES                0x00700000
+
+#define EFI_IMAGE_SCN_MEM_DISCARDABLE              0x02000000
+#define EFI_IMAGE_SCN_MEM_NOT_CACHED               0x04000000
+#define EFI_IMAGE_SCN_MEM_NOT_PAGED                0x08000000
+#define EFI_IMAGE_SCN_MEM_SHARED                   0x10000000
+#define EFI_IMAGE_SCN_MEM_EXECUTE                  0x20000000
+#define EFI_IMAGE_SCN_MEM_READ                     0x40000000
+#define EFI_IMAGE_SCN_MEM_WRITE                    0x80000000
 
 ///
 /// Size of a Symbol Table Record.

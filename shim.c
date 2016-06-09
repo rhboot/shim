@@ -1122,6 +1122,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	unsigned int alignment;
+	int found_entry_point = 0;
 
 	/*
 	 * The binary header contains relevant context and section pointers
@@ -1147,8 +1149,26 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		}
 	}
 
+	/* The spec says, uselessly, of SectionAlignment:
+	 * =====
+	 * The alignment (in bytes) of sections when they are loaded into
+	 * memory. It must be greater than or equal to FileAlignment. The
+	 * default is the page size for the architecture.
+	 * =====
+	 * Which doesn't tell you whose responsibility it is to enforce the
+	 * "default", or when.  It implies that the value in the field must
+	 * be > FileAlignment (also poorly defined), but it appears visual
+	 * studio will happily write 512 for FileAlignment (its default) and
+	 * 0 for SectionAlignment, intending to imply PAGE_SIZE.
+	 *
+	 * We only support one page size, so if it's zero, nerf it to 4096.
+	 */
+	alignment = context.SectionAlignment;
+	if (!alignment)
+		alignment = 4096;
+
 	buffer = AllocatePool(context.ImageSize + context.SectionAlignment);
-	buffer = ALIGN_POINTER(buffer, context.SectionAlignment);
+	buffer = ALIGN_POINTER(buffer, alignment);
 
 	if (!buffer) {
 		perror(L"Failed to allocate image buffer\n");
@@ -1157,11 +1177,25 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
+	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
+	if (!entry_point) {
+		perror(L"Entry point is invalid\n");
+		FreePool(buffer);
+		return EFI_UNSUPPORTED;
+	}
+
+
 	char *RelocBase, *RelocBaseEnd;
-	RelocBase = ImageAddress(buffer, datasize,
+	/*
+	 * These are relative virtual addresses, so we have to check them
+	 * against the image size, not the data size.
+	 */
+	RelocBase = ImageAddress(buffer, context.ImageSize,
 				 context.RelocDir->VirtualAddress);
-	/* RelocBaseEnd here is the address of the last byte of the table */
-	RelocBaseEnd = ImageAddress(buffer, datasize,
+	/*
+	 * RelocBaseEnd here is the address of the last byte of the table
+	 */
+	RelocBaseEnd = ImageAddress(buffer, context.ImageSize,
 				    context.RelocDir->VirtualAddress +
 				    context.RelocDir->Size - 1);
 
@@ -1172,13 +1206,22 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	 */
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
-		size = Section->Misc.VirtualSize;
+		base = ImageAddress (buffer, context.ImageSize,
+				     Section->VirtualAddress);
+		end = ImageAddress (buffer, context.ImageSize,
+				    Section->VirtualAddress
+				     + Section->Misc.VirtualSize - 1);
 
-		if (size > Section->SizeOfRawData)
-			size = Section->SizeOfRawData;
+		if (end < base) {
+			perror(L"Section %d has negative size\n", i);
+			FreePool(buffer);
+			return EFI_UNSUPPORTED;
+		}
 
-		base = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress);
-		end = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress + size - 1);
+		if (Section->VirtualAddress <= context.EntryPoint &&
+		    (Section->VirtualAddress + Section->SizeOfRawData - 1)
+		    > context.EntryPoint)
+			found_entry_point++;
 
 		/* We do want to process .reloc, but it's often marked
 		 * discardable, so we don't want to memcpy it. */
@@ -1199,27 +1242,32 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 			}
 		}
 
-		if (Section->Characteristics & 0x02000000) {
-			/* section has EFI_IMAGE_SCN_MEM_DISCARDABLE attr set */
+		if (Section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE) {
 			continue;
 		}
 
-		if (!base || !end) {
-			perror(L"Section %d has invalid size\n", i);
+		if (!base) {
+			perror(L"Section %d has invalid base address\n", i);
+			return EFI_UNSUPPORTED;
+		}
+		if (!end) {
+			perror(L"Section %d has zero size\n", i);
 			return EFI_UNSUPPORTED;
 		}
 
-		if (Section->VirtualAddress < context.SizeOfHeaders ||
-				Section->PointerToRawData < context.SizeOfHeaders) {
+		if (!(Section->Characteristics & EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA) &&
+		    (Section->VirtualAddress < context.SizeOfHeaders ||
+		     Section->PointerToRawData < context.SizeOfHeaders)) {
 			perror(L"Section %d is inside image headers\n", i);
 			return EFI_UNSUPPORTED;
 		}
 
 		if (Section->SizeOfRawData > 0)
-			CopyMem(base, data + Section->PointerToRawData, size);
+			CopyMem(base, data + Section->PointerToRawData, Section->SizeOfRawData);
 
-		if (size < Section->Misc.VirtualSize)
-			ZeroMem (base + size, Section->Misc.VirtualSize - size);
+		if (Section->SizeOfRawData < Section->Misc.VirtualSize)
+			ZeroMem (base + Section->SizeOfRawData,
+				 Section->Misc.VirtualSize - Section->SizeOfRawData);
 	}
 
 	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
@@ -1242,7 +1290,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		}
 	}
 
-	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	/*
 	 * grub needs to know its location and size in memory, so fix up
 	 * the loaded image protocol values
@@ -1254,9 +1301,12 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	li->LoadOptions = load_options;
 	li->LoadOptionsSize = load_options_size;
 
-	if (!entry_point) {
-		perror(L"Invalid entry point\n");
-		FreePool(buffer);
+	if (!found_entry_point) {
+		perror(L"Entry point is not within sections\n");
+		return EFI_UNSUPPORTED;
+	}
+	if (found_entry_point > 1) {
+		perror(L"%d sections contain entry point\n");
 		return EFI_UNSUPPORTED;
 	}
 
