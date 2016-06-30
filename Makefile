@@ -158,8 +158,8 @@ endif
 		-j .note.gnu.build-id \
 		$(FORMAT) $^ $@.debug
 
-%.efi.signed: %.efi certdb/secmod.db
-	pesign -n certdb -i $< -c "shim" -s -o $@ -f
+%.efi.signed: %.efi shim.crt
+	sbsign --key shim.key --cert shim.crt $<
 
 clean:
 	$(MAKE) -C Cryptlib clean
