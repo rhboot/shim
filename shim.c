@@ -1372,7 +1372,6 @@ should_use_fallback(EFI_HANDLE image_handle)
 		 * Print(L"Could not open \"\\EFI\\BOOT%s\": %d\n", FALLBACK,
 		 * 	 rc);
 		 */
-		uefi_call_wrapper(vh->Close, 1, vh);
 		goto error;
 	}
 
