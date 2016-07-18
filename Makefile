@@ -9,7 +9,7 @@ LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 
 ARCH		= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
-OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.version //g' | cut -f1-2 -d.` \>= 2.24)
+OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
 SUBDIRS		= Cryptlib lib
 
@@ -25,7 +25,7 @@ EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= elf_$(ARCH)_efi.lds
 
-DEFAULT_LOADER	:= \\\\grub.efi
+DEFAULT_LOADER	:= \\\\grubx64.efi
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
 		  -Werror=sign-compare -ffreestanding -std=gnu89 \
@@ -158,8 +158,8 @@ endif
 		-j .note.gnu.build-id \
 		$(FORMAT) $^ $@.debug
 
-%.efi.signed: %.efi certdb/secmod.db
-	pesign -n certdb -i $< -c "shim" -s -o $@ -f
+%.efi.signed: %.efi shim.crt
+	sbsign --key shim.key --cert shim.crt $<
 
 clean:
 	$(MAKE) -C Cryptlib clean

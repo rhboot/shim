@@ -1118,7 +1118,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	EFI_STATUS efi_status;
 	char *buffer;
 	int i;
-	unsigned int size;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
@@ -1373,6 +1372,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 		 * 	 rc);
 		 */
 		uefi_call_wrapper(vh->Close, 1, vh);
+		vh = NULL;
 		goto error;
 	}
 
