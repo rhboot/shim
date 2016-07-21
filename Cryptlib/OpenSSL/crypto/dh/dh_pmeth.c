@@ -455,7 +455,6 @@ static int pkey_dh_derive(EVP_PKEY_CTX *ctx, unsigned char *key,
     }
 #ifndef OPENSSL_NO_CMS
     else if (dctx->kdf_type == EVP_PKEY_DH_KDF_X9_42) {
-
         unsigned char *Z = NULL;
         size_t Zlen = 0;
         if (!dctx->kdf_outlen || !dctx->kdf_oid)

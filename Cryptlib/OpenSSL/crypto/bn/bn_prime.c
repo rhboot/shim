@@ -172,7 +172,7 @@ int BN_generate_prime_ex(BIGNUM *ret, int bits, int safe,
 
     mods = OPENSSL_malloc(sizeof(*mods) * NUMPRIMES);
     if (mods == NULL)
-	    goto err;
+        goto err;
     ctx = BN_CTX_new();
     if (ctx == NULL)
         goto err;

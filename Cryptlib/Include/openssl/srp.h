@@ -122,6 +122,7 @@ int SRP_VBASE_free(SRP_VBASE *vb);
 #ifndef OPENSSL_NO_STDIO
 int SRP_VBASE_init(SRP_VBASE *vb, char *verifier_file);
 #endif
+
 /* This method ignores the configured seed and fails for an unknown user. */
 SRP_user_pwd *SRP_VBASE_get_by_user(SRP_VBASE *vb, char *username);
 /* NOTE: unlike in SRP_VBASE_get_by_user, caller owns the returned pointer.*/
