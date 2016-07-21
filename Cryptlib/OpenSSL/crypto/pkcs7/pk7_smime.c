@@ -64,7 +64,6 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-
 #define BUFFERSIZE 4096
 
 static int pkcs7_copy_existing_digest(PKCS7 *p7, PKCS7_SIGNER_INFO *si);
@@ -596,6 +595,7 @@ int PKCS7_decrypt(PKCS7 *p7, EVP_PKEY *pkey, X509 *cert, BIO *data, int flags)
             break;
         }
     }
+
 err:
     OPENSSL_free(buf);
     BIO_free_all(tmpmem);
