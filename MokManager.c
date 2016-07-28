@@ -24,8 +24,6 @@
 #define SHIM_VENDOR L"Shim"
 #endif
 
-#define EFI_VARIABLE_APPEND_WRITE 0x00000040
-
 EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
 EFI_GUID EFI_CERT_SHA224_GUID = { 0xb6e5233, 0xa65c, 0x44c9, {0x94, 0x7, 0xd9, 0xab, 0x83, 0xbf, 0xc8, 0xbd} };
 EFI_GUID EFI_CERT_SHA384_GUID = { 0xff3e5307, 0x9fd0, 0x48c9, {0x85, 0xf1, 0x8a, 0xd5, 0x6c, 0x70, 0x1e, 0x1} };
@@ -864,6 +862,53 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS write_db (CHAR16 *db_name, void *MokNew, UINTN MokNewSize)
+{
+	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	EFI_STATUS status;
+	UINT32 attributes;
+	void *old_data = NULL;
+	void *new_data = NULL;
+	UINTN old_size;
+	UINTN new_size;
+
+	status = get_variable_attr(db_name, (UINT8 **)&old_data, &old_size,
+				   shim_lock_guid, &attributes);
+	if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
+		return status;
+	}
+
+	/* Check if the old db is compromised or not */
+	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
+		FreePool(old_data);
+		old_data = NULL;
+		old_size = 0;
+	}
+
+	new_size = old_size + MokNewSize;
+	new_data = AllocatePool(new_size);
+	if (new_data == NULL) {
+		status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+
+	CopyMem(new_data, old_data, old_size);
+	CopyMem(new_data + old_size, MokNew, MokNewSize);
+
+	status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
+				   &shim_lock_guid,
+				   EFI_VARIABLE_NON_VOLATILE
+				   | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				   new_size, new_data);
+
+out:
+	if (old_size > 0) {
+		FreePool(old_data);
+	}
+
+	return status;
+}
+
 static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 			      BOOLEAN MokX)
 {
@@ -918,12 +963,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 					       0, NULL);
 	} else {
 		/* Write new MOK */
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-					       &shim_lock_guid,
-					       EFI_VARIABLE_NON_VOLATILE
-					       | EFI_VARIABLE_BOOTSERVICE_ACCESS
-					       | EFI_VARIABLE_APPEND_WRITE,
-					       MokNewSize, MokNew);
+		efi_status = write_db(db_name, MokNew, MokNewSize);
 	}
 
 	if (efi_status != EFI_SUCCESS) {
