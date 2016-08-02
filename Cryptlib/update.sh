@@ -1,6 +1,7 @@
 #!/bin/bash
 
 DIR=$1
+OPENSSL_VERSION="1.0.2h"
 
 cp $DIR/CryptoPkg/Library/BaseCryptLib/InternalCryptLib.h InternalCryptLib.h
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptMd4.c Hash/CryptMd4.c
@@ -26,6 +27,6 @@ cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/CrtWrapper.c SysCall/CrtWrapper.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/TimerWrapper.c SysCall/TimerWrapper.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/BaseMemAllocation.c SysCall/BaseMemAllocation.c
 
-cp $DIR/CryptoPkg/Include/openssl/* Include/openssl/
+cp $DIR/CryptoPkg/Library/OpensslLib/openssl-${OPENSSL_VERSION}/include/openssl/* Include/openssl/
 
 patch -p2 <Cryptlib.diff

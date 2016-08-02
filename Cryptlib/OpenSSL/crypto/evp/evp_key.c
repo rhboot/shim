@@ -63,6 +63,7 @@
 #include <openssl/evp.h>
 #include <openssl/ui.h>
 
+#ifndef OPENSSL_NO_UI
 /* should be init to zeros. */
 static char prompt_string[80];
 
@@ -104,6 +105,8 @@ int EVP_read_pw_string_min(char *buf, int min, int len, const char *prompt,
     if ((prompt == NULL) && (prompt_string[0] != '\0'))
         prompt = prompt_string;
     ui = UI_new();
+    if (ui == NULL)
+        return -1;
     UI_add_input_string(ui, prompt, 0, buf, min,
                         (len >= BUFSIZ) ? BUFSIZ - 1 : len);
     if (verify)
@@ -115,6 +118,7 @@ int EVP_read_pw_string_min(char *buf, int min, int len, const char *prompt,
     OPENSSL_cleanse(buff, BUFSIZ);
     return ret;
 }
+#endif /* OPENSSL_NO_UI */
 
 int EVP_BytesToKey(const EVP_CIPHER *type, const EVP_MD *md,
                    const unsigned char *salt, const unsigned char *data,
@@ -137,7 +141,7 @@ int EVP_BytesToKey(const EVP_CIPHER *type, const EVP_MD *md,
     EVP_MD_CTX_init(&c);
     for (;;) {
         if (!EVP_DigestInit_ex(&c, md, NULL))
-            return 0;
+            goto err;
         if (addmd++)
             if (!EVP_DigestUpdate(&c, &(md_buf[0]), mds))
                 goto err;
@@ -188,6 +192,6 @@ int EVP_BytesToKey(const EVP_CIPHER *type, const EVP_MD *md,
     rv = type->key_len;
  err:
     EVP_MD_CTX_cleanup(&c);
-    OPENSSL_cleanse(&(md_buf[0]), EVP_MAX_MD_SIZE);
+    OPENSSL_cleanse(md_buf, sizeof(md_buf));
     return rv;
 }

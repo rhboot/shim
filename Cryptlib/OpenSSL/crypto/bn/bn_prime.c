@@ -131,7 +131,7 @@
 static int witness(BIGNUM *w, const BIGNUM *a, const BIGNUM *a1,
                    const BIGNUM *a1_odd, int k, BN_CTX *ctx,
                    BN_MONT_CTX *mont);
-static int probable_prime(BIGNUM *rnd, int bits);
+static int probable_prime(BIGNUM *rnd, int bits, prime_t *mods);
 static int probable_prime_dh(BIGNUM *rnd, int bits,
                              const BIGNUM *add, const BIGNUM *rem,
                              BN_CTX *ctx);
@@ -166,9 +166,13 @@ int BN_generate_prime_ex(BIGNUM *ret, int bits, int safe,
     BIGNUM *t;
     int found = 0;
     int i, j, c1 = 0;
-    BN_CTX *ctx;
+    BN_CTX *ctx = NULL;
+    prime_t *mods = NULL;
     int checks = BN_prime_checks_for_size(bits);
 
+    mods = OPENSSL_malloc(sizeof(*mods) * NUMPRIMES);
+    if (mods == NULL)
+        goto err;
     ctx = BN_CTX_new();
     if (ctx == NULL)
         goto err;
@@ -179,7 +183,7 @@ int BN_generate_prime_ex(BIGNUM *ret, int bits, int safe,
  loop:
     /* make a random number and set the top and bottom bits */
     if (add == NULL) {
-        if (!probable_prime(ret, bits))
+        if (!probable_prime(ret, bits, mods))
             goto err;
     } else {
         if (safe) {
@@ -230,6 +234,7 @@ int BN_generate_prime_ex(BIGNUM *ret, int bits, int safe,
     /* we have a prime :-) */
     found = 1;
  err:
+    OPENSSL_free(mods);
     if (ctx != NULL) {
         BN_CTX_end(ctx);
         BN_CTX_free(ctx);
@@ -375,10 +380,9 @@ static int witness(BIGNUM *w, const BIGNUM *a, const BIGNUM *a1,
     return 1;
 }
 
-static int probable_prime(BIGNUM *rnd, int bits)
+static int probable_prime(BIGNUM *rnd, int bits, prime_t *mods)
 {
     int i;
-    prime_t mods[NUMPRIMES];
     BN_ULONG delta, maxdelta;
 
  again:

@@ -142,7 +142,7 @@ struct dh_st {
     BIGNUM *p;
     BIGNUM *g;
     long length;                /* optional */
-    BIGNUM *pub_key;            /* g^x */
+    BIGNUM *pub_key;            /* g^x % p */
     BIGNUM *priv_key;           /* x */
     int flags;
     BN_MONT_CTX *method_mont_p;
@@ -174,6 +174,7 @@ struct dh_st {
 /* DH_check_pub_key error codes */
 # define DH_CHECK_PUBKEY_TOO_SMALL       0x01
 # define DH_CHECK_PUBKEY_TOO_LARGE       0x02
+# define DH_CHECK_PUBKEY_INVALID         0x04
 
 /*
  * primes p where (p-1)/2 is prime too are called "safe"; we define this for
@@ -239,11 +240,13 @@ DH *DH_get_1024_160(void);
 DH *DH_get_2048_224(void);
 DH *DH_get_2048_256(void);
 
+# ifndef OPENSSL_NO_CMS
 /* RFC2631 KDF */
 int DH_KDF_X9_42(unsigned char *out, size_t outlen,
                  const unsigned char *Z, size_t Zlen,
                  ASN1_OBJECT *key_oid,
                  const unsigned char *ukm, size_t ukmlen, const EVP_MD *md);
+# endif
 
 # define EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, len) \
         EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_DH, EVP_PKEY_OP_PARAMGEN, \
@@ -336,7 +339,9 @@ int DH_KDF_X9_42(unsigned char *out, size_t outlen,
 
 /* KDF types */
 # define EVP_PKEY_DH_KDF_NONE                            1
+# ifndef OPENSSL_NO_CMS
 # define EVP_PKEY_DH_KDF_X9_42                           2
+# endif
 
 /* BEGIN ERROR CODES */
 /*

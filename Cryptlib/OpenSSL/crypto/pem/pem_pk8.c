@@ -69,9 +69,11 @@
 static int do_pk8pkey(BIO *bp, EVP_PKEY *x, int isder,
                       int nid, const EVP_CIPHER *enc,
                       char *kstr, int klen, pem_password_cb *cb, void *u);
+#ifndef OPENSSL_NO_FP_API
 static int do_pk8pkey_fp(FILE *bp, EVP_PKEY *x, int isder,
                          int nid, const EVP_CIPHER *enc,
                          char *kstr, int klen, pem_password_cb *cb, void *u);
+#endif
 
 /*
  * These functions write a private key in PKCS#8 format: it is a "drop in"

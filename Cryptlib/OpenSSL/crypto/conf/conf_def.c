@@ -182,6 +182,10 @@ static int def_destroy_data(CONF *conf)
 
 static int def_load(CONF *conf, const char *name, long *line)
 {
+#ifdef OPENSSL_NO_STDIO
+    CONFerr(CONF_F_DEF_LOAD, ERR_R_SYS_LIB);
+    return 0;
+#else
     int ret;
     BIO *in = NULL;
 
@@ -202,6 +206,7 @@ static int def_load(CONF *conf, const char *name, long *line)
     BIO_free(in);
 
     return ret;
+#endif
 }
 
 static int def_load_bio(CONF *conf, BIO *in, long *line)
@@ -225,12 +230,11 @@ static int def_load_bio(CONF *conf, BIO *in, long *line)
         goto err;
     }
 
-    section = (char *)OPENSSL_malloc(10);
+    section = BUF_strdup("default");
     if (section == NULL) {
         CONFerr(CONF_F_DEF_LOAD_BIO, ERR_R_MALLOC_FAILURE);
         goto err;
     }
-    BUF_strlcpy(section, "default", 10);
 
     if (_CONF_new_data(conf) == 0) {
         CONFerr(CONF_F_DEF_LOAD_BIO, ERR_R_MALLOC_FAILURE);

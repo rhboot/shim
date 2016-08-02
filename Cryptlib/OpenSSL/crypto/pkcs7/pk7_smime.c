@@ -64,6 +64,8 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
+#define BUFFERSIZE 4096
+
 static int pkcs7_copy_existing_digest(PKCS7 *p7, PKCS7_SIGNER_INFO *si);
 
 PKCS7 *PKCS7_sign(X509 *signcert, EVP_PKEY *pkey, STACK_OF(X509) *certs,
@@ -255,10 +257,9 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
     PKCS7_SIGNER_INFO *si;
     X509_STORE_CTX cert_ctx;
     char *buf = NULL;
-    int bufsiz;
     int i, j = 0, k, ret = 0;
-    BIO *p7bio;
-    BIO *tmpin, *tmpout;
+    BIO *p7bio = NULL;
+    BIO *tmpin = NULL, *tmpout = NULL;
 
     if (!p7) {
         PKCS7err(PKCS7_F_PKCS7_VERIFY, PKCS7_R_INVALID_NULL_POINTER);
@@ -278,7 +279,18 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
 #if 0
     /*
      * NB: this test commented out because some versions of Netscape
-     * illegally include zero length content when signing data.
+     * illegally include zero length content when signing data. Also
+     * Microsoft Authenticode includes a SpcIndirectDataContent data
+     * structure which describes the content to be protected by the
+     * signature, rather than directly embedding that content. So
+     * Authenticode implementations are also expected to use
+     * PKCS7_verify() with explicit external data, on non-detached
+     * PKCS#7 signatures.
+     *
+     * In OpenSSL 1.1 a new flag PKCS7_NO_DUAL_CONTENT has been
+     * introduced to disable this sanity check. For the 1.0.2 branch
+     * this change is not acceptable, so the check remains completely
+     * commented out (as it has been for a long time).
      */
 
     /* Check for data and content: two sets of data */
@@ -296,7 +308,6 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
     }
 
     signers = PKCS7_get0_signers(p7, certs, flags);
-
     if (!signers)
         return 0;
 
@@ -309,14 +320,12 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
                 if (!X509_STORE_CTX_init(&cert_ctx, store, signer,
                                          p7->d.sign->cert)) {
                     PKCS7err(PKCS7_F_PKCS7_VERIFY, ERR_R_X509_LIB);
-                    sk_X509_free(signers);
-                    return 0;
+                    goto err;
                 }
                 X509_STORE_CTX_set_default(&cert_ctx, "smime_sign");
             } else if (!X509_STORE_CTX_init(&cert_ctx, store, signer, NULL)) {
                 PKCS7err(PKCS7_F_PKCS7_VERIFY, ERR_R_X509_LIB);
-                sk_X509_free(signers);
-                return 0;
+                goto err;
             }
             if (!(flags & PKCS7_NOCRL))
                 X509_STORE_CTX_set0_crls(&cert_ctx, p7->d.sign->crl);
@@ -329,8 +338,7 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
                          PKCS7_R_CERTIFICATE_VERIFY_ERROR);
                 ERR_add_error_data(2, "Verify error:",
                                    X509_verify_cert_error_string(j));
-                sk_X509_free(signers);
-                return 0;
+                goto err;
             }
             /* Check for revocation status here */
         }
@@ -349,7 +357,7 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
         tmpin = BIO_new_mem_buf(ptr, len);
         if (tmpin == NULL) {
             PKCS7err(PKCS7_F_PKCS7_VERIFY, ERR_R_MALLOC_FAILURE);
-            return 0;
+            goto err;
         }
     } else
         tmpin = indata;
@@ -366,14 +374,13 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
     } else
         tmpout = out;
 
-    bufsiz = 4096;
-    buf = OPENSSL_malloc(bufsiz);
-    if (buf == NULL) {
+    /* We now have to 'read' from p7bio to calculate digests etc. */
+    if ((buf = OPENSSL_malloc(BUFFERSIZE)) == NULL) {
+        PKCS7err(PKCS7_F_PKCS7_VERIFY, ERR_R_MALLOC_FAILURE);
         goto err;
     }
-    /* We now have to 'read' from p7bio to calculate digests etc. */
     for (;;) {
-        i = BIO_read(p7bio, buf, bufsiz);
+        i = BIO_read(p7bio, buf, BUFFERSIZE);
         if (i <= 0)
             break;
         if (tmpout)
@@ -404,19 +411,13 @@ int PKCS7_verify(PKCS7 *p7, STACK_OF(X509) *certs, X509_STORE *store,
     ret = 1;
 
  err:
-
+    OPENSSL_free(buf);
     if (tmpin == indata) {
         if (indata)
             BIO_pop(p7bio);
     }
     BIO_free_all(p7bio);
-
     sk_X509_free(signers);
-
-    if (buf != NULL) {
-      OPENSSL_free(buf);
-    }
-
     return ret;
 }
 
@@ -529,7 +530,7 @@ int PKCS7_decrypt(PKCS7 *p7, EVP_PKEY *pkey, X509 *cert, BIO *data, int flags)
 {
     BIO *tmpmem;
     int ret, i;
-    char buf[4096];
+    char *buf = NULL;
 
     if (!p7) {
         PKCS7err(PKCS7_F_PKCS7_DECRYPT, PKCS7_R_INVALID_NULL_POINTER);
@@ -573,24 +574,30 @@ int PKCS7_decrypt(PKCS7 *p7, EVP_PKEY *pkey, X509 *cert, BIO *data, int flags)
         }
         BIO_free_all(bread);
         return ret;
-    } else {
-        for (;;) {
-            i = BIO_read(tmpmem, buf, sizeof(buf));
-            if (i <= 0) {
-                ret = 1;
-                if (BIO_method_type(tmpmem) == BIO_TYPE_CIPHER) {
-                    if (!BIO_get_cipher_status(tmpmem))
-                        ret = 0;
-                }
-
-                break;
-            }
-            if (BIO_write(data, buf, i) != i) {
-                ret = 0;
-                break;
-            }
-        }
-        BIO_free_all(tmpmem);
-        return ret;
     }
+    if ((buf = OPENSSL_malloc(BUFFERSIZE)) == NULL) {
+        PKCS7err(PKCS7_F_PKCS7_DECRYPT, ERR_R_MALLOC_FAILURE);
+        goto err;
+    }
+    for (;;) {
+        i = BIO_read(tmpmem, buf, BUFFERSIZE);
+        if (i <= 0) {
+            ret = 1;
+            if (BIO_method_type(tmpmem) == BIO_TYPE_CIPHER) {
+                if (!BIO_get_cipher_status(tmpmem))
+                    ret = 0;
+            }
+
+            break;
+        }
+        if (BIO_write(data, buf, i) != i) {
+            ret = 0;
+            break;
+        }
+    }
+
+err:
+    OPENSSL_free(buf);
+    BIO_free_all(tmpmem);
+    return ret;
 }

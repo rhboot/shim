@@ -270,7 +270,7 @@ static X509_ALGOR *rsa_mgf1_decode(X509_ALGOR *alg)
 {
     const unsigned char *p;
     int plen;
-    if (alg == NULL)
+    if (alg == NULL || alg->parameter == NULL)
         return NULL;
     if (OBJ_obj2nid(alg->algorithm) != NID_mgf1)
         return NULL;
@@ -768,6 +768,7 @@ static int rsa_item_sign(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
     return 2;
 }
 
+#ifndef OPENSSL_NO_CMS
 static RSA_OAEP_PARAMS *rsa_oaep_decode(const X509_ALGOR *alg,
                                         X509_ALGOR **pmaskHash)
 {
@@ -791,7 +792,6 @@ static RSA_OAEP_PARAMS *rsa_oaep_decode(const X509_ALGOR *alg,
     return pss;
 }
 
-#ifndef OPENSSL_NO_CMS
 static int rsa_cms_decrypt(CMS_RecipientInfo *ri)
 {
     EVP_PKEY_CTX *pkctx;
@@ -864,9 +864,7 @@ static int rsa_cms_decrypt(CMS_RecipientInfo *ri)
         X509_ALGOR_free(maskHash);
     return rv;
 }
-#endif
 
-#ifndef OPENSSL_NO_CMS
 static int rsa_cms_encrypt(CMS_RecipientInfo *ri)
 {
     const EVP_MD *md, *mgf1md;

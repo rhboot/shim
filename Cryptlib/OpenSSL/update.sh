@@ -1,6 +1,6 @@
 #/bin/sh
 DIR=$1
-version="1.0.2d"
+version="1.0.2h"
 
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/e_os.h e_os.h
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/constant_time_locl.h crypto/constant_time_locl.h
@@ -474,20 +474,6 @@ install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_lib.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_util.c crypto/ui/ui_util.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_compat.c crypto/ui/ui_compat.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/krb5/krb5_asn.c crypto/krb5/krb5_asn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pqueue/pqueue.h crypto/pqueue/pqueue.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pqueue/pqueue.c crypto/pqueue/pqueue.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts.h crypto/ts/ts.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_err.c crypto/ts/ts_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_req_utils.c crypto/ts/ts_req_utils.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_req_print.c crypto/ts/ts_req_print.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_rsp_utils.c crypto/ts/ts_rsp_utils.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_rsp_print.c crypto/ts/ts_rsp_print.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_rsp_sign.c crypto/ts/ts_rsp_sign.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_rsp_verify.c crypto/ts/ts_rsp_verify.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_verify_ctx.c crypto/ts/ts_verify_ctx.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_lib.c crypto/ts/ts_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_conf.c crypto/ts/ts_conf.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ts/ts_asn1.c crypto/ts/ts_asn1.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cmac.c crypto/cmac/cmac.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cm_ameth.c crypto/cmac/cm_ameth.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cm_pmeth.c crypto/cmac/cm_pmeth.c
