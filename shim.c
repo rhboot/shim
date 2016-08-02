@@ -966,7 +966,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		 */
 		if (sizeof(shim_cert) &&
 		    AuthenticodeVerify(cert->CertData,
-			       context->SecDir->Size - sizeof(cert->Hdr),
+			       cert->Hdr.dwLength - sizeof(cert->Hdr),
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
@@ -977,7 +977,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		 * And finally, check against shim's built-in key
 		 */
 		if (vendor_cert_size && AuthenticodeVerify(cert->CertData,
-							context->SecDir->Size - sizeof(cert->Hdr),
+							cert->Hdr.dwLength - sizeof(cert->Hdr),
 							vendor_cert, vendor_cert_size, sha256hash,
 							SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
