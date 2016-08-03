@@ -872,6 +872,16 @@ static EFI_STATUS write_db (CHAR16 *db_name, void *MokNew, UINTN MokNewSize)
 	UINTN old_size;
 	UINTN new_size;
 
+	status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
+				   &shim_lock_guid,
+				   EFI_VARIABLE_NON_VOLATILE
+				   | EFI_VARIABLE_BOOTSERVICE_ACCESS
+				   | EFI_VARIABLE_APPEND_WRITE,
+				   MokNewSize, MokNew);
+	if (status == EFI_SUCCESS || status != EFI_INVALID_PARAMETER) {
+		return status;
+	}
+
 	status = get_variable_attr(db_name, (UINT8 **)&old_data, &old_size,
 				   shim_lock_guid, &attributes);
 	if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
