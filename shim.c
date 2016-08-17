@@ -52,8 +52,14 @@
 #include "console.h"
 #include "version.h"
 
+#include <stdarg.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
+
+#define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
 static EFI_SYSTEM_TABLE *systab;
 static EFI_HANDLE image_handle;
@@ -389,6 +395,38 @@ static BOOLEAN verify_x509(UINT8 *Cert, UINTN CertSize)
 	return TRUE;
 }
 
+static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
+{
+	X509 *x509;
+	CONST UINT8 *Temp = Cert;
+	EXTENDED_KEY_USAGE *eku;
+	ASN1_OBJECT *module_signing;
+
+	module_signing = OBJ_nid2obj(OBJ_create(OID_EKU_MODSIGN, NULL, NULL));
+
+	x509 = d2i_X509 (NULL, &Temp, (long) CertSize);
+	if (x509 != NULL) {
+		eku = X509_get_ext_d2i(x509, NID_ext_key_usage, NULL, NULL);
+
+		if (eku) {
+			int i = 0;
+			for (i = 0; i < sk_ASN1_OBJECT_num(eku); i++) {
+				ASN1_OBJECT *key_usage = sk_ASN1_OBJECT_value(eku, i);
+
+				if (OBJ_cmp(module_signing, key_usage) == 0)
+					return FALSE;
+			}
+			EXTENDED_KEY_USAGE_free(eku);
+		}
+
+		X509_free(x509);
+	}
+
+	OBJ_cleanup();
+
+	return TRUE;
+}
+
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
@@ -404,13 +442,15 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
-				IsFound = AuthenticodeVerify (data->CertData,
-							      data->Hdr.dwLength - sizeof(data->Hdr),
-							      Cert->SignatureData,
-							      CertSize,
-							      hash, SHA256_DIGEST_SIZE);
-				if (IsFound)
-					return DATA_FOUND;
+				if (verify_eku(Cert->SignatureData, CertSize)) {
+					IsFound = AuthenticodeVerify (data->CertData,
+								      data->Hdr.dwLength - sizeof(data->Hdr),
+								      Cert->SignatureData,
+								      CertSize,
+								      hash, SHA256_DIGEST_SIZE);
+					if (IsFound)
+						return DATA_FOUND;
+				}
 			} else if (verbose) {
 				console_notify(L"Not a DER encoding x.509 Certificate");
 			}
