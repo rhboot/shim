@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include <Library/BaseCryptLib.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
+#include <openssl/asn1.h>
 #include <openssl/bn.h>
 #include "shim.h"
 #include "PeImage.h"
@@ -338,6 +340,7 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 	CHAR16 *subject = NULL;
 	CHAR16 *from = NULL;
 	CHAR16 *until = NULL;
+	EXTENDED_KEY_USAGE *extusage;
 	POOL_PRINT hash_string1;
 	POOL_PRINT hash_string2;
 	POOL_PRINT serial_string;
@@ -405,7 +408,32 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 		return;
 
 	i = 0;
-	text = AllocateZeroPool(sizeof(CHAR16 *) * (fields*3 + 1));
+
+	extusage = X509_get_ext_d2i(X509Cert, NID_ext_key_usage, NULL, NULL);
+	text = AllocateZeroPool(sizeof(CHAR16 *) * (fields*3 + sk_ASN1_OBJECT_num(extusage) + 3));
+
+	if (extusage) {
+		int j = 0;
+
+		text[i++] = StrDuplicate(L"[Extended Key Usage]");
+
+		for (j = 0; j < sk_ASN1_OBJECT_num(extusage); j++) {
+			POOL_PRINT extkeyusage;
+			ASN1_OBJECT *obj = sk_ASN1_OBJECT_value(extusage, j);
+			int buflen = 80;
+			char buf[buflen];
+
+			ZeroMem(&extkeyusage, sizeof(extkeyusage));
+
+			OBJ_obj2txt(buf, buflen, obj, 0);
+			CatPrint(&extkeyusage, L"OID: %a", buf);
+			text[i++] = StrDuplicate(extkeyusage.str);
+			FreePool(extkeyusage.str);
+		}
+		text[i++] = StrDuplicate(L"");
+		EXTENDED_KEY_USAGE_free(extusage);
+	}
+
 	if (serial_string.str) {
 		text[i++] = StrDuplicate(L"[Serial Number]");
 		text[i++] = serial_string.str;
