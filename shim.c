@@ -915,11 +915,21 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	unsigned int size = datasize;
 
 	if (context->SecDir->Size != 0) {
+		if (context->SecDir->Size >= size) {
+			perror(L"Certificate Database size is too large\n");
+			return EFI_INVALID_PARAMETER;
+		}
+
 		cert = ImageAddress (data, size,
 				     context->SecDir->VirtualAddress);
 
 		if (!cert) {
 			perror(L"Certificate located outside the image\n");
+			return EFI_INVALID_PARAMETER;
+		}
+
+		if (cert->Hdr.dwLength > context->SecDir->Size) {
+			perror(L"Certificate list size is inconsistent with PE headers");
 			return EFI_INVALID_PARAMETER;
 		}
 
