@@ -999,6 +999,7 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 	unsigned long HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
+	unsigned long FileAlignment = 0;
 
 	if (datasize < sizeof (PEHdr->Pe32)) {
 		perror(L"Invalid image\n");
@@ -1018,17 +1019,28 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		context->SizeOfHeaders = PEHdr->Pe32Plus.OptionalHeader.SizeOfHeaders;
 		context->ImageSize = PEHdr->Pe32Plus.OptionalHeader.SizeOfImage;
 		context->SectionAlignment = PEHdr->Pe32Plus.OptionalHeader.SectionAlignment;
+		FileAlignment = PEHdr->Pe32Plus.OptionalHeader.FileAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
 	} else {
 		context->NumberOfRvaAndSizes = PEHdr->Pe32.OptionalHeader.NumberOfRvaAndSizes;
 		context->SizeOfHeaders = PEHdr->Pe32.OptionalHeader.SizeOfHeaders;
 		context->ImageSize = (UINT64)PEHdr->Pe32.OptionalHeader.SizeOfImage;
 		context->SectionAlignment = PEHdr->Pe32.OptionalHeader.SectionAlignment;
+		FileAlignment = PEHdr->Pe32.OptionalHeader.FileAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
 	}
 
-	if (context->SectionAlignment < 0x1000)
-		context->SectionAlignment = 0x1000;
+	if (FileAlignment % 2 != 0) {
+		perror(L"File Alignment is invalid (%d)\n", FileAlignment);
+		return EFI_UNSUPPORTED;
+	}
+	if (FileAlignment == 0)
+		FileAlignment = 0x200;
+	if (context->SectionAlignment == 0)
+		context->SectionAlignment = PAGE_SIZE;
+	if (context->SectionAlignment < FileAlignment)
+		context->SectionAlignment = FileAlignment;
+
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
 	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < context->NumberOfRvaAndSizes) {
@@ -1262,12 +1274,20 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 			return EFI_UNSUPPORTED;
 		}
 
-		if (Section->SizeOfRawData > 0)
-			CopyMem(base, data + Section->PointerToRawData, Section->SizeOfRawData);
+		if (Section->Characteristics & EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
+			ZeroMem(base, Section->Misc.VirtualSize);
+		} else {
+			if (Section->PointerToRawData < context.SizeOfHeaders) {
+				perror(L"Section %d is inside image headers\n", i);
+				return EFI_UNSUPPORTED;
+			}
 
-		if (Section->SizeOfRawData < Section->Misc.VirtualSize)
-			ZeroMem (base + Section->SizeOfRawData,
-				 Section->Misc.VirtualSize - Section->SizeOfRawData);
+			if (Section->SizeOfRawData > 0)
+				CopyMem(base, data + Section->PointerToRawData, size);
+
+			if (size < Section->Misc.VirtualSize)
+				ZeroMem(base + size, Section->Misc.VirtualSize - size);
+		}
 	}
 
 	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
