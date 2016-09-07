@@ -916,6 +916,10 @@ out:
 		FreePool(old_data);
 	}
 
+	if (new_data != NULL) {
+		FreePool(new_data);
+	}
+
 	return status;
 }
 
