@@ -1293,10 +1293,12 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 			}
 
 			if (Section->SizeOfRawData > 0)
-				CopyMem(base, data + Section->PointerToRawData, size);
+				CopyMem(base, data + Section->PointerToRawData,
+					Section->SizeOfRawData);
 
-			if (size < Section->Misc.VirtualSize)
-				ZeroMem(base + size, Section->Misc.VirtualSize - size);
+			if (Section->SizeOfRawData < Section->Misc.VirtualSize)
+				ZeroMem(base + Section->SizeOfRawData,
+					Section->Misc.VirtualSize - Section->SizeOfRawData);
 		}
 	}
 
