@@ -1027,6 +1027,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       cert->Hdr.dwLength - sizeof(cert->Hdr),
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
+			update_verification_method(VERIFIED_BY_CERT);
 			status = EFI_SUCCESS;
 			return status;
 		    }
@@ -1035,6 +1036,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			    cert->Hdr.dwLength - sizeof(cert->Hdr),
 			    shim_cert, sizeof(shim_cert), sha1hash,
 			    SHA1_DIGEST_SIZE)) {
+			update_verification_method(VERIFIED_BY_CERT);
 			status = EFI_SUCCESS;
 			return status;
 		    }
@@ -1048,6 +1050,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				       cert->Hdr.dwLength - sizeof(cert->Hdr),
 				       vendor_cert, vendor_cert_size,
 				       sha256hash, SHA256_DIGEST_SIZE)) {
+			update_verification_method(VERIFIED_BY_CERT);
 			status = EFI_SUCCESS;
 			return status;
 		    }
@@ -1056,6 +1059,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 					   cert->Hdr.dwLength - sizeof(cert->Hdr),
 					   vendor_cert, vendor_cert_size,
 					   sha1hash, SHA1_DIGEST_SIZE)) {
+			update_verification_method(VERIFIED_BY_CERT);
 			status = EFI_SUCCESS;
 			return status;
 		    }
