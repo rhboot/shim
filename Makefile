@@ -7,6 +7,11 @@ endif
 CC		= $(CROSS_COMPILE)gcc
 LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
+OPENSSL		?= openssl
+HEXDUMP		?= hexdump
+PK12UTIL	?= pk12util
+CERTUTIL	?= certutil
+PESIGN		?= pesign
 
 ARCH		= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
@@ -108,11 +113,11 @@ shim.crt:
 	./make-certs shim shim@xn--u4h.net all codesign 1.3.6.1.4.1.311.10.3.1 </dev/null
 
 shim.cer: shim.crt
-	openssl x509 -outform der -in $< -out $@
+	$(OPENSSL) x509 -outform der -in $< -out $@
 
 shim_cert.h: shim.cer
 	echo "static UINT8 shim_cert[] = {" > $@
-	hexdump -v -e '1/1 "0x%02x, "' $< >> $@
+	$(HEXDUMP) -v -e '1/1 "0x%02x, "' $< >> $@
 	echo "};" >> $@
 
 version.c : version.c.in
@@ -123,8 +128,8 @@ version.c : version.c.in
 
 certdb/secmod.db: shim.crt
 	-mkdir certdb
-	pk12util -d certdb/ -i shim.p12 -W "" -K ""
-	certutil -d certdb/ -A -i shim.crt -n shim -t u
+	$(PK12UTIL) -d certdb/ -i shim.p12 -W "" -K ""
+	$(CERTUTIL) -d certdb/ -A -i shim.crt -n shim -t u
 
 shim.o: $(SOURCES) shim_cert.h
 shim.o: $(wildcard *.h)
@@ -186,7 +191,7 @@ endif
 		$(FORMAT) $^ $@.debug
 
 %.efi.signed: %.efi certdb/secmod.db
-	pesign -n certdb -i $< -c "shim" -s -o $@ -f
+	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 
 clean:
 	$(MAKE) -C Cryptlib clean
