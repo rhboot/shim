@@ -61,6 +61,21 @@ static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm)
 	return FALSE;
 }
 
+/*
+ * According to TCG EFI Protocol Specification for TPM 2.0 family,
+ * all events generated after the invocation of EFI_TCG2_GET_EVENT_LOG
+ * shall be stored in an instance of an EFI_CONFIGURATION_TABLE aka
+ * EFI TCG 2.0 final events table. Hence, it is necessary to trigger the
+ * internal switch through calling get_event_log() in order to allow
+ * to retrieve the logs from OS runtime.
+ */
+static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2)
+{
+	return uefi_call_wrapper(tpm2->get_event_log, 5, tpm2,
+				 EFI_TCG2_EVENT_LOG_FORMAT_TCG_2, NULL,
+				 NULL, NULL);
+}
+
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description)
 {
@@ -75,6 +90,12 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 
 		if (!tpm2_present(tpm2))
 			return EFI_SUCCESS;
+
+		status = trigger_tcg2_final_events_table(tpm2);
+		if (EFI_ERROR(status)) {
+			perror(L"Unable to trigger tcg2 final events table\n");
+			return status;
+		}
 
 		event = AllocatePool(sizeof(*event) + strlen(description) + 1);
 		if (!event) {

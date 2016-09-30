@@ -114,6 +114,8 @@ typedef struct tdEFI_TCG2_EVENT {
   uint8_t Event[1];
 } __attribute__ ((packed)) EFI_TCG2_EVENT;
 
+#define EFI_TCG2_EVENT_LOG_FORMAT_TCG_2 0x00000002
+
 struct efi_tpm2_protocol
 {
   EFI_STATUS (EFIAPI *get_capability) (struct efi_tpm2_protocol *this,
