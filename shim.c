@@ -686,12 +686,14 @@ static BOOLEAN secure_mode (void)
 #define check_size_line(data, datasize_in, hashbase, hashsize, l) ({	\
 	if ((unsigned long)hashbase >					\
 			(unsigned long)data + datasize_in) {		\
+		status = EFI_INVALID_PARAMETER;				\
 		perror(L"shim.c:%d Invalid hash base 0x%016x\n", l,	\
 			hashbase);					\
 		goto done;						\
 	}								\
 	if ((unsigned long)hashbase + hashsize >			\
 			(unsigned long)data + datasize_in) {		\
+		status = EFI_INVALID_PARAMETER;				\
 		perror(L"shim.c:%d Invalid hash size 0x%016x\n", l,	\
 			hashsize);					\
 		goto done;						\
@@ -887,6 +889,13 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	if (datasize > SumOfBytesHashed) {
 		hashbase = data + SumOfBytesHashed;
 		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
+
+		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
+		    (SumOfBytesHashed - hashsize != context->SecDir->VirtualAddress)) {
+			perror(L"Malformed binary after Attribute Certificate Table\n");
+			status = EFI_INVALID_PARAMETER;
+			goto done;
+		}
 		check_size(data, datasize_in, hashbase, hashsize);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
