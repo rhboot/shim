@@ -1,0 +1,26 @@
+diff --git i/src/minicom.c w/src/minicom.c
+index e1a557b..f043c30 100644
+--- i/src/minicom.c
++++ w/src/minicom.c
+@@ -1255,7 +1255,7 @@ int main(int argc, char **argv)
+           vt_set(addlf, -1, docap, -1, -1, -1, -1, -1, addcr);
+           break;
+         case 'S': /* start Script */
+-          strncpy(scr_name, optarg, 33);
++          strncpy(scr_name, optarg, 256);
+           break;
+         case '7': /* 7bit fallback mode */
+ 	  screen_ibmpc = screen_iso = 0;
+diff --git i/src/minicom.h w/src/minicom.h
+index 129e826..2c96aef 100644
+--- i/src/minicom.h
++++ w/src/minicom.h
+@@ -100,7 +100,7 @@ EXTERN int alt_override;/* -m option */
+ EXTERN char parfile[256]; /* Global parameter file */
+ EXTERN char pparfile[256]; /* Personal parameter file */
+ 
+-EXTERN char scr_name[33];   /* Name of last script */
++EXTERN char scr_name[256];   /* Name of last script */
+ EXTERN char scr_user[33];   /* Login name to use with script */
+ EXTERN char scr_passwd[33]; /* Password to use with script */
+ 

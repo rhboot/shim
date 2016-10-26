@@ -1,0 +1,116 @@
+#------------------------------------------------------------------------------
+#
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Module Name:
+#
+#  ResetVec.S16
+#
+# Abstract:
+#
+#  Reset Vector Data structure
+#  This structure is located at 0xFFFFFFD0
+#
+#------------------------------------------------------------------------------
+
+ASM_GLOBAL ASM_PFX (_start)
+ASM_PFX(_start):
+
+#
+# FIT table pointer for LT-SX.
+#
+FitTablePointer:
+    .long   0xeeeeeeee, 0xeeeeeeee
+    
+    .align 16
+    
+#
+# This is located at 0xFFFFFFD0h
+#    
+    .byte   0xBF, 0x50, 0x41    # mov     di, "AP"
+    jmp     ApStartup
+    .fill   PeiCoreEntryPoint - ., 1, 0
+    
+    .align 16
+#
+# Pointer to the entry point of the PEI core
+# It is located at 0xFFFFFFE0, and is fixed up by some build tool
+# So if the value 8..1 appears in the final FD image, tool failure occurs.
+#
+PeiCoreEntryPoint:
+    .long   0x87654321
+
+#
+# This is the handler for all kinds of exceptions. Since it's for debugging
+# purpose only, nothing except a deadloop would be done here. Developers could
+# analyze the cause of the exception if a debugger had been attached.
+#
+InterruptHandler:
+    jmp     .
+    iret
+    .fill   ResetHandler - ., 1, 0
+
+    .align 16
+#
+# For IA32, the reset vector must be at 0xFFFFFFF0, i.e., 4G-16 byte
+# Execution starts here upon power-on/platform-reset.
+#
+ResetHandler:
+    wbinvd
+ApStartup:
+    #
+    # Jmp Rel16 instruction
+    # Use machine code directly in case of the assembler optimization
+    # SEC entry point relatvie address will be fixed up by some build tool.
+    #
+    # Typically, SEC entry point is the function _ModuleEntryPoint() defined in
+    # SecEntry.asm
+    #
+    .byte      0xe9
+    .word      -3
+    .fill      ApSegAddress - ., 1, 0
+    
+    .align 8
+#
+# Ap reset vector segment address is at 0xFFFFFFF8
+# This will be fixed up by some build tool,
+# so if the value 1..8 appears in the final FD image,
+# tool failure occurs
+#
+ApSegAddress:
+    .long   0x12345678
+
+#
+# BFV Base is at 0xFFFFFFFC
+# This will be fixed up by some build tool,
+# so if the value 1..8 appears in the final FD image,
+# tool failure occurs.
+#
+BfvBase:
+    .long   0x12345678

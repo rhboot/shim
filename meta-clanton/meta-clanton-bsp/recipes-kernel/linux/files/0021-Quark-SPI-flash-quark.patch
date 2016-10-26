@@ -1,0 +1,38 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Bryan O'Donoghue <bryan.odonoghue@intel.com>
+Date: Tue, 11 Feb 2014 16:28:26 +0000
+Subject: [PATCH 21/21] Quark SPI flash
+
+---
+ drivers/mtd/devices/Kconfig  | 5 +++++
+ drivers/mtd/devices/Makefile | 3 +--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
+index 46dcb54..4844920 100644
+--- a/drivers/mtd/devices/Kconfig
++++ b/drivers/mtd/devices/Kconfig
+@@ -159,6 +159,11 @@ config MTD_MTDRAM
+ 	  provide storage.  You probably want to say 'N' unless you're
+ 	  testing stuff.
+ 
++config MTD_MTD_QRK_ROM
++	bool "Simple R/O drive for SPI flash in Quark x86 legacy block"
++	help
++	  Driver to enable reading directly from legacy block SPI /sketch part
++
+ config MTDRAM_TOTAL_SIZE
+ 	int "MTDRAM device size in KiB"
+ 	depends on MTD_MTDRAM
+diff --git a/drivers/mtd/devices/Makefile b/drivers/mtd/devices/Makefile
+index 395733a..4c8e399 100644
+--- a/drivers/mtd/devices/Makefile
++++ b/drivers/mtd/devices/Makefile
+@@ -20,5 +20,4 @@ obj-$(CONFIG_MTD_M25P80)	+= m25p80.o
+ obj-$(CONFIG_MTD_SPEAR_SMI)	+= spear_smi.o
+ obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
+ obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
+-
+-CFLAGS_docg3.o			+= -I$(src)
+\ No newline at end of file
++CFLAGS_docg3.o			+= -I$(src)

@@ -1,0 +1,2138 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Dan O'Donovan <dan.odonovan@emutex.com>
+Date: Mon, 24 Feb 2014 18:41:59 +0000
+Subject: [PATCH 18/21] Quark sensors
+
+---
+ drivers/iio/accel/Kconfig                          |   8 +
+ drivers/iio/accel/Makefile                         |   2 +
+ drivers/iio/accel/lis331dlh_intel_qrk.c            | 728 +++++++++++++++++++++
+ drivers/iio/common/Kconfig                         |   1 +
+ drivers/iio/common/Makefile                        |   1 +
+ drivers/iio/common/st_sensors/Kconfig              |  14 +
+ drivers/iio/common/st_sensors/Makefile             |  10 +
+ drivers/iio/common/st_sensors/st_sensors_buffer.c  | 115 ++++
+ drivers/iio/common/st_sensors/st_sensors_core.c    | 447 +++++++++++++
+ drivers/iio/common/st_sensors/st_sensors_i2c.c     |  81 +++
+ drivers/iio/common/st_sensors/st_sensors_spi.c     | 128 ++++
+ drivers/iio/common/st_sensors/st_sensors_trigger.c |  77 +++
+ drivers/iio/industrialio-buffer.c                  |   6 +-
+ include/linux/iio/common/st_sensors.h              | 289 ++++++++
+ include/linux/iio/common/st_sensors_i2c.h          |  20 +
+ include/linux/iio/common/st_sensors_spi.h          |  20 +
+ include/linux/platform_data/lis331dlh_intel_qrk.h  |  29 +
+ 17 files changed, 1973 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/iio/accel/lis331dlh_intel_qrk.c
+ create mode 100644 drivers/iio/common/st_sensors/Kconfig
+ create mode 100644 drivers/iio/common/st_sensors/Makefile
+ create mode 100644 drivers/iio/common/st_sensors/st_sensors_buffer.c
+ create mode 100644 drivers/iio/common/st_sensors/st_sensors_core.c
+ create mode 100644 drivers/iio/common/st_sensors/st_sensors_i2c.c
+ create mode 100644 drivers/iio/common/st_sensors/st_sensors_spi.c
+ create mode 100644 drivers/iio/common/st_sensors/st_sensors_trigger.c
+ create mode 100644 include/linux/iio/common/st_sensors.h
+ create mode 100644 include/linux/iio/common/st_sensors_i2c.h
+ create mode 100644 include/linux/iio/common/st_sensors_spi.h
+ create mode 100644 include/linux/platform_data/lis331dlh_intel_qrk.h
+
+diff --git a/drivers/iio/accel/Kconfig b/drivers/iio/accel/Kconfig
+index 05e996f..be6ded3 100644
+--- a/drivers/iio/accel/Kconfig
++++ b/drivers/iio/accel/Kconfig
+@@ -13,5 +13,13 @@ config HID_SENSOR_ACCEL_3D
+ 	help
+ 	  Say yes here to build support for the HID SENSOR
+ 	  accelerometers 3D.
++ 
++config IIO_LIS331DLH_INTEL_QRK
++        tristate "STMicroelectronics LIS331DLH accelerometer i2c driver for Intel Quark platform"
++        depends on INTEL_QUARK_X1000_SOC
++	depends on I2C && SYSFS
++	select IIO_ST_SENSORS_CORE
++        help
++          Selects the LIS331DLH accelerometer driver for the Intel Clanton Hill platform
+ 
+ endmenu
+diff --git a/drivers/iio/accel/Makefile b/drivers/iio/accel/Makefile
+index 5bc6855..81f8085 100644
+--- a/drivers/iio/accel/Makefile
++++ b/drivers/iio/accel/Makefile
+@@ -3,3 +3,5 @@
+ #
+ 
+ obj-$(CONFIG_HID_SENSOR_ACCEL_3D) += hid-sensor-accel-3d.o
++
++obj-$(CONFIG_IIO_LIS331DLH_INTEL_QRK) += lis331dlh_intel_qrk.o
+diff --git a/drivers/iio/accel/lis331dlh_intel_qrk.c b/drivers/iio/accel/lis331dlh_intel_qrk.c
+new file mode 100644
+index 0000000..fe868fd
+--- /dev/null
++++ b/drivers/iio/accel/lis331dlh_intel_qrk.c
+@@ -0,0 +1,728 @@
++/*
++ * Intel Clanton Hill platform accelerometer driver
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * Derived from STMicroelectronics accelerometers driver by Denis Ciocca
++ *
++ * The Intel Clanton Hill platform hardware design includes an
++ * STMicroelectronics LIS331DLH accelerometer, intended to be used mainly for
++ * sensing orientation, movement and sudden impacts (e.g. vehicle collision)
++ *
++ * This driver plugs into the Linux Industrial-IO framework to provide a
++ * standardised user-space application interface for retreiving data and events
++ * from the accelerometer.
++ *
++ * The LIS331DLH is connected via I2C to the host CPU on the Clanton Hill
++ * platform and so this driver registers to the kernel as an I2C device driver
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/errno.h>
++#include <linux/types.h>
++#include <linux/mutex.h>
++#include <linux/interrupt.h>
++#include <linux/i2c.h>
++#include <linux/gpio.h>
++#include <linux/iio/iio.h>
++#include <linux/iio/sysfs.h>
++#include <linux/iio/events.h>
++
++#include <linux/iio/common/st_sensors.h>
++#include <linux/iio/common/st_sensors_i2c.h>
++
++#include <linux/platform_data/lis331dlh_intel_qrk.h>
++
++/* DEFAULT VALUE FOR SENSORS */
++#define ST_ACCEL_DEFAULT_OUT_X_L_ADDR		0x28
++#define ST_ACCEL_DEFAULT_OUT_Y_L_ADDR		0x2a
++#define ST_ACCEL_DEFAULT_OUT_Z_L_ADDR		0x2c
++
++/* FULLSCALE */
++#define ST_ACCEL_FS_AVL_2G			2
++#define ST_ACCEL_FS_AVL_4G			4
++#define ST_ACCEL_FS_AVL_6G			6
++#define ST_ACCEL_FS_AVL_8G			8
++#define ST_ACCEL_FS_AVL_16G			16
++
++/* CUSTOM VALUES FOR SENSOR 2 */
++#define ST_ACCEL_2_WAI_EXP			0x32
++#define ST_ACCEL_2_ODR_ADDR			0x20
++#define ST_ACCEL_2_ODR_MASK			0x18
++#define ST_ACCEL_2_ODR_AVL_50HZ_VAL		0x00
++#define ST_ACCEL_2_ODR_AVL_100HZ_VAL		0x01
++#define ST_ACCEL_2_ODR_AVL_400HZ_VAL		0x02
++#define ST_ACCEL_2_ODR_AVL_1000HZ_VAL		0x03
++#define ST_ACCEL_2_PW_ADDR			0x20
++#define ST_ACCEL_2_PW_MASK			0xe0
++#define ST_ACCEL_2_PW_DOWN			0x00
++#define ST_ACCEL_2_PW_NORMAL		0x20
++#define ST_ACCEL_2_CTRL_REG1_XEN	0x01
++#define ST_ACCEL_2_CTRL_REG1_YEN	0x02
++#define ST_ACCEL_2_CTRL_REG1_ZEN	0x04
++#define ST_ACCEL_2_FS_ADDR			0x23
++#define ST_ACCEL_2_FS_MASK			0x30
++#define ST_ACCEL_2_FS_AVL_2_VAL			0X00
++#define ST_ACCEL_2_FS_AVL_4_VAL			0X01
++#define ST_ACCEL_2_FS_AVL_8_VAL			0x03
++#define ST_ACCEL_2_FS_AVL_2_GAIN		IIO_G_TO_M_S_2(1000)
++#define ST_ACCEL_2_FS_AVL_4_GAIN		IIO_G_TO_M_S_2(2000)
++#define ST_ACCEL_2_FS_AVL_8_GAIN		IIO_G_TO_M_S_2(3900)
++#define ST_ACCEL_2_BDU_ADDR			0x23
++#define ST_ACCEL_2_BDU_MASK			0x80
++#define ST_ACCEL_2_DRDY_IRQ_ADDR		0x22
++#define ST_ACCEL_2_DRDY_IRQ_MASK		0x02
++#define ST_ACCEL_2_THRESH_IRQ_ADDR		0x30
++#define ST_ACCEL_2_THRESH_IRQ_MASK		0x7f
++#define ST_ACCEL_2_INT1_CFG_ADDR		0x30
++#define ST_ACCEL_2_INT1_SRC_ADDR		0x31
++#define ST_ACCEL_2_INT1_THRESH_ADDR		0x32
++#define ST_ACCEL_2_INT1_DURATION_ADDR		0x33
++#define ST_ACCEL_2_INT2_CFG_ADDR		0x34
++#define ST_ACCEL_2_INT2_SRC_ADDR		0x35
++#define ST_ACCEL_2_INT2_THRESH_ADDR		0x36
++#define ST_ACCEL_2_INT2_DURATION_ADDR		0x37
++#define ST_ACCEL_2_INT_IA_MASK			0x40
++#define ST_ACCEL_2_INT_LIR_MASK			0x05
++#define ST_ACCEL_2_INT_SRC_HIGH_MASK	0x20
++#define ST_ACCEL_2_INT_CFG_XLIE_EN		0x01
++#define ST_ACCEL_2_INT_CFG_XHIE_EN		0x02
++#define ST_ACCEL_2_INT_CFG_YLIE_EN		0x04
++#define ST_ACCEL_2_INT_CFG_YHIE_EN		0x08
++#define ST_ACCEL_2_INT_CFG_ZLIE_EN		0x10
++#define ST_ACCEL_2_INT_CFG_ZHIE_EN		0x20
++
++#define ST_ACCEL_2_MULTIREAD_BIT		true
++#define ST_ACCEL_2_THRESH_VAL_MIN		0x00
++#define ST_ACCEL_2_THRESH_VAL_MAX		0x7f
++#define QRK_ACCEL_INT2_WAKEUP_THRESH_VAL	0x7f
++
++#define QRK_ACCEL_INT1_DISABLED			0
++#define QRK_ACCEL_INT1_ENABLED			1
++
++#define QRK_ACCEL_LSM_CHANNELS(device_type, index, mod, endian, bits, addr) \
++{ \
++	.type = device_type, \
++	.modified = 1, \
++	.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT | \
++			IIO_CHAN_INFO_SCALE_SEPARATE_BIT, \
++	.scan_index = index, \
++	.channel = mod, \
++	.channel2 = mod, \
++	.address = addr, \
++	.scan_type = { \
++		.sign = 's', \
++		.realbits = bits, \
++		.shift = 16 - bits, \
++		.storagebits = 16, \
++		.endianness = endian, \
++	}, \
++	.event_mask = IIO_EV_BIT(IIO_EV_TYPE_THRESH, IIO_EV_DIR_RISING), \
++}
++
++static const u8 iio_modifier_map[] = {
++	IIO_NO_MOD,
++	IIO_MOD_X,
++	IIO_MOD_Y,
++	IIO_MOD_X_AND_Y,
++	IIO_MOD_Z,
++	IIO_MOD_X_AND_Z,
++	IIO_MOD_Y_AND_Z,
++	IIO_MOD_X_AND_Y_AND_Z,
++};
++
++/*  Threshold event ISR bottom half.  This function reads interrupt status
++ *  registers for INT1 to reset any active interrupt conditions
++ *  and pushes an IIO event if a threshold interrupt was active.
++ */
++static irqreturn_t lis331dlh_intel_qrk_threshold_event_handler(
++	int irq,
++	void *private)
++{
++	int err;
++	u8 data;
++	u8 mask;
++	int i;
++	u64 iio_modifier;
++
++	struct st_sensor_data *sdata = iio_priv(private);
++	s64 timestamp = iio_get_time_ns();
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++			ST_ACCEL_2_INT1_SRC_ADDR,
++			&data);
++
++	if (err < 0)
++		goto st_sensors_read_err;
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++			ST_ACCEL_2_INT1_CFG_ADDR,
++				&mask);
++
++	if (err < 0)
++		goto st_sensors_read_err;
++
++	if (data & ST_ACCEL_2_INT_IA_MASK) {
++		data &= mask;
++
++		iio_modifier = 0;
++		for (i = 0; i < ST_SENSORS_NUMBER_DATA_CHANNELS; i++) {
++			iio_modifier <<= 1;
++			iio_modifier += !!(data & ST_ACCEL_2_INT_SRC_HIGH_MASK);
++			data <<= 2;
++		}
++
++		iio_modifier = iio_modifier_map[iio_modifier];
++
++		iio_push_event(private,
++				IIO_MOD_EVENT_CODE(IIO_ACCEL,
++				0,
++				iio_modifier,
++				IIO_EV_TYPE_THRESH,
++				IIO_EV_DIR_RISING),
++				timestamp);
++	}
++
++st_sensors_read_err:
++	return IRQ_HANDLED;
++}
++
++static inline int lis331dlh_intel_qrk_read_info_raw(struct iio_dev *indio_dev,
++				struct iio_chan_spec const *ch, int *val)
++{
++	int err;
++
++	mutex_lock(&indio_dev->mlock);
++	err = st_sensors_read_axis_data(indio_dev, ch->address, val);
++
++	if (unlikely(err < 0))
++		goto read_error;
++
++	*val = *val >> ch->scan_type.shift;
++	mutex_unlock(&indio_dev->mlock);
++
++	return err;
++
++read_error:
++	mutex_unlock(&indio_dev->mlock);
++	return err;
++}
++
++static int lis331dlh_intel_qrk_read_raw(
++	struct iio_dev *indio_dev,
++	struct iio_chan_spec const *ch,
++	int *val, int *val2, long mask)
++{
++	int err;
++	struct st_sensor_data *adata = iio_priv(indio_dev);
++
++	switch (mask) {
++	case IIO_CHAN_INFO_RAW:
++		err = lis331dlh_intel_qrk_read_info_raw(indio_dev, ch, val);
++		if (unlikely(err < 0))
++			goto read_error;
++
++		return IIO_VAL_INT;
++	case IIO_CHAN_INFO_SCALE:
++		*val = 0;
++		*val2 = adata->current_fullscale->gain;
++		return IIO_VAL_INT_PLUS_MICRO;
++	default:
++		return -EINVAL;
++	}
++
++read_error:
++	return err;
++}
++
++static int lis331dlh_intel_qrk_write_raw(
++	struct iio_dev *indio_dev,
++	struct iio_chan_spec const *chan,
++	int val, int val2, long mask)
++{
++	int err;
++
++	switch (mask) {
++	case IIO_CHAN_INFO_SCALE:
++		err = st_sensors_set_fullscale_by_gain(indio_dev, val2);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return err;
++}
++
++static ST_SENSOR_DEV_ATTR_SAMP_FREQ();
++static ST_SENSORS_DEV_ATTR_SAMP_FREQ_AVAIL();
++static ST_SENSORS_DEV_ATTR_SCALE_AVAIL(in_accel_scale_available);
++
++static struct attribute *lis331dlh_intel_qrk_attributes[] = {
++	&iio_dev_attr_sampling_frequency_available.dev_attr.attr,
++	&iio_dev_attr_in_accel_scale_available.dev_attr.attr,
++	&iio_dev_attr_sampling_frequency.dev_attr.attr,
++	NULL,
++};
++
++static const struct attribute_group lis331dlh_intel_qrk_attribute_group = {
++	.attrs = lis331dlh_intel_qrk_attributes,
++};
++
++static int lis331dlh_intel_qrk_read_event_value(
++	struct iio_dev *indio_dev,
++	u64 event_code,
++	int *val)
++{
++	int err;
++	u8 data;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++				ST_ACCEL_2_INT1_THRESH_ADDR, &data);
++
++	*val = (int) data;
++	return err;
++}
++
++static int lis331dlh_intel_qrk_write_event_value(
++	struct iio_dev *indio_dev,
++	u64 event_code,
++	int val)
++{
++	int err;
++	struct st_sensor_data *sdata;
++
++	/* range check */
++	if (unlikely((val < ST_ACCEL_2_THRESH_VAL_MIN) ||
++				 (val > ST_ACCEL_2_THRESH_VAL_MAX)))
++		return -EINVAL;
++
++	sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->write_byte(&sdata->tb, sdata->dev,
++				ST_ACCEL_2_INT1_THRESH_ADDR, val);
++
++	return err;
++}
++
++/*  Configure the INT1 pin to fire an interrupt on a high threshold event.
++ */
++static int lis331dlh_intel_qrk_configure_threshold_interrupt(
++	struct iio_dev *indio_dev, u8 state)
++{
++	int err = 0;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	if (sdata->sensor->drdy_irq.ig1.en_mask == state)
++		return 0;
++
++	if (state == QRK_ACCEL_INT1_ENABLED) {
++		err = request_threaded_irq(sdata->get_irq_data_ready(indio_dev),
++				NULL,
++				lis331dlh_intel_qrk_threshold_event_handler,
++				IRQF_TRIGGER_RISING | IRQF_ONESHOT,
++				"lis331dlh_intel_qrk_threshold",
++				indio_dev);
++		if (likely(err == 0)) {
++			sdata->sensor->drdy_irq.ig1.en_mask =
++					QRK_ACCEL_INT1_ENABLED;
++			err = sdata->tf->write_byte(
++				&sdata->tb, sdata->dev,
++				ST_ACCEL_2_INT1_DURATION_ADDR, 1);
++		}
++	} else {
++		free_irq(sdata->get_irq_data_ready(indio_dev), indio_dev);
++		sdata->sensor->drdy_irq.ig1.en_mask = QRK_ACCEL_INT1_DISABLED;
++	}
++
++	return err;
++}
++
++static int lis331dlh_intel_qrk_read_event_config(
++	struct iio_dev *indio_dev,
++	u64 event_code)
++{
++	int err = 0;
++	u8 data, mask;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++				   ST_ACCEL_2_INT1_CFG_ADDR,
++				   &data);
++
++	mask = 1 << ((IIO_EVENT_CODE_EXTRACT_MODIFIER(event_code) << 1) - 1);
++
++	return !!(data & mask);
++}
++
++static int lis331dlh_intel_qrk_write_event_config(
++	struct iio_dev *indio_dev,
++	u64 event_code,
++	int state)
++{
++	int err;
++	u8 data;
++	u8 mask;
++
++	bool new_int_state;
++
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++	mask = 1 << ((IIO_EVENT_CODE_EXTRACT_MODIFIER(event_code) << 1) - 1);
++
++	err = st_sensors_write_data_with_mask(indio_dev,
++					ST_ACCEL_2_INT1_CFG_ADDR,
++					mask, state);
++	if (unlikely(err < 0))
++		goto write_event_err;
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++					ST_ACCEL_2_INT1_CFG_ADDR, &data);
++	if (unlikely(err < 0))
++		goto write_event_err;
++
++	new_int_state = data & (ST_ACCEL_2_INT_CFG_XHIE_EN |
++					ST_ACCEL_2_INT_CFG_YHIE_EN |
++					ST_ACCEL_2_INT_CFG_ZHIE_EN);
++	err = lis331dlh_intel_qrk_configure_threshold_interrupt(
++			indio_dev, new_int_state);
++
++write_event_err:
++	return err;
++}
++
++/*  Configure the INT2 pin to fire an interrupt on a threshold high event.  INT2
++ *  should be wired to a suspend well IRQ to wake up the host.
++ */
++static int lis331dlh_intel_qrk_enable_wakeup_interrupt(
++	struct iio_dev *indio_dev)
++{
++	int err = 0;
++	u8 data;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->write_byte(&sdata->tb, sdata->dev,
++					ST_ACCEL_2_INT2_THRESH_ADDR,
++					QRK_ACCEL_INT2_WAKEUP_THRESH_VAL);
++	if (unlikely(err < 0))
++		goto enable_wakeup_int_err;
++
++	/* Latch interrupt request on INT2 */
++	err = st_sensors_write_data_with_mask(
++			indio_dev, ST_ACCEL_2_DRDY_IRQ_ADDR,
++			ST_ACCEL_2_INT_LIR_MASK, 1);
++	if (unlikely(err < 0))
++		goto enable_wakeup_int_err;
++
++	err = sdata->tf->write_byte(&sdata->tb, sdata->dev,
++					ST_ACCEL_2_INT2_DURATION_ADDR, 0);
++	if (unlikely(err < 0))
++		goto enable_wakeup_int_err;
++
++	err = sdata->tf->write_byte(&sdata->tb, sdata->dev,
++						ST_ACCEL_2_INT2_CFG_ADDR,
++						ST_ACCEL_2_INT_CFG_XHIE_EN |
++						ST_ACCEL_2_INT_CFG_YHIE_EN);
++	if (unlikely(err < 0))
++		goto enable_wakeup_int_err;
++
++	/* Clean ST_ACCEL_2_INT2_SRC */
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++						ST_ACCEL_2_INT2_SRC_ADDR,
++						&data);
++
++enable_wakeup_int_err:
++	return err;
++}
++
++static int lis331dlh_intel_qrk_disable_wakeup_interrupt(
++	struct iio_dev *indio_dev)
++{
++	int err = 0;
++	u8 data;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->write_byte(&sdata->tb, sdata->dev,
++						ST_ACCEL_2_INT2_CFG_ADDR,
++						0);
++	if (unlikely(err < 0))
++		goto disable_wakeup_int_err;
++
++	/* Clean ST_ACCEL_2_INT2_SRC */
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++						ST_ACCEL_2_INT2_SRC_ADDR,
++						&data);
++	if (unlikely(err < 0))
++		goto disable_wakeup_int_err;
++
++disable_wakeup_int_err:
++	return err;
++}
++
++static int lis331dlh_intel_qrk_handle_wakeup_interrupt(
++	struct iio_dev *indio_dev)
++{
++	int err;
++	u8 data;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++	s64 timestamp = iio_get_time_ns();
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++				   ST_ACCEL_2_INT2_SRC_ADDR,
++				   &data);
++	if (unlikely(err < 0))
++		goto handle_wakeup_int_err;
++
++	if (data & ST_ACCEL_2_INT_IA_MASK) {
++		iio_push_event(indio_dev,
++				IIO_MOD_EVENT_CODE(IIO_ACCEL,
++				0,
++				IIO_MOD_X_OR_Y_OR_Z,
++				IIO_EV_TYPE_THRESH,
++				IIO_EV_DIR_EITHER),
++				timestamp);
++	}
++
++handle_wakeup_int_err:
++	return err;
++}
++
++static const struct iio_info accel_info = {
++	.driver_module = THIS_MODULE,
++	.attrs = &lis331dlh_intel_qrk_attribute_group,
++	.read_raw = &lis331dlh_intel_qrk_read_raw,
++	.write_raw = &lis331dlh_intel_qrk_write_raw,
++	.read_event_config = &lis331dlh_intel_qrk_read_event_config,
++	.write_event_config = &lis331dlh_intel_qrk_write_event_config,
++	.read_event_value = &lis331dlh_intel_qrk_read_event_value,
++	.write_event_value = &lis331dlh_intel_qrk_write_event_value,
++};
++
++static const struct iio_chan_spec st_accel_12bit_channels[] = {
++	QRK_ACCEL_LSM_CHANNELS(IIO_ACCEL, ST_SENSORS_SCAN_X, IIO_MOD_X, IIO_LE,
++		ST_SENSORS_DEFAULT_12_REALBITS, ST_ACCEL_DEFAULT_OUT_X_L_ADDR),
++	QRK_ACCEL_LSM_CHANNELS(IIO_ACCEL, ST_SENSORS_SCAN_Y, IIO_MOD_Y, IIO_LE,
++		ST_SENSORS_DEFAULT_12_REALBITS, ST_ACCEL_DEFAULT_OUT_Y_L_ADDR),
++	QRK_ACCEL_LSM_CHANNELS(IIO_ACCEL, ST_SENSORS_SCAN_Z, IIO_MOD_Z, IIO_LE,
++		ST_SENSORS_DEFAULT_12_REALBITS, ST_ACCEL_DEFAULT_OUT_Z_L_ADDR),
++	IIO_CHAN_SOFT_TIMESTAMP(3)
++};
++
++static struct st_sensors lis331dlh_intel_qrk_sensor = {
++	.wai = ST_ACCEL_2_WAI_EXP,
++	.sensors_supported = {
++		[0] = "lis331dlh_qrk",
++	},
++	.ch = (struct iio_chan_spec *)st_accel_12bit_channels,
++	.odr = {
++		.addr = ST_ACCEL_2_ODR_ADDR,
++		.mask = ST_ACCEL_2_ODR_MASK,
++		.odr_avl = {
++			{ 50, ST_ACCEL_2_ODR_AVL_50HZ_VAL, },
++			{ 100, ST_ACCEL_2_ODR_AVL_100HZ_VAL, },
++			{ 400, ST_ACCEL_2_ODR_AVL_400HZ_VAL, },
++			{ 1000, ST_ACCEL_2_ODR_AVL_1000HZ_VAL, },
++		},
++	},
++	.pw = {
++		.addr = ST_ACCEL_2_PW_ADDR,
++		.mask = ST_ACCEL_2_PW_MASK,
++		.value_on = ST_SENSORS_DEFAULT_POWER_ON_VALUE,
++		.value_off = ST_SENSORS_DEFAULT_POWER_OFF_VALUE,
++	},
++	.enable_axis = {
++		.addr = ST_SENSORS_DEFAULT_AXIS_ADDR,
++		.mask = ST_SENSORS_DEFAULT_AXIS_MASK,
++	},
++	.fs = {
++		.addr = ST_ACCEL_2_FS_ADDR,
++		.mask = ST_ACCEL_2_FS_MASK,
++		.fs_avl = {
++			[0] = {
++				.num = ST_ACCEL_FS_AVL_2G,
++				.value = ST_ACCEL_2_FS_AVL_2_VAL,
++				.gain = ST_ACCEL_2_FS_AVL_2_GAIN,
++			},
++			[1] = {
++				.num = ST_ACCEL_FS_AVL_4G,
++				.value = ST_ACCEL_2_FS_AVL_4_VAL,
++				.gain = ST_ACCEL_2_FS_AVL_4_GAIN,
++			},
++			[2] = {
++				.num = ST_ACCEL_FS_AVL_8G,
++				.value = ST_ACCEL_2_FS_AVL_8_VAL,
++				.gain = ST_ACCEL_2_FS_AVL_8_GAIN,
++			},
++		},
++	},
++	.bdu = {
++		.addr = ST_ACCEL_2_BDU_ADDR,
++		.mask = ST_ACCEL_2_BDU_MASK,
++	},
++	.drdy_irq = {
++		.addr = ST_ACCEL_2_DRDY_IRQ_ADDR,
++		.mask = ST_ACCEL_2_DRDY_IRQ_MASK,
++	},
++	.multi_read_bit = ST_ACCEL_2_MULTIREAD_BIT,
++	.bootime = 2,
++};
++
++static int lis331dlh_intel_qrk_probe(
++	struct i2c_client *client,
++	const struct i2c_device_id *id)
++{
++	struct iio_dev *indio_dev;
++	struct st_sensor_data *adata;
++	struct lis331dlh_intel_qrk_platform_data *pdata;
++	int ret = 0;
++
++	indio_dev = iio_device_alloc(sizeof(*adata));
++	if (unlikely(indio_dev == NULL)) {
++		ret = -ENOMEM;
++		goto iio_device_alloc_error;
++	}
++
++	i2c_set_clientdata(client, indio_dev);
++	indio_dev->dev.parent = &client->dev;
++	indio_dev->name = client->name;
++
++	adata = iio_priv(indio_dev);
++	adata->dev = &client->dev;
++
++	pdata = client->dev.platform_data;
++	if (unlikely(!pdata)) {
++		pr_err("No platform data provided\n");
++		goto lis331dlh_intel_qrk_init_err;
++	}
++
++	ret = gpio_to_irq(pdata->irq1_pin);
++	if (unlikely(ret < 0)) {
++		pr_err(
++			"Failed to obtain valid IRQ for GPIO %d, "
++			"gpio_to_irq returned %d\n",
++			pdata->irq1_pin, ret);
++		goto lis331dlh_intel_qrk_init_err;
++	}
++	to_i2c_client(adata->dev)->irq = ret;
++
++	st_sensors_i2c_configure(indio_dev, client, adata);
++
++	indio_dev->modes = INDIO_DIRECT_MODE;
++	indio_dev->info = &accel_info;
++
++	ret = st_sensors_check_device_support(indio_dev,
++						1, &lis331dlh_intel_qrk_sensor);
++	if (unlikely(ret < 0))
++		goto lis331dlh_intel_qrk_init_err;
++
++	indio_dev->channels = adata->sensor->ch;
++	indio_dev->num_channels = ST_SENSORS_NUMBER_ALL_CHANNELS;
++
++	adata->multiread_bit = adata->sensor->multi_read_bit;
++	adata->current_fullscale = (struct st_sensor_fullscale_avl *)
++		&adata->sensor->fs.fs_avl[0];
++	adata->odr = adata->sensor->odr.odr_avl[0].hz;
++
++	adata->sensor->drdy_irq.ig1.en_mask = QRK_ACCEL_INT1_DISABLED;
++
++	ret = st_sensors_init_sensor(indio_dev);
++	if (unlikely(ret < 0))
++		goto lis331dlh_intel_qrk_init_err;
++
++	ret = st_sensors_set_enable(indio_dev, true);
++	if (unlikely(ret < 0))
++		goto lis331dlh_intel_qrk_init_err;
++
++	ret = iio_device_register(indio_dev);
++	if (unlikely(ret))
++		goto lis331dlh_intel_qrk_init_err;
++
++	return 0;
++
++lis331dlh_intel_qrk_init_err:
++	iio_device_free(indio_dev);
++iio_device_alloc_error:
++	return ret;
++}
++
++static int lis331dlh_intel_qrk_remove(
++	struct i2c_client *client)
++{
++	struct iio_dev *indio_dev = i2c_get_clientdata(client);
++	struct st_sensor_data *adata = iio_priv(indio_dev);
++
++	st_sensors_set_enable(indio_dev, false);
++
++	if (adata->sensor->drdy_irq.ig1.en_mask == QRK_ACCEL_INT1_ENABLED)
++		free_irq(adata->get_irq_data_ready(indio_dev), indio_dev);
++
++	iio_device_unregister(indio_dev);
++
++	iio_device_free(indio_dev);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int lis331dlh_intel_qrk_suspend(
++	struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++
++	lis331dlh_intel_qrk_enable_wakeup_interrupt(indio_dev);
++
++	return 0;
++}
++
++static int lis331dlh_intel_qrk_resume(
++	struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++
++	lis331dlh_intel_qrk_handle_wakeup_interrupt(indio_dev);
++	lis331dlh_intel_qrk_disable_wakeup_interrupt(indio_dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops lis331dlh_intel_qrk_pm_ops = {
++	.suspend = lis331dlh_intel_qrk_suspend,
++	.resume = lis331dlh_intel_qrk_resume,
++};
++
++#define LIS331DLH_INTEL_QRK_PM_OPS (&lis331dlh_intel_qrk_pm_ops)
++#else
++#define LIS331DLH_INTEL_QRK_PM_OPS NULL
++#endif
++
++static const struct i2c_device_id lis331dlh_intel_qrk_id_table[] = {
++	{ "lis331dlh_qrk" },
++	{},
++};
++MODULE_DEVICE_TABLE(i2c, lis331dlh_intel_qrk_id_table);
++
++static struct i2c_driver lis331dlh_intel_qrk_driver = {
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "lis331dlh_qrk",
++		.pm	= LIS331DLH_INTEL_QRK_PM_OPS,
++	},
++	.probe = lis331dlh_intel_qrk_probe,
++	.remove = lis331dlh_intel_qrk_remove,
++	.id_table = lis331dlh_intel_qrk_id_table,
++};
++
++module_i2c_driver(lis331dlh_intel_qrk_driver);
++
++MODULE_AUTHOR("Wojciech Ziemba <wojciech.ziemba@emutex.com>");
++MODULE_DESCRIPTION("STMicroelectronics LIS331DLH accelerometer i2c driver for Intel Quark platform");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iio/common/Kconfig b/drivers/iio/common/Kconfig
+index ed45ee5..64bcb14 100644
+--- a/drivers/iio/common/Kconfig
++++ b/drivers/iio/common/Kconfig
+@@ -3,3 +3,4 @@
+ #
+ 
+ source "drivers/iio/common/hid-sensors/Kconfig"
++source "drivers/iio/common/st_sensors/Kconfig"
+\ No newline at end of file
+diff --git a/drivers/iio/common/Makefile b/drivers/iio/common/Makefile
+index 8158400..c2352be 100644
+--- a/drivers/iio/common/Makefile
++++ b/drivers/iio/common/Makefile
+@@ -7,3 +7,4 @@
+ #
+ 
+ obj-y += hid-sensors/
++obj-y += st_sensors/
+diff --git a/drivers/iio/common/st_sensors/Kconfig b/drivers/iio/common/st_sensors/Kconfig
+new file mode 100644
+index 0000000..865f1ca
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/Kconfig
+@@ -0,0 +1,14 @@
++#
++# STMicroelectronics sensors common library
++#
++
++config IIO_ST_SENSORS_I2C
++	tristate
++
++config IIO_ST_SENSORS_SPI
++	tristate
++
++config IIO_ST_SENSORS_CORE
++	tristate
++	select IIO_ST_SENSORS_I2C if I2C
++	select IIO_ST_SENSORS_SPI if SPI_MASTER
+diff --git a/drivers/iio/common/st_sensors/Makefile b/drivers/iio/common/st_sensors/Makefile
+new file mode 100644
+index 0000000..9f3e24f
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/Makefile
+@@ -0,0 +1,10 @@
++#
++# Makefile for the STMicroelectronics sensor common modules.
++#
++
++obj-$(CONFIG_IIO_ST_SENSORS_I2C) += st_sensors_i2c.o
++obj-$(CONFIG_IIO_ST_SENSORS_SPI) += st_sensors_spi.o
++obj-$(CONFIG_IIO_ST_SENSORS_CORE) += st_sensors.o
++st_sensors-y := st_sensors_core.o
++st_sensors-$(CONFIG_IIO_BUFFER) += st_sensors_buffer.o
++st_sensors-$(CONFIG_IIO_TRIGGER) += st_sensors_trigger.o
+diff --git a/drivers/iio/common/st_sensors/st_sensors_buffer.c b/drivers/iio/common/st_sensors/st_sensors_buffer.c
+new file mode 100644
+index 0000000..a269b7d
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/st_sensors_buffer.c
+@@ -0,0 +1,115 @@
++/*
++ * STMicroelectronics sensors buffer library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/iio/iio.h>
++#include <linux/iio/trigger.h>
++#include <linux/interrupt.h>
++#include <linux/iio/buffer.h>
++#include <linux/iio/trigger_consumer.h>
++#include <linux/iio/triggered_buffer.h>
++#include <linux/irqreturn.h>
++
++#include <linux/iio/common/st_sensors.h>
++
++
++int st_sensors_get_buffer_element(struct iio_dev *indio_dev, u8 *buf)
++{
++	int i, n = 0, len;
++	u8 addr[ST_SENSORS_NUMBER_DATA_CHANNELS];
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	for (i = 0; i < ST_SENSORS_NUMBER_DATA_CHANNELS; i++) {
++		if (test_bit(i, indio_dev->active_scan_mask)) {
++			addr[n] = indio_dev->channels[i].address;
++			n++;
++		}
++	}
++	switch (n) {
++	case 1:
++		len = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
++			addr[0], ST_SENSORS_BYTE_FOR_CHANNEL, buf,
++			sdata->multiread_bit);
++		break;
++	case 2:
++		if ((addr[1] - addr[0]) == ST_SENSORS_BYTE_FOR_CHANNEL) {
++			len = sdata->tf->read_multiple_byte(&sdata->tb,
++					sdata->dev, addr[0],
++					ST_SENSORS_BYTE_FOR_CHANNEL*n,
++					buf, sdata->multiread_bit);
++		} else {
++			u8 rx_array[ST_SENSORS_BYTE_FOR_CHANNEL*
++				    ST_SENSORS_NUMBER_DATA_CHANNELS];
++			len = sdata->tf->read_multiple_byte(&sdata->tb,
++				sdata->dev, addr[0],
++				ST_SENSORS_BYTE_FOR_CHANNEL*
++				ST_SENSORS_NUMBER_DATA_CHANNELS,
++				rx_array, sdata->multiread_bit);
++			if (len < 0)
++				goto read_data_channels_error;
++
++			for (i = 0; n + i < sizeof(rx_array); i++){
++				if (i < n)
++					buf[i] = rx_array[i];
++				else
++					buf[i] = rx_array[n + i];
++			}
++			len = ST_SENSORS_BYTE_FOR_CHANNEL*n;
++		}
++		break;
++	case 3:
++		len = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
++			addr[0], ST_SENSORS_BYTE_FOR_CHANNEL*
++			ST_SENSORS_NUMBER_DATA_CHANNELS,
++			buf, sdata->multiread_bit);
++		break;
++	default:
++		len = -EINVAL;
++		goto read_data_channels_error;
++	}
++	if (len != ST_SENSORS_BYTE_FOR_CHANNEL*n) {
++		len = -EIO;
++		goto read_data_channels_error;
++	}
++
++read_data_channels_error:
++	return len;
++}
++EXPORT_SYMBOL(st_sensors_get_buffer_element);
++
++irqreturn_t st_sensors_trigger_handler(int irq, void *p)
++{
++	int len;
++	struct iio_poll_func *pf = p;
++	struct iio_dev *indio_dev = pf->indio_dev;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	len = st_sensors_get_buffer_element(indio_dev, sdata->buffer_data);
++	if (len < 0)
++		goto st_sensors_get_buffer_element_error;
++
++	if (indio_dev->scan_timestamp)
++		*(s64 *)((u8 *)sdata->buffer_data +
++				ALIGN(len, sizeof(s64))) = pf->timestamp;
++
++	iio_push_to_buffers(indio_dev, sdata->buffer_data);
++
++st_sensors_get_buffer_element_error:
++	iio_trigger_notify_done(indio_dev->trig);
++
++	return IRQ_HANDLED;
++}
++EXPORT_SYMBOL(st_sensors_trigger_handler);
++
++MODULE_AUTHOR("Denis Ciocca <denis.ciocca@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics ST-sensors buffer");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+new file mode 100644
+index 0000000..945a55b
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+@@ -0,0 +1,447 @@
++/*
++ * STMicroelectronics sensors core library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/iio/iio.h>
++#include <asm/unaligned.h>
++
++#include <linux/iio/common/st_sensors.h>
++
++
++#define ST_SENSORS_WAI_ADDRESS		0x0f
++
++int st_sensors_write_data_with_mask(struct iio_dev *indio_dev,
++						u8 reg_addr, u8 mask, u8 data)
++{
++	int err;
++	u8 new_data;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev, reg_addr, &new_data);
++	if (err < 0)
++		goto st_sensors_write_data_with_mask_error;
++
++	new_data = ((new_data & (~mask)) | ((data << __ffs(mask)) & mask));
++	err = sdata->tf->write_byte(&sdata->tb, sdata->dev, reg_addr, new_data);
++
++st_sensors_write_data_with_mask_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_write_data_with_mask);
++
++static int st_sensors_match_odr(struct st_sensors *sensor,
++			unsigned int odr, struct st_sensor_odr_avl *odr_out)
++{
++	int i, ret = -EINVAL;
++
++	for (i = 0; i < ST_SENSORS_ODR_LIST_MAX; i++) {
++		if (sensor->odr.odr_avl[i].hz == 0)
++			goto st_sensors_match_odr_error;
++
++		if (sensor->odr.odr_avl[i].hz == odr) {
++			odr_out->hz = sensor->odr.odr_avl[i].hz;
++			odr_out->value = sensor->odr.odr_avl[i].value;
++			ret = 0;
++			break;
++		}
++	}
++
++st_sensors_match_odr_error:
++	return ret;
++}
++
++int st_sensors_set_odr(struct iio_dev *indio_dev, unsigned int odr)
++{
++	int err;
++	struct st_sensor_odr_avl odr_out = {0, 0};
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = st_sensors_match_odr(sdata->sensor, odr, &odr_out);
++	if (err < 0)
++		goto st_sensors_match_odr_error;
++
++	if ((sdata->sensor->odr.addr == sdata->sensor->pw.addr) &&
++			(sdata->sensor->odr.mask == sdata->sensor->pw.mask)) {
++		if (sdata->enabled == true) {
++			err = st_sensors_write_data_with_mask(indio_dev,
++				sdata->sensor->odr.addr,
++				sdata->sensor->odr.mask,
++				odr_out.value);
++		} else {
++			err = 0;
++		}
++	} else {
++		err = st_sensors_write_data_with_mask(indio_dev,
++			sdata->sensor->odr.addr, sdata->sensor->odr.mask,
++			odr_out.value);
++	}
++	if (err >= 0)
++		sdata->odr = odr_out.hz;
++
++st_sensors_match_odr_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_set_odr);
++
++static int st_sensors_match_fs(struct st_sensors *sensor,
++					unsigned int fs, int *index_fs_avl)
++{
++	int i, ret = -EINVAL;
++
++	for (i = 0; i < ST_SENSORS_FULLSCALE_AVL_MAX; i++) {
++		if (sensor->fs.fs_avl[i].num == 0)
++			goto st_sensors_match_odr_error;
++
++		if (sensor->fs.fs_avl[i].num == fs) {
++			*index_fs_avl = i;
++			ret = 0;
++			break;
++		}
++	}
++
++st_sensors_match_odr_error:
++	return ret;
++}
++
++static int st_sensors_set_fullscale(struct iio_dev *indio_dev, unsigned int fs)
++{
++	int err, i = 0;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = st_sensors_match_fs(sdata->sensor, fs, &i);
++	if (err < 0)
++		goto st_accel_set_fullscale_error;
++
++	err = st_sensors_write_data_with_mask(indio_dev,
++				sdata->sensor->fs.addr,
++				sdata->sensor->fs.mask,
++				sdata->sensor->fs.fs_avl[i].value);
++	if (err < 0)
++		goto st_accel_set_fullscale_error;
++
++	sdata->current_fullscale = (struct st_sensor_fullscale_avl *)
++						&sdata->sensor->fs.fs_avl[i];
++	return err;
++
++st_accel_set_fullscale_error:
++	dev_err(&indio_dev->dev, "failed to set new fullscale.\n");
++	return err;
++}
++
++int st_sensors_set_enable(struct iio_dev *indio_dev, bool enable)
++{
++	u8 tmp_value;
++	int err = -EINVAL;
++	bool found = false;
++	struct st_sensor_odr_avl odr_out = {0, 0};
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	if (enable) {
++		tmp_value = sdata->sensor->pw.value_on;
++		if ((sdata->sensor->odr.addr == sdata->sensor->pw.addr) &&
++			(sdata->sensor->odr.mask == sdata->sensor->pw.mask)) {
++			err = st_sensors_match_odr(sdata->sensor,
++							sdata->odr, &odr_out);
++			if (err < 0)
++				goto set_enable_error;
++			tmp_value = odr_out.value;
++			found = true;
++		}
++		err = st_sensors_write_data_with_mask(indio_dev,
++				sdata->sensor->pw.addr,
++				sdata->sensor->pw.mask, tmp_value);
++		if (err < 0)
++			goto set_enable_error;
++
++		sdata->enabled = true;
++
++		if (found)
++			sdata->odr = odr_out.hz;
++	} else {
++		err = st_sensors_write_data_with_mask(indio_dev,
++				sdata->sensor->pw.addr,
++				sdata->sensor->pw.mask,
++				sdata->sensor->pw.value_off);
++		if (err < 0)
++			goto set_enable_error;
++
++		sdata->enabled = false;
++	}
++
++set_enable_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_set_enable);
++
++int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable)
++{
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	return st_sensors_write_data_with_mask(indio_dev,
++				sdata->sensor->enable_axis.addr,
++				sdata->sensor->enable_axis.mask, axis_enable);
++}
++EXPORT_SYMBOL(st_sensors_set_axis_enable);
++
++int st_sensors_init_sensor(struct iio_dev *indio_dev)
++{
++	int err;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	mutex_init(&sdata->tb.buf_lock);
++
++	err = st_sensors_set_enable(indio_dev, false);
++	if (err < 0)
++		goto init_error;
++
++	err = st_sensors_set_fullscale(indio_dev,
++						sdata->current_fullscale->num);
++	if (err < 0)
++		goto init_error;
++
++	err = st_sensors_set_odr(indio_dev, sdata->odr);
++	if (err < 0)
++		goto init_error;
++
++	/* set BDU */
++	err = st_sensors_write_data_with_mask(indio_dev,
++			sdata->sensor->bdu.addr, sdata->sensor->bdu.mask, true);
++	if (err < 0)
++		goto init_error;
++
++	err = st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
++
++init_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_init_sensor);
++
++int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable)
++{
++	int err;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	/* Enable/Disable the interrupt generator 1. */
++	if (sdata->sensor->drdy_irq.ig1.en_addr > 0) {
++		err = st_sensors_write_data_with_mask(indio_dev,
++			sdata->sensor->drdy_irq.ig1.en_addr,
++			sdata->sensor->drdy_irq.ig1.en_mask, (int)enable);
++		if (err < 0)
++			goto st_accel_set_dataready_irq_error;
++	}
++
++	/* Enable/Disable the interrupt generator for data ready. */
++	err = st_sensors_write_data_with_mask(indio_dev,
++			sdata->sensor->drdy_irq.addr,
++			sdata->sensor->drdy_irq.mask, (int)enable);
++
++st_accel_set_dataready_irq_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_set_dataready_irq);
++
++int st_sensors_set_fullscale_by_gain(struct iio_dev *indio_dev, int scale)
++{
++	int err = -EINVAL, i;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	for (i = 0; i < ST_SENSORS_FULLSCALE_AVL_MAX; i++) {
++		if ((sdata->sensor->fs.fs_avl[i].gain == scale) &&
++				(sdata->sensor->fs.fs_avl[i].gain != 0)) {
++			err = 0;
++			break;
++		}
++	}
++	if (err < 0)
++		goto st_sensors_match_scale_error;
++
++	err = st_sensors_set_fullscale(indio_dev,
++					sdata->sensor->fs.fs_avl[i].num);
++
++st_sensors_match_scale_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_set_fullscale_by_gain);
++
++int st_sensors_read_axis_data(struct iio_dev *indio_dev,
++							u8 ch_addr, int *data)
++{
++	int err;
++	u8 outdata[ST_SENSORS_BYTE_FOR_CHANNEL];
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->read_multiple_byte(&sdata->tb, sdata->dev,
++				ch_addr, ST_SENSORS_BYTE_FOR_CHANNEL,
++				outdata, sdata->multiread_bit);
++	if (err < 0)
++		goto read_error;
++
++	*data = (s16)get_unaligned_le16(outdata);
++
++read_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_read_axis_data);
++
++int st_sensors_read_info_raw(struct iio_dev *indio_dev,
++				struct iio_chan_spec const *ch, int *val)
++{
++	int err;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	mutex_lock(&indio_dev->mlock);
++	if (indio_dev->currentmode == INDIO_BUFFER_TRIGGERED) {
++		err = -EBUSY;
++		goto read_error;
++	} else {
++		err = st_sensors_set_enable(indio_dev, true);
++		if (err < 0)
++			goto read_error;
++
++		msleep((sdata->sensor->bootime * 1000) / sdata->odr);
++		err = st_sensors_read_axis_data(indio_dev, ch->address, val);
++		if (err < 0)
++			goto read_error;
++
++		*val = *val >> ch->scan_type.shift;
++	}
++	mutex_unlock(&indio_dev->mlock);
++
++	return err;
++
++read_error:
++	mutex_unlock(&indio_dev->mlock);
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_read_info_raw);
++
++int st_sensors_check_device_support(struct iio_dev *indio_dev,
++			int num_sensors_list, const struct st_sensors *sensors)
++{
++	u8 wai;
++	int i, n, err;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	err = sdata->tf->read_byte(&sdata->tb, sdata->dev,
++					ST_SENSORS_DEFAULT_WAI_ADDRESS, &wai);
++	if (err < 0) {
++		dev_err(&indio_dev->dev, "failed to read Who-Am-I register.\n");
++		goto read_wai_error;
++	}
++
++	for (i = 0; i < num_sensors_list; i++) {
++		if (sensors[i].wai == wai)
++			break;
++	}
++	if (i == num_sensors_list)
++		goto device_not_supported;
++
++	for (n = 0; n < ARRAY_SIZE(sensors[i].sensors_supported); n++) {
++		if (strcmp(indio_dev->name,
++				&sensors[i].sensors_supported[n][0]) == 0)
++			break;
++	}
++	if (n == ARRAY_SIZE(sensors[i].sensors_supported)) {
++		dev_err(&indio_dev->dev, "device name and WhoAmI mismatch.\n");
++		goto sensor_name_mismatch;
++	}
++
++	sdata->sensor = (struct st_sensors *)&sensors[i];
++
++	return i;
++
++device_not_supported:
++	dev_err(&indio_dev->dev, "device not supported: WhoAmI (0x%x).\n", wai);
++sensor_name_mismatch:
++	err = -ENODEV;
++read_wai_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_check_device_support);
++
++ssize_t st_sensors_sysfs_get_sampling_frequency(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	struct st_sensor_data *adata = iio_priv(dev_get_drvdata(dev));
++
++	return sprintf(buf, "%d\n", adata->odr);
++}
++EXPORT_SYMBOL(st_sensors_sysfs_get_sampling_frequency);
++
++ssize_t st_sensors_sysfs_set_sampling_frequency(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t size)
++{
++	int err;
++	unsigned int odr;
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++
++	err = kstrtoint(buf, 10, &odr);
++	if (err < 0)
++		goto conversion_error;
++
++	mutex_lock(&indio_dev->mlock);
++	err = st_sensors_set_odr(indio_dev, odr);
++	mutex_unlock(&indio_dev->mlock);
++
++conversion_error:
++	return err < 0 ? err : size;
++}
++EXPORT_SYMBOL(st_sensors_sysfs_set_sampling_frequency);
++
++ssize_t st_sensors_sysfs_sampling_frequency_avail(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	int i, len = 0;
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	mutex_lock(&indio_dev->mlock);
++	for (i = 0; i < ST_SENSORS_ODR_LIST_MAX; i++) {
++		if (sdata->sensor->odr.odr_avl[i].hz == 0)
++			break;
++
++		len += scnprintf(buf + len, PAGE_SIZE - len, "%d ",
++					sdata->sensor->odr.odr_avl[i].hz);
++	}
++	mutex_unlock(&indio_dev->mlock);
++	buf[len - 1] = '\n';
++
++	return len;
++}
++EXPORT_SYMBOL(st_sensors_sysfs_sampling_frequency_avail);
++
++ssize_t st_sensors_sysfs_scale_avail(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	int i, len = 0;
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	mutex_lock(&indio_dev->mlock);
++	for (i = 0; i < ST_SENSORS_FULLSCALE_AVL_MAX; i++) {
++		if (sdata->sensor->fs.fs_avl[i].num == 0)
++			break;
++
++		len += scnprintf(buf + len, PAGE_SIZE - len, "0.%06u ",
++					sdata->sensor->fs.fs_avl[i].gain);
++	}
++	mutex_unlock(&indio_dev->mlock);
++	buf[len - 1] = '\n';
++
++	return len;
++}
++EXPORT_SYMBOL(st_sensors_sysfs_scale_avail);
++
++MODULE_AUTHOR("Denis Ciocca <denis.ciocca@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics ST-sensors core");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iio/common/st_sensors/st_sensors_i2c.c b/drivers/iio/common/st_sensors/st_sensors_i2c.c
+new file mode 100644
+index 0000000..38af944
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/st_sensors_i2c.c
+@@ -0,0 +1,81 @@
++/*
++ * STMicroelectronics sensors i2c library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/iio/iio.h>
++
++#include <linux/iio/common/st_sensors_i2c.h>
++
++
++#define ST_SENSORS_I2C_MULTIREAD	0x80
++
++static unsigned int st_sensors_i2c_get_irq(struct iio_dev *indio_dev)
++{
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	return to_i2c_client(sdata->dev)->irq;
++}
++
++static int st_sensors_i2c_read_byte(struct st_sensor_transfer_buffer *tb,
++				struct device *dev, u8 reg_addr, u8 *res_byte)
++{
++	int err;
++
++	err = i2c_smbus_read_byte_data(to_i2c_client(dev), reg_addr);
++	if (err < 0)
++		goto st_accel_i2c_read_byte_error;
++
++	*res_byte = err & 0xff;
++
++st_accel_i2c_read_byte_error:
++	return err < 0 ? err : 0;
++}
++
++static int st_sensors_i2c_read_multiple_byte(
++		struct st_sensor_transfer_buffer *tb, struct device *dev,
++			u8 reg_addr, int len, u8 *data, bool multiread_bit)
++{
++	if (multiread_bit)
++		reg_addr |= ST_SENSORS_I2C_MULTIREAD;
++
++	return i2c_smbus_read_i2c_block_data(to_i2c_client(dev),
++							reg_addr, len, data);
++}
++
++static int st_sensors_i2c_write_byte(struct st_sensor_transfer_buffer *tb,
++				struct device *dev, u8 reg_addr, u8 data)
++{
++	return i2c_smbus_write_byte_data(to_i2c_client(dev), reg_addr, data);
++}
++
++static const struct st_sensor_transfer_function st_sensors_tf_i2c = {
++	.read_byte = st_sensors_i2c_read_byte,
++	.write_byte = st_sensors_i2c_write_byte,
++	.read_multiple_byte = st_sensors_i2c_read_multiple_byte,
++};
++
++void st_sensors_i2c_configure(struct iio_dev *indio_dev,
++		struct i2c_client *client, struct st_sensor_data *sdata)
++{
++	i2c_set_clientdata(client, indio_dev);
++
++	indio_dev->dev.parent = &client->dev;
++	indio_dev->name = client->name;
++
++	sdata->tf = &st_sensors_tf_i2c;
++	sdata->get_irq_data_ready = st_sensors_i2c_get_irq;
++}
++EXPORT_SYMBOL(st_sensors_i2c_configure);
++
++MODULE_AUTHOR("Denis Ciocca <denis.ciocca@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics ST-sensors i2c driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iio/common/st_sensors/st_sensors_spi.c b/drivers/iio/common/st_sensors/st_sensors_spi.c
+new file mode 100644
+index 0000000..f0aa2f1
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/st_sensors_spi.c
+@@ -0,0 +1,128 @@
++/*
++ * STMicroelectronics sensors spi library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/iio/iio.h>
++
++#include <linux/iio/common/st_sensors_spi.h>
++
++
++#define ST_SENSORS_SPI_MULTIREAD	0xc0
++#define ST_SENSORS_SPI_READ		0x80
++
++static unsigned int st_sensors_spi_get_irq(struct iio_dev *indio_dev)
++{
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	return to_spi_device(sdata->dev)->irq;
++}
++
++static int st_sensors_spi_read(struct st_sensor_transfer_buffer *tb,
++	struct device *dev, u8 reg_addr, int len, u8 *data, bool multiread_bit)
++{
++	struct spi_message msg;
++	int err;
++
++	struct spi_transfer xfers[] = {
++		{
++			.tx_buf = tb->tx_buf,
++			.bits_per_word = 8,
++			.len = 1,
++		},
++		{
++			.rx_buf = tb->rx_buf,
++			.bits_per_word = 8,
++			.len = len,
++		}
++	};
++
++	mutex_lock(&tb->buf_lock);
++	if ((multiread_bit) && (len > 1))
++		tb->tx_buf[0] = reg_addr | ST_SENSORS_SPI_MULTIREAD;
++	else
++		tb->tx_buf[0] = reg_addr | ST_SENSORS_SPI_READ;
++
++	spi_message_init(&msg);
++	spi_message_add_tail(&xfers[0], &msg);
++	spi_message_add_tail(&xfers[1], &msg);
++	err = spi_sync(to_spi_device(dev), &msg);
++	if (err)
++		goto acc_spi_read_error;
++
++	memcpy(data, tb->rx_buf, len*sizeof(u8));
++	mutex_unlock(&tb->buf_lock);
++	return len;
++
++acc_spi_read_error:
++	mutex_unlock(&tb->buf_lock);
++	return err;
++}
++
++static int st_sensors_spi_read_byte(struct st_sensor_transfer_buffer *tb,
++				struct device *dev, u8 reg_addr, u8 *res_byte)
++{
++	return st_sensors_spi_read(tb, dev, reg_addr, 1, res_byte, false);
++}
++
++static int st_sensors_spi_read_multiple_byte(
++	struct st_sensor_transfer_buffer *tb, struct device *dev,
++			u8 reg_addr, int len, u8 *data, bool multiread_bit)
++{
++	return st_sensors_spi_read(tb, dev, reg_addr, len, data, multiread_bit);
++}
++
++static int st_sensors_spi_write_byte(struct st_sensor_transfer_buffer *tb,
++				struct device *dev, u8 reg_addr, u8 data)
++{
++	struct spi_message msg;
++	int err;
++
++	struct spi_transfer xfers = {
++		.tx_buf = tb->tx_buf,
++		.bits_per_word = 8,
++		.len = 2,
++	};
++
++	mutex_lock(&tb->buf_lock);
++	tb->tx_buf[0] = reg_addr;
++	tb->tx_buf[1] = data;
++
++	spi_message_init(&msg);
++	spi_message_add_tail(&xfers, &msg);
++	err = spi_sync(to_spi_device(dev), &msg);
++	mutex_unlock(&tb->buf_lock);
++
++	return err;
++}
++
++static const struct st_sensor_transfer_function st_sensors_tf_spi = {
++	.read_byte = st_sensors_spi_read_byte,
++	.write_byte = st_sensors_spi_write_byte,
++	.read_multiple_byte = st_sensors_spi_read_multiple_byte,
++};
++
++void st_sensors_spi_configure(struct iio_dev *indio_dev,
++			struct spi_device *spi, struct st_sensor_data *sdata)
++{
++	spi_set_drvdata(spi, indio_dev);
++
++	indio_dev->dev.parent = &spi->dev;
++	indio_dev->name = spi->modalias;
++
++	sdata->tf = &st_sensors_tf_spi;
++	sdata->get_irq_data_ready = st_sensors_spi_get_irq;
++}
++EXPORT_SYMBOL(st_sensors_spi_configure);
++
++MODULE_AUTHOR("Denis Ciocca <denis.ciocca@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics ST-sensors spi driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iio/common/st_sensors/st_sensors_trigger.c b/drivers/iio/common/st_sensors/st_sensors_trigger.c
+new file mode 100644
+index 0000000..139ed03
+--- /dev/null
++++ b/drivers/iio/common/st_sensors/st_sensors_trigger.c
+@@ -0,0 +1,77 @@
++/*
++ * STMicroelectronics sensors trigger library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/iio/iio.h>
++#include <linux/iio/trigger.h>
++#include <linux/interrupt.h>
++
++#include <linux/iio/common/st_sensors.h>
++
++
++int st_sensors_allocate_trigger(struct iio_dev *indio_dev,
++				const struct iio_trigger_ops *trigger_ops)
++{
++	int err;
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	sdata->trig = iio_trigger_alloc("%s-trigger", indio_dev->name);
++	if (sdata->trig == NULL) {
++		err = -ENOMEM;
++		dev_err(&indio_dev->dev, "failed to allocate iio trigger.\n");
++		goto iio_trigger_alloc_error;
++	}
++
++	err = request_threaded_irq(sdata->get_irq_data_ready(indio_dev),
++			iio_trigger_generic_data_rdy_poll,
++			NULL,
++			IRQF_TRIGGER_RISING,
++			sdata->trig->name,
++			sdata->trig);
++	if (err)
++		goto request_irq_error;
++
++	sdata->trig->private_data = indio_dev;
++	sdata->trig->ops = trigger_ops;
++	sdata->trig->dev.parent = sdata->dev;
++
++	err = iio_trigger_register(sdata->trig);
++	if (err < 0) {
++		dev_err(&indio_dev->dev, "failed to register iio trigger.\n");
++		goto iio_trigger_register_error;
++	}
++	indio_dev->trig = sdata->trig;
++
++	return 0;
++
++iio_trigger_register_error:
++	free_irq(sdata->get_irq_data_ready(indio_dev), sdata->trig);
++request_irq_error:
++	iio_trigger_free(sdata->trig);
++iio_trigger_alloc_error:
++	return err;
++}
++EXPORT_SYMBOL(st_sensors_allocate_trigger);
++
++void st_sensors_deallocate_trigger(struct iio_dev *indio_dev)
++{
++	struct st_sensor_data *sdata = iio_priv(indio_dev);
++
++	iio_trigger_unregister(sdata->trig);
++	free_irq(sdata->get_irq_data_ready(indio_dev), sdata->trig);
++	iio_trigger_free(sdata->trig);
++}
++EXPORT_SYMBOL(st_sensors_deallocate_trigger);
++
++MODULE_AUTHOR("Denis Ciocca <denis.ciocca@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics ST-sensors trigger");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iio/industrialio-buffer.c b/drivers/iio/industrialio-buffer.c
+index aaadd32..7b8d510 100644
+--- a/drivers/iio/industrialio-buffer.c
++++ b/drivers/iio/industrialio-buffer.c
+@@ -119,8 +119,8 @@ static ssize_t iio_scan_el_show(struct device *dev,
+ 	int ret;
+ 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+ 
+-	ret = test_bit(to_iio_dev_attr(attr)->address,
+-		       indio_dev->buffer->scan_mask);
++	ret = abs(test_bit(to_iio_dev_attr(attr)->address,
++		       indio_dev->buffer->scan_mask));
+ 
+ 	return sprintf(buf, "%d\n", ret);
+ }
+@@ -762,7 +762,7 @@ int iio_scan_mask_query(struct iio_dev *indio_dev,
+ 	if (!buffer->scan_mask)
+ 		return 0;
+ 
+-	return test_bit(bit, buffer->scan_mask);
++	return abs(test_bit(bit, buffer->scan_mask));
+ };
+ EXPORT_SYMBOL_GPL(iio_scan_mask_query);
+ 
+diff --git a/include/linux/iio/common/st_sensors.h b/include/linux/iio/common/st_sensors.h
+new file mode 100644
+index 0000000..56d0495
+--- /dev/null
++++ b/include/linux/iio/common/st_sensors.h
+@@ -0,0 +1,289 @@
++/*
++ * STMicroelectronics sensors library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#ifndef ST_SENSORS_H
++#define ST_SENSORS_H
++
++#include <linux/i2c.h>
++#include <linux/spi/spi.h>
++#include <linux/irqreturn.h>
++#include <linux/iio/trigger.h>
++
++#define ST_SENSORS_TX_MAX_LENGTH		2
++#define ST_SENSORS_RX_MAX_LENGTH		6
++
++#define ST_SENSORS_ODR_LIST_MAX			10
++#define ST_SENSORS_FULLSCALE_AVL_MAX		10
++
++#define ST_SENSORS_NUMBER_ALL_CHANNELS		4
++#define ST_SENSORS_NUMBER_DATA_CHANNELS		3
++#define ST_SENSORS_ENABLE_ALL_AXIS		0x07
++#define ST_SENSORS_BYTE_FOR_CHANNEL		2
++#define ST_SENSORS_SCAN_X			0
++#define ST_SENSORS_SCAN_Y			1
++#define ST_SENSORS_SCAN_Z			2
++#define ST_SENSORS_DEFAULT_12_REALBITS		12
++#define ST_SENSORS_DEFAULT_16_REALBITS		16
++#define ST_SENSORS_DEFAULT_POWER_ON_VALUE	0x01
++#define ST_SENSORS_DEFAULT_POWER_OFF_VALUE	0x00
++#define ST_SENSORS_DEFAULT_WAI_ADDRESS		0x0f
++#define ST_SENSORS_DEFAULT_AXIS_ADDR		0x20
++#define ST_SENSORS_DEFAULT_AXIS_MASK		0x07
++#define ST_SENSORS_DEFAULT_AXIS_N_BIT		3
++
++#define ST_SENSORS_MAX_NAME			17
++#define ST_SENSORS_MAX_4WAI			7
++
++#define ST_SENSORS_LSM_CHANNELS(device_type, index, mod, endian, bits, addr) \
++{ \
++	.type = device_type, \
++	.modified = 1, \
++	.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT | \
++			IIO_CHAN_INFO_SCALE_SEPARATE_BIT, \
++	.scan_index = index, \
++	.channel2 = mod, \
++	.address = addr, \
++	.scan_type = { \
++		.sign = 's', \
++		.realbits = bits, \
++		.shift = 16 - bits, \
++		.storagebits = 16, \
++		.endianness = endian, \
++	}, \
++}
++
++#define ST_SENSOR_DEV_ATTR_SAMP_FREQ() \
++		IIO_DEV_ATTR_SAMP_FREQ(S_IWUSR | S_IRUGO, \
++			st_sensors_sysfs_get_sampling_frequency, \
++			st_sensors_sysfs_set_sampling_frequency)
++
++#define ST_SENSORS_DEV_ATTR_SAMP_FREQ_AVAIL() \
++		IIO_DEV_ATTR_SAMP_FREQ_AVAIL( \
++			st_sensors_sysfs_sampling_frequency_avail)
++
++#define ST_SENSORS_DEV_ATTR_SCALE_AVAIL(name) \
++		IIO_DEVICE_ATTR(name, S_IRUGO, \
++			st_sensors_sysfs_scale_avail, NULL , 0);
++
++struct st_sensor_odr_avl {
++	unsigned int hz;
++	u8 value;
++};
++
++struct st_sensor_odr {
++	u8 addr;
++	u8 mask;
++	struct st_sensor_odr_avl odr_avl[ST_SENSORS_ODR_LIST_MAX];
++};
++
++struct st_sensor_power {
++	u8 addr;
++	u8 mask;
++	u8 value_off;
++	u8 value_on;
++};
++
++struct st_sensor_axis {
++	u8 addr;
++	u8 mask;
++};
++
++struct st_sensor_fullscale_avl {
++	unsigned int num;
++	u8 value;
++	unsigned int gain;
++	unsigned int gain2;
++};
++
++struct st_sensor_fullscale {
++	u8 addr;
++	u8 mask;
++	struct st_sensor_fullscale_avl fs_avl[ST_SENSORS_FULLSCALE_AVL_MAX];
++};
++
++/**
++ * struct st_sensor_bdu - ST sensor device block data update
++ * @addr: address of the register.
++ * @mask: mask to write the block data update flag.
++ */
++struct st_sensor_bdu {
++	u8 addr;
++	u8 mask;
++};
++
++/**
++ * struct st_sensor_data_ready_irq - ST sensor device data-ready interrupt
++ * @addr: address of the register.
++ * @mask: mask to write the on/off value.
++ * struct ig1 - represents the Interrupt Generator 1 of sensors.
++ * @en_addr: address of the enable ig1 register.
++ * @en_mask: mask to write the on/off value for enable.
++ */
++struct st_sensor_data_ready_irq {
++	u8 addr;
++	u8 mask;
++	struct {
++		u8 en_addr;
++		u8 en_mask;
++	} ig1;
++};
++
++/**
++ * struct st_sensor_transfer_buffer - ST sensor device I/O buffer
++ * @buf_lock: Mutex to protect rx and tx buffers.
++ * @tx_buf: Buffer used by SPI transfer function to send data to the sensors.
++ *	This buffer is used to avoid DMA not-aligned issue.
++ * @rx_buf: Buffer used by SPI transfer to receive data from sensors.
++ *	This buffer is used to avoid DMA not-aligned issue.
++ */
++struct st_sensor_transfer_buffer {
++	struct mutex buf_lock;
++	u8 rx_buf[ST_SENSORS_RX_MAX_LENGTH];
++	u8 tx_buf[ST_SENSORS_TX_MAX_LENGTH] ____cacheline_aligned;
++};
++
++/**
++ * struct st_sensor_transfer_function - ST sensor device I/O function
++ * @read_byte: Function used to read one byte.
++ * @write_byte: Function used to write one byte.
++ * @read_multiple_byte: Function used to read multiple byte.
++ */
++struct st_sensor_transfer_function {
++	int (*read_byte) (struct st_sensor_transfer_buffer *tb,
++				struct device *dev, u8 reg_addr, u8 *res_byte);
++	int (*write_byte) (struct st_sensor_transfer_buffer *tb,
++				struct device *dev, u8 reg_addr, u8 data);
++	int (*read_multiple_byte) (struct st_sensor_transfer_buffer *tb,
++		struct device *dev, u8 reg_addr, int len, u8 *data,
++							bool multiread_bit);
++};
++
++/**
++ * struct st_sensors - ST sensors list
++ * @wai: Contents of WhoAmI register.
++ * @sensors_supported: List of supported sensors by struct itself.
++ * @ch: IIO channels for the sensor.
++ * @odr: Output data rate register and ODR list available.
++ * @pw: Power register of the sensor.
++ * @enable_axis: Enable one or more axis of the sensor.
++ * @fs: Full scale register and full scale list available.
++ * @bdu: Block data update register.
++ * @drdy_irq: Data ready register of the sensor.
++ * @multi_read_bit: Use or not particular bit for [I2C/SPI] multi-read.
++ * @bootime: samples to discard when sensor passing from power-down to power-up.
++ */
++struct st_sensors {
++	u8 wai;
++	char sensors_supported[ST_SENSORS_MAX_4WAI][ST_SENSORS_MAX_NAME];
++	struct iio_chan_spec *ch;
++	struct st_sensor_odr odr;
++	struct st_sensor_power pw;
++	struct st_sensor_axis enable_axis;
++	struct st_sensor_fullscale fs;
++	struct st_sensor_bdu bdu;
++	struct st_sensor_data_ready_irq drdy_irq;
++	bool multi_read_bit;
++	unsigned int bootime;
++};
++
++/**
++ * struct st_sensor_data - ST sensor device status
++ * @dev: Pointer to instance of struct device (I2C or SPI).
++ * @trig: The trigger in use by the core driver.
++ * @sensor: Pointer to the current sensor struct in use.
++ * @current_fullscale: Maximum range of measure by the sensor.
++ * @enabled: Status of the sensor (false->off, true->on).
++ * @multiread_bit: Use or not particular bit for [I2C/SPI] multiread.
++ * @buffer_data: Data used by buffer part.
++ * @odr: Output data rate of the sensor [Hz].
++ * @get_irq_data_ready: Function to get the IRQ used for data ready signal.
++ * @tf: Transfer function structure used by I/O operations.
++ * @tb: Transfer buffers and mutex used by I/O operations.
++ */
++struct st_sensor_data {
++	struct device *dev;
++	struct iio_trigger *trig;
++	struct st_sensors *sensor;
++	struct st_sensor_fullscale_avl *current_fullscale;
++
++	bool enabled;
++	bool multiread_bit;
++
++	char *buffer_data;
++
++	unsigned int odr;
++
++	unsigned int (*get_irq_data_ready) (struct iio_dev *indio_dev);
++
++	const struct st_sensor_transfer_function *tf;
++	struct st_sensor_transfer_buffer tb;
++};
++
++#ifdef CONFIG_IIO_BUFFER
++irqreturn_t st_sensors_trigger_handler(int irq, void *p);
++
++int st_sensors_get_buffer_element(struct iio_dev *indio_dev, u8 *buf);
++#endif
++
++#ifdef CONFIG_IIO_TRIGGER
++int st_sensors_allocate_trigger(struct iio_dev *indio_dev,
++				const struct iio_trigger_ops *trigger_ops);
++
++void st_sensors_deallocate_trigger(struct iio_dev *indio_dev);
++
++#else
++static inline int st_sensors_allocate_trigger(struct iio_dev *indio_dev,
++				const struct iio_trigger_ops *trigger_ops)
++{
++	return 0;
++}
++static inline void st_sensors_deallocate_trigger(struct iio_dev *indio_dev)
++{
++	return;
++}
++#endif
++
++int st_sensors_init_sensor(struct iio_dev *indio_dev);
++
++int st_sensors_write_data_with_mask(struct iio_dev *indio_dev,
++				u8 reg_addr, u8 mask, u8 data);
++
++int st_sensors_set_enable(struct iio_dev *indio_dev, bool enable);
++
++int st_sensors_set_axis_enable(struct iio_dev *indio_dev, u8 axis_enable);
++
++int st_sensors_set_odr(struct iio_dev *indio_dev, unsigned int odr);
++
++int st_sensors_set_dataready_irq(struct iio_dev *indio_dev, bool enable);
++
++int st_sensors_set_fullscale_by_gain(struct iio_dev *indio_dev, int scale);
++
++int st_sensors_read_axis_data(struct iio_dev *indio_dev,
++							u8 ch_addr, int *data);
++
++int st_sensors_read_info_raw(struct iio_dev *indio_dev,
++				struct iio_chan_spec const *ch, int *val);
++
++int st_sensors_check_device_support(struct iio_dev *indio_dev,
++			int num_sensors_list, const struct st_sensors *sensors);
++
++ssize_t st_sensors_sysfs_get_sampling_frequency(struct device *dev,
++				struct device_attribute *attr, char *buf);
++
++ssize_t st_sensors_sysfs_set_sampling_frequency(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t size);
++
++ssize_t st_sensors_sysfs_sampling_frequency_avail(struct device *dev,
++				struct device_attribute *attr, char *buf);
++
++ssize_t st_sensors_sysfs_scale_avail(struct device *dev,
++				struct device_attribute *attr, char *buf);
++
++#endif /* ST_SENSORS_H */
+diff --git a/include/linux/iio/common/st_sensors_i2c.h b/include/linux/iio/common/st_sensors_i2c.h
+new file mode 100644
+index 0000000..67d8453
+--- /dev/null
++++ b/include/linux/iio/common/st_sensors_i2c.h
+@@ -0,0 +1,20 @@
++/*
++ * STMicroelectronics sensors i2c library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#ifndef ST_SENSORS_I2C_H
++#define ST_SENSORS_I2C_H
++
++#include <linux/i2c.h>
++#include <linux/iio/common/st_sensors.h>
++
++void st_sensors_i2c_configure(struct iio_dev *indio_dev,
++		struct i2c_client *client, struct st_sensor_data *sdata);
++
++#endif /* ST_SENSORS_I2C_H */
+diff --git a/include/linux/iio/common/st_sensors_spi.h b/include/linux/iio/common/st_sensors_spi.h
+new file mode 100644
+index 0000000..d964a35
+--- /dev/null
++++ b/include/linux/iio/common/st_sensors_spi.h
+@@ -0,0 +1,20 @@
++/*
++ * STMicroelectronics sensors spi library driver
++ *
++ * Copyright 2012-2013 STMicroelectronics Inc.
++ *
++ * Denis Ciocca <denis.ciocca@st.com>
++ *
++ * Licensed under the GPL-2.
++ */
++
++#ifndef ST_SENSORS_SPI_H
++#define ST_SENSORS_SPI_H
++
++#include <linux/spi/spi.h>
++#include <linux/iio/common/st_sensors.h>
++
++void st_sensors_spi_configure(struct iio_dev *indio_dev,
++			struct spi_device *spi, struct st_sensor_data *sdata);
++
++#endif /* ST_SENSORS_SPI_H */
+diff --git a/include/linux/platform_data/lis331dlh_intel_qrk.h b/include/linux/platform_data/lis331dlh_intel_qrk.h
+new file mode 100644
+index 0000000..f0d914c
+--- /dev/null
++++ b/include/linux/platform_data/lis331dlh_intel_qrk.h
+@@ -0,0 +1,29 @@
++/*
++ * Platform data for Intel Clanton Hill platform accelerometer driver
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#ifndef __LINUX_PLATFORM_DATA_LIS331DLH_INTEL_QRK_H__
++#define __LINUX_PLATFORM_DATA_LIS331DLH_INTEL_QRK_H__
++
++/**
++ * struct lis331dlh_intel_qrk_platform_data - Platform data for the ST Micro
++ *                                            accelerometer driver
++ * @irq1_pin: GPIO pin number for the threshold interrupt(INT1).
++ **/
++struct lis331dlh_intel_qrk_platform_data {
++	int irq1_pin;
++};
++
++#endif /* LINUX_PLATFORM_DATA_LIS331DLH_INTEL_QRK_H_ */

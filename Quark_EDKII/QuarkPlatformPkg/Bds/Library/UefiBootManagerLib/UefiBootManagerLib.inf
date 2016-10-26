@@ -1,0 +1,132 @@
+## @file
+#  
+#  General BDS defines and produce general interfaces for platform BDS driver including:
+#  1) BDS boot policy interface;
+#  2) BDS boot device connect interface;
+#  3) BDS Misc interfaces for mainting boot variable, ouput string, etc.
+#  
+#  Copyright (c) 2013 Intel Corporation.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  * Redistributions of source code must retain the above copyright
+#  notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#  notice, this list of conditions and the following disclaimer in
+#  the documentation and/or other materials provided with the
+#  distribution.
+#  * Neither the name of Intel Corporation nor the names of its
+#  contributors may be used to endorse or promote products derived
+#  from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+#  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+#  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+#  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+#  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#  
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = UefiBootManagerLib
+  FILE_GUID                      = 8D4752BC-595E-49a2-B4AF-F3F57B601DE9
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = UefiBootManagerLib|DXE_DRIVER UEFI_APPLICATION
+
+#
+# The following information is for reference only and not required by the build tools.
+#
+#  VALID_ARCHITECTURES           = IA32 X64 IPF EBC
+#
+
+[Sources]
+  Performance.c
+  BdsConnect.c
+  BdsMisc.c
+  BdsConsole.c
+  BdsBoot.c
+  BdsLoadOption.c
+  BdsHotkey.c
+  InternalBdsLib.h
+  Capsules.c
+  
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  QuarkPlatformPkg/QuarkPlatformPkg.dec
+
+[LibraryClasses]
+  HobLib
+  PcdLib
+  BaseLib
+  UefiLib
+  TimerLib
+  DebugLib
+  PrintLib
+  BaseMemoryLib
+  DevicePathLib
+  PerformanceLib
+  PeCoffGetEntryPointLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  DxeServicesTableLib
+  MemoryAllocationLib
+  DxeServicesLib
+  ReportStatusCodeLib
+  CapsuleLib
+  PerformanceLib
+
+[Guids]
+  gEfiMemoryTypeInformationGuid                 ## CONSUMES ## GUID (The identifier of memory type information type in system table)
+                                                ## CONSUMES ## GUID HOB (The hob holding memory type information)
+  gEfiGlobalVariableGuid                        ## SOMETIMES_PRODUCES ## Variable:L"BootCurrent" (The boot option of current boot)
+                                                ## SOMETIMES_CONSUMES ## Variable:L"BootXX" (Boot option variable)
+                                                ## CONSUMES           ## Variable:L"Timeout" (The time out value in second of showing progress bar)
+                                                ## SOMETIMES_CONSUMES ## Variable:L"BootOrder" (The boot option array)
+                                                ## SOMETIMES_CONSUMES ## Variable:L"DriverOrder" (The driver order list)
+                                                ## SOMETIMES_CONSUMES ## Variable:L"ConIn" (The device path of console in device)
+                                                ## SOMETIMES_CONSUMES ## Variable:L"ConOut" (The device path of console out device)
+                                                ## SOMETIMES_CONSUMES ## Variable:L"ErrOut" (The device path of error out device)
+  gEfiFileInfoGuid                              ## CONSUMES ## GUID
+  gPerformanceProtocolGuid                      ## SOMETIMES_PRODUCES ## Variable:L"PerfDataMemAddr" (The ACPI address of performance data)
+
+[Protocols]
+  gEfiPciRootBridgeIoProtocolGuid               # PROTOCOL CONSUMES
+  gEfiSimpleFileSystemProtocolGuid              # PROTOCOL CONSUMES
+  gEfiLoadFileProtocolGuid                      # PROTOCOL CONSUMES
+  gEfiSimpleTextOutProtocolGuid                 # PROTOCOL CONSUMES
+  gEfiPciIoProtocolGuid                         # PROTOCOL CONSUMES
+  gEfiLoadedImageProtocolGuid                   # PROTOCOL CONSUMES
+  gEfiSimpleNetworkProtocolGuid                 # PROTOCOL CONSUMES
+  gEfiSimpleTextInProtocolGuid                  # PROTOCOL CONSUMES
+  gEfiBlockIoProtocolGuid                       # PROTOCOL CONSUMES
+  gEfiFirmwareVolume2ProtocolGuid               # PROTOCOL CONSUMES
+  gEfiDevicePathProtocolGuid                    # PROTOCOL CONSUMES
+  gEfiBootLogoProtocolGuid                      # PROTOCOL CONSUMES
+  gEfiGraphicsOutputProtocolGuid                # PROTOCOL SOMETIMES_CONSUMES
+  gEfiUsbIoProtocolGuid                         # PROTOCOL SOMETIMES_CONSUMES
+  gEfiDiskInfoProtocolGuid                      # PROTOCOL SOMETIMES_CONSUMES
+  gEfiDevicePathToTextProtocolGuid              # PROTOCOL SOMETIMES_CONSUMES
+
+[FeaturePcd]
+  gQuarkPlatformTokenSpaceGuid.PcdShortformBootSupport
+  gQuarkPlatformTokenSpaceGuid.PcdBdsFindDisplay
+
+[FixedPcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdResetOnMemoryTypeInformationChange
+  gEfiMdeModulePkgTokenSpaceGuid.PcdProgressCodeOsLoaderLoad
+  gEfiMdeModulePkgTokenSpaceGuid.PcdProgressCodeOsLoaderStart
+  gQuarkPlatformTokenSpaceGuid.PcdBootManagerMenuFile
+
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdConInConnectOnDemand

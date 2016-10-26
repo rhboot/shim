@@ -1,0 +1,350 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Bryan O'Donoghue <bryan.odonoghue@intel.com>
+Date: Thu, 8 May 2014 14:28:54 +0100
+Subject: [PATCH 12/21] USB gadget serial
+
+---
+ Documentation/usb/linux-cdc-acm.inf |   4 +-
+ drivers/usb/gadget/Kconfig          |   5 +-
+ drivers/usb/gadget/pch_udc.c        | 147 ++++++++++++++++++++++++------------
+ drivers/usb/gadget/serial.c         |  24 +++++-
+ 4 files changed, 123 insertions(+), 57 deletions(-)
+
+diff --git a/Documentation/usb/linux-cdc-acm.inf b/Documentation/usb/linux-cdc-acm.inf
+index f0ffc27..e56f074 100644
+--- a/Documentation/usb/linux-cdc-acm.inf
++++ b/Documentation/usb/linux-cdc-acm.inf
+@@ -90,10 +90,10 @@ ServiceBinary=%12%\USBSER.sys
+ [SourceDisksFiles]
+ [SourceDisksNames]
+ [DeviceList]
+-%DESCRIPTION%=DriverInstall, USB\VID_0525&PID_A4A7, USB\VID_1D6B&PID_0104&MI_02, USB\VID_1D6B&PID_0106&MI_00
++%DESCRIPTION%=DriverInstall, USB\VID_0525&PID_A4A7, USB\VID_1D6B&PID_0104&MI_02, USB\VID_1D6B&PID_0106&MI_00, USB\VID_8086&PID_BABE  
+ 
+ [DeviceList.NTamd64]
+-%DESCRIPTION%=DriverInstall, USB\VID_0525&PID_A4A7, USB\VID_1D6B&PID_0104&MI_02, USB\VID_1D6B&PID_0106&MI_00
++%DESCRIPTION%=DriverInstall, USB\VID_0525&PID_A4A7, USB\VID_1D6B&PID_0104&MI_02, USB\VID_1D6B&PID_0106&MI_00, USB\VID_8086&PID_BABE  
+ 
+ 
+ ;------------------------------------------------------------------------------
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 14625fd..1ab9996 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -439,7 +439,7 @@ config USB_GOKU
+ 	   gadget drivers to also be dynamically linked.
+ 
+ config USB_EG20T
+-	tristate "Intel EG20T PCH/LAPIS Semiconductor IOH(ML7213/ML7831) UDC"
++	tristate "Intel QRK/EG20T PCH/LAPIS Semiconductor IOH(ML7213/ML7831) UDC"
+ 	depends on PCI
+ 	help
+ 	  This is a USB device driver for EG20T PCH.
+@@ -459,7 +459,8 @@ config USB_EG20T
+ 	  ML7831 is for general purpose use.
+ 	  ML7213/ML7831 is companion chip for Intel Atom E6xx series.
+ 	  ML7213/ML7831 is completely compatible for Intel EG20T PCH.
+-
++	  
++	  This driver can be used with Intel's Quark SOC platform
+ #
+ # LAST -- dummy/emulated controller
+ #
+diff --git a/drivers/usb/gadget/pch_udc.c b/drivers/usb/gadget/pch_udc.c
+index 6490c00..618261f 100644
+--- a/drivers/usb/gadget/pch_udc.c
++++ b/drivers/usb/gadget/pch_udc.c
+@@ -6,6 +6,7 @@
+  * the Free Software Foundation; version 2 of the License.
+  */
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++#include <asm/qrk.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/pci.h>
+@@ -18,6 +19,10 @@
+ #include <linux/gpio.h>
+ #include <linux/irq.h>
+ 
++static unsigned int enable_msi = 1;
++module_param(enable_msi, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(enable_msi, "Enable PCI MSI mode");
++
+ /* GPIO port for VBUS detecting */
+ static int vbus_gpio_port = -1;		/* GPIO port number (-1:Not used) */
+ 
+@@ -343,6 +348,7 @@ struct pch_vbus_gpio_data {
+  * @setup_data:		Received setup data
+  * @phys_addr:		of device memory
+  * @base_addr:		for mapped device memory
++ * @bar:		Indicates which PCI BAR for USB regs
+  * @irq:		IRQ line for the device
+  * @cfg_data:		current cfg, intf, and alt in use
+  * @vbus_gpio:		GPIO informaton for detecting VBUS
+@@ -371,13 +377,16 @@ struct pch_udc_dev {
+ 	struct usb_ctrlrequest		setup_data;
+ 	unsigned long			phys_addr;
+ 	void __iomem			*base_addr;
++	unsigned			bar;
+ 	unsigned			irq;
+ 	struct pch_udc_cfg_data		cfg_data;
+ 	struct pch_vbus_gpio_data	vbus_gpio;
+ };
+ 
+-#define PCH_UDC_PCI_BAR			1
++#define PCH_UDC_PCI_BAR_QUARK		0
++#define PCH_UDC_PCI_BAR_EG20T		1
+ #define PCI_DEVICE_ID_INTEL_EG20T_UDC	0x8808
++#define PCI_DEVICE_ID_INTEL_QUARK_UDC	0x0939
+ #define PCI_VENDOR_ID_ROHM		0x10DB
+ #define PCI_DEVICE_ID_ML7213_IOH_UDC	0x801D
+ #define PCI_DEVICE_ID_ML7831_IOH_UDC	0x8808
+@@ -2779,55 +2788,75 @@ static irqreturn_t pch_udc_isr(int irq, void *pdev)
+ {
+ 	struct pch_udc_dev *dev = (struct pch_udc_dev *) pdev;
+ 	u32 dev_intr, ep_intr;
+-	int i;
+-
+-	dev_intr = pch_udc_read_device_interrupts(dev);
+-	ep_intr = pch_udc_read_ep_interrupts(dev);
+-
+-	/* For a hot plug, this find that the controller is hung up. */
+-	if (dev_intr == ep_intr)
+-		if (dev_intr == pch_udc_readl(dev, UDC_DEVCFG_ADDR)) {
+-			dev_dbg(&dev->pdev->dev, "UDC: Hung up\n");
+-			/* The controller is reset */
+-			pch_udc_writel(dev, UDC_SRST, UDC_SRST_ADDR);
+-			return IRQ_HANDLED;
++	int i, events = 0, count = 0;
++
++	mask_pvm(dev->pdev);
++	do {
++		events = 0;
++		dev_intr = pch_udc_read_device_interrupts(dev);
++		ep_intr = pch_udc_read_ep_interrupts(dev);
++
++		/* For a hot plug, this find that the controller is hung up. */
++		if (dev_intr == ep_intr)
++			if (dev_intr == pch_udc_readl(dev, UDC_DEVCFG_ADDR)) {
++				dev_dbg(&dev->pdev->dev, "UDC: Hung up\n");
++				/* The controller is reset */
++				pch_udc_writel(dev, UDC_SRST, UDC_SRST_ADDR);
++				unmask_pvm(dev->pdev);
++				return IRQ_HANDLED;
++			}
++		if (dev_intr){
++			/* Clear device interrupts */
++			pch_udc_write_device_interrupts(dev, dev_intr);
++			events = 1;
++			count = 1;
+ 		}
+-	if (dev_intr)
+-		/* Clear device interrupts */
+-		pch_udc_write_device_interrupts(dev, dev_intr);
+-	if (ep_intr)
+-		/* Clear ep interrupts */
+-		pch_udc_write_ep_interrupts(dev, ep_intr);
+-	if (!dev_intr && !ep_intr)
+-		return IRQ_NONE;
+-	spin_lock(&dev->lock);
+-	if (dev_intr)
+-		pch_udc_dev_isr(dev, dev_intr);
+-	if (ep_intr) {
+-		pch_udc_read_all_epstatus(dev, ep_intr);
+-		/* Process Control In interrupts, if present */
+-		if (ep_intr & UDC_EPINT_IN_EP0) {
+-			pch_udc_svc_control_in(dev);
+-			pch_udc_postsvc_epinters(dev, 0);
++		if (ep_intr){
++			/* Clear ep interrupts */
++			pch_udc_write_ep_interrupts(dev, ep_intr);
++			events = 1;
++			count = 1;
+ 		}
+-		/* Process Control Out interrupts, if present */
+-		if (ep_intr & UDC_EPINT_OUT_EP0)
+-			pch_udc_svc_control_out(dev);
+-		/* Process data in end point interrupts */
+-		for (i = 1; i < PCH_UDC_USED_EP_NUM; i++) {
+-			if (ep_intr & (1 <<  i)) {
+-				pch_udc_svc_data_in(dev, i);
+-				pch_udc_postsvc_epinters(dev, i);
++		if (!dev_intr && !ep_intr){
++			unmask_pvm(dev->pdev);
++			if (count)
++				return IRQ_HANDLED;
++			else
++				return IRQ_NONE;
++		}
++		spin_lock(&dev->lock);
++		if (dev_intr){
++			pch_udc_dev_isr(dev, dev_intr);
++		}
++		if (ep_intr) {
++			pch_udc_read_all_epstatus(dev, ep_intr);
++			/* Process Control In interrupts, if present */
++			if (ep_intr & UDC_EPINT_IN_EP0) {
++				pch_udc_svc_control_in(dev);
++				pch_udc_postsvc_epinters(dev, 0);
+ 			}
++			/* Process Control Out interrupts, if present */
++			if (ep_intr & UDC_EPINT_OUT_EP0)
++				pch_udc_svc_control_out(dev);
++			/* Process data in end point interrupts */
++			for (i = 1; i < PCH_UDC_USED_EP_NUM; i++) {
++				if (ep_intr & (1 <<  i)) {
++					pch_udc_svc_data_in(dev, i);
++					pch_udc_postsvc_epinters(dev, i);
++				}
++			}
++			/* Process data out end point interrupts */
++			for (i = UDC_EPINT_OUT_SHIFT + 1;
++				i < (UDC_EPINT_OUT_SHIFT + PCH_UDC_USED_EP_NUM);
++				i++)
++				if (ep_intr & (1 <<  i))
++					pch_udc_svc_data_out(dev,
++						i - UDC_EPINT_OUT_SHIFT);
+ 		}
+-		/* Process data out end point interrupts */
+-		for (i = UDC_EPINT_OUT_SHIFT + 1; i < (UDC_EPINT_OUT_SHIFT +
+-						 PCH_UDC_USED_EP_NUM); i++)
+-			if (ep_intr & (1 <<  i))
+-				pch_udc_svc_data_out(dev, i -
+-							 UDC_EPINT_OUT_SHIFT);
+-	}
+-	spin_unlock(&dev->lock);
++		spin_unlock(&dev->lock);
++	}while(events == 1);
++	unmask_pvm(dev->pdev);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -3108,7 +3137,7 @@ static void pch_udc_remove(struct pci_dev *pdev)
+ 		iounmap(dev->base_addr);
+ 	if (dev->mem_region)
+ 		release_mem_region(dev->phys_addr,
+-				   pci_resource_len(pdev, PCH_UDC_PCI_BAR));
++				   pci_resource_len(pdev, dev->bar));
+ 	if (dev->active)
+ 		pci_disable_device(pdev);
+ 	if (dev->registered)
+@@ -3184,9 +3213,16 @@ static int pch_udc_probe(struct pci_dev *pdev,
+ 	dev->active = 1;
+ 	pci_set_drvdata(pdev, dev);
+ 
++	/* Determine BAR based on PCI ID */
++	if(id->device == PCI_DEVICE_ID_INTEL_QUARK_UDC){
++		dev->bar = PCH_UDC_PCI_BAR_QUARK;
++	}else {
++		dev->bar = PCH_UDC_PCI_BAR_EG20T;
++	}
++
+ 	/* PCI resource allocation */
+-	resource = pci_resource_start(pdev, 1);
+-	len = pci_resource_len(pdev, 1);
++	resource = pci_resource_start(pdev, dev->bar);
++	len = pci_resource_len(pdev, dev->bar);
+ 
+ 	if (!request_mem_region(resource, len, KBUILD_MODNAME)) {
+ 		dev_err(&pdev->dev, "%s: pci device used already\n", __func__);
+@@ -3213,6 +3249,12 @@ static int pch_udc_probe(struct pci_dev *pdev,
+ 		retval = -ENODEV;
+ 		goto finished;
+ 	}
++
++	pci_set_master(pdev);
++	if (enable_msi == 1){
++		pci_enable_msi(pdev);
++	}
++
+ 	if (request_irq(pdev->irq, pch_udc_isr, IRQF_SHARED, KBUILD_MODNAME,
+ 			dev)) {
+ 		dev_err(&pdev->dev, "%s: request_irq(%d) fail\n", __func__,
+@@ -3223,7 +3265,7 @@ static int pch_udc_probe(struct pci_dev *pdev,
+ 	dev->irq = pdev->irq;
+ 	dev->irq_registered = 1;
+ 
+-	pci_set_master(pdev);
++
+ 	pci_try_set_mwi(pdev);
+ 
+ 	/* device struct setup */
+@@ -3261,6 +3303,11 @@ finished:
+ 
+ static DEFINE_PCI_DEVICE_TABLE(pch_udc_pcidev_id) = {
+ 	{
++		PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_QUARK_UDC),
++		.class = (PCI_CLASS_SERIAL_USB << 8) | 0xfe,
++		.class_mask = 0xffffffff,
++	},
++	{
+ 		PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_EG20T_UDC),
+ 		.class = (PCI_CLASS_SERIAL_USB << 8) | 0xfe,
+ 		.class_mask = 0xffffffff,
+diff --git a/drivers/usb/gadget/serial.c b/drivers/usb/gadget/serial.c
+index 44752f5..e02a4c9 100644
+--- a/drivers/usb/gadget/serial.c
++++ b/drivers/usb/gadget/serial.c
+@@ -127,6 +127,15 @@ static unsigned n_ports = 1;
+ module_param(n_ports, uint, 0);
+ MODULE_PARM_DESC(n_ports, "number of ports to create, default=1");
+ 
++static __u16 vendor = GS_VENDOR_ID;
++module_param(vendor, ushort, 0);
++MODULE_PARM_DESC(vendor, "User specified vendor ID (default="
++		__MODULE_STRING(GS_VENDOR_ID)")");
++
++static __u16 product = 0;
++module_param(product, ushort, 0);
++MODULE_PARM_DESC(product, "User specified product ID");
++
+ /*-------------------------------------------------------------------------*/
+ 
+ static int __init serial_bind_config(struct usb_configuration *c)
+@@ -172,6 +181,14 @@ static int __init gs_bind(struct usb_composite_dev *cdev)
+ 	status = strings_dev[STRING_DESCRIPTION_IDX].id;
+ 	serial_config_driver.iConfiguration = status;
+ 
++	/* Allow command line over-ride to set specific vendor/device id */
++	if (vendor != GS_VENDOR_ID)
++		device_desc.idVendor = cpu_to_le16(vendor);
++	if (product != 0)
++		device_desc.idProduct = cpu_to_le16(product);
++	pr_info("g_serial: Vendor 0x%04x Product 0x%04x\n",
++		device_desc.idVendor, device_desc.idProduct);
++
+ 	if (gadget_is_otg(cdev->gadget)) {
+ 		serial_config_driver.descriptors = otg_desc;
+ 		serial_config_driver.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+@@ -201,6 +218,7 @@ static __refdata struct usb_composite_driver gserial_driver = {
+ 	.bind		= gs_bind,
+ };
+ 
++static int bCfgVal;
+ static int __init init(void)
+ {
+ 	/* We *could* export two configs; that'd be much cleaner...
+@@ -208,19 +226,19 @@ static int __init init(void)
+ 	 */
+ 	if (use_acm) {
+ 		serial_config_driver.label = "CDC ACM config";
+-		serial_config_driver.bConfigurationValue = 2;
++		serial_config_driver.bConfigurationValue = ++bCfgVal;
+ 		device_desc.bDeviceClass = USB_CLASS_COMM;
+ 		device_desc.idProduct =
+ 				cpu_to_le16(GS_CDC_PRODUCT_ID);
+ 	} else if (use_obex) {
+ 		serial_config_driver.label = "CDC OBEX config";
+-		serial_config_driver.bConfigurationValue = 3;
++		serial_config_driver.bConfigurationValue = ++bCfgVal;
+ 		device_desc.bDeviceClass = USB_CLASS_COMM;
+ 		device_desc.idProduct =
+ 			cpu_to_le16(GS_CDC_OBEX_PRODUCT_ID);
+ 	} else {
+ 		serial_config_driver.label = "Generic Serial config";
+-		serial_config_driver.bConfigurationValue = 1;
++		serial_config_driver.bConfigurationValue = ++bCfgVal;
+ 		device_desc.bDeviceClass = USB_CLASS_VENDOR_SPEC;
+ 		device_desc.idProduct =
+ 				cpu_to_le16(GS_PRODUCT_ID);

@@ -1,0 +1,60 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Derek Browne <Derek.Browne@intel.com>
+Date: Thu, 20 Feb 2014 15:16:30 +0000
+Subject: [PATCH 10/21] Quark SDIO host controller
+
+---
+ drivers/mmc/host/sdhci-pci.c | 12 ++++++++++++
+ include/linux/pci_ids.h      |  2 ++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci-pci.c b/drivers/mmc/host/sdhci-pci.c
+index c7dd0cb..e5759b7 100644
+--- a/drivers/mmc/host/sdhci-pci.c
++++ b/drivers/mmc/host/sdhci-pci.c
+@@ -162,6 +162,10 @@ static const struct sdhci_pci_fixes sdhci_cafe = {
+ 			  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+ };
+ 
++static const struct sdhci_pci_fixes sdhci_intel_qrk = {
++	.quirks		= SDHCI_QUIRK_NO_HISPD_BIT,
++};
++
+ static int mrst_hc_probe_slot(struct sdhci_pci_slot *slot)
+ {
+ 	slot->host->mmc->caps |= MMC_CAP_8_BIT_DATA;
+@@ -777,6 +781,14 @@ static const struct pci_device_id pci_ids[] = {
+ 
+ 	{
+ 		.vendor		= PCI_VENDOR_ID_INTEL,
++		.device		= PCI_DEVICE_ID_INTEL_QRK_SD,
++		.subvendor	= PCI_ANY_ID,
++		.subdevice	= PCI_ANY_ID,
++		.driver_data	= (kernel_ulong_t)&sdhci_intel_qrk,
++	},
++
++	{
++		.vendor		= PCI_VENDOR_ID_INTEL,
+ 		.device		= PCI_DEVICE_ID_INTEL_MRST_SD0,
+ 		.subvendor	= PCI_ANY_ID,
+ 		.subdevice	= PCI_ANY_ID,
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index 0eb6579..b5bb350 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -2512,6 +2512,7 @@
+ #define PCI_DEVICE_ID_INTEL_MFD_EMMC0	0x0823
+ #define PCI_DEVICE_ID_INTEL_MFD_EMMC1	0x0824
+ #define PCI_DEVICE_ID_INTEL_MRST_SD2	0x084F
++#define PCI_DEVICE_ID_INTEL_QUARK_ILB	0x095E
+ #define PCI_DEVICE_ID_INTEL_I960	0x0960
+ #define PCI_DEVICE_ID_INTEL_I960RM	0x0962
+ #define PCI_DEVICE_ID_INTEL_CENTERTON_ILB	0x0c60
+@@ -2534,6 +2535,7 @@
+ #define PCI_DEVICE_ID_INTEL_82840_HB	0x1a21
+ #define PCI_DEVICE_ID_INTEL_82845_HB	0x1a30
+ #define PCI_DEVICE_ID_INTEL_IOAT	0x1a38
++#define PCI_DEVICE_ID_INTEL_QRK_SD	0x08A7
+ #define PCI_DEVICE_ID_INTEL_COUGARPOINT_LPC_MIN	0x1c41
+ #define PCI_DEVICE_ID_INTEL_COUGARPOINT_LPC_MAX	0x1c5f
+ #define PCI_DEVICE_ID_INTEL_PATSBURG_LPC_0	0x1d40

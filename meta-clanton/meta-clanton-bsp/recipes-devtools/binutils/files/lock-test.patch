@@ -1,0 +1,117 @@
+diff --git a/gas/testsuite/gas/i386/i386.exp b/gas/testsuite/gas/i386/i386.exp
+index 5108808..3547bb4 100644
+--- a/gas/testsuite/gas/i386/i386.exp
++++ b/gas/testsuite/gas/i386/i386.exp
+@@ -17,6 +17,10 @@ proc gas_32_check { } {
+     return [regexp "targets:.*i386" [lindex $status 1]];
+ }
+ 
++global ASFLAGS
++set init_ASFLAGS "$ASFLAGS"
++set ASFLAGS "$ASFLAGS -mquark-strip-lock=no"
++
+ if [expr ([istarget "i*86-*-*"] ||  [istarget "x86_64-*-*"]) && [gas_32_check]]  then {
+ 
+     global ASFLAGS
+@@ -499,3 +503,5 @@ if [expr ([istarget "i*86-*-*"] || [istarget "x86_64-*-*"]) && [gas_64_check]] t
+ 
+     set ASFLAGS "$old_ASFLAGS"
+ }
++
++set ASFLAGS "$init_ASFLAGS"
+diff --git a/gas/testsuite/gas/i386/lock-problem.exp b/gas/testsuite/gas/i386/lock-problem.exp
+new file mode 100644
+index 0000000..6ef0604
+--- /dev/null
++++ b/gas/testsuite/gas/i386/lock-problem.exp
+@@ -0,0 +1,27 @@
++proc gas_32_check { } {
++    global NM
++    global NMFLAGS
++
++    set status [gas_host_run "$NM $NMFLAGS --help" ""]
++    return [regexp "targets:.*i386" [lindex $status 1]];
++}
++
++if [expr ([istarget "i*86-*-*"] ||  [istarget "x86_64-*-*"]) && [gas_32_check]]  then {
++    global ASFLAGS
++
++    set old_ASFLAGS "$ASFLAGS"
++    set ASFLAGS "$ASFLAGS --32"
++    run_dump_test "mquark-strip-lock-yes"
++    set ASFLAGS "$old_ASFLAGS"
++
++    set old_ASFLAGS "$ASFLAGS"
++    set ASFLAGS "$ASFLAGS -mquark-strip-lock=yes --32"
++    run_dump_test "mquark-strip-lock-yes"
++    set ASFLAGS "$old_ASFLAGS"
++
++    set old_ASFLAGS "$ASFLAGS"
++    set ASFLAGS "$ASFLAGS -mquark-strip-lock=no --32"
++    run_dump_test "mquark-strip-lock-no"
++    set ASFLAGS "$old_ASFLAGS"
++}
++
+diff --git a/gas/testsuite/gas/i386/lock-problem.s b/gas/testsuite/gas/i386/lock-problem.s
+new file mode 100644
+index 0000000..65b1cc1
+--- /dev/null
++++ b/gas/testsuite/gas/i386/lock-problem.s
+@@ -0,0 +1,11 @@
++        .code32
++.globl main
++        .type   main, @function
++main:
++        pushl %ebp
++        movl %esp, %ebp
++        subl $0xfff88, %esp
++        movl %ebp, %eax
++        sub $0x100000, %eax
++        lock addl $0x1,(%eax)
++        leave
+diff --git a/gas/testsuite/gas/i386/mquark-strip-lock-no.d b/gas/testsuite/gas/i386/mquark-strip-lock-no.d
+new file mode 100644
+index 0000000..6ff7f03
+--- /dev/null
++++ b/gas/testsuite/gas/i386/mquark-strip-lock-no.d
+@@ -0,0 +1,17 @@
++#source: lock-problem.s
++#objdump: -dw
++#name: i386 quark do-not-strip lock 
++
++.*: +file format .*i386.*
++
++Disassembly of section .text:
++
++00000000 <main>:
++   0:	55                   	push   %ebp
++   1:	89 e5                	mov    %esp,%ebp
++   3:	81 ec 88 ff 0f 00    	sub    \$0xfff88,%esp
++   9:	89 e8                	mov    %ebp,%eax
++   b:	2d 00 00 10 00       	sub    \$0x100000,%eax
++  10:	f0 83 00 01          	lock addl \$0x1,\(%eax\)
++  14:	c9                   	leave  
++#pass
+diff --git a/gas/testsuite/gas/i386/mquark-strip-lock-yes.d b/gas/testsuite/gas/i386/mquark-strip-lock-yes.d
+new file mode 100644
+index 0000000..e711aa8
+--- /dev/null
++++ b/gas/testsuite/gas/i386/mquark-strip-lock-yes.d
+@@ -0,0 +1,17 @@
++#source: lock-problem.s
++#objdump: -dw
++#name: i386 quark strip lock
++
++.*: +file format .*i386.*
++
++Disassembly of section .text:
++
++0+ <main>:
++   0:	55                   	push   %ebp
++   1:	89 e5                	mov    %esp,%ebp
++   3:	81 ec 88 ff 0f 00    	sub    \$0xfff88,%esp
++   9:	89 e8                	mov    %ebp,%eax
++   b:	2d 00 00 10 00       	sub    \$0x100000,%eax
++  10:	83 00 01             	addl   \$0x1,\(%eax\)
++  13:	c9                   	leave  
++#pass

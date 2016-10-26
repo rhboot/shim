@@ -1,0 +1,492 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?= <mirq-linux@rere.qmqm.pl>
+Date: Fri, 1 Feb 2013 20:40:17 +0100
+Subject: [PATCH 02/21] driver-core: constify data for class_find_device()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+All in-kernel users of class_find_device() don't really need mutable
+data for match callback.
+
+In two places (kernel/power/suspend_test.c, drivers/scsi/osd/osd_uld.c)
+this patch changes match callbacks to use const search data.
+
+The const is propagated to rtc_class_open() and power_supply_get_by_name()
+parameters.
+
+Note that there's a dev reference leak in suspend_test.c that's not
+touched in this patch.
+
+Signed-off-by: Michał Mirosław <mirq-linux@rere.qmqm.pl>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+(cherry picked from commit 9f3b795a626ee79574595e06d1437fe0c7d51d29)
+---
+ drivers/base/class.c                |  4 ++--
+ drivers/base/core.c                 |  4 ++--
+ drivers/gpio/gpiolib.c              |  2 +-
+ drivers/isdn/mISDN/core.c           |  4 ++--
+ drivers/net/phy/mdio_bus.c          |  2 +-
+ drivers/power/power_supply_core.c   |  4 ++--
+ drivers/rtc/interface.c             |  6 +++---
+ drivers/scsi/hosts.c                |  4 ++--
+ drivers/scsi/osd/osd_uld.c          | 26 +++++++++-----------------
+ drivers/scsi/scsi_transport_iscsi.c |  4 ++--
+ drivers/spi/spi.c                   |  4 ++--
+ drivers/uwb/lc-rc.c                 | 21 ++++++++++-----------
+ include/linux/device.h              |  4 ++--
+ include/linux/power_supply.h        |  2 +-
+ include/linux/rtc.h                 |  2 +-
+ init/do_mounts.c                    |  4 ++--
+ kernel/power/suspend_test.c         | 11 +++++------
+ net/ieee802154/wpan-class.c         |  5 ++---
+ net/nfc/core.c                      |  4 ++--
+ 19 files changed, 53 insertions(+), 64 deletions(-)
+
+diff --git a/drivers/base/class.c b/drivers/base/class.c
+index 03243d4..3ce8454 100644
+--- a/drivers/base/class.c
++++ b/drivers/base/class.c
+@@ -420,8 +420,8 @@ EXPORT_SYMBOL_GPL(class_for_each_device);
+  * code.  There's no locking restriction.
+  */
+ struct device *class_find_device(struct class *class, struct device *start,
+-				 void *data,
+-				 int (*match)(struct device *, void *))
++				 const void *data,
++				 int (*match)(struct device *, const void *))
+ {
+ 	struct class_dev_iter iter;
+ 	struct device *dev;
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index a235085..dda0c7f 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -1617,9 +1617,9 @@ struct device *device_create(struct class *class, struct device *parent,
+ }
+ EXPORT_SYMBOL_GPL(device_create);
+ 
+-static int __match_devt(struct device *dev, void *data)
++static int __match_devt(struct device *dev, const void *data)
+ {
+-	dev_t *devt = data;
++	const dev_t *devt = data;
+ 
+ 	return dev->devt == *devt;
+ }
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 199fca1..5359ca7 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -806,7 +806,7 @@ fail_unlock:
+ }
+ EXPORT_SYMBOL_GPL(gpio_export);
+ 
+-static int match_export(struct device *dev, void *data)
++static int match_export(struct device *dev, const void *data)
+ {
+ 	return dev_get_drvdata(dev) == data;
+ }
+diff --git a/drivers/isdn/mISDN/core.c b/drivers/isdn/mISDN/core.c
+index 3e24571..da30c5c 100644
+--- a/drivers/isdn/mISDN/core.c
++++ b/drivers/isdn/mISDN/core.c
+@@ -168,13 +168,13 @@ static struct class mISDN_class = {
+ };
+ 
+ static int
+-_get_mdevice(struct device *dev, void *id)
++_get_mdevice(struct device *dev, const void *id)
+ {
+ 	struct mISDNdevice *mdev = dev_to_mISDN(dev);
+ 
+ 	if (!mdev)
+ 		return 0;
+-	if (mdev->id != *(u_int *)id)
++	if (mdev->id != *(const u_int *)id)
+ 		return 0;
+ 	return 1;
+ }
+diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+index 044b532..dc92097 100644
+--- a/drivers/net/phy/mdio_bus.c
++++ b/drivers/net/phy/mdio_bus.c
+@@ -95,7 +95,7 @@ static struct class mdio_bus_class = {
+ 
+ #if IS_ENABLED(CONFIG_OF_MDIO)
+ /* Helper function for of_mdio_find_bus */
+-static int of_mdio_bus_match(struct device *dev, void *mdio_bus_np)
++static int of_mdio_bus_match(struct device *dev, const void *mdio_bus_np)
+ {
+ 	return dev->of_node == mdio_bus_np;
+ }
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 8a7cfb3..5deac43 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -141,7 +141,7 @@ int power_supply_set_battery_charged(struct power_supply *psy)
+ }
+ EXPORT_SYMBOL_GPL(power_supply_set_battery_charged);
+ 
+-static int power_supply_match_device_by_name(struct device *dev, void *data)
++static int power_supply_match_device_by_name(struct device *dev, const void *data)
+ {
+ 	const char *name = data;
+ 	struct power_supply *psy = dev_get_drvdata(dev);
+@@ -149,7 +149,7 @@ static int power_supply_match_device_by_name(struct device *dev, void *data)
+ 	return strcmp(psy->name, name) == 0;
+ }
+ 
+-struct power_supply *power_supply_get_by_name(char *name)
++struct power_supply *power_supply_get_by_name(const char *name)
+ {
+ 	struct device *dev = class_find_device(power_supply_class, NULL, name,
+ 					power_supply_match_device_by_name);
+diff --git a/drivers/rtc/interface.c b/drivers/rtc/interface.c
+index 9592b93..42bd57d 100644
+--- a/drivers/rtc/interface.c
++++ b/drivers/rtc/interface.c
+@@ -587,16 +587,16 @@ void rtc_update_irq(struct rtc_device *rtc,
+ }
+ EXPORT_SYMBOL_GPL(rtc_update_irq);
+ 
+-static int __rtc_match(struct device *dev, void *data)
++static int __rtc_match(struct device *dev, const void *data)
+ {
+-	char *name = (char *)data;
++	const char *name = data;
+ 
+ 	if (strcmp(dev_name(dev), name) == 0)
+ 		return 1;
+ 	return 0;
+ }
+ 
+-struct rtc_device *rtc_class_open(char *name)
++struct rtc_device *rtc_class_open(const char *name)
+ {
+ 	struct device *dev;
+ 	struct rtc_device *rtc = NULL;
+diff --git a/drivers/scsi/hosts.c b/drivers/scsi/hosts.c
+index 593085a..df0c3c7 100644
+--- a/drivers/scsi/hosts.c
++++ b/drivers/scsi/hosts.c
+@@ -468,10 +468,10 @@ void scsi_unregister(struct Scsi_Host *shost)
+ }
+ EXPORT_SYMBOL(scsi_unregister);
+ 
+-static int __scsi_host_match(struct device *dev, void *data)
++static int __scsi_host_match(struct device *dev, const void *data)
+ {
+ 	struct Scsi_Host *p;
+-	unsigned short *hostnum = (unsigned short *)data;
++	const unsigned short *hostnum = data;
+ 
+ 	p = class_to_shost(dev);
+ 	return p->host_no == *hostnum;
+diff --git a/drivers/scsi/osd/osd_uld.c b/drivers/scsi/osd/osd_uld.c
+index 4375417..0fab6b5 100644
+--- a/drivers/scsi/osd/osd_uld.c
++++ b/drivers/scsi/osd/osd_uld.c
+@@ -268,18 +268,11 @@ static inline bool _the_same_or_null(const u8 *a1, unsigned a1_len,
+ 	return 0 == memcmp(a1, a2, a1_len);
+ }
+ 
+-struct find_oud_t {
+-	const struct osd_dev_info *odi;
+-	struct device *dev;
+-	struct osd_uld_device *oud;
+-} ;
+-
+-int _mach_odi(struct device *dev, void *find_data)
++static int _match_odi(struct device *dev, const void *find_data)
+ {
+ 	struct osd_uld_device *oud = container_of(dev, struct osd_uld_device,
+ 						  class_dev);
+-	struct find_oud_t *fot = find_data;
+-	const struct osd_dev_info *odi = fot->odi;
++	const struct osd_dev_info *odi = find_data;
+ 
+ 	if (_the_same_or_null(oud->odi.systemid, oud->odi.systemid_len,
+ 			      odi->systemid, odi->systemid_len) &&
+@@ -287,7 +280,6 @@ int _mach_odi(struct device *dev, void *find_data)
+ 			      odi->osdname, odi->osdname_len)) {
+ 		OSD_DEBUG("found device sysid_len=%d osdname=%d\n",
+ 			  odi->systemid_len, odi->osdname_len);
+-		fot->oud = oud;
+ 		return 1;
+ 	} else {
+ 		return 0;
+@@ -301,19 +293,19 @@ int _mach_odi(struct device *dev, void *find_data)
+  */
+ struct osd_dev *osduld_info_lookup(const struct osd_dev_info *odi)
+ {
+-	struct find_oud_t find = {.odi = odi};
+-
+-	find.dev = class_find_device(&osd_uld_class, NULL, &find, _mach_odi);
+-	if (likely(find.dev)) {
++	struct device *dev = class_find_device(&osd_uld_class, NULL, odi, _match_odi);
++	if (likely(dev)) {
+ 		struct osd_dev_handle *odh = kzalloc(sizeof(*odh), GFP_KERNEL);
++		struct osd_uld_device *oud = container_of(dev,
++			struct osd_uld_device, class_dev);
+ 
+ 		if (unlikely(!odh)) {
+-			put_device(find.dev);
++			put_device(dev);
+ 			return ERR_PTR(-ENOMEM);
+ 		}
+ 
+-		odh->od = find.oud->od;
+-		odh->oud = find.oud;
++		odh->od = oud->od;
++		odh->oud = oud;
+ 
+ 		return &odh->od;
+ 	}
+diff --git a/drivers/scsi/scsi_transport_iscsi.c b/drivers/scsi/scsi_transport_iscsi.c
+index 31969f2..59d427b 100644
+--- a/drivers/scsi/scsi_transport_iscsi.c
++++ b/drivers/scsi/scsi_transport_iscsi.c
+@@ -183,10 +183,10 @@ static struct attribute_group iscsi_endpoint_group = {
+ 
+ #define ISCSI_MAX_EPID -1
+ 
+-static int iscsi_match_epid(struct device *dev, void *data)
++static int iscsi_match_epid(struct device *dev, const void *data)
+ {
+ 	struct iscsi_endpoint *ep = iscsi_dev_to_endpoint(dev);
+-	uint64_t *epid = (uint64_t *) data;
++	const uint64_t *epid = data;
+ 
+ 	return *epid == ep->id;
+ }
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 19ee901..493ce4a 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1248,10 +1248,10 @@ int spi_master_resume(struct spi_master *master)
+ }
+ EXPORT_SYMBOL_GPL(spi_master_resume);
+ 
+-static int __spi_master_match(struct device *dev, void *data)
++static int __spi_master_match(struct device *dev, const void *data)
+ {
+ 	struct spi_master *m;
+-	u16 *bus_num = data;
++	const u16 *bus_num = data;
+ 
+ 	m = container_of(dev, struct spi_master, dev);
+ 	return m->bus_num == *bus_num;
+diff --git a/drivers/uwb/lc-rc.c b/drivers/uwb/lc-rc.c
+index 4d688c7..3eca6ce 100644
+--- a/drivers/uwb/lc-rc.c
++++ b/drivers/uwb/lc-rc.c
+@@ -40,9 +40,9 @@
+ 
+ #include "uwb-internal.h"
+ 
+-static int uwb_rc_index_match(struct device *dev, void *data)
++static int uwb_rc_index_match(struct device *dev, const void *data)
+ {
+-	int *index = data;
++	const int *index = data;
+ 	struct uwb_rc *rc = dev_get_drvdata(dev);
+ 
+ 	if (rc->index == *index)
+@@ -334,9 +334,9 @@ void uwb_rc_rm(struct uwb_rc *rc)
+ }
+ EXPORT_SYMBOL_GPL(uwb_rc_rm);
+ 
+-static int find_rc_try_get(struct device *dev, void *data)
++static int find_rc_try_get(struct device *dev, const void *data)
+ {
+-	struct uwb_rc *target_rc = data;
++	const struct uwb_rc *target_rc = data;
+ 	struct uwb_rc *rc = dev_get_drvdata(dev);
+ 
+ 	if (rc == NULL) {
+@@ -386,9 +386,9 @@ static inline struct uwb_rc *uwb_rc_get(struct uwb_rc *rc)
+ 	return rc;
+ }
+ 
+-static int find_rc_grandpa(struct device *dev, void *data)
++static int find_rc_grandpa(struct device *dev, const void *data)
+ {
+-	struct device *grandpa_dev = data;
++	const struct device *grandpa_dev = data;
+ 	struct uwb_rc *rc = dev_get_drvdata(dev);
+ 
+ 	if (rc->uwb_dev.dev.parent->parent == grandpa_dev) {
+@@ -419,7 +419,7 @@ struct uwb_rc *uwb_rc_get_by_grandpa(const struct device *grandpa_dev)
+ 	struct device *dev;
+ 	struct uwb_rc *rc = NULL;
+ 
+-	dev = class_find_device(&uwb_rc_class, NULL, (void *)grandpa_dev,
++	dev = class_find_device(&uwb_rc_class, NULL, grandpa_dev,
+ 				find_rc_grandpa);
+ 	if (dev)
+ 		rc = dev_get_drvdata(dev);
+@@ -432,9 +432,9 @@ EXPORT_SYMBOL_GPL(uwb_rc_get_by_grandpa);
+  *
+  * @returns the pointer to the radio controller, properly referenced
+  */
+-static int find_rc_dev(struct device *dev, void *data)
++static int find_rc_dev(struct device *dev, const void *data)
+ {
+-	struct uwb_dev_addr *addr = data;
++	const struct uwb_dev_addr *addr = data;
+ 	struct uwb_rc *rc = dev_get_drvdata(dev);
+ 
+ 	if (rc == NULL) {
+@@ -453,8 +453,7 @@ struct uwb_rc *uwb_rc_get_by_dev(const struct uwb_dev_addr *addr)
+ 	struct device *dev;
+ 	struct uwb_rc *rc = NULL;
+ 
+-	dev = class_find_device(&uwb_rc_class, NULL, (void *)addr,
+-				find_rc_dev);
++	dev = class_find_device(&uwb_rc_class, NULL, addr, find_rc_dev);
+ 	if (dev)
+ 		rc = dev_get_drvdata(dev);
+ 
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 43dcda9..13de5ee 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -395,8 +395,8 @@ extern int class_for_each_device(struct class *class, struct device *start,
+ 				 void *data,
+ 				 int (*fn)(struct device *dev, void *data));
+ extern struct device *class_find_device(struct class *class,
+-					struct device *start, void *data,
+-					int (*match)(struct device *, void *));
++					struct device *start, const void *data,
++					int (*match)(struct device *, const void *));
+ 
+ struct class_attribute {
+ 	struct attribute attr;
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index 1f0ab90..86ecaa6 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -224,7 +224,7 @@ struct power_supply_info {
+ 	int use_for_apm;
+ };
+ 
+-extern struct power_supply *power_supply_get_by_name(char *name);
++extern struct power_supply *power_supply_get_by_name(const char *name);
+ extern void power_supply_changed(struct power_supply *psy);
+ extern int power_supply_am_i_supplied(struct power_supply *psy);
+ extern int power_supply_set_battery_charged(struct power_supply *psy);
+diff --git a/include/linux/rtc.h b/include/linux/rtc.h
+index 9531845c..445fe6e 100644
+--- a/include/linux/rtc.h
++++ b/include/linux/rtc.h
+@@ -148,7 +148,7 @@ extern int rtc_initialize_alarm(struct rtc_device *rtc,
+ extern void rtc_update_irq(struct rtc_device *rtc,
+ 			unsigned long num, unsigned long events);
+ 
+-extern struct rtc_device *rtc_class_open(char *name);
++extern struct rtc_device *rtc_class_open(const char *name);
+ extern void rtc_class_close(struct rtc_device *rtc);
+ 
+ extern int rtc_irq_register(struct rtc_device *rtc,
+diff --git a/init/do_mounts.c b/init/do_mounts.c
+index 1d1b634..a2b49f2 100644
+--- a/init/do_mounts.c
++++ b/init/do_mounts.c
+@@ -81,9 +81,9 @@ struct uuidcmp {
+  *
+  * Returns 1 if the device matches, and 0 otherwise.
+  */
+-static int match_dev_by_uuid(struct device *dev, void *data)
++static int match_dev_by_uuid(struct device *dev, const void *data)
+ {
+-	struct uuidcmp *cmp = data;
++	const struct uuidcmp *cmp = data;
+ 	struct hd_struct *part = dev_to_part(dev);
+ 
+ 	if (!part->info)
+diff --git a/kernel/power/suspend_test.c b/kernel/power/suspend_test.c
+index 25596e4..9b2a1d5 100644
+--- a/kernel/power/suspend_test.c
++++ b/kernel/power/suspend_test.c
+@@ -112,7 +112,7 @@ static void __init test_wakealarm(struct rtc_device *rtc, suspend_state_t state)
+ 	rtc_set_alarm(rtc, &alm);
+ }
+ 
+-static int __init has_wakealarm(struct device *dev, void *name_ptr)
++static int __init has_wakealarm(struct device *dev, const void *data)
+ {
+ 	struct rtc_device *candidate = to_rtc_device(dev);
+ 
+@@ -121,7 +121,6 @@ static int __init has_wakealarm(struct device *dev, void *name_ptr)
+ 	if (!device_may_wakeup(candidate->dev.parent))
+ 		return 0;
+ 
+-	*(const char **)name_ptr = dev_name(dev);
+ 	return 1;
+ }
+ 
+@@ -159,8 +158,8 @@ static int __init test_suspend(void)
+ 	static char		warn_no_rtc[] __initdata =
+ 		KERN_WARNING "PM: no wakealarm-capable RTC driver is ready\n";
+ 
+-	char			*pony = NULL;
+ 	struct rtc_device	*rtc = NULL;
++	struct device		*dev;
+ 
+ 	/* PM is initialized by now; is that state testable? */
+ 	if (test_state == PM_SUSPEND_ON)
+@@ -171,9 +170,9 @@ static int __init test_suspend(void)
+ 	}
+ 
+ 	/* RTCs have initialized by now too ... can we use one? */
+-	class_find_device(rtc_class, NULL, &pony, has_wakealarm);
+-	if (pony)
+-		rtc = rtc_class_open(pony);
++	dev = class_find_device(rtc_class, NULL, NULL, has_wakealarm);
++	if (dev)
++		rtc = rtc_class_open(dev_name(dev));
+ 	if (!rtc) {
+ 		printk(warn_no_rtc);
+ 		goto done;
+diff --git a/net/ieee802154/wpan-class.c b/net/ieee802154/wpan-class.c
+index 1627ef2..13571ea 100644
+--- a/net/ieee802154/wpan-class.c
++++ b/net/ieee802154/wpan-class.c
+@@ -91,7 +91,7 @@ static struct class wpan_phy_class = {
+ static DEFINE_MUTEX(wpan_phy_mutex);
+ static int wpan_phy_idx;
+ 
+-static int wpan_phy_match(struct device *dev, void *data)
++static int wpan_phy_match(struct device *dev, const void *data)
+ {
+ 	return !strcmp(dev_name(dev), (const char *)data);
+ }
+@@ -103,8 +103,7 @@ struct wpan_phy *wpan_phy_find(const char *str)
+ 	if (WARN_ON(!str))
+ 		return NULL;
+ 
+-	dev = class_find_device(&wpan_phy_class, NULL,
+-			(void *)str, wpan_phy_match);
++	dev = class_find_device(&wpan_phy_class, NULL, str, wpan_phy_match);
+ 	if (!dev)
+ 		return NULL;
+ 
+diff --git a/net/nfc/core.c b/net/nfc/core.c
+index aa64ea4..0f4a6de 100644
+--- a/net/nfc/core.c
++++ b/net/nfc/core.c
+@@ -734,10 +734,10 @@ struct class nfc_class = {
+ };
+ EXPORT_SYMBOL(nfc_class);
+ 
+-static int match_idx(struct device *d, void *data)
++static int match_idx(struct device *d, const void *data)
+ {
+ 	struct nfc_dev *dev = to_nfc_dev(d);
+-	unsigned int *idx = data;
++	const unsigned int *idx = data;
+ 
+ 	return dev->idx == *idx;
+ }

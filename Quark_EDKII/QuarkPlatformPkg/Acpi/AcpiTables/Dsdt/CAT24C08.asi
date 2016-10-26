@@ -1,0 +1,65 @@
+/*++
+
+  Copyright (c) 2013 Intel Corporation.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+
+  * Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in
+  the documentation and/or other materials provided with the
+  distribution.
+  * Neither the name of Intel Corporation nor the names of its
+  contributors may be used to endorse or promote products derived
+  from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+  Module Name:
+
+    CAT24C08.asi
+
+  Abstract:
+
+    ONSEMI CAT24C08 I2C 8KB EEPROM.
+
+--*/
+
+Device(EEP2)
+{
+    Name(_HID, "INT3499") // ONSEMI CAT24C08 I2C 8KB EEPROM.
+    Name(_CID, "INT3499")
+
+    Name(RBUF, ResourceTemplate()
+    {
+        I2CSerialBus(0x54, ControllerInitiated, 400000, AddressingMode7Bit, "\\_SB.PCI0.GIP0.I2C_", 0, ResourceConsumer, , )
+    })
+    Method(_CRS, 0x0, NotSerialized)
+    {
+        Return(RBUF)
+    }
+    Method(_STA, 0x0, NotSerialized)
+    {
+        //
+        // Only Platform Type / Id 8 has this device.
+        //
+        If(LNotEqual(PTYP, 8))
+        {
+          return (0)
+        }
+        Return(0xf)
+    }
+}

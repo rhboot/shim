@@ -1,0 +1,36 @@
+--- a/clloader.c	2015-01-06 10:47:36.000000000 -0800
++++ b/clloader.c	2015-01-06 10:53:50.000000000 -0800
+@@ -2719,25 +2719,28 @@
+ 					if (ret < 1  &&  -1 == ioctl_rc ) {
+ 						// cable is probably gone here so just close the file it will reopen back at top
+ 						ret = close(mystate.tty_from_host);
+ 						fprintf(stderr, "Bad connection to host  %d bytes available, ioctl return is %d\n",rd_bytes, ioctl_rc) ;
+ 						mystate.tty_from_host = -1 ;
+ 						fprintf(stderr, "cable was probably disconnected\n");
+-						//kill sketch then kill clloader
++						//kill sketch then kill clloader. Launcher will restart clloader and sketch
+ 						kill(mystate.slave_pid, SIGTERM);
+ 						exit(0);
+ 					}else{
+ 						fprintf(stderr, "host: %s\n", rbuf_from_host);
+ 						errors = 0;
+ 						/* TODO: bring out state change of BAUD/LINE and replace magic string */
+-						if (strncmp(CL_LOADER_CMD_HOST_START_DOWNLOAD_CMD,
++						if (strncmp(downloadCMD, rbuf_from_host,
++							((size_t)strlen(rbuf_from_host)-1)) == 0) {
++							// We got a special command to start download
++							 clantonLeavePassThroughState = TRUE;
++						} else if (strncmp(CL_LOADER_CMD_HOST_START_DOWNLOAD_CMD,
+ 							rbuf_from_host,
+-							(size_t)strlen(CL_LOADER_CMD_HOST_START_DOWNLOAD_CMD)) == 0) {
+-							// We got a special command to start download
++							((size_t)strlen(rbuf_from_host)-1)) == 0) {	
++							// Old command string. Allow to download anyway.
+ 							 clantonLeavePassThroughState = TRUE;
+-
+ 						} else {
+ 							write(mystate.tty_slave,rbuf_from_host,ret); //todo check write status
+ 						}
+ 					}
+ 				}
+ 				break;

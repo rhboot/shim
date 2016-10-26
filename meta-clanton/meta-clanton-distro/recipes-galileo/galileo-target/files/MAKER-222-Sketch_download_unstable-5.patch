@@ -1,0 +1,17 @@
+--- a/clloader.c	2014-10-07 14:24:46.000000000 -0700
++++ b/clloader.c	2014-10-09 16:31:13.000000000 -0700
+@@ -2751,13 +2751,13 @@
+ 
+ 				clantonLeavePassThroughState = 0;
+ 
+ 				if ( Verbose) {
+ 					fprintf(stderr,"HUP or CHLDTERM Received, Change state to wait for command from host\n");
+ 				}
+-
++				sleep(1);
+ 				/* Terminate the child sketch process */
+ 				/* todo: send a shutdown signal for a more graceful termination */
+ 				if ( mystate.slave_pid) {
+ 					if ( Verbose )
+ 						fprintf(stderr,"Going to kill child process:pid %d \n",mystate.slave_pid);
+ 					if( kill(mystate.slave_pid,SIGKILL )){ /* Use SIGTERM later : todo */

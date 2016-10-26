@@ -1,0 +1,19 @@
+This layer depends on:
+
+URI: git://github.com/openembedded/meta-oe.git
+branch: dylan
+revision: HEAD
+
+URI: git://git.yoctoproject.org/poky.git
+branch: dylan
+revision: dylan-9.0.2
+
+Layer maintainer: Krzysztof Sywula <Krzysztof.M.Sywula@intel.com>
+
+Right now layer is not yet hosted on public git repo. In order to contribute:
+- make sure you have correct user.name/user.email in git config
+- in current directory do: git init; git add meta-clanton-* setup*
+- then: git commit meta-clanton-* setup* -m "initialize"
+- modify desired file
+- git commit desired file
+- git send-email --to=Krzysztof.M.Sywula@intel.com --confirm=always -M -1

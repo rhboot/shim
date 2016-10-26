@@ -1,0 +1,5945 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Bryan O'Donoghue <bryan.odonoghue@intel.com>
+Date: Thu, 24 Apr 2014 13:32:03 +0100
+Subject: [PATCH 08/21] Quark UART
+
+---
+ drivers/dma/Kconfig                   |    6 +-
+ drivers/dma/Makefile                  |    1 +
+ drivers/dma/intel_mid_dma.c           | 1460 -----------------------
+ drivers/dma/intel_mid_dma/Makefile    |    3 +
+ drivers/dma/intel_mid_dma_core.c      | 1336 ++++++++++++++++++++++
+ drivers/dma/intel_mid_dma_pci.c       |  292 +++++
+ drivers/dma/intel_mid_dma_regs.h      |  109 +-
+ drivers/dma/intel_qrk_dma_pci.c       |  147 +++
+ drivers/tty/serial/8250/8250.c        |   53 +
+ drivers/tty/serial/8250/8250_pci.c    |   52 +-
+ drivers/tty/serial/Kconfig            |   20 +
+ drivers/tty/serial/Makefile           |    1 +
+ drivers/tty/serial/intel_quark_uart.c | 2034 +++++++++++++++++++++++++++++++++
+ include/linux/intel_mid_dma.h         |  189 +++
+ 14 files changed, 4147 insertions(+), 1556 deletions(-)
+ delete mode 100644 drivers/dma/intel_mid_dma.c
+ create mode 100644 drivers/dma/intel_mid_dma/Makefile
+ create mode 100644 drivers/dma/intel_mid_dma_core.c
+ create mode 100644 drivers/dma/intel_mid_dma_pci.c
+ create mode 100644 drivers/dma/intel_qrk_dma_pci.c
+ create mode 100755 drivers/tty/serial/intel_quark_uart.c
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index d4c1218..9867547 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -34,13 +34,13 @@ if DMADEVICES
+ comment "DMA Devices"
+ 
+ config INTEL_MID_DMAC
+-	tristate "Intel MID DMA support for Peripheral DMA controllers"
++	tristate "Intel DMAC Moorsetown/Medfield/Quark DMA controllers"
+ 	depends on PCI && X86
+ 	select DMA_ENGINE
+ 	default n
+ 	help
+-	  Enable support for the Intel(R) MID DMA engine present
+-	  in Intel MID chipsets.
++	  Enable support for the Intel(R) MID/Quark DMA engine present
++	  in Intel MID chipsets and Quark SOC devices
+ 
+ 	  Say Y here if you have such a chipset.
+ 
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 7428fea..0ab1b45 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -5,6 +5,7 @@ obj-$(CONFIG_DMA_ENGINE) += dmaengine.o
+ obj-$(CONFIG_DMA_VIRTUAL_CHANNELS) += virt-dma.o
+ obj-$(CONFIG_NET_DMA) += iovlock.o
+ obj-$(CONFIG_INTEL_MID_DMAC) += intel_mid_dma.o
++intel_mid_dma-objs:= intel_mid_dma_core.o intel_qrk_dma_pci.o intel_mid_dma_pci.o
+ obj-$(CONFIG_DMATEST) += dmatest.o
+ obj-$(CONFIG_INTEL_IOATDMA) += ioat/
+ obj-$(CONFIG_INTEL_IOP_ADMA) += iop-adma.o
+diff --git a/drivers/dma/intel_mid_dma.c b/drivers/dma/intel_mid_dma.c
+deleted file mode 100644
+index a0de82e..0000000
+--- a/drivers/dma/intel_mid_dma.c
++++ /dev/null
+@@ -1,1460 +0,0 @@
+-/*
+- *  intel_mid_dma.c - Intel Langwell DMA Drivers
+- *
+- *  Copyright (C) 2008-10 Intel Corp
+- *  Author: Vinod Koul <vinod.koul@intel.com>
+- *  The driver design is based on dw_dmac driver
+- *  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- *
+- *  This program is free software; you can redistribute it and/or modify
+- *  it under the terms of the GNU General Public License as published by
+- *  the Free Software Foundation; version 2 of the License.
+- *
+- *  This program is distributed in the hope that it will be useful, but
+- *  WITHOUT ANY WARRANTY; without even the implied warranty of
+- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- *  General Public License for more details.
+- *
+- *  You should have received a copy of the GNU General Public License along
+- *  with this program; if not, write to the Free Software Foundation, Inc.,
+- *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+- *
+- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- *
+- *
+- */
+-#include <linux/pci.h>
+-#include <linux/interrupt.h>
+-#include <linux/pm_runtime.h>
+-#include <linux/intel_mid_dma.h>
+-#include <linux/module.h>
+-
+-#include "dmaengine.h"
+-
+-#define MAX_CHAN	4 /*max ch across controllers*/
+-#include "intel_mid_dma_regs.h"
+-
+-#define INTEL_MID_DMAC1_ID		0x0814
+-#define INTEL_MID_DMAC2_ID		0x0813
+-#define INTEL_MID_GP_DMAC2_ID		0x0827
+-#define INTEL_MFLD_DMAC1_ID		0x0830
+-#define LNW_PERIPHRAL_MASK_BASE		0xFFAE8008
+-#define LNW_PERIPHRAL_MASK_SIZE		0x10
+-#define LNW_PERIPHRAL_STATUS		0x0
+-#define LNW_PERIPHRAL_MASK		0x8
+-
+-struct intel_mid_dma_probe_info {
+-	u8 max_chan;
+-	u8 ch_base;
+-	u16 block_size;
+-	u32 pimr_mask;
+-};
+-
+-#define INFO(_max_chan, _ch_base, _block_size, _pimr_mask) \
+-	((kernel_ulong_t)&(struct intel_mid_dma_probe_info) {	\
+-		.max_chan = (_max_chan),			\
+-		.ch_base = (_ch_base),				\
+-		.block_size = (_block_size),			\
+-		.pimr_mask = (_pimr_mask),			\
+-	})
+-
+-/*****************************************************************************
+-Utility Functions*/
+-/**
+- * get_ch_index	-	convert status to channel
+- * @status: status mask
+- * @base: dma ch base value
+- *
+- * Modify the status mask and return the channel index needing
+- * attention (or -1 if neither)
+- */
+-static int get_ch_index(int *status, unsigned int base)
+-{
+-	int i;
+-	for (i = 0; i < MAX_CHAN; i++) {
+-		if (*status & (1 << (i + base))) {
+-			*status = *status & ~(1 << (i + base));
+-			pr_debug("MDMA: index %d New status %x\n", i, *status);
+-			return i;
+-		}
+-	}
+-	return -1;
+-}
+-
+-/**
+- * get_block_ts	-	calculates dma transaction length
+- * @len: dma transfer length
+- * @tx_width: dma transfer src width
+- * @block_size: dma controller max block size
+- *
+- * Based on src width calculate the DMA trsaction length in data items
+- * return data items or FFFF if exceeds max length for block
+- */
+-static int get_block_ts(int len, int tx_width, int block_size)
+-{
+-	int byte_width = 0, block_ts = 0;
+-
+-	switch (tx_width) {
+-	case DMA_SLAVE_BUSWIDTH_1_BYTE:
+-		byte_width = 1;
+-		break;
+-	case DMA_SLAVE_BUSWIDTH_2_BYTES:
+-		byte_width = 2;
+-		break;
+-	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+-	default:
+-		byte_width = 4;
+-		break;
+-	}
+-
+-	block_ts = len/byte_width;
+-	if (block_ts > block_size)
+-		block_ts = 0xFFFF;
+-	return block_ts;
+-}
+-
+-/*****************************************************************************
+-DMAC1 interrupt Functions*/
+-
+-/**
+- * dmac1_mask_periphral_intr -	mask the periphral interrupt
+- * @mid: dma device for which masking is required
+- *
+- * Masks the DMA periphral interrupt
+- * this is valid for DMAC1 family controllers only
+- * This controller should have periphral mask registers already mapped
+- */
+-static void dmac1_mask_periphral_intr(struct middma_device *mid)
+-{
+-	u32 pimr;
+-
+-	if (mid->pimr_mask) {
+-		pimr = readl(mid->mask_reg + LNW_PERIPHRAL_MASK);
+-		pimr |= mid->pimr_mask;
+-		writel(pimr, mid->mask_reg + LNW_PERIPHRAL_MASK);
+-	}
+-	return;
+-}
+-
+-/**
+- * dmac1_unmask_periphral_intr -	unmask the periphral interrupt
+- * @midc: dma channel for which masking is required
+- *
+- * UnMasks the DMA periphral interrupt,
+- * this is valid for DMAC1 family controllers only
+- * This controller should have periphral mask registers already mapped
+- */
+-static void dmac1_unmask_periphral_intr(struct intel_mid_dma_chan *midc)
+-{
+-	u32 pimr;
+-	struct middma_device *mid = to_middma_device(midc->chan.device);
+-
+-	if (mid->pimr_mask) {
+-		pimr = readl(mid->mask_reg + LNW_PERIPHRAL_MASK);
+-		pimr &= ~mid->pimr_mask;
+-		writel(pimr, mid->mask_reg + LNW_PERIPHRAL_MASK);
+-	}
+-	return;
+-}
+-
+-/**
+- * enable_dma_interrupt -	enable the periphral interrupt
+- * @midc: dma channel for which enable interrupt is required
+- *
+- * Enable the DMA periphral interrupt,
+- * this is valid for DMAC1 family controllers only
+- * This controller should have periphral mask registers already mapped
+- */
+-static void enable_dma_interrupt(struct intel_mid_dma_chan *midc)
+-{
+-	dmac1_unmask_periphral_intr(midc);
+-
+-	/*en ch interrupts*/
+-	iowrite32(UNMASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_TFR);
+-	iowrite32(UNMASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_ERR);
+-	return;
+-}
+-
+-/**
+- * disable_dma_interrupt -	disable the periphral interrupt
+- * @midc: dma channel for which disable interrupt is required
+- *
+- * Disable the DMA periphral interrupt,
+- * this is valid for DMAC1 family controllers only
+- * This controller should have periphral mask registers already mapped
+- */
+-static void disable_dma_interrupt(struct intel_mid_dma_chan *midc)
+-{
+-	/*Check LPE PISR, make sure fwd is disabled*/
+-	iowrite32(MASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_BLOCK);
+-	iowrite32(MASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_TFR);
+-	iowrite32(MASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_ERR);
+-	return;
+-}
+-
+-/*****************************************************************************
+-DMA channel helper Functions*/
+-/**
+- * mid_desc_get		-	get a descriptor
+- * @midc: dma channel for which descriptor is required
+- *
+- * Obtain a descriptor for the channel. Returns NULL if none are free.
+- * Once the descriptor is returned it is private until put on another
+- * list or freed
+- */
+-static struct intel_mid_dma_desc *midc_desc_get(struct intel_mid_dma_chan *midc)
+-{
+-	struct intel_mid_dma_desc *desc, *_desc;
+-	struct intel_mid_dma_desc *ret = NULL;
+-
+-	spin_lock_bh(&midc->lock);
+-	list_for_each_entry_safe(desc, _desc, &midc->free_list, desc_node) {
+-		if (async_tx_test_ack(&desc->txd)) {
+-			list_del(&desc->desc_node);
+-			ret = desc;
+-			break;
+-		}
+-	}
+-	spin_unlock_bh(&midc->lock);
+-	return ret;
+-}
+-
+-/**
+- * mid_desc_put		-	put a descriptor
+- * @midc: dma channel for which descriptor is required
+- * @desc: descriptor to put
+- *
+- * Return a descriptor from lwn_desc_get back to the free pool
+- */
+-static void midc_desc_put(struct intel_mid_dma_chan *midc,
+-			struct intel_mid_dma_desc *desc)
+-{
+-	if (desc) {
+-		spin_lock_bh(&midc->lock);
+-		list_add_tail(&desc->desc_node, &midc->free_list);
+-		spin_unlock_bh(&midc->lock);
+-	}
+-}
+-/**
+- * midc_dostart		-		begin a DMA transaction
+- * @midc: channel for which txn is to be started
+- * @first: first descriptor of series
+- *
+- * Load a transaction into the engine. This must be called with midc->lock
+- * held and bh disabled.
+- */
+-static void midc_dostart(struct intel_mid_dma_chan *midc,
+-			struct intel_mid_dma_desc *first)
+-{
+-	struct middma_device *mid = to_middma_device(midc->chan.device);
+-
+-	/*  channel is idle */
+-	if (midc->busy && test_ch_en(midc->dma_base, midc->ch_id)) {
+-		/*error*/
+-		pr_err("ERR_MDMA: channel is busy in start\n");
+-		/* The tasklet will hopefully advance the queue... */
+-		return;
+-	}
+-	midc->busy = true;
+-	/*write registers and en*/
+-	iowrite32(first->sar, midc->ch_regs + SAR);
+-	iowrite32(first->dar, midc->ch_regs + DAR);
+-	iowrite32(first->lli_phys, midc->ch_regs + LLP);
+-	iowrite32(first->cfg_hi, midc->ch_regs + CFG_HIGH);
+-	iowrite32(first->cfg_lo, midc->ch_regs + CFG_LOW);
+-	iowrite32(first->ctl_lo, midc->ch_regs + CTL_LOW);
+-	iowrite32(first->ctl_hi, midc->ch_regs + CTL_HIGH);
+-	pr_debug("MDMA:TX SAR %x,DAR %x,CFGL %x,CFGH %x,CTLH %x, CTLL %x\n",
+-		(int)first->sar, (int)first->dar, first->cfg_hi,
+-		first->cfg_lo, first->ctl_hi, first->ctl_lo);
+-	first->status = DMA_IN_PROGRESS;
+-
+-	iowrite32(ENABLE_CHANNEL(midc->ch_id), mid->dma_base + DMA_CHAN_EN);
+-}
+-
+-/**
+- * midc_descriptor_complete	-	process completed descriptor
+- * @midc: channel owning the descriptor
+- * @desc: the descriptor itself
+- *
+- * Process a completed descriptor and perform any callbacks upon
+- * the completion. The completion handling drops the lock during the
+- * callbacks but must be called with the lock held.
+- */
+-static void midc_descriptor_complete(struct intel_mid_dma_chan *midc,
+-		struct intel_mid_dma_desc *desc)
+-		__releases(&midc->lock) __acquires(&midc->lock)
+-{
+-	struct dma_async_tx_descriptor	*txd = &desc->txd;
+-	dma_async_tx_callback callback_txd = NULL;
+-	struct intel_mid_dma_lli	*llitem;
+-	void *param_txd = NULL;
+-
+-	dma_cookie_complete(txd);
+-	callback_txd = txd->callback;
+-	param_txd = txd->callback_param;
+-
+-	if (desc->lli != NULL) {
+-		/*clear the DONE bit of completed LLI in memory*/
+-		llitem = desc->lli + desc->current_lli;
+-		llitem->ctl_hi &= CLEAR_DONE;
+-		if (desc->current_lli < desc->lli_length-1)
+-			(desc->current_lli)++;
+-		else
+-			desc->current_lli = 0;
+-	}
+-	spin_unlock_bh(&midc->lock);
+-	if (callback_txd) {
+-		pr_debug("MDMA: TXD callback set ... calling\n");
+-		callback_txd(param_txd);
+-	}
+-	if (midc->raw_tfr) {
+-		desc->status = DMA_SUCCESS;
+-		if (desc->lli != NULL) {
+-			pci_pool_free(desc->lli_pool, desc->lli,
+-						desc->lli_phys);
+-			pci_pool_destroy(desc->lli_pool);
+-			desc->lli = NULL;
+-		}
+-		list_move(&desc->desc_node, &midc->free_list);
+-		midc->busy = false;
+-	}
+-	spin_lock_bh(&midc->lock);
+-
+-}
+-/**
+- * midc_scan_descriptors -		check the descriptors in channel
+- *					mark completed when tx is completete
+- * @mid: device
+- * @midc: channel to scan
+- *
+- * Walk the descriptor chain for the device and process any entries
+- * that are complete.
+- */
+-static void midc_scan_descriptors(struct middma_device *mid,
+-				struct intel_mid_dma_chan *midc)
+-{
+-	struct intel_mid_dma_desc *desc = NULL, *_desc = NULL;
+-
+-	/*tx is complete*/
+-	list_for_each_entry_safe(desc, _desc, &midc->active_list, desc_node) {
+-		if (desc->status == DMA_IN_PROGRESS)
+-			midc_descriptor_complete(midc, desc);
+-	}
+-	return;
+-	}
+-/**
+- * midc_lli_fill_sg -		Helper function to convert
+- *				SG list to Linked List Items.
+- *@midc: Channel
+- *@desc: DMA descriptor
+- *@sglist: Pointer to SG list
+- *@sglen: SG list length
+- *@flags: DMA transaction flags
+- *
+- * Walk through the SG list and convert the SG list into Linked
+- * List Items (LLI).
+- */
+-static int midc_lli_fill_sg(struct intel_mid_dma_chan *midc,
+-				struct intel_mid_dma_desc *desc,
+-				struct scatterlist *sglist,
+-				unsigned int sglen,
+-				unsigned int flags)
+-{
+-	struct intel_mid_dma_slave *mids;
+-	struct scatterlist  *sg;
+-	dma_addr_t lli_next, sg_phy_addr;
+-	struct intel_mid_dma_lli *lli_bloc_desc;
+-	union intel_mid_dma_ctl_lo ctl_lo;
+-	union intel_mid_dma_ctl_hi ctl_hi;
+-	int i;
+-
+-	pr_debug("MDMA: Entered midc_lli_fill_sg\n");
+-	mids = midc->mid_slave;
+-
+-	lli_bloc_desc = desc->lli;
+-	lli_next = desc->lli_phys;
+-
+-	ctl_lo.ctl_lo = desc->ctl_lo;
+-	ctl_hi.ctl_hi = desc->ctl_hi;
+-	for_each_sg(sglist, sg, sglen, i) {
+-		/*Populate CTL_LOW and LLI values*/
+-		if (i != sglen - 1) {
+-			lli_next = lli_next +
+-				sizeof(struct intel_mid_dma_lli);
+-		} else {
+-		/*Check for circular list, otherwise terminate LLI to ZERO*/
+-			if (flags & DMA_PREP_CIRCULAR_LIST) {
+-				pr_debug("MDMA: LLI is configured in circular mode\n");
+-				lli_next = desc->lli_phys;
+-			} else {
+-				lli_next = 0;
+-				ctl_lo.ctlx.llp_dst_en = 0;
+-				ctl_lo.ctlx.llp_src_en = 0;
+-			}
+-		}
+-		/*Populate CTL_HI values*/
+-		ctl_hi.ctlx.block_ts = get_block_ts(sg_dma_len(sg),
+-							desc->width,
+-							midc->dma->block_size);
+-		/*Populate SAR and DAR values*/
+-		sg_phy_addr = sg_dma_address(sg);
+-		if (desc->dirn ==  DMA_MEM_TO_DEV) {
+-			lli_bloc_desc->sar  = sg_phy_addr;
+-			lli_bloc_desc->dar  = mids->dma_slave.dst_addr;
+-		} else if (desc->dirn ==  DMA_DEV_TO_MEM) {
+-			lli_bloc_desc->sar  = mids->dma_slave.src_addr;
+-			lli_bloc_desc->dar  = sg_phy_addr;
+-		}
+-		/*Copy values into block descriptor in system memroy*/
+-		lli_bloc_desc->llp = lli_next;
+-		lli_bloc_desc->ctl_lo = ctl_lo.ctl_lo;
+-		lli_bloc_desc->ctl_hi = ctl_hi.ctl_hi;
+-
+-		lli_bloc_desc++;
+-	}
+-	/*Copy very first LLI values to descriptor*/
+-	desc->ctl_lo = desc->lli->ctl_lo;
+-	desc->ctl_hi = desc->lli->ctl_hi;
+-	desc->sar = desc->lli->sar;
+-	desc->dar = desc->lli->dar;
+-
+-	return 0;
+-}
+-/*****************************************************************************
+-DMA engine callback Functions*/
+-/**
+- * intel_mid_dma_tx_submit -	callback to submit DMA transaction
+- * @tx: dma engine descriptor
+- *
+- * Submit the DMA transaction for this descriptor, start if ch idle
+- */
+-static dma_cookie_t intel_mid_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+-{
+-	struct intel_mid_dma_desc	*desc = to_intel_mid_dma_desc(tx);
+-	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(tx->chan);
+-	dma_cookie_t		cookie;
+-
+-	spin_lock_bh(&midc->lock);
+-	cookie = dma_cookie_assign(tx);
+-
+-	if (list_empty(&midc->active_list))
+-		list_add_tail(&desc->desc_node, &midc->active_list);
+-	else
+-		list_add_tail(&desc->desc_node, &midc->queue);
+-
+-	midc_dostart(midc, desc);
+-	spin_unlock_bh(&midc->lock);
+-
+-	return cookie;
+-}
+-
+-/**
+- * intel_mid_dma_issue_pending -	callback to issue pending txn
+- * @chan: chan where pending trascation needs to be checked and submitted
+- *
+- * Call for scan to issue pending descriptors
+- */
+-static void intel_mid_dma_issue_pending(struct dma_chan *chan)
+-{
+-	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-
+-	spin_lock_bh(&midc->lock);
+-	if (!list_empty(&midc->queue))
+-		midc_scan_descriptors(to_middma_device(chan->device), midc);
+-	spin_unlock_bh(&midc->lock);
+-}
+-
+-/**
+- * intel_mid_dma_tx_status -	Return status of txn
+- * @chan: chan for where status needs to be checked
+- * @cookie: cookie for txn
+- * @txstate: DMA txn state
+- *
+- * Return status of DMA txn
+- */
+-static enum dma_status intel_mid_dma_tx_status(struct dma_chan *chan,
+-						dma_cookie_t cookie,
+-						struct dma_tx_state *txstate)
+-{
+-	struct intel_mid_dma_chan *midc = to_intel_mid_dma_chan(chan);
+-	enum dma_status ret;
+-
+-	ret = dma_cookie_status(chan, cookie, txstate);
+-	if (ret != DMA_SUCCESS) {
+-		spin_lock_bh(&midc->lock);
+-		midc_scan_descriptors(to_middma_device(chan->device), midc);
+-		spin_unlock_bh(&midc->lock);
+-
+-		ret = dma_cookie_status(chan, cookie, txstate);
+-	}
+-
+-	return ret;
+-}
+-
+-static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
+-{
+-	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct dma_slave_config  *slave = (struct dma_slave_config *)arg;
+-	struct intel_mid_dma_slave *mid_slave;
+-
+-	BUG_ON(!midc);
+-	BUG_ON(!slave);
+-	pr_debug("MDMA: slave control called\n");
+-
+-	mid_slave = to_intel_mid_dma_slave(slave);
+-
+-	BUG_ON(!mid_slave);
+-
+-	midc->mid_slave = mid_slave;
+-	return 0;
+-}
+-/**
+- * intel_mid_dma_device_control -	DMA device control
+- * @chan: chan for DMA control
+- * @cmd: control cmd
+- * @arg: cmd arg value
+- *
+- * Perform DMA control command
+- */
+-static int intel_mid_dma_device_control(struct dma_chan *chan,
+-			enum dma_ctrl_cmd cmd, unsigned long arg)
+-{
+-	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct middma_device	*mid = to_middma_device(chan->device);
+-	struct intel_mid_dma_desc	*desc, *_desc;
+-	union intel_mid_dma_cfg_lo cfg_lo;
+-
+-	if (cmd == DMA_SLAVE_CONFIG)
+-		return dma_slave_control(chan, arg);
+-
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
+-
+-	spin_lock_bh(&midc->lock);
+-	if (midc->busy == false) {
+-		spin_unlock_bh(&midc->lock);
+-		return 0;
+-	}
+-	/*Suspend and disable the channel*/
+-	cfg_lo.cfg_lo = ioread32(midc->ch_regs + CFG_LOW);
+-	cfg_lo.cfgx.ch_susp = 1;
+-	iowrite32(cfg_lo.cfg_lo, midc->ch_regs + CFG_LOW);
+-	iowrite32(DISABLE_CHANNEL(midc->ch_id), mid->dma_base + DMA_CHAN_EN);
+-	midc->busy = false;
+-	/* Disable interrupts */
+-	disable_dma_interrupt(midc);
+-	midc->descs_allocated = 0;
+-
+-	spin_unlock_bh(&midc->lock);
+-	list_for_each_entry_safe(desc, _desc, &midc->active_list, desc_node) {
+-		if (desc->lli != NULL) {
+-			pci_pool_free(desc->lli_pool, desc->lli,
+-						desc->lli_phys);
+-			pci_pool_destroy(desc->lli_pool);
+-			desc->lli = NULL;
+-		}
+-		list_move(&desc->desc_node, &midc->free_list);
+-	}
+-	return 0;
+-}
+-
+-
+-/**
+- * intel_mid_dma_prep_memcpy -	Prep memcpy txn
+- * @chan: chan for DMA transfer
+- * @dest: destn address
+- * @src: src address
+- * @len: DMA transfer len
+- * @flags: DMA flags
+- *
+- * Perform a DMA memcpy. Note we support slave periphral DMA transfers only
+- * The periphral txn details should be filled in slave structure properly
+- * Returns the descriptor for this txn
+- */
+-static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy(
+-			struct dma_chan *chan, dma_addr_t dest,
+-			dma_addr_t src, size_t len, unsigned long flags)
+-{
+-	struct intel_mid_dma_chan *midc;
+-	struct intel_mid_dma_desc *desc = NULL;
+-	struct intel_mid_dma_slave *mids;
+-	union intel_mid_dma_ctl_lo ctl_lo;
+-	union intel_mid_dma_ctl_hi ctl_hi;
+-	union intel_mid_dma_cfg_lo cfg_lo;
+-	union intel_mid_dma_cfg_hi cfg_hi;
+-	enum dma_slave_buswidth width;
+-
+-	pr_debug("MDMA: Prep for memcpy\n");
+-	BUG_ON(!chan);
+-	if (!len)
+-		return NULL;
+-
+-	midc = to_intel_mid_dma_chan(chan);
+-	BUG_ON(!midc);
+-
+-	mids = midc->mid_slave;
+-	BUG_ON(!mids);
+-
+-	pr_debug("MDMA:called for DMA %x CH %d Length %zu\n",
+-				midc->dma->pci_id, midc->ch_id, len);
+-	pr_debug("MDMA:Cfg passed Mode %x, Dirn %x, HS %x, Width %x\n",
+-			mids->cfg_mode, mids->dma_slave.direction,
+-			mids->hs_mode, mids->dma_slave.src_addr_width);
+-
+-	/*calculate CFG_LO*/
+-	if (mids->hs_mode == LNW_DMA_SW_HS) {
+-		cfg_lo.cfg_lo = 0;
+-		cfg_lo.cfgx.hs_sel_dst = 1;
+-		cfg_lo.cfgx.hs_sel_src = 1;
+-	} else if (mids->hs_mode == LNW_DMA_HW_HS)
+-		cfg_lo.cfg_lo = 0x00000;
+-
+-	/*calculate CFG_HI*/
+-	if (mids->cfg_mode == LNW_DMA_MEM_TO_MEM) {
+-		/*SW HS only*/
+-		cfg_hi.cfg_hi = 0;
+-	} else {
+-		cfg_hi.cfg_hi = 0;
+-		if (midc->dma->pimr_mask) {
+-			cfg_hi.cfgx.protctl = 0x0; /*default value*/
+-			cfg_hi.cfgx.fifo_mode = 1;
+-			if (mids->dma_slave.direction == DMA_MEM_TO_DEV) {
+-				cfg_hi.cfgx.src_per = 0;
+-				if (mids->device_instance == 0)
+-					cfg_hi.cfgx.dst_per = 3;
+-				if (mids->device_instance == 1)
+-					cfg_hi.cfgx.dst_per = 1;
+-			} else if (mids->dma_slave.direction == DMA_DEV_TO_MEM) {
+-				if (mids->device_instance == 0)
+-					cfg_hi.cfgx.src_per = 2;
+-				if (mids->device_instance == 1)
+-					cfg_hi.cfgx.src_per = 0;
+-				cfg_hi.cfgx.dst_per = 0;
+-			}
+-		} else {
+-			cfg_hi.cfgx.protctl = 0x1; /*default value*/
+-			cfg_hi.cfgx.src_per = cfg_hi.cfgx.dst_per =
+-					midc->ch_id - midc->dma->chan_base;
+-		}
+-	}
+-
+-	/*calculate CTL_HI*/
+-	ctl_hi.ctlx.reser = 0;
+-	ctl_hi.ctlx.done  = 0;
+-	width = mids->dma_slave.src_addr_width;
+-
+-	ctl_hi.ctlx.block_ts = get_block_ts(len, width, midc->dma->block_size);
+-	pr_debug("MDMA:calc len %d for block size %d\n",
+-				ctl_hi.ctlx.block_ts, midc->dma->block_size);
+-	/*calculate CTL_LO*/
+-	ctl_lo.ctl_lo = 0;
+-	ctl_lo.ctlx.int_en = 1;
+-	ctl_lo.ctlx.dst_msize = mids->dma_slave.src_maxburst;
+-	ctl_lo.ctlx.src_msize = mids->dma_slave.dst_maxburst;
+-
+-	/*
+-	 * Here we need some translation from "enum dma_slave_buswidth"
+-	 * to the format for our dma controller
+-	 *		standard	intel_mid_dmac's format
+-	 *		 1 Byte			0b000
+-	 *		 2 Bytes		0b001
+-	 *		 4 Bytes		0b010
+-	 */
+-	ctl_lo.ctlx.dst_tr_width = mids->dma_slave.dst_addr_width / 2;
+-	ctl_lo.ctlx.src_tr_width = mids->dma_slave.src_addr_width / 2;
+-
+-	if (mids->cfg_mode == LNW_DMA_MEM_TO_MEM) {
+-		ctl_lo.ctlx.tt_fc = 0;
+-		ctl_lo.ctlx.sinc = 0;
+-		ctl_lo.ctlx.dinc = 0;
+-	} else {
+-		if (mids->dma_slave.direction == DMA_MEM_TO_DEV) {
+-			ctl_lo.ctlx.sinc = 0;
+-			ctl_lo.ctlx.dinc = 2;
+-			ctl_lo.ctlx.tt_fc = 1;
+-		} else if (mids->dma_slave.direction == DMA_DEV_TO_MEM) {
+-			ctl_lo.ctlx.sinc = 2;
+-			ctl_lo.ctlx.dinc = 0;
+-			ctl_lo.ctlx.tt_fc = 2;
+-		}
+-	}
+-
+-	pr_debug("MDMA:Calc CTL LO %x, CTL HI %x, CFG LO %x, CFG HI %x\n",
+-		ctl_lo.ctl_lo, ctl_hi.ctl_hi, cfg_lo.cfg_lo, cfg_hi.cfg_hi);
+-
+-	enable_dma_interrupt(midc);
+-
+-	desc = midc_desc_get(midc);
+-	if (desc == NULL)
+-		goto err_desc_get;
+-	desc->sar = src;
+-	desc->dar = dest ;
+-	desc->len = len;
+-	desc->cfg_hi = cfg_hi.cfg_hi;
+-	desc->cfg_lo = cfg_lo.cfg_lo;
+-	desc->ctl_lo = ctl_lo.ctl_lo;
+-	desc->ctl_hi = ctl_hi.ctl_hi;
+-	desc->width = width;
+-	desc->dirn = mids->dma_slave.direction;
+-	desc->lli_phys = 0;
+-	desc->lli = NULL;
+-	desc->lli_pool = NULL;
+-	return &desc->txd;
+-
+-err_desc_get:
+-	pr_err("ERR_MDMA: Failed to get desc\n");
+-	midc_desc_put(midc, desc);
+-	return NULL;
+-}
+-/**
+- * intel_mid_dma_prep_slave_sg -	Prep slave sg txn
+- * @chan: chan for DMA transfer
+- * @sgl: scatter gather list
+- * @sg_len: length of sg txn
+- * @direction: DMA transfer dirtn
+- * @flags: DMA flags
+- * @context: transfer context (ignored)
+- *
+- * Prepares LLI based periphral transfer
+- */
+-static struct dma_async_tx_descriptor *intel_mid_dma_prep_slave_sg(
+-			struct dma_chan *chan, struct scatterlist *sgl,
+-			unsigned int sg_len, enum dma_transfer_direction direction,
+-			unsigned long flags, void *context)
+-{
+-	struct intel_mid_dma_chan *midc = NULL;
+-	struct intel_mid_dma_slave *mids = NULL;
+-	struct intel_mid_dma_desc *desc = NULL;
+-	struct dma_async_tx_descriptor *txd = NULL;
+-	union intel_mid_dma_ctl_lo ctl_lo;
+-
+-	pr_debug("MDMA: Prep for slave SG\n");
+-
+-	if (!sg_len) {
+-		pr_err("MDMA: Invalid SG length\n");
+-		return NULL;
+-	}
+-	midc = to_intel_mid_dma_chan(chan);
+-	BUG_ON(!midc);
+-
+-	mids = midc->mid_slave;
+-	BUG_ON(!mids);
+-
+-	if (!midc->dma->pimr_mask) {
+-		/* We can still handle sg list with only one item */
+-		if (sg_len == 1) {
+-			txd = intel_mid_dma_prep_memcpy(chan,
+-						mids->dma_slave.dst_addr,
+-						mids->dma_slave.src_addr,
+-						sg_dma_len(sgl),
+-						flags);
+-			return txd;
+-		} else {
+-			pr_warn("MDMA: SG list is not supported by this controller\n");
+-			return  NULL;
+-		}
+-	}
+-
+-	pr_debug("MDMA: SG Length = %d, direction = %d, Flags = %#lx\n",
+-			sg_len, direction, flags);
+-
+-	txd = intel_mid_dma_prep_memcpy(chan, 0, 0, sg_dma_len(sgl), flags);
+-	if (NULL == txd) {
+-		pr_err("MDMA: Prep memcpy failed\n");
+-		return NULL;
+-	}
+-
+-	desc = to_intel_mid_dma_desc(txd);
+-	desc->dirn = direction;
+-	ctl_lo.ctl_lo = desc->ctl_lo;
+-	ctl_lo.ctlx.llp_dst_en = 1;
+-	ctl_lo.ctlx.llp_src_en = 1;
+-	desc->ctl_lo = ctl_lo.ctl_lo;
+-	desc->lli_length = sg_len;
+-	desc->current_lli = 0;
+-	/* DMA coherent memory pool for LLI descriptors*/
+-	desc->lli_pool = pci_pool_create("intel_mid_dma_lli_pool",
+-				midc->dma->pdev,
+-				(sizeof(struct intel_mid_dma_lli)*sg_len),
+-				32, 0);
+-	if (NULL == desc->lli_pool) {
+-		pr_err("MID_DMA:LLI pool create failed\n");
+-		return NULL;
+-	}
+-
+-	desc->lli = pci_pool_alloc(desc->lli_pool, GFP_KERNEL, &desc->lli_phys);
+-	if (!desc->lli) {
+-		pr_err("MID_DMA: LLI alloc failed\n");
+-		pci_pool_destroy(desc->lli_pool);
+-		return NULL;
+-	}
+-
+-	midc_lli_fill_sg(midc, desc, sgl, sg_len, flags);
+-	if (flags & DMA_PREP_INTERRUPT) {
+-		iowrite32(UNMASK_INTR_REG(midc->ch_id),
+-				midc->dma_base + MASK_BLOCK);
+-		pr_debug("MDMA:Enabled Block interrupt\n");
+-	}
+-	return &desc->txd;
+-}
+-
+-/**
+- * intel_mid_dma_free_chan_resources -	Frees dma resources
+- * @chan: chan requiring attention
+- *
+- * Frees the allocated resources on this DMA chan
+- */
+-static void intel_mid_dma_free_chan_resources(struct dma_chan *chan)
+-{
+-	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct middma_device	*mid = to_middma_device(chan->device);
+-	struct intel_mid_dma_desc	*desc, *_desc;
+-
+-	if (true == midc->busy) {
+-		/*trying to free ch in use!!!!!*/
+-		pr_err("ERR_MDMA: trying to free ch in use\n");
+-	}
+-	spin_lock_bh(&midc->lock);
+-	midc->descs_allocated = 0;
+-	list_for_each_entry_safe(desc, _desc, &midc->active_list, desc_node) {
+-		list_del(&desc->desc_node);
+-		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
+-	}
+-	list_for_each_entry_safe(desc, _desc, &midc->free_list, desc_node) {
+-		list_del(&desc->desc_node);
+-		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
+-	}
+-	list_for_each_entry_safe(desc, _desc, &midc->queue, desc_node) {
+-		list_del(&desc->desc_node);
+-		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
+-	}
+-	spin_unlock_bh(&midc->lock);
+-	midc->in_use = false;
+-	midc->busy = false;
+-	/* Disable CH interrupts */
+-	iowrite32(MASK_INTR_REG(midc->ch_id), mid->dma_base + MASK_BLOCK);
+-	iowrite32(MASK_INTR_REG(midc->ch_id), mid->dma_base + MASK_ERR);
+-	pm_runtime_put(&mid->pdev->dev);
+-}
+-
+-/**
+- * intel_mid_dma_alloc_chan_resources -	Allocate dma resources
+- * @chan: chan requiring attention
+- *
+- * Allocates DMA resources on this chan
+- * Return the descriptors allocated
+- */
+-static int intel_mid_dma_alloc_chan_resources(struct dma_chan *chan)
+-{
+-	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
+-	struct middma_device	*mid = to_middma_device(chan->device);
+-	struct intel_mid_dma_desc	*desc;
+-	dma_addr_t		phys;
+-	int	i = 0;
+-
+-	pm_runtime_get_sync(&mid->pdev->dev);
+-
+-	if (mid->state == SUSPENDED) {
+-		if (dma_resume(&mid->pdev->dev)) {
+-			pr_err("ERR_MDMA: resume failed");
+-			return -EFAULT;
+-		}
+-	}
+-
+-	/* ASSERT:  channel is idle */
+-	if (test_ch_en(mid->dma_base, midc->ch_id)) {
+-		/*ch is not idle*/
+-		pr_err("ERR_MDMA: ch not idle\n");
+-		pm_runtime_put(&mid->pdev->dev);
+-		return -EIO;
+-	}
+-	dma_cookie_init(chan);
+-
+-	spin_lock_bh(&midc->lock);
+-	while (midc->descs_allocated < DESCS_PER_CHANNEL) {
+-		spin_unlock_bh(&midc->lock);
+-		desc = pci_pool_alloc(mid->dma_pool, GFP_KERNEL, &phys);
+-		if (!desc) {
+-			pr_err("ERR_MDMA: desc failed\n");
+-			pm_runtime_put(&mid->pdev->dev);
+-			return -ENOMEM;
+-			/*check*/
+-		}
+-		dma_async_tx_descriptor_init(&desc->txd, chan);
+-		desc->txd.tx_submit = intel_mid_dma_tx_submit;
+-		desc->txd.flags = DMA_CTRL_ACK;
+-		desc->txd.phys = phys;
+-		spin_lock_bh(&midc->lock);
+-		i = ++midc->descs_allocated;
+-		list_add_tail(&desc->desc_node, &midc->free_list);
+-	}
+-	spin_unlock_bh(&midc->lock);
+-	midc->in_use = true;
+-	midc->busy = false;
+-	pr_debug("MID_DMA: Desc alloc done ret: %d desc\n", i);
+-	return i;
+-}
+-
+-/**
+- * midc_handle_error -	Handle DMA txn error
+- * @mid: controller where error occurred
+- * @midc: chan where error occurred
+- *
+- * Scan the descriptor for error
+- */
+-static void midc_handle_error(struct middma_device *mid,
+-		struct intel_mid_dma_chan *midc)
+-{
+-	midc_scan_descriptors(mid, midc);
+-}
+-
+-/**
+- * dma_tasklet -	DMA interrupt tasklet
+- * @data: tasklet arg (the controller structure)
+- *
+- * Scan the controller for interrupts for completion/error
+- * Clear the interrupt and call for handling completion/error
+- */
+-static void dma_tasklet(unsigned long data)
+-{
+-	struct middma_device *mid = NULL;
+-	struct intel_mid_dma_chan *midc = NULL;
+-	u32 status, raw_tfr, raw_block;
+-	int i;
+-
+-	mid = (struct middma_device *)data;
+-	if (mid == NULL) {
+-		pr_err("ERR_MDMA: tasklet Null param\n");
+-		return;
+-	}
+-	pr_debug("MDMA: in tasklet for device %x\n", mid->pci_id);
+-	raw_tfr = ioread32(mid->dma_base + RAW_TFR);
+-	raw_block = ioread32(mid->dma_base + RAW_BLOCK);
+-	status = raw_tfr | raw_block;
+-	status &= mid->intr_mask;
+-	while (status) {
+-		/*txn interrupt*/
+-		i = get_ch_index(&status, mid->chan_base);
+-		if (i < 0) {
+-			pr_err("ERR_MDMA:Invalid ch index %x\n", i);
+-			return;
+-		}
+-		midc = &mid->ch[i];
+-		if (midc == NULL) {
+-			pr_err("ERR_MDMA:Null param midc\n");
+-			return;
+-		}
+-		pr_debug("MDMA:Tx complete interrupt %x, Ch No %d Index %d\n",
+-				status, midc->ch_id, i);
+-		midc->raw_tfr = raw_tfr;
+-		midc->raw_block = raw_block;
+-		spin_lock_bh(&midc->lock);
+-		/*clearing this interrupts first*/
+-		iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_TFR);
+-		if (raw_block) {
+-			iowrite32((1 << midc->ch_id),
+-				mid->dma_base + CLEAR_BLOCK);
+-		}
+-		midc_scan_descriptors(mid, midc);
+-		pr_debug("MDMA:Scan of desc... complete, unmasking\n");
+-		iowrite32(UNMASK_INTR_REG(midc->ch_id),
+-				mid->dma_base + MASK_TFR);
+-		if (raw_block) {
+-			iowrite32(UNMASK_INTR_REG(midc->ch_id),
+-				mid->dma_base + MASK_BLOCK);
+-		}
+-		spin_unlock_bh(&midc->lock);
+-	}
+-
+-	status = ioread32(mid->dma_base + RAW_ERR);
+-	status &= mid->intr_mask;
+-	while (status) {
+-		/*err interrupt*/
+-		i = get_ch_index(&status, mid->chan_base);
+-		if (i < 0) {
+-			pr_err("ERR_MDMA:Invalid ch index %x\n", i);
+-			return;
+-		}
+-		midc = &mid->ch[i];
+-		if (midc == NULL) {
+-			pr_err("ERR_MDMA:Null param midc\n");
+-			return;
+-		}
+-		pr_debug("MDMA:Tx complete interrupt %x, Ch No %d Index %d\n",
+-				status, midc->ch_id, i);
+-
+-		iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_ERR);
+-		spin_lock_bh(&midc->lock);
+-		midc_handle_error(mid, midc);
+-		iowrite32(UNMASK_INTR_REG(midc->ch_id),
+-				mid->dma_base + MASK_ERR);
+-		spin_unlock_bh(&midc->lock);
+-	}
+-	pr_debug("MDMA:Exiting takslet...\n");
+-	return;
+-}
+-
+-static void dma_tasklet1(unsigned long data)
+-{
+-	pr_debug("MDMA:in takslet1...\n");
+-	return dma_tasklet(data);
+-}
+-
+-static void dma_tasklet2(unsigned long data)
+-{
+-	pr_debug("MDMA:in takslet2...\n");
+-	return dma_tasklet(data);
+-}
+-
+-/**
+- * intel_mid_dma_interrupt -	DMA ISR
+- * @irq: IRQ where interrupt occurred
+- * @data: ISR cllback data (the controller structure)
+- *
+- * See if this is our interrupt if so then schedule the tasklet
+- * otherwise ignore
+- */
+-static irqreturn_t intel_mid_dma_interrupt(int irq, void *data)
+-{
+-	struct middma_device *mid = data;
+-	u32 tfr_status, err_status;
+-	int call_tasklet = 0;
+-
+-	tfr_status = ioread32(mid->dma_base + RAW_TFR);
+-	err_status = ioread32(mid->dma_base + RAW_ERR);
+-	if (!tfr_status && !err_status)
+-		return IRQ_NONE;
+-
+-	/*DMA Interrupt*/
+-	pr_debug("MDMA:Got an interrupt on irq %d\n", irq);
+-	pr_debug("MDMA: Status %x, Mask %x\n", tfr_status, mid->intr_mask);
+-	tfr_status &= mid->intr_mask;
+-	if (tfr_status) {
+-		/*need to disable intr*/
+-		iowrite32((tfr_status << INT_MASK_WE), mid->dma_base + MASK_TFR);
+-		iowrite32((tfr_status << INT_MASK_WE), mid->dma_base + MASK_BLOCK);
+-		pr_debug("MDMA: Calling tasklet %x\n", tfr_status);
+-		call_tasklet = 1;
+-	}
+-	err_status &= mid->intr_mask;
+-	if (err_status) {
+-		iowrite32((err_status << INT_MASK_WE),
+-			  mid->dma_base + MASK_ERR);
+-		call_tasklet = 1;
+-	}
+-	if (call_tasklet)
+-		tasklet_schedule(&mid->tasklet);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t intel_mid_dma_interrupt1(int irq, void *data)
+-{
+-	return intel_mid_dma_interrupt(irq, data);
+-}
+-
+-static irqreturn_t intel_mid_dma_interrupt2(int irq, void *data)
+-{
+-	return intel_mid_dma_interrupt(irq, data);
+-}
+-
+-/**
+- * mid_setup_dma -	Setup the DMA controller
+- * @pdev: Controller PCI device structure
+- *
+- * Initialize the DMA controller, channels, registers with DMA engine,
+- * ISR. Initialize DMA controller channels.
+- */
+-static int mid_setup_dma(struct pci_dev *pdev)
+-{
+-	struct middma_device *dma = pci_get_drvdata(pdev);
+-	int err, i;
+-
+-	/* DMA coherent memory pool for DMA descriptor allocations */
+-	dma->dma_pool = pci_pool_create("intel_mid_dma_desc_pool", pdev,
+-					sizeof(struct intel_mid_dma_desc),
+-					32, 0);
+-	if (NULL == dma->dma_pool) {
+-		pr_err("ERR_MDMA:pci_pool_create failed\n");
+-		err = -ENOMEM;
+-		goto err_dma_pool;
+-	}
+-
+-	INIT_LIST_HEAD(&dma->common.channels);
+-	dma->pci_id = pdev->device;
+-	if (dma->pimr_mask) {
+-		dma->mask_reg = ioremap(LNW_PERIPHRAL_MASK_BASE,
+-					LNW_PERIPHRAL_MASK_SIZE);
+-		if (dma->mask_reg == NULL) {
+-			pr_err("ERR_MDMA:Can't map periphral intr space !!\n");
+-			err = -ENOMEM;
+-			goto err_ioremap;
+-		}
+-	} else
+-		dma->mask_reg = NULL;
+-
+-	pr_debug("MDMA:Adding %d channel for this controller\n", dma->max_chan);
+-	/*init CH structures*/
+-	dma->intr_mask = 0;
+-	dma->state = RUNNING;
+-	for (i = 0; i < dma->max_chan; i++) {
+-		struct intel_mid_dma_chan *midch = &dma->ch[i];
+-
+-		midch->chan.device = &dma->common;
+-		dma_cookie_init(&midch->chan);
+-		midch->ch_id = dma->chan_base + i;
+-		pr_debug("MDMA:Init CH %d, ID %d\n", i, midch->ch_id);
+-
+-		midch->dma_base = dma->dma_base;
+-		midch->ch_regs = dma->dma_base + DMA_CH_SIZE * midch->ch_id;
+-		midch->dma = dma;
+-		dma->intr_mask |= 1 << (dma->chan_base + i);
+-		spin_lock_init(&midch->lock);
+-
+-		INIT_LIST_HEAD(&midch->active_list);
+-		INIT_LIST_HEAD(&midch->queue);
+-		INIT_LIST_HEAD(&midch->free_list);
+-		/*mask interrupts*/
+-		iowrite32(MASK_INTR_REG(midch->ch_id),
+-			dma->dma_base + MASK_BLOCK);
+-		iowrite32(MASK_INTR_REG(midch->ch_id),
+-			dma->dma_base + MASK_SRC_TRAN);
+-		iowrite32(MASK_INTR_REG(midch->ch_id),
+-			dma->dma_base + MASK_DST_TRAN);
+-		iowrite32(MASK_INTR_REG(midch->ch_id),
+-			dma->dma_base + MASK_ERR);
+-		iowrite32(MASK_INTR_REG(midch->ch_id),
+-			dma->dma_base + MASK_TFR);
+-
+-		disable_dma_interrupt(midch);
+-		list_add_tail(&midch->chan.device_node, &dma->common.channels);
+-	}
+-	pr_debug("MDMA: Calc Mask as %x for this controller\n", dma->intr_mask);
+-
+-	/*init dma structure*/
+-	dma_cap_zero(dma->common.cap_mask);
+-	dma_cap_set(DMA_MEMCPY, dma->common.cap_mask);
+-	dma_cap_set(DMA_SLAVE, dma->common.cap_mask);
+-	dma_cap_set(DMA_PRIVATE, dma->common.cap_mask);
+-	dma->common.dev = &pdev->dev;
+-
+-	dma->common.device_alloc_chan_resources =
+-					intel_mid_dma_alloc_chan_resources;
+-	dma->common.device_free_chan_resources =
+-					intel_mid_dma_free_chan_resources;
+-
+-	dma->common.device_tx_status = intel_mid_dma_tx_status;
+-	dma->common.device_prep_dma_memcpy = intel_mid_dma_prep_memcpy;
+-	dma->common.device_issue_pending = intel_mid_dma_issue_pending;
+-	dma->common.device_prep_slave_sg = intel_mid_dma_prep_slave_sg;
+-	dma->common.device_control = intel_mid_dma_device_control;
+-
+-	/*enable dma cntrl*/
+-	iowrite32(REG_BIT0, dma->dma_base + DMA_CFG);
+-
+-	/*register irq */
+-	if (dma->pimr_mask) {
+-		pr_debug("MDMA:Requesting irq shared for DMAC1\n");
+-		err = request_irq(pdev->irq, intel_mid_dma_interrupt1,
+-			IRQF_SHARED, "INTEL_MID_DMAC1", dma);
+-		if (0 != err)
+-			goto err_irq;
+-	} else {
+-		dma->intr_mask = 0x03;
+-		pr_debug("MDMA:Requesting irq for DMAC2\n");
+-		err = request_irq(pdev->irq, intel_mid_dma_interrupt2,
+-			IRQF_SHARED, "INTEL_MID_DMAC2", dma);
+-		if (0 != err)
+-			goto err_irq;
+-	}
+-	/*register device w/ engine*/
+-	err = dma_async_device_register(&dma->common);
+-	if (0 != err) {
+-		pr_err("ERR_MDMA:device_register failed: %d\n", err);
+-		goto err_engine;
+-	}
+-	if (dma->pimr_mask) {
+-		pr_debug("setting up tasklet1 for DMAC1\n");
+-		tasklet_init(&dma->tasklet, dma_tasklet1, (unsigned long)dma);
+-	} else {
+-		pr_debug("setting up tasklet2 for DMAC2\n");
+-		tasklet_init(&dma->tasklet, dma_tasklet2, (unsigned long)dma);
+-	}
+-	return 0;
+-
+-err_engine:
+-	free_irq(pdev->irq, dma);
+-err_irq:
+-	if (dma->mask_reg)
+-		iounmap(dma->mask_reg);
+-err_ioremap:
+-	pci_pool_destroy(dma->dma_pool);
+-err_dma_pool:
+-	pr_err("ERR_MDMA:setup_dma failed: %d\n", err);
+-	return err;
+-
+-}
+-
+-/**
+- * middma_shutdown -	Shutdown the DMA controller
+- * @pdev: Controller PCI device structure
+- *
+- * Called by remove
+- * Unregister DMa controller, clear all structures and free interrupt
+- */
+-static void middma_shutdown(struct pci_dev *pdev)
+-{
+-	struct middma_device *device = pci_get_drvdata(pdev);
+-
+-	dma_async_device_unregister(&device->common);
+-	pci_pool_destroy(device->dma_pool);
+-	if (device->mask_reg)
+-		iounmap(device->mask_reg);
+-	if (device->dma_base)
+-		iounmap(device->dma_base);
+-	free_irq(pdev->irq, device);
+-	return;
+-}
+-
+-/**
+- * intel_mid_dma_probe -	PCI Probe
+- * @pdev: Controller PCI device structure
+- * @id: pci device id structure
+- *
+- * Initialize the PCI device, map BARs, query driver data.
+- * Call setup_dma to complete contoller and chan initilzation
+- */
+-static int intel_mid_dma_probe(struct pci_dev *pdev,
+-					const struct pci_device_id *id)
+-{
+-	struct middma_device *device;
+-	u32 base_addr, bar_size;
+-	struct intel_mid_dma_probe_info *info;
+-	int err;
+-
+-	pr_debug("MDMA: probe for %x\n", pdev->device);
+-	info = (void *)id->driver_data;
+-	pr_debug("MDMA: CH %d, base %d, block len %d, Periphral mask %x\n",
+-				info->max_chan, info->ch_base,
+-				info->block_size, info->pimr_mask);
+-
+-	err = pci_enable_device(pdev);
+-	if (err)
+-		goto err_enable_device;
+-
+-	err = pci_request_regions(pdev, "intel_mid_dmac");
+-	if (err)
+-		goto err_request_regions;
+-
+-	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+-	if (err)
+-		goto err_set_dma_mask;
+-
+-	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
+-	if (err)
+-		goto err_set_dma_mask;
+-
+-	device = kzalloc(sizeof(*device), GFP_KERNEL);
+-	if (!device) {
+-		pr_err("ERR_MDMA:kzalloc failed probe\n");
+-		err = -ENOMEM;
+-		goto err_kzalloc;
+-	}
+-	device->pdev = pci_dev_get(pdev);
+-
+-	base_addr = pci_resource_start(pdev, 0);
+-	bar_size  = pci_resource_len(pdev, 0);
+-	device->dma_base = ioremap_nocache(base_addr, DMA_REG_SIZE);
+-	if (!device->dma_base) {
+-		pr_err("ERR_MDMA:ioremap failed\n");
+-		err = -ENOMEM;
+-		goto err_ioremap;
+-	}
+-	pci_set_drvdata(pdev, device);
+-	pci_set_master(pdev);
+-	device->max_chan = info->max_chan;
+-	device->chan_base = info->ch_base;
+-	device->block_size = info->block_size;
+-	device->pimr_mask = info->pimr_mask;
+-
+-	err = mid_setup_dma(pdev);
+-	if (err)
+-		goto err_dma;
+-
+-	pm_runtime_put_noidle(&pdev->dev);
+-	pm_runtime_allow(&pdev->dev);
+-	return 0;
+-
+-err_dma:
+-	iounmap(device->dma_base);
+-err_ioremap:
+-	pci_dev_put(pdev);
+-	kfree(device);
+-err_kzalloc:
+-err_set_dma_mask:
+-	pci_release_regions(pdev);
+-	pci_disable_device(pdev);
+-err_request_regions:
+-err_enable_device:
+-	pr_err("ERR_MDMA:Probe failed %d\n", err);
+-	return err;
+-}
+-
+-/**
+- * intel_mid_dma_remove -	PCI remove
+- * @pdev: Controller PCI device structure
+- *
+- * Free up all resources and data
+- * Call shutdown_dma to complete contoller and chan cleanup
+- */
+-static void intel_mid_dma_remove(struct pci_dev *pdev)
+-{
+-	struct middma_device *device = pci_get_drvdata(pdev);
+-
+-	pm_runtime_get_noresume(&pdev->dev);
+-	pm_runtime_forbid(&pdev->dev);
+-	middma_shutdown(pdev);
+-	pci_dev_put(pdev);
+-	kfree(device);
+-	pci_release_regions(pdev);
+-	pci_disable_device(pdev);
+-}
+-
+-/* Power Management */
+-/*
+-* dma_suspend - PCI suspend function
+-*
+-* @pci: PCI device structure
+-* @state: PM message
+-*
+-* This function is called by OS when a power event occurs
+-*/
+-static int dma_suspend(struct device *dev)
+-{
+-	struct pci_dev *pci = to_pci_dev(dev);
+-	int i;
+-	struct middma_device *device = pci_get_drvdata(pci);
+-	pr_debug("MDMA: dma_suspend called\n");
+-
+-	for (i = 0; i < device->max_chan; i++) {
+-		if (device->ch[i].in_use)
+-			return -EAGAIN;
+-	}
+-	dmac1_mask_periphral_intr(device);
+-	device->state = SUSPENDED;
+-	pci_save_state(pci);
+-	pci_disable_device(pci);
+-	pci_set_power_state(pci, PCI_D3hot);
+-	return 0;
+-}
+-
+-/**
+-* dma_resume - PCI resume function
+-*
+-* @pci:	PCI device structure
+-*
+-* This function is called by OS when a power event occurs
+-*/
+-int dma_resume(struct device *dev)
+-{
+-	struct pci_dev *pci = to_pci_dev(dev);
+-	int ret;
+-	struct middma_device *device = pci_get_drvdata(pci);
+-
+-	pr_debug("MDMA: dma_resume called\n");
+-	pci_set_power_state(pci, PCI_D0);
+-	pci_restore_state(pci);
+-	ret = pci_enable_device(pci);
+-	if (ret) {
+-		pr_err("MDMA: device can't be enabled for %x\n", pci->device);
+-		return ret;
+-	}
+-	device->state = RUNNING;
+-	iowrite32(REG_BIT0, device->dma_base + DMA_CFG);
+-	return 0;
+-}
+-
+-static int dma_runtime_suspend(struct device *dev)
+-{
+-	struct pci_dev *pci_dev = to_pci_dev(dev);
+-	struct middma_device *device = pci_get_drvdata(pci_dev);
+-
+-	device->state = SUSPENDED;
+-	return 0;
+-}
+-
+-static int dma_runtime_resume(struct device *dev)
+-{
+-	struct pci_dev *pci_dev = to_pci_dev(dev);
+-	struct middma_device *device = pci_get_drvdata(pci_dev);
+-
+-	device->state = RUNNING;
+-	iowrite32(REG_BIT0, device->dma_base + DMA_CFG);
+-	return 0;
+-}
+-
+-static int dma_runtime_idle(struct device *dev)
+-{
+-	struct pci_dev *pdev = to_pci_dev(dev);
+-	struct middma_device *device = pci_get_drvdata(pdev);
+-	int i;
+-
+-	for (i = 0; i < device->max_chan; i++) {
+-		if (device->ch[i].in_use)
+-			return -EAGAIN;
+-	}
+-
+-	return pm_schedule_suspend(dev, 0);
+-}
+-
+-/******************************************************************************
+-* PCI stuff
+-*/
+-static struct pci_device_id intel_mid_dma_ids[] = {
+-	{ PCI_VDEVICE(INTEL, INTEL_MID_DMAC1_ID),	INFO(2, 6, 4095, 0x200020)},
+-	{ PCI_VDEVICE(INTEL, INTEL_MID_DMAC2_ID),	INFO(2, 0, 2047, 0)},
+-	{ PCI_VDEVICE(INTEL, INTEL_MID_GP_DMAC2_ID),	INFO(2, 0, 2047, 0)},
+-	{ PCI_VDEVICE(INTEL, INTEL_MFLD_DMAC1_ID),	INFO(4, 0, 4095, 0x400040)},
+-	{ 0, }
+-};
+-MODULE_DEVICE_TABLE(pci, intel_mid_dma_ids);
+-
+-static const struct dev_pm_ops intel_mid_dma_pm = {
+-	.runtime_suspend = dma_runtime_suspend,
+-	.runtime_resume = dma_runtime_resume,
+-	.runtime_idle = dma_runtime_idle,
+-	.suspend = dma_suspend,
+-	.resume = dma_resume,
+-};
+-
+-static struct pci_driver intel_mid_dma_pci_driver = {
+-	.name		=	"Intel MID DMA",
+-	.id_table	=	intel_mid_dma_ids,
+-	.probe		=	intel_mid_dma_probe,
+-	.remove		=	intel_mid_dma_remove,
+-#ifdef CONFIG_PM
+-	.driver = {
+-		.pm = &intel_mid_dma_pm,
+-	},
+-#endif
+-};
+-
+-static int __init intel_mid_dma_init(void)
+-{
+-	pr_debug("INFO_MDMA: LNW DMA Driver Version %s\n",
+-			INTEL_MID_DMA_DRIVER_VERSION);
+-	return pci_register_driver(&intel_mid_dma_pci_driver);
+-}
+-fs_initcall(intel_mid_dma_init);
+-
+-static void __exit intel_mid_dma_exit(void)
+-{
+-	pci_unregister_driver(&intel_mid_dma_pci_driver);
+-}
+-module_exit(intel_mid_dma_exit);
+-
+-MODULE_AUTHOR("Vinod Koul <vinod.koul@intel.com>");
+-MODULE_DESCRIPTION("Intel (R) MID DMAC Driver");
+-MODULE_LICENSE("GPL v2");
+-MODULE_VERSION(INTEL_MID_DMA_DRIVER_VERSION);
+diff --git a/drivers/dma/intel_mid_dma/Makefile b/drivers/dma/intel_mid_dma/Makefile
+new file mode 100644
+index 0000000..6ec8b97
+--- /dev/null
++++ b/drivers/dma/intel_mid_dma/Makefile
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_INTEL_MID_DMAC) += intel_mid_dma.o
++intel_mid_dma-objs:= intel_qrk_dma_pci.o intel_mid_dma_pci.o
++
+diff --git a/drivers/dma/intel_mid_dma_core.c b/drivers/dma/intel_mid_dma_core.c
+new file mode 100644
+index 0000000..b869d6c
+--- /dev/null
++++ b/drivers/dma/intel_mid_dma_core.c
+@@ -0,0 +1,1336 @@
++/*
++ *  intel_mid_dma_core.c - Intel Langwell DMA Drivers
++ *
++ *  Copyright (C) 2008-14 Intel Corp
++ *  Author: Vinod Koul <vinod.koul@intel.com>
++ *  The driver design is based on dw_dmac driver
++ *  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; version 2 of the License.
++ *
++ *  This program is distributed in the hope that it will be useful, but
++ *  WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ *  General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License along
++ *  with this program; if not, write to the Free Software Foundation, Inc.,
++ *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
++ *
++ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ *
++ *
++ */
++#include <linux/pci.h>
++#include <linux/interrupt.h>
++#include <linux/pm_runtime.h>
++#include <linux/intel_mid_dma.h>
++#include <linux/module.h>
++
++#include "dmaengine.h"
++#include "intel_mid_dma_regs.h"
++
++#define MAX_CHAN	4 /*max ch across controllers*/
++
++#define INTEL_MID_DMAC1_ID		0x0814
++#define INTEL_MID_DMAC2_ID		0x0813
++#define INTEL_MID_GP_DMAC2_ID		0x0827
++#define INTEL_MFLD_DMAC1_ID		0x0830
++#define LNW_PERIPHRAL_MASK_BASE		0xFFAE8008
++#define LNW_PERIPHRAL_MASK_SIZE		0x10
++#define LNW_PERIPHRAL_STATUS		0x0
++#define LNW_PERIPHRAL_MASK		0x8
++
++
++/*****************************************************************************
++Utility Functions*/
++/**
++ * get_ch_index	-	convert status to channel
++ * @status: status mask
++ * @base: dma ch base value
++ *
++ * Modify the status mask and return the channel index needing
++ * attention (or -1 if neither)
++ */
++static int get_ch_index(int *status, unsigned int base)
++{
++	int i;
++	for (i = 0; i < MAX_CHAN; i++) {
++		if (*status & (1 << (i + base))) {
++			*status = *status & ~(1 << (i + base));
++			pr_debug("MDMA: index %d New status %x\n", i, *status);
++			return i;
++		}
++	}
++	return -1;
++}
++
++/**
++ * get_block_ts	-	calculates dma transaction length
++ * @len: dma transfer length
++ * @tx_width: dma transfer src width
++ * @block_size: dma controller max block size
++ *
++ * Based on src width calculate the DMA trsaction length in data items
++ * return data items or FFFF if exceeds max length for block
++ */
++static int get_block_ts(int len, int tx_width, int block_size)
++{
++	int byte_width = 0, block_ts = 0;
++
++	switch (tx_width) {
++	case DMA_SLAVE_BUSWIDTH_1_BYTE:
++		byte_width = 1;
++		break;
++	case DMA_SLAVE_BUSWIDTH_2_BYTES:
++		byte_width = 2;
++		break;
++	case DMA_SLAVE_BUSWIDTH_4_BYTES:
++	default:
++		byte_width = 4;
++		break;
++	}
++
++	block_ts = len/byte_width;
++	if (block_ts > block_size)
++		block_ts = 0xFFFF;
++	return block_ts;
++}
++
++/*****************************************************************************
++DMAC1 interrupt Functions*/
++
++/**
++ * dmac1_mask_periphral_intr -	mask the periphral interrupt
++ * @mid: dma device for which masking is required
++ *
++ * Masks the DMA periphral interrupt
++ * this is valid for DMAC1 family controllers only
++ * This controller should have periphral mask registers already mapped
++ */
++void dmac1_mask_periphral_intr(struct middma_device *mid)
++{
++	u32 pimr;
++
++	if (mid->pimr_mask) {
++		pimr = readl(mid->mask_reg + LNW_PERIPHRAL_MASK);
++		pimr |= mid->pimr_mask;
++		writel(pimr, mid->mask_reg + LNW_PERIPHRAL_MASK);
++	}
++	return;
++}
++
++/**
++ * dmac1_unmask_periphral_intr -	unmask the periphral interrupt
++ * @midc: dma channel for which masking is required
++ *
++ * UnMasks the DMA periphral interrupt,
++ * this is valid for DMAC1 family controllers only
++ * This controller should have peripheral mask registers already mapped
++ */
++void dmac1_unmask_periphral_intr(struct intel_mid_dma_chan *midc)
++{
++	u32 pimr;
++	struct middma_device *mid = to_middma_device(midc->chan.device);
++
++	if (mid->pimr_mask) {
++		pimr = readl(mid->mask_reg + LNW_PERIPHRAL_MASK);
++		pimr &= ~mid->pimr_mask;
++		writel(pimr, mid->mask_reg + LNW_PERIPHRAL_MASK);
++	}
++	return;
++}
++
++/**
++ * enable_dma_interrupt -	enable the periphral interrupt
++ * @midc: dma channel for which enable interrupt is required
++ *
++ * Enable the DMA periphral interrupt,
++ * this is valid for DMAC1 family controllers only
++ * This controller should have periphral mask registers already mapped
++ */
++static void enable_dma_interrupt(struct intel_mid_dma_chan *midc)
++{
++	dmac1_unmask_periphral_intr(midc);
++
++	/*en ch interrupts*/
++	iowrite32(UNMASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_TFR);
++	iowrite32(UNMASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_ERR);
++	return;
++}
++
++/**
++ * disable_dma_interrupt -	disable the periphral interrupt
++ * @midc: dma channel for which disable interrupt is required
++ *
++ * Disable the DMA periphral interrupt,
++ * this is valid for DMAC1 family controllers only
++ * This controller should have periphral mask registers already mapped
++ */
++static void disable_dma_interrupt(struct intel_mid_dma_chan *midc)
++{
++	/*Check LPE PISR, make sure fwd is disabled*/
++	iowrite32(MASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_BLOCK);
++	iowrite32(MASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_TFR);
++	iowrite32(MASK_INTR_REG(midc->ch_id), midc->dma_base + MASK_ERR);
++	return;
++}
++
++/*****************************************************************************
++DMA channel helper Functions*/
++/**
++ * mid_desc_get		-	get a descriptor
++ * @midc: dma channel for which descriptor is required
++ *
++ * Obtain a descriptor for the channel. Returns NULL if none are free.
++ * Once the descriptor is returned it is private until put on another
++ * list or freed
++ */
++static struct intel_mid_dma_desc *midc_desc_get(struct intel_mid_dma_chan *midc)
++{
++	struct intel_mid_dma_desc *desc, *_desc;
++	struct intel_mid_dma_desc *ret = NULL;
++
++	spin_lock_bh(&midc->lock);
++	list_for_each_entry_safe(desc, _desc, &midc->free_list, desc_node) {
++		if (async_tx_test_ack(&desc->txd)) {
++			list_del(&desc->desc_node);
++			ret = desc;
++			break;
++		}
++	}
++	spin_unlock_bh(&midc->lock);
++	return ret;
++}
++
++/**
++ * mid_desc_put		-	put a descriptor
++ * @midc: dma channel for which descriptor is required
++ * @desc: descriptor to put
++ *
++ * Return a descriptor from lwn_desc_get back to the free pool
++ */
++static void midc_desc_put(struct intel_mid_dma_chan *midc,
++			struct intel_mid_dma_desc *desc)
++{
++	if (desc) {
++		spin_lock_bh(&midc->lock);
++		list_add_tail(&desc->desc_node, &midc->free_list);
++		spin_unlock_bh(&midc->lock);
++	}
++}
++
++/**
++ * midc_dostart		-		begin a DMA transaction
++ * @midc: channel for which txn is to be started
++ * @first: first descriptor of series
++ *
++ * Load a transaction into the engine. This must be called with midc->lock
++ * held and bh disabled.
++ */
++static void midc_dostart(struct intel_mid_dma_chan *midc,
++			struct intel_mid_dma_desc *first)
++{
++	struct middma_device *mid = to_middma_device(midc->chan.device);
++
++	/*  channel is idle */
++	if (midc->busy && test_ch_en(midc->dma_base, midc->ch_id)) {
++		/*error*/
++		pr_err("ERR_MDMA: channel is busy in start\n");
++		/* The tasklet will hopefully advance the queue... */
++		return;
++	}
++
++	/*write registers and en*/
++	midc->busy = true;
++	iowrite32(first->sar, midc->ch_regs + SAR);
++	iowrite32(first->dar, midc->ch_regs + DAR);
++	iowrite32(first->lli_phys, midc->ch_regs + LLP);
++	iowrite32(first->cfg_hi, midc->ch_regs + CFG_HIGH);
++	iowrite32(first->cfg_lo, midc->ch_regs + CFG_LOW);
++	iowrite32(first->ctl_lo, midc->ch_regs + CTL_LOW);
++	iowrite32(first->ctl_hi, midc->ch_regs + CTL_HIGH);
++	pr_debug("MDMA:TX SAR %x,DAR %x,CFGL %x,CFGH %x,CTLH %x, CTLL %x\n",
++		(int)first->sar, (int)first->dar, first->cfg_hi,
++		first->cfg_lo, first->ctl_hi, first->ctl_lo);
++	first->status = DMA_IN_PROGRESS;
++
++	iowrite32(ENABLE_CHANNEL(midc->ch_id), mid->dma_base + DMA_CHAN_EN);
++}
++
++/**
++ * midc_descriptor_complete	-	process completed descriptor
++ * @midc: channel owning the descriptor
++ * @desc: the descriptor itself
++ *
++ * Process a completed descriptor and perform any callbacks upon
++ * the completion. The completion handling drops the lock during the
++ * callbacks but must be called with the lock held.
++ */
++static void midc_descriptor_complete(struct intel_mid_dma_chan *midc,
++		struct intel_mid_dma_desc *desc)
++		__releases(&midc->lock) __acquires(&midc->lock)
++{
++	struct dma_async_tx_descriptor	*txd = &desc->txd;
++	dma_async_tx_callback callback_txd = NULL;
++	struct intel_mid_dma_lli	*llitem;
++	void *param_txd = NULL;
++
++	dma_cookie_complete(txd);
++	callback_txd = txd->callback;
++	param_txd = txd->callback_param;
++	if (desc->lli != NULL) {
++		/*clear the DONE bit of completed LLI in memory*/
++		llitem = desc->lli + desc->current_lli;
++		llitem->ctl_hi &= CLEAR_DONE;
++		if (desc->current_lli < desc->lli_length-1)
++			(desc->current_lli)++;
++		else
++			desc->current_lli = 0;
++	}
++	spin_unlock_bh(&midc->lock);
++	if (callback_txd) {
++		pr_debug("MDMA: TXD callback set ... calling\n");
++		callback_txd(param_txd);
++	}
++	if (midc->raw_tfr) {
++		desc->status = DMA_SUCCESS;
++		if (desc->lli != NULL) {
++			pci_pool_free(desc->lli_pool, desc->lli,
++						desc->lli_phys);
++			pci_pool_destroy(desc->lli_pool);
++			desc->lli = NULL;
++		}
++		list_move(&desc->desc_node, &midc->free_list);
++		midc->busy = false;
++	}
++	spin_lock_bh(&midc->lock);
++
++}
++
++/**
++ * midc_scan_descriptors -		check the descriptors in channel
++ *					mark completed when tx is completete
++ * @mid: device
++ * @midc: channel to scan
++ *
++ * Walk the descriptor chain for the device and process any entries
++ * that are complete.
++ */
++static void midc_scan_descriptors(struct middma_device *mid,
++				struct intel_mid_dma_chan *midc)
++{
++	struct intel_mid_dma_desc *desc = NULL, *_desc = NULL;
++
++	/*tx is complete*/
++	list_for_each_entry_safe(desc, _desc, &midc->active_list, desc_node) {
++		if (desc->status == DMA_IN_PROGRESS)
++			midc_descriptor_complete(midc, desc);
++	}
++	return;
++}
++
++/**
++ * midc_lli_fill_sg -		Helper function to convert
++ *				SG list to Linked List Items.
++ *@midc: Channel
++ *@desc: DMA descriptor
++ *@sglist: Pointer to SG list
++ *@sglen: SG list length
++ *@flags: DMA transaction flags
++ *
++ * Walk through the SG list and convert the SG list into Linked
++ * List Items (LLI).
++ */
++static int midc_lli_fill_sg(struct intel_mid_dma_chan *midc,
++				struct intel_mid_dma_desc *desc,
++				struct scatterlist *sglist,
++				unsigned int sglen,
++				unsigned int flags)
++{
++	struct intel_mid_dma_slave *mids;
++	struct scatterlist  *sg;
++	dma_addr_t lli_next, sg_phy_addr;
++	struct intel_mid_dma_lli *lli_bloc_desc;
++	union intel_mid_dma_ctl_lo ctl_lo;
++	union intel_mid_dma_ctl_hi ctl_hi;
++	int i;
++
++	pr_debug("MDMA: Entered midc_lli_fill_sg\n");
++	mids = midc->mid_slave;
++
++	lli_bloc_desc = desc->lli;
++	lli_next = desc->lli_phys;
++
++	ctl_lo.ctl_lo = desc->ctl_lo;
++	ctl_hi.ctl_hi = desc->ctl_hi;
++	for_each_sg(sglist, sg, sglen, i) {
++		/*Populate CTL_LOW and LLI values*/
++		if (i != sglen - 1) {
++			lli_next = lli_next +
++				sizeof(struct intel_mid_dma_lli);
++		} else {
++		/*Check for circular list, otherwise terminate LLI to ZERO*/
++			if (flags & DMA_PREP_CIRCULAR_LIST) {
++				pr_debug("MDMA: LLI is configured in circular mode\n");
++				lli_next = desc->lli_phys;
++			} else {
++				lli_next = (dma_addr_t)lli_bloc_desc; /* Needs to be !0 */
++				ctl_lo.ctlx.llp_dst_en = 0;
++				ctl_lo.ctlx.llp_src_en = 0;
++			}
++		}
++		/*Populate CTL_HI values*/
++		ctl_hi.ctlx.block_ts = get_block_ts(sg_dma_len(sg),
++							desc->width,
++							midc->dma->block_size);
++		/*Populate SAR and DAR values*/
++		sg_phy_addr = sg_dma_address(sg);
++		if (desc->dirn ==  DMA_MEM_TO_DEV) {
++			lli_bloc_desc->sar  = sg_phy_addr;
++			lli_bloc_desc->dar  = mids->dma_slave.dst_addr;
++		} else if (desc->dirn ==  DMA_DEV_TO_MEM) {
++			lli_bloc_desc->sar  = mids->dma_slave.src_addr;
++			lli_bloc_desc->dar  = sg_phy_addr;
++		}
++		/*Copy values into block descriptor in system memory*/
++		lli_bloc_desc->llp = lli_next;
++		lli_bloc_desc->ctl_lo = ctl_lo.ctl_lo;
++		lli_bloc_desc->ctl_hi = ctl_hi.ctl_hi;
++		lli_bloc_desc++;
++	}
++	/*Copy very first LLI values to descriptor*/
++	desc->ctl_lo = desc->lli->ctl_lo;
++	desc->ctl_hi = desc->lli->ctl_hi;
++	desc->sar = desc->lli->sar;
++	desc->dar = desc->lli->dar;
++
++	return 0;
++}
++/*****************************************************************************
++DMA engine callback Functions*/
++/**
++ * intel_mid_dma_tx_submit -	callback to submit DMA transaction
++ * @tx: dma engine descriptor
++ *
++ * Submit the DMA transaction for this descriptor, start if ch idle
++ */
++static dma_cookie_t intel_mid_dma_tx_submit(struct dma_async_tx_descriptor *tx)
++{
++	struct intel_mid_dma_desc	*desc = to_intel_mid_dma_desc(tx);
++	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(tx->chan);
++	dma_cookie_t		cookie;
++
++	spin_lock_bh(&midc->lock);
++	cookie = dma_cookie_assign(tx);
++
++	if (list_empty(&midc->active_list))
++		list_add_tail(&desc->desc_node, &midc->active_list);
++	else
++		list_add_tail(&desc->desc_node, &midc->queue);
++
++	midc_dostart(midc, desc);
++	spin_unlock_bh(&midc->lock);
++
++	return cookie;
++}
++
++/**
++ * intel_mid_dma_issue_pending -	callback to issue pending txn
++ * @chan: chan where pending trascation needs to be checked and submitted
++ *
++ * Call for scan to issue pending descriptors
++ */
++static void intel_mid_dma_issue_pending(struct dma_chan *chan)
++{
++	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
++
++	spin_lock_bh(&midc->lock);
++	if (!list_empty(&midc->queue))
++		midc_scan_descriptors(to_middma_device(chan->device), midc);
++	spin_unlock_bh(&midc->lock);
++}
++
++/**
++ * intel_mid_dma_tx_status -	Return status of txn
++ * @chan: chan for where status needs to be checked
++ * @cookie: cookie for txn
++ * @txstate: DMA txn state
++ *
++ * Return status of DMA txn
++ */
++static enum dma_status intel_mid_dma_tx_status(struct dma_chan *chan,
++						dma_cookie_t cookie,
++						struct dma_tx_state *txstate)
++{
++	struct intel_mid_dma_chan *midc = to_intel_mid_dma_chan(chan);
++	enum dma_status ret;
++
++	ret = dma_cookie_status(chan, cookie, txstate);
++	if (ret != DMA_SUCCESS) {
++		spin_lock_bh(&midc->lock);
++		midc_scan_descriptors(to_middma_device(chan->device), midc);
++		spin_unlock_bh(&midc->lock);
++
++		ret = dma_cookie_status(chan, cookie, txstate);
++	}
++
++	return ret;
++}
++
++static int dma_slave_control(struct dma_chan *chan, unsigned long arg)
++{
++	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
++	struct dma_slave_config  *slave = (struct dma_slave_config *)arg;
++	struct intel_mid_dma_slave *mid_slave;
++
++	BUG_ON(!midc);
++	BUG_ON(!slave);
++	pr_debug("MDMA: slave control called\n");
++
++	mid_slave = to_intel_mid_dma_slave(slave);
++
++	BUG_ON(!mid_slave);
++
++	midc->mid_slave = mid_slave;
++	return 0;
++}
++/**
++ * intel_mid_dma_device_control -	DMA device control
++ * @chan: chan for DMA control
++ * @cmd: control cmd
++ * @arg: cmd arg value
++ *
++ * Perform DMA control command
++ */
++static int intel_mid_dma_device_control(struct dma_chan *chan,
++			enum dma_ctrl_cmd cmd, unsigned long arg)
++{
++	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
++	struct middma_device	*mid = to_middma_device(chan->device);
++	struct intel_mid_dma_desc	*desc, *_desc;
++	union intel_mid_dma_cfg_lo cfg_lo;
++
++	if (cmd == DMA_SLAVE_CONFIG)
++		return dma_slave_control(chan, arg);
++
++	if (cmd != DMA_TERMINATE_ALL)
++		return -ENXIO;
++
++	spin_lock_bh(&midc->lock);
++	if (midc->busy == false) {
++		spin_unlock_bh(&midc->lock);
++		return 0;
++	}
++	/*Suspend and disable the channel*/
++	cfg_lo.cfg_lo = ioread32(midc->ch_regs + CFG_LOW);
++	cfg_lo.cfgx.ch_susp = 1;
++	iowrite32(cfg_lo.cfg_lo, midc->ch_regs + CFG_LOW);
++	iowrite32(DISABLE_CHANNEL(midc->ch_id), mid->dma_base + DMA_CHAN_EN);
++	midc->busy = false;
++	/* Disable interrupts */
++	disable_dma_interrupt(midc);
++	midc->descs_allocated = 0;
++
++	spin_unlock_bh(&midc->lock);
++	list_for_each_entry_safe(desc, _desc, &midc->active_list, desc_node) {
++		if (desc->lli != NULL) {
++			pci_pool_free(desc->lli_pool, desc->lli,
++						desc->lli_phys);
++			pci_pool_destroy(desc->lli_pool);
++			desc->lli = NULL;
++		}
++		list_move(&desc->desc_node, &midc->free_list);
++	}
++	return 0;
++}
++
++/**
++ * intel_mid_dma_prep_memcpy -	Prep memcpy txn
++ * @chan: chan for DMA transfer
++ * @dest: destn address
++ * @src: src address
++ * @len: DMA transfer len
++ * @flags: DMA flags
++ *
++ * Perform a DMA memcpy. Note we support slave periphral DMA transfers only
++ * The periphral txn details should be filled in slave structure properly
++ * Returns the descriptor for this txn
++ */
++static struct dma_async_tx_descriptor *intel_mid_dma_prep_memcpy(
++			struct dma_chan *chan, dma_addr_t dest,
++			dma_addr_t src, size_t len, unsigned long flags)
++{
++	struct intel_mid_dma_chan *midc;
++	struct intel_mid_dma_desc *desc = NULL;
++	struct intel_mid_dma_slave *mids;
++	union intel_mid_dma_ctl_lo ctl_lo;
++	union intel_mid_dma_ctl_hi ctl_hi;
++	union intel_mid_dma_cfg_lo cfg_lo;
++	union intel_mid_dma_cfg_hi cfg_hi;
++	enum dma_slave_buswidth width;
++
++	pr_debug("MDMA: Prep for memcpy\n");
++	BUG_ON(!chan);
++	if (!len)
++		return NULL;
++
++	midc = to_intel_mid_dma_chan(chan);
++	BUG_ON(!midc);
++
++	mids = midc->mid_slave;
++	BUG_ON(!mids);
++
++	pr_debug("MDMA:called for DMA %x CH %d Length %zu src_addr 0x%08x dst 0x%08x\n",
++				midc->dma->pci_id, midc->ch_id, len, (u32)src, (u32)dest);
++	pr_debug("MDMA:Cfg passed Mode %x, Dirn %d, Handshake %s, Width %x\n",
++			mids->cfg_mode, mids->dma_slave.direction,
++			mids->hs_mode == LNW_DMA_HW_HS ? "hardware" : "software" , mids->dma_slave.src_addr_width);
++
++	/*calculate CFG_LO*/
++	if (mids->hs_mode == LNW_DMA_SW_HS) {
++		cfg_lo.cfg_lo = 0;
++		cfg_lo.cfgx.hs_sel_dst = 1;
++		cfg_lo.cfgx.hs_sel_src = 1;
++	} else if (mids->hs_mode == LNW_DMA_HW_HS)
++		cfg_lo.cfg_lo = 0x00000;
++
++	/*calculate CFG_HI*/
++	if (mids->cfg_mode == LNW_DMA_MEM_TO_MEM) {
++		/*SW HS only*/
++		cfg_hi.cfg_hi = 0;
++	} else {
++		cfg_hi.cfg_hi = 0;
++		if (midc->dma->pimr_mask) {
++			cfg_hi.cfgx.protctl = 0x0; /*default value*/
++			cfg_hi.cfgx.fifo_mode = 1;
++			if (mids->dma_slave.direction == DMA_MEM_TO_DEV) {
++				cfg_hi.cfgx.src_per = 0;
++				if (mids->device_instance == 0)
++					cfg_hi.cfgx.dst_per = 3;
++				if (mids->device_instance == 1)
++					cfg_hi.cfgx.dst_per = 1;
++			} else if (mids->dma_slave.direction == DMA_DEV_TO_MEM) {
++				if (mids->device_instance == 0)
++					cfg_hi.cfgx.src_per = 2;
++				if (mids->device_instance == 1)
++					cfg_hi.cfgx.src_per = 0;
++				cfg_hi.cfgx.dst_per = 0;
++			}
++		} else {
++			cfg_hi.cfgx.protctl = 0x1; /*default value*/
++			cfg_hi.cfgx.src_per = cfg_hi.cfgx.dst_per =
++					midc->ch_id - midc->dma->chan_base;
++			/* Quark - set polarity active low - make a param */
++			if(midc->dma->is_quark){
++				cfg_lo.cfgx.dst_hs_pol = 0x1;
++				cfg_lo.cfgx.src_hs_pol = 0x1;
++				cfg_lo.cfgx.hs_sel_dst = 0x00;
++				cfg_lo.cfgx.hs_sel_src = 0x01;
++			}
++		}
++	}
++
++	/*calculate CTL_HI*/
++	ctl_hi.ctlx.reser = 0;
++	ctl_hi.ctlx.done  = 0;
++	width = mids->dma_slave.src_addr_width;
++
++	ctl_hi.ctlx.block_ts = get_block_ts(len, width, midc->dma->block_size);
++	pr_debug("MDMA:calc len (block_ts) %d for block size %d\n",
++				ctl_hi.ctlx.block_ts, midc->dma->block_size);
++	/*calculate CTL_LO*/
++	ctl_lo.ctl_lo = 0;
++	ctl_lo.ctlx.int_en = 1;
++	/* Note Quark: original driver inverted these two values - need to
++	 * resolve before integration - have we missed a trick ? */
++	ctl_lo.ctlx.dst_msize = mids->dma_slave.dst_maxburst;
++	ctl_lo.ctlx.src_msize = mids->dma_slave.src_maxburst;
++	pr_debug("MDMA:Cfg dst_msize 0x%x src_msize 0x%x\n", ctl_lo.ctlx.src_msize, ctl_lo.ctlx.dst_msize);
++	pr_debug("MDMA:Cfg mids->dma_slave.dst_maxburst 0x%x mids->dma_slave.src_maxburst 0x%x\n", mids->dma_slave.src_maxburst,
++mids->dma_slave.dst_maxburst);
++
++	/*
++	 * Here we need some translation from "enum dma_slave_buswidth"
++	 * to the format for our dma controller
++	 *		standard	intel_mid_dmac's format
++	 *		 1 Byte			0b000
++	 *		 2 Bytes		0b001
++	 *		 4 Bytes		0b010
++	 */
++	ctl_lo.ctlx.dst_tr_width = mids->dma_slave.dst_addr_width / 2;
++	ctl_lo.ctlx.src_tr_width = mids->dma_slave.src_addr_width / 2;
++
++	if (mids->cfg_mode == LNW_DMA_MEM_TO_MEM) {
++		ctl_lo.ctlx.tt_fc = 0;
++		ctl_lo.ctlx.sinc = 0;
++		ctl_lo.ctlx.dinc = 0;
++	} else {
++		if (mids->dma_slave.direction == DMA_MEM_TO_DEV) {
++			ctl_lo.ctlx.sinc = 0;
++			ctl_lo.ctlx.dinc = 2;
++			ctl_lo.ctlx.tt_fc = 1;
++		} else if (mids->dma_slave.direction == DMA_DEV_TO_MEM) {
++			ctl_lo.ctlx.sinc = 2;
++			ctl_lo.ctlx.dinc = 0;
++			ctl_lo.ctlx.tt_fc = 2;
++		}
++	}
++
++	pr_debug("MDMA:Calc CTL LO 0x%x, CTL HI 0x%x, CFG LO 0x%x CFG HI 0x%x\n",
++		ctl_lo.ctl_lo, ctl_hi.ctl_hi, cfg_lo.cfg_lo, cfg_hi.cfg_hi);
++	enable_dma_interrupt(midc);
++
++	desc = midc_desc_get(midc);
++	if (desc == NULL)
++		goto err_desc_get;
++	desc->sar = src;
++	desc->dar = dest ;
++	desc->len = len;
++	desc->cfg_hi = cfg_hi.cfg_hi;
++	desc->cfg_lo = cfg_lo.cfg_lo;
++	desc->ctl_lo = ctl_lo.ctl_lo;
++	desc->ctl_hi = ctl_hi.ctl_hi;
++	desc->width = width;
++	desc->dirn = mids->dma_slave.direction;
++	desc->lli_phys = 0;
++	desc->lli = NULL;
++	desc->lli_pool = NULL;
++	return &desc->txd;
++
++err_desc_get:
++	pr_err("ERR_MDMA: Failed to get desc\n");
++	midc_desc_put(midc, desc);
++	return NULL;
++}
++/**
++ * intel_mid_dma_prep_slave_sg -	Prep slave sg txn
++ * @chan: chan for DMA transfer
++ * @sgl: scatter gather list
++ * @sg_len: length of sg txn
++ * @direction: DMA transfer dirtn
++ * @flags: DMA flags
++ * @context: transfer context (ignored)
++ *
++ * Prepares LLI based periphral transfer
++ */
++static struct dma_async_tx_descriptor *intel_mid_dma_prep_slave_sg(
++			struct dma_chan *chan, struct scatterlist *sgl,
++			unsigned int sg_len, enum dma_transfer_direction direction,
++			unsigned long flags, void *context)
++{
++	struct intel_mid_dma_chan *midc = NULL;
++	struct intel_mid_dma_slave *mids = NULL;
++	struct intel_mid_dma_desc *desc = NULL;
++	struct dma_async_tx_descriptor *txd = NULL;
++	union intel_mid_dma_ctl_lo ctl_lo;
++
++	pr_debug("MDMA: Prep for slave SG\n");
++
++	if (!sg_len) {
++		pr_err("MDMA: Invalid SG length\n");
++		return NULL;
++	}
++	midc = to_intel_mid_dma_chan(chan);
++	BUG_ON(!midc);
++
++	mids = midc->mid_slave;
++	BUG_ON(!mids);
++
++	if (!midc->dma->is_quark && !midc->dma->pimr_mask) {
++		/* We can still handle sg list with only one item */
++		if (sg_len == 1) {
++			txd = intel_mid_dma_prep_memcpy(chan,
++						mids->dma_slave.dst_addr,
++						mids->dma_slave.src_addr,
++						sg_dma_len(sgl),
++						flags);
++			return txd;
++		} else {
++			pr_warn("MDMA: SG list is not supported by this controller\n");
++			return  NULL;
++		}
++	}
++
++	pr_debug("MDMA: SG Length = %d, direction = %d, Flags = %#lx\n",
++			sg_len, direction, flags);
++
++	txd = intel_mid_dma_prep_memcpy(chan, mids->dma_slave.dst_addr,
++			mids->dma_slave.src_addr, sg_dma_len(sgl), flags);
++	if (NULL == txd) {
++		pr_err("MDMA: Prep memcpy failed\n");
++		return NULL;
++	}
++
++	desc = to_intel_mid_dma_desc(txd);
++	desc->dirn = direction;
++	ctl_lo.ctl_lo = desc->ctl_lo;
++	ctl_lo.ctlx.llp_dst_en = 1;
++	ctl_lo.ctlx.llp_src_en = 1;
++	desc->ctl_lo = ctl_lo.ctl_lo;
++	desc->lli_length = sg_len;
++	desc->current_lli = 0;
++	/* DMA coherent memory pool for LLI descriptors*/
++	desc->lli_pool = pci_pool_create("intel_mid_dma_lli_pool",
++				midc->dma->pdev,
++				(sizeof(struct intel_mid_dma_lli)*sg_len),
++				32, 0);
++	if (NULL == desc->lli_pool) {
++		pr_err("MID_DMA:LLI pool create failed\n");
++		return NULL;
++	}
++
++	desc->lli = pci_pool_alloc(desc->lli_pool, GFP_KERNEL, &desc->lli_phys);
++	if (!desc->lli) {
++		pr_err("MID_DMA: LLI alloc failed\n");
++		pci_pool_destroy(desc->lli_pool);
++		return NULL;
++	}
++
++	midc_lli_fill_sg(midc, desc, sgl, sg_len, flags);
++	if (flags & DMA_PREP_INTERRUPT) {
++		iowrite32(UNMASK_INTR_REG(midc->ch_id),
++				midc->dma_base + MASK_BLOCK);
++		pr_debug("MDMA:Enabled Block interrupt\n");
++	}
++	return &desc->txd;
++}
++
++/**
++ * intel_mid_dma_free_chan_resources -	Frees dma resources
++ * @chan: chan requiring attention
++ *
++ * Frees the allocated resources on this DMA chan
++ */
++static void intel_mid_dma_free_chan_resources(struct dma_chan *chan)
++{
++	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
++	struct middma_device	*mid = to_middma_device(chan->device);
++	struct intel_mid_dma_desc	*desc, *_desc;
++
++	if (true == midc->busy) {
++		/*trying to free ch in use!!!!!*/
++		pr_err("ERR_MDMA: trying to free ch in use\n");
++	}
++	spin_lock_bh(&midc->lock);
++	midc->descs_allocated = 0;
++	list_for_each_entry_safe(desc, _desc, &midc->active_list, desc_node) {
++		list_del(&desc->desc_node);
++		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
++	}
++	list_for_each_entry_safe(desc, _desc, &midc->free_list, desc_node) {
++		list_del(&desc->desc_node);
++		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
++	}
++	list_for_each_entry_safe(desc, _desc, &midc->queue, desc_node) {
++		list_del(&desc->desc_node);
++		pci_pool_free(mid->dma_pool, desc, desc->txd.phys);
++	}
++	spin_unlock_bh(&midc->lock);
++	midc->in_use = false;
++	midc->busy = false;
++	/* Disable CH interrupts */
++	iowrite32(MASK_INTR_REG(midc->ch_id), mid->dma_base + MASK_BLOCK);
++	iowrite32(MASK_INTR_REG(midc->ch_id), mid->dma_base + MASK_ERR);
++	pm_runtime_put(&mid->pdev->dev);
++}
++
++/**
++ * intel_mid_dma_alloc_chan_resources -	Allocate dma resources
++ * @chan: chan requiring attention
++ *
++ * Allocates DMA resources on this chan
++ * Return the descriptors allocated
++ */
++static int intel_mid_dma_alloc_chan_resources(struct dma_chan *chan)
++{
++	struct intel_mid_dma_chan	*midc = to_intel_mid_dma_chan(chan);
++	struct middma_device	*mid = to_middma_device(chan->device);
++	struct intel_mid_dma_desc	*desc;
++	dma_addr_t		phys;
++	int	i = 0;
++
++	pm_runtime_get_sync(&mid->pdev->dev);
++
++	if (mid->state == SUSPENDED) {
++		if (dma_resume(&mid->pdev->dev)) {
++			pr_err("ERR_MDMA: resume failed");
++			return -EFAULT;
++		}
++	}
++
++	/* ASSERT:  channel is idle */
++	if (test_ch_en(mid->dma_base, midc->ch_id)) {
++		/*ch is not idle*/
++		pr_err("ERR_MDMA: ch not idle\n");
++		pm_runtime_put(&mid->pdev->dev);
++		return -EIO;
++	}
++	dma_cookie_init(chan);
++
++	spin_lock_bh(&midc->lock);
++	while (midc->descs_allocated < DESCS_PER_CHANNEL) {
++		spin_unlock_bh(&midc->lock);
++		desc = pci_pool_alloc(mid->dma_pool, GFP_KERNEL, &phys);
++		if (!desc) {
++			pr_err("ERR_MDMA: desc failed\n");
++			pm_runtime_put(&mid->pdev->dev);
++			return -ENOMEM;
++			/*check*/
++		}
++		dma_async_tx_descriptor_init(&desc->txd, chan);
++		desc->txd.tx_submit = intel_mid_dma_tx_submit;
++		desc->txd.flags = DMA_CTRL_ACK;
++		desc->txd.phys = phys;
++		spin_lock_bh(&midc->lock);
++		i = ++midc->descs_allocated;
++		list_add_tail(&desc->desc_node, &midc->free_list);
++	}
++	spin_unlock_bh(&midc->lock);
++	midc->in_use = true;
++	midc->busy = false;
++	pr_debug("MID_DMA: Desc alloc done ret: %d desc\n", i);
++	return i;
++}
++
++/**
++ * midc_handle_error -	Handle DMA txn error
++ * @mid: controller where error occurred
++ * @midc: chan where error occurred
++ *
++ * Scan the descriptor for error
++ */
++static void midc_handle_error(struct middma_device *mid,
++		struct intel_mid_dma_chan *midc)
++{
++	midc_scan_descriptors(mid, midc);
++}
++
++/**
++ * dma_tasklet -	DMA interrupt tasklet
++ * @data: tasklet arg (the controller structure)
++ *
++ * Scan the controller for interrupts for completion/error
++ * Clear the interrupt and call for handling completion/error
++ */
++static void dma_tasklet(unsigned long data)
++{
++	struct middma_device *mid = NULL;
++	struct intel_mid_dma_chan *midc = NULL;
++	u32 status, raw_tfr, raw_block;
++	int i;
++
++	mid = (struct middma_device *)data;
++	if (mid == NULL) {
++		pr_err("ERR_MDMA: tasklet Null param\n");
++		return;
++	}
++	pr_debug("MDMA: in tasklet for device %x\n", mid->pci_id);
++	raw_tfr = ioread32(mid->dma_base + RAW_TFR);
++	raw_block = ioread32(mid->dma_base + RAW_BLOCK);
++	status = raw_tfr | raw_block;
++	status &= mid->intr_mask;
++	while (status) {
++		/*txn interrupt*/
++		i = get_ch_index(&status, mid->chan_base);
++		if (i < 0) {
++			pr_err("ERR_MDMA:Invalid ch index %x\n", i);
++			return;
++		}
++		midc = &mid->ch[i];
++		if (midc == NULL) {
++			pr_err("ERR_MDMA:Null param midc\n");
++			return;
++		}
++		pr_debug("MDMA:Tx complete interrupt %x, Ch No %d Index %d\n",
++				status, midc->ch_id, i);
++		midc->raw_tfr = raw_tfr;
++		midc->raw_block = raw_block;
++		spin_lock_bh(&midc->lock);
++		/*clearing this interrupts first*/
++		iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_TFR);
++		if (raw_block) {
++			iowrite32((1 << midc->ch_id),
++				mid->dma_base + CLEAR_BLOCK);
++		}
++		midc_scan_descriptors(mid, midc);
++		pr_debug("MDMA:Scan of desc... complete, unmasking\n");
++		iowrite32(UNMASK_INTR_REG(midc->ch_id),
++				mid->dma_base + MASK_TFR);
++		if (raw_block) {
++			iowrite32(UNMASK_INTR_REG(midc->ch_id),
++				mid->dma_base + MASK_BLOCK);
++		}
++		spin_unlock_bh(&midc->lock);
++	}
++
++	status = ioread32(mid->dma_base + RAW_ERR);
++	status &= mid->intr_mask;
++	while (status) {
++		/*err interrupt*/
++		i = get_ch_index(&status, mid->chan_base);
++		if (i < 0) {
++			pr_err("ERR_MDMA:Invalid ch index %x\n", i);
++			return;
++		}
++		midc = &mid->ch[i];
++		if (midc == NULL) {
++			pr_err("ERR_MDMA:Null param midc\n");
++			return;
++		}
++		pr_debug("MDMA:Tx complete interrupt %x, Ch No %d Index %d\n",
++				status, midc->ch_id, i);
++
++		iowrite32((1 << midc->ch_id), mid->dma_base + CLEAR_ERR);
++		spin_lock_bh(&midc->lock);
++		midc_handle_error(mid, midc);
++		iowrite32(UNMASK_INTR_REG(midc->ch_id),
++				mid->dma_base + MASK_ERR);
++		spin_unlock_bh(&midc->lock);
++	}
++	pr_debug("MDMA:Exiting takslet...\n");
++	return;
++}
++
++static void dma_tasklet1(unsigned long data)
++{
++	pr_debug("MDMA:in takslet1...\n");
++	return dma_tasklet(data);
++}
++
++static void dma_tasklet2(unsigned long data)
++{
++	pr_debug("MDMA:in takslet2...\n");
++	return dma_tasklet(data);
++}
++
++/**
++ * intel_mid_dma_interrupt -	DMA ISR
++ * @irq: IRQ where interrupt occurred
++ * @data: ISR cllback data (the controller structure)
++ *
++ * See if this is our interrupt if so then schedule the tasklet
++ * otherwise ignore
++ */
++irqreturn_t intel_mid_dma_interrupt(int irq, void *data)
++{
++	struct middma_device *mid = data;
++	u32 tfr_status, err_status, block_status;
++	int call_tasklet = 0;
++
++	tfr_status = ioread32(mid->dma_base + RAW_TFR);
++	block_status = ioread32(mid->dma_base + RAW_BLOCK);
++	err_status = ioread32(mid->dma_base + RAW_ERR);
++	if (!tfr_status && !err_status && !block_status){
++		return IRQ_NONE;
++	}
++
++	/*DMA Interrupt*/
++	pr_debug("MDMA:Got an interrupt on irq %d\n", irq);
++	pr_debug("MDMA: raw_tfr %x, raw_err %x raw_block %x Mask %x\n",
++		tfr_status, err_status, block_status, mid->intr_mask);
++
++	tfr_status &= mid->intr_mask;
++	if (tfr_status) {
++		/*need to disable intr*/
++		iowrite32((tfr_status << INT_MASK_WE), mid->dma_base + MASK_TFR);
++		iowrite32((tfr_status << INT_MASK_WE), mid->dma_base + MASK_BLOCK);
++		pr_debug("MDMA: Calling tasklet %x\n", tfr_status);
++		call_tasklet = 1;
++	}
++	err_status &= mid->intr_mask;
++	if (err_status) {
++		iowrite32((err_status << INT_MASK_WE),
++			  mid->dma_base + MASK_ERR);
++		call_tasklet = 1;
++	}
++	if (call_tasklet)
++		tasklet_schedule(&mid->tasklet);
++	
++	return IRQ_HANDLED;
++}
++EXPORT_SYMBOL(intel_mid_dma_interrupt);
++
++static irqreturn_t intel_mid_dma_interrupt1(int irq, void *data)
++{
++	return intel_mid_dma_interrupt(irq, data);
++}
++
++static irqreturn_t intel_mid_dma_interrupt2(int irq, void *data)
++{
++	return intel_mid_dma_interrupt(irq, data);
++}
++
++/**
++ * mid_setup_dma -	Setup the DMA controller
++ * @pdev: Controller PCI device structure
++ *
++ * Initialize the DMA controller, channels, registers with DMA engine,
++ * ISR. Initialize DMA controller channels.
++ */
++int mid_setup_dma(struct pci_dev *pdev, struct middma_device *dma)
++{
++	int err, i;
++
++	/* DMA coherent memory pool for DMA descriptor allocations */
++	dma->dma_pool = pci_pool_create("intel_mid_dma_desc_pool", pdev,
++					sizeof(struct intel_mid_dma_desc),
++					32, 0);
++	if (NULL == dma->dma_pool) {
++		pr_err("ERR_MDMA:pci_pool_create failed\n");
++		err = -ENOMEM;
++		goto err_dma_pool;
++	}
++
++	INIT_LIST_HEAD(&dma->common.channels);
++	dma->pci_id = pdev->device;
++	if (dma->pimr_mask) {
++		dma->mask_reg = ioremap(LNW_PERIPHRAL_MASK_BASE,
++					LNW_PERIPHRAL_MASK_SIZE);
++		if (dma->mask_reg == NULL) {
++			pr_err("ERR_MDMA:Can't map periphral intr space !!\n");
++			err = -ENOMEM;
++			goto err_ioremap;
++		}
++	} else
++		dma->mask_reg = NULL;
++
++	pr_debug("MDMA:Adding %d channel for this controller\n", dma->max_chan);
++	/*init CH structures*/
++	dma->intr_mask = 0;
++	dma->state = RUNNING;
++	for (i = 0; i < dma->max_chan; i++) {
++		struct intel_mid_dma_chan *midch = &dma->ch[i];
++
++		midch->chan.device = &dma->common;
++		dma_cookie_init(&midch->chan);
++		midch->ch_id = dma->chan_base + i;
++		pr_debug("MDMA:Init CH %d, ID %d\n", i, midch->ch_id);
++
++		midch->dma_base = dma->dma_base;
++		midch->ch_regs = dma->dma_base + DMA_CH_SIZE * midch->ch_id;
++		midch->dma = dma;
++		dma->intr_mask |= 1 << (dma->chan_base + i);
++		spin_lock_init(&midch->lock);
++
++		INIT_LIST_HEAD(&midch->active_list);
++		INIT_LIST_HEAD(&midch->queue);
++		INIT_LIST_HEAD(&midch->free_list);
++		/*mask interrupts*/
++		iowrite32(MASK_INTR_REG(midch->ch_id),
++			dma->dma_base + MASK_BLOCK);
++		iowrite32(MASK_INTR_REG(midch->ch_id),
++			dma->dma_base + MASK_SRC_TRAN);
++		iowrite32(MASK_INTR_REG(midch->ch_id),
++			dma->dma_base + MASK_DST_TRAN);
++		iowrite32(MASK_INTR_REG(midch->ch_id),
++			dma->dma_base + MASK_ERR);
++		iowrite32(MASK_INTR_REG(midch->ch_id),
++			dma->dma_base + MASK_TFR);
++
++		disable_dma_interrupt(midch);
++		list_add_tail(&midch->chan.device_node, &dma->common.channels);
++	}
++	pr_debug("MDMA: Calc Mask as %x for this controller\n", dma->intr_mask);
++
++	/*init dma structure*/
++	dma_cap_zero(dma->common.cap_mask);
++	dma_cap_set(DMA_MEMCPY, dma->common.cap_mask);
++	dma_cap_set(DMA_SLAVE, dma->common.cap_mask);
++	dma_cap_set(DMA_PRIVATE, dma->common.cap_mask);
++	dma->common.dev = &pdev->dev;
++
++	dma->common.device_alloc_chan_resources =
++					intel_mid_dma_alloc_chan_resources;
++	dma->common.device_free_chan_resources =
++					intel_mid_dma_free_chan_resources;
++
++	dma->common.device_tx_status = intel_mid_dma_tx_status;
++	dma->common.device_prep_dma_memcpy = intel_mid_dma_prep_memcpy;
++	dma->common.device_issue_pending = intel_mid_dma_issue_pending;
++	dma->common.device_prep_slave_sg = intel_mid_dma_prep_slave_sg;
++	dma->common.device_control = intel_mid_dma_device_control;
++
++	/*enable dma cntrl*/
++	iowrite32(REG_BIT0, dma->dma_base + DMA_CFG);
++
++	/*register irq */
++	if (dma->pimr_mask) {
++		pr_debug("MDMA:Requesting irq shared for DMAC1\n");
++		err = request_irq(pdev->irq, intel_mid_dma_interrupt1,
++			IRQF_SHARED, "INTEL_MID_DMAC1", dma);
++		if (0 != err)
++			goto err_irq;
++	} else {
++		dma->intr_mask = 0x03;
++		pr_debug("MDMA:Requesting irq for DMAC2\n");
++		err = request_irq(pdev->irq, intel_mid_dma_interrupt2,
++			IRQF_SHARED, "INTEL_MID_DMAC2", dma);
++		if (0 != err)
++			goto err_irq;
++	}
++	/*register device w/ engine*/
++	err = dma_async_device_register(&dma->common);
++	if (0 != err) {
++		pr_err("ERR_MDMA:device_register failed: %d\n", err);
++		goto err_engine;
++	}
++	if (dma->pimr_mask) {
++		pr_debug("setting up tasklet1 for DMAC1\n");
++		tasklet_init(&dma->tasklet, dma_tasklet1, (unsigned long)dma);
++	} else {
++		pr_debug("setting up tasklet2 for DMAC2\n");
++		tasklet_init(&dma->tasklet, dma_tasklet2, (unsigned long)dma);
++	}
++	return 0;
++
++err_engine:
++	free_irq(pdev->irq, dma);
++err_irq:
++	if (dma->mask_reg)
++		iounmap(dma->mask_reg);
++err_ioremap:
++	pci_pool_destroy(dma->dma_pool);
++err_dma_pool:
++	pr_err("ERR_MDMA:setup_dma failed: %d\n", err);
++	return err;
++
++}
++/**
++ * middma_shutdown -	Shutdown the DMA controller
++ * @pdev: Controller PCI device structure
++ *
++ * Called by remove
++ * Unregister DMa controller, clear all structures and free interrupt
++ */
++void middma_shutdown(struct pci_dev *pdev, struct middma_device *device)
++{
++	dma_async_device_unregister(&device->common);
++	pci_pool_destroy(device->dma_pool);
++	if (device->mask_reg)
++		iounmap(device->mask_reg);
++	if (device->dma_base)
++		iounmap(device->dma_base);
++	free_irq(pdev->irq, device);
++	return;
++}
++
++/* Power Management */
++/*
++* dma_suspend - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++* TBD in 1.1 release 
++*/
++#if 0
++static int dma_suspend(struct device *dev)
++{
++	struct pci_dev *pci = to_pci_dev(dev);
++	int i;
++	struct middma_device *device = pci_get_drvdata(pci);
++	pr_debug("MDMA: dma_suspend called\n");
++
++	for (i = 0; i < device->max_chan; i++) {
++		if (device->ch[i].in_use)
++			return -EAGAIN;
++	}
++
++	if(!device->is_quark){
++		dmac1_mask_periphral_intr(device);
++	}
++
++	device->state = SUSPENDED;
++	pci_save_state(pci);
++	pci_disable_device(pci);
++	pci_set_power_state(pci, PCI_D3hot);
++	return 0;
++}
++#endif
++
++/**
++* dma_resume - PCI resume function
++*
++* @pci:	PCI device structure
++*
++* This function is called by OS when a power event occurs
++*/
++int middma_resume(struct device *dev)
++{
++	struct pci_dev *pci_dev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pci_dev);
++
++	device->state = RUNNING;
++	iowrite32(REG_BIT0, device->dma_base + DMA_CFG);
++	return 0;
++}
++
++/*
++* dma_runtime_suspend - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++* TBD in 1.1 release 
++*/
++#if 0
++static int dma_runtime_suspend(struct device *dev)
++{
++	struct pci_dev *pci_dev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pci_dev);
++
++	device->state = SUSPENDED;
++	return 0;
++}
++#endif
++
++/*
++* dma_runtime_resume - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++* TBD in 1.1 release 
++*/
++#if 0
++static int dma_runtime_resume(struct device *dev)
++{
++	struct pci_dev *pci_dev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pci_dev);
++
++	device->state = RUNNING;
++	iowrite32(REG_BIT0, device->dma_base + DMA_CFG);
++	return 0;
++}
++#endif
++
++/*
++* dma_runtime_idle - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++* TBD in 1.1 release 
++*/
++#if 0
++static int dma_runtime_idle(struct device *dev)
++{
++	struct pci_dev *pdev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < device->max_chan; i++) {
++		if (device->ch[i].in_use)
++			return -EAGAIN;
++	}
++
++	return pm_schedule_suspend(dev, 0);
++}
++#endif
+diff --git a/drivers/dma/intel_mid_dma_pci.c b/drivers/dma/intel_mid_dma_pci.c
+new file mode 100644
+index 0000000..b0d3ab1
+--- /dev/null
++++ b/drivers/dma/intel_mid_dma_pci.c
+@@ -0,0 +1,292 @@
++/*
++ *  intel_mid_dma.c - Intel Langwell DMA Drivers
++ *
++ *  Copyright (C) 2008-12 Intel Corp
++ *  Author: Vinod Koul <vinod.koul@intel.com>
++ *  The driver design is based on dw_dmac driver
++ *  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; version 2 of the License.
++ *
++ *  This program is distributed in the hope that it will be useful, but
++ *  WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ *  General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License along
++ *  with this program; if not, write to the Free Software Foundation, Inc.,
++ *  59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
++ *
++ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ *
++ *
++ */
++#define DEBUG
++#include <linux/pci.h>
++#include <linux/interrupt.h>
++#include <linux/pm_runtime.h>
++#include <linux/intel_mid_dma.h>
++#include <linux/module.h>
++
++#include "intel_mid_dma_regs.h"
++
++#define INTEL_MID_DMAC1_ID		0x0814
++#define INTEL_MID_DMAC2_ID		0x0813
++#define INTEL_MID_GP_DMAC2_ID		0x0827
++#define INTEL_MFLD_DMAC1_ID		0x0830
++
++#define INFO(_max_chan, _ch_base, _block_size, _pimr_mask, _is_quark) \
++	((kernel_ulong_t)&(struct intel_mid_dma_probe_info) {	\
++		.max_chan = (_max_chan),			\
++		.ch_base = (_ch_base),				\
++		.block_size = (_block_size),			\
++		.pimr_mask = (_pimr_mask),			\
++		.is_quark = (_is_quark),				\
++	})
++
++/**
++ * intel_mid_dma_probe -	PCI Probe
++ * @pdev: Controller PCI device structure
++ * @id: pci device id structure
++ *
++ * Initialize the PCI device, map BARs, query driver data.
++ * Call setup_dma to complete contoller and chan initilzation
++ */
++static int intel_mid_dma_probe(struct pci_dev *pdev,
++					const struct pci_device_id *id)
++{
++	struct middma_device *device;
++	u32 base_addr, bar_size;
++	struct intel_mid_dma_probe_info *info;
++	int err;
++
++	pr_debug("MDMA: probe for %x\n", pdev->device);
++	info = (void *)id->driver_data;
++	pr_debug("MDMA: CH %d, base %d, block len %d, Periphral mask %x\n",
++				info->max_chan, info->ch_base,
++				info->block_size, info->pimr_mask);
++
++	err = pci_enable_device(pdev);
++	if (err)
++		goto err_enable_device;
++
++	err = pci_request_regions(pdev, "intel_mid_dmac");
++	if (err)
++		goto err_request_regions;
++
++	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
++	if (err)
++		goto err_set_dma_mask;
++
++	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
++	if (err)
++		goto err_set_dma_mask;
++
++	device = kzalloc(sizeof(*device), GFP_KERNEL);
++	if (!device) {
++		pr_err("ERR_MDMA:kzalloc failed probe\n");
++		err = -ENOMEM;
++		goto err_kzalloc;
++	}
++	device->pdev = pci_dev_get(pdev);
++
++	base_addr = pci_resource_start(pdev, 0);
++	bar_size  = pci_resource_len(pdev, 0);
++	device->dma_base = ioremap_nocache(base_addr, DMA_REG_SIZE);
++	if (!device->dma_base) {
++		pr_err("ERR_MDMA:ioremap failed\n");
++		err = -ENOMEM;
++		goto err_ioremap;
++	}
++	pci_set_drvdata(pdev, device);
++	pci_set_master(pdev);
++	device->max_chan = info->max_chan;
++	device->chan_base = info->ch_base;
++	device->block_size = info->block_size;
++	device->pimr_mask = info->pimr_mask;
++	device->is_quark = info->is_quark;
++
++	err = mid_setup_dma(pdev, device);
++	if (err)
++		goto err_dma;
++
++	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_allow(&pdev->dev);
++	return 0;
++
++err_dma:
++	iounmap(device->dma_base);
++err_ioremap:
++	pci_dev_put(pdev);
++	kfree(device);
++err_kzalloc:
++err_set_dma_mask:
++	pci_release_regions(pdev);
++	pci_disable_device(pdev);
++err_request_regions:
++err_enable_device:
++	pr_err("ERR_MDMA:Probe failed %d\n", err);
++	return err;
++}
++
++/**
++ * intel_mid_dma_remove -	PCI remove
++ * @pdev: Controller PCI device structure
++ *
++ * Free up all resources and data
++ * Call shutdown_dma to complete contoller and chan cleanup
++ */
++static void intel_mid_dma_remove(struct pci_dev *pdev)
++{
++	struct middma_device *device = pci_get_drvdata(pdev);
++
++	pm_runtime_get_noresume(&pdev->dev);
++	pm_runtime_forbid(&pdev->dev);
++#if 0
++	middma_shutdown(pdev, device);
++#endif
++	pci_dev_put(pdev);
++	kfree(device);
++	pci_release_regions(pdev);
++	pci_disable_device(pdev);
++}
++
++/* Power Management */
++/*
++* dma_suspend - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++*/
++static int dma_suspend(struct device *dev)
++{
++	struct pci_dev *pci = to_pci_dev(dev);
++	int i;
++	struct middma_device *device = pci_get_drvdata(pci);
++	pr_debug("MDMA: dma_suspend called\n");
++
++	for (i = 0; i < device->max_chan; i++) {
++		if (device->ch[i].in_use)
++			return -EAGAIN;
++	}
++#if 0
++	dmac1_mask_periphral_intr(device);
++#endif
++	device->state = SUSPENDED;
++	pci_save_state(pci);
++	pci_disable_device(pci);
++	pci_set_power_state(pci, PCI_D3hot);
++	return 0;
++}
++
++/**
++* dma_resume - PCI resume function
++*
++* @pci:	PCI device structure
++*
++* This function is called by OS when a power event occurs
++*/
++int dma_resume(struct device *dev)
++{
++	struct pci_dev *pci = to_pci_dev(dev);
++	int ret;
++
++	pr_debug("MDMA: dma_resume called\n");
++	pci_set_power_state(pci, PCI_D0);
++	pci_restore_state(pci);
++	ret = pci_enable_device(pci);
++	if (ret) {
++		pr_err("MDMA: device can't be enabled for %x\n", pci->device);
++		return ret;
++	}
++
++	return middma_resume(dev);
++}
++
++static int dma_runtime_suspend(struct device *dev)
++{
++	struct pci_dev *pci_dev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pci_dev);
++
++	device->state = SUSPENDED;
++	return 0;
++}
++
++static int dma_runtime_resume(struct device *dev)
++{
++	struct pci_dev *pci_dev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pci_dev);
++
++	device->state = RUNNING;
++	iowrite32(REG_BIT0, device->dma_base + DMA_CFG);
++	return 0;
++}
++
++static int dma_runtime_idle(struct device *dev)
++{
++	struct pci_dev *pdev = to_pci_dev(dev);
++	struct middma_device *device = pci_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < device->max_chan; i++) {
++		if (device->ch[i].in_use)
++			return -EAGAIN;
++	}
++
++	return pm_schedule_suspend(dev, 0);
++}
++
++/******************************************************************************
++* PCI stuff
++*/
++static struct pci_device_id intel_mid_dma_ids[] = {
++	{ PCI_VDEVICE(INTEL, INTEL_MID_DMAC1_ID),	INFO(2, 6, 4095, 0x200020, 0)},
++	{ PCI_VDEVICE(INTEL, INTEL_MID_DMAC2_ID),	INFO(2, 0, 2047, 0, 0)},
++	{ PCI_VDEVICE(INTEL, INTEL_MID_GP_DMAC2_ID),	INFO(2, 0, 2047, 0, 0)},
++	{ PCI_VDEVICE(INTEL, INTEL_MFLD_DMAC1_ID),	INFO(4, 0, 4095, 0x400040, 0)},
++	{ 0, }
++};
++MODULE_DEVICE_TABLE(pci, intel_mid_dma_ids);
++
++static const struct dev_pm_ops intel_mid_dma_pm = {
++	.runtime_suspend = dma_runtime_suspend,
++	.runtime_resume = dma_runtime_resume,
++	.runtime_idle = dma_runtime_idle,
++	.suspend = dma_suspend,
++	.resume = dma_resume,
++};
++
++static struct pci_driver intel_mid_dma_pci_driver = {
++	.name		=	"Intel MID DMA",
++	.id_table	=	intel_mid_dma_ids,
++	.probe		=	intel_mid_dma_probe,
++	.remove		=	intel_mid_dma_remove,
++#ifdef CONFIG_PM
++	.driver = {
++		.pm = &intel_mid_dma_pm,
++	},
++#endif
++};
++
++static int __init intel_mid_dma_init(void)
++{
++	pr_debug("INFO_MDMA: LNW DMA Driver Version %s\n",
++			INTEL_MID_DMA_DRIVER_VERSION);
++	return pci_register_driver(&intel_mid_dma_pci_driver);
++}
++fs_initcall(intel_mid_dma_init);
++
++static void __exit intel_mid_dma_exit(void)
++{
++	pci_unregister_driver(&intel_mid_dma_pci_driver);
++}
++module_exit(intel_mid_dma_exit);
++
++MODULE_AUTHOR("Vinod Koul <vinod.koul@intel.com>");
++MODULE_DESCRIPTION("Intel (R) MID DMAC Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_VERSION(INTEL_MID_DMA_DRIVER_VERSION);
+diff --git a/drivers/dma/intel_mid_dma_regs.h b/drivers/dma/intel_mid_dma_regs.h
+index 17b4219..f3d5597 100644
+--- a/drivers/dma/intel_mid_dma_regs.h
++++ b/drivers/dma/intel_mid_dma_regs.h
+@@ -27,6 +27,7 @@
+ 
+ #include <linux/dmaengine.h>
+ #include <linux/dmapool.h>
++#include <linux/intel_mid_dma.h>
+ #include <linux/pci_ids.h>
+ 
+ #define INTEL_MID_DMA_DRIVER_VERSION "1.1.0"
+@@ -158,114 +159,29 @@ union intel_mid_dma_cfg_hi {
+ };
+ 
+ 
+-/**
+- * struct intel_mid_dma_chan - internal mid representation of a DMA channel
+- * @chan: dma_chan strcture represetation for mid chan
+- * @ch_regs: MMIO register space pointer to channel register
+- * @dma_base: MMIO register space DMA engine base pointer
+- * @ch_id: DMA channel id
+- * @lock: channel spinlock
+- * @active_list: current active descriptors
+- * @queue: current queued up descriptors
+- * @free_list: current free descriptors
+- * @slave: dma slave structure
+- * @descs_allocated: total number of descriptors allocated
+- * @dma: dma device structure pointer
+- * @busy: bool representing if ch is busy (active txn) or not
+- * @in_use: bool representing if ch is in use or not
+- * @raw_tfr: raw trf interrupt received
+- * @raw_block: raw block interrupt received
+- */
+-struct intel_mid_dma_chan {
+-	struct dma_chan		chan;
+-	void __iomem		*ch_regs;
+-	void __iomem		*dma_base;
+-	int			ch_id;
+-	spinlock_t		lock;
+-	struct list_head	active_list;
+-	struct list_head	queue;
+-	struct list_head	free_list;
+-	unsigned int		descs_allocated;
+-	struct middma_device	*dma;
+-	bool			busy;
+-	bool			in_use;
+-	u32			raw_tfr;
+-	u32			raw_block;
+-	struct intel_mid_dma_slave *mid_slave;
+-};
+-
+ static inline struct intel_mid_dma_chan *to_intel_mid_dma_chan(
+ 						struct dma_chan *chan)
+ {
+ 	return container_of(chan, struct intel_mid_dma_chan, chan);
+ }
+ 
+-enum intel_mid_dma_state {
+-	RUNNING = 0,
+-	SUSPENDED,
+-};
+-/**
+- * struct middma_device - internal representation of a DMA device
+- * @pdev: PCI device
+- * @dma_base: MMIO register space pointer of DMA
+- * @dma_pool: for allocating DMA descriptors
+- * @common: embedded struct dma_device
+- * @tasklet: dma tasklet for processing interrupts
+- * @ch: per channel data
+- * @pci_id: DMA device PCI ID
+- * @intr_mask: Interrupt mask to be used
+- * @mask_reg: MMIO register for periphral mask
+- * @chan_base: Base ch index (read from driver data)
+- * @max_chan: max number of chs supported (from drv_data)
+- * @block_size: Block size of DMA transfer supported (from drv_data)
+- * @pimr_mask: MMIO register addr for periphral interrupt (from drv_data)
+- * @state: dma PM device state
+- */
+-struct middma_device {
+-	struct pci_dev		*pdev;
+-	void __iomem		*dma_base;
+-	struct pci_pool		*dma_pool;
+-	struct dma_device	common;
+-	struct tasklet_struct   tasklet;
+-	struct intel_mid_dma_chan ch[MAX_CHAN];
+-	unsigned int		pci_id;
+-	unsigned int		intr_mask;
+-	void __iomem		*mask_reg;
+-	int			chan_base;
+-	int			max_chan;
+-	int			block_size;
+-	unsigned int		pimr_mask;
+-	enum intel_mid_dma_state state;
+-};
+-
+ static inline struct middma_device *to_middma_device(struct dma_device *common)
+ {
+ 	return container_of(common, struct middma_device, common);
+ }
+ 
+-struct intel_mid_dma_desc {
+-	void __iomem			*block; /*ch ptr*/
+-	struct list_head		desc_node;
+-	struct dma_async_tx_descriptor	txd;
+-	size_t				len;
++#if CONFIG_INTEL_QUARK_X1000_SOC
++struct intel_mid_dma_lli {
+ 	dma_addr_t			sar;
+ 	dma_addr_t			dar;
+-	u32				cfg_hi;
+-	u32				cfg_lo;
++	dma_addr_t			llp;
+ 	u32				ctl_lo;
+ 	u32				ctl_hi;
+-	struct pci_pool			*lli_pool;
+-	struct intel_mid_dma_lli	*lli;
+-	dma_addr_t			lli_phys;
+-	unsigned int			lli_length;
+-	unsigned int			current_lli;
+-	dma_addr_t			next;
+-	enum dma_transfer_direction		dirn;
+-	enum dma_status			status;
+-	enum dma_slave_buswidth		width; /*width of DMA txn*/
+-	enum intel_mid_dma_mode		cfg_mode; /*mode configuration*/
++	u32				sstatx;
++	u32				dstatx;
++} __attribute__ ((packed));
+ 
+-};
++#else
+ 
+ struct intel_mid_dma_lli {
+ 	dma_addr_t			sar;
+@@ -275,6 +191,7 @@ struct intel_mid_dma_lli {
+ 	u32				ctl_hi;
+ } __attribute__ ((packed));
+ 
++#endif
+ static inline int test_ch_en(void __iomem *dma, u32 ch_no)
+ {
+ 	u32 en_reg = ioread32(dma + DMA_CHAN_EN);
+@@ -294,6 +211,14 @@ static inline struct intel_mid_dma_slave *to_intel_mid_dma_slave
+ }
+ 
+ 
++int mid_setup_dma(struct pci_dev *pdev, struct middma_device *dma);
++#if 0
++void middma_shutdown(struct pci_dev *pdev, struct middma_device *device);
++void dmac1_mask_periphral_intr(struct middma_device *mid);
++void dmac1_unmask_periphral_intr(struct intel_mid_dma_chan *midc);
++#endif
++int middma_resume(struct device *dev);
++
+ int dma_resume(struct device *dev);
+ 
+ #endif /*__INTEL_MID_DMAC_REGS_H__*/
+diff --git a/drivers/dma/intel_qrk_dma_pci.c b/drivers/dma/intel_qrk_dma_pci.c
+new file mode 100644
+index 0000000..c826ad7
+--- /dev/null
++++ b/drivers/dma/intel_qrk_dma_pci.c
+@@ -0,0 +1,147 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++/*
++ *  intel_quark_dma_pci.c
++ *
++ *  Author: Bryan O'Donoghue <bryan.odonoghue@intel.com>
++ *  This is an entry point for Intel Quark based DMAC on Quark's UART
++ *  specifically we don't have a dedicated PCI function, instead we have DMAC
++ *  regs hung off of a PCI BAR. This entry/exit allows re-use of the core
++ *  DMA API for MID devices manipulated to suit our BAR setup
++ *  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ */
++#include <linux/pci.h>
++#include <linux/interrupt.h>
++#include <linux/pm_runtime.h>
++#include <linux/intel_mid_dma.h>
++#include <linux/module.h>
++
++#include "intel_mid_dma_regs.h"
++
++/**
++ * intel_mid_dma_probe -	PCI Probe
++ * @pdev: Controller PCI device structure
++ * @id: pci device id structure
++ *
++ * Initialize the PCI device, map BARs, query driver data.
++ * Call mid_setup_dma to complete contoller and chan initilzation
++ */
++int intel_qrk_dma_probe(struct pci_dev *pdev,
++					struct middma_device *device)
++{
++	u32 base_addr, bar_size;
++	int err;
++
++	dev_info(&pdev->dev, "MDMA: probe for %x\n", pdev->device);
++	dev_info(&pdev->dev, "MDMA: CH %d, base %d, block len %d, Periphral mask %x\n",
++				device->max_chan, device->chan_base,
++				device->block_size, device->pimr_mask);
++
++	device->pdev = pci_dev_get(pdev);
++
++	base_addr = pci_resource_start(pdev, 1);
++	bar_size  = pci_resource_len(pdev, 1);
++	device->dma_base = ioremap_nocache(base_addr, DMA_REG_SIZE);
++	if (!device->dma_base) {
++		pr_err("ERR_MDMA:ioremap failed\n");
++		err = -ENOMEM;
++		goto err_ioremap;
++	}
++
++	dev_info(&pdev->dev, "Remapped BAR 0x%08x to virt 0x%p\n",
++		base_addr, device->dma_base);
++
++	err = mid_setup_dma(pdev, device);
++	if (err)
++		goto err_dma;
++
++	return 0;
++
++err_dma:
++	iounmap(device->dma_base);
++err_ioremap:
++	pr_err("ERR_MDMA:Probe failed %d\n", err);
++	return err;
++}
++EXPORT_SYMBOL(intel_qrk_dma_probe);
++
++/**
++ * intel_mid_dma_remove -	PCI remove
++ * @pdev: Controller PCI device structure
++ *
++ * Free up all resources and data
++ * Call shutdown_dma to complete contoller and chan cleanup
++ */
++void intel_qrk_dma_remove(struct pci_dev *pdev, struct middma_device *device)
++{
++	//middma_shutdown(pdev, device);
++}
++EXPORT_SYMBOL(intel_qrk_dma_remove);
++
++/* Power Management */
++/*
++* dma_suspend - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++*/
++int intel_qrk_dma_suspend(struct middma_device *device)
++{
++	int i = 0;
++	pr_debug("MDMA: dma_suspend called\n");
++
++	for (i = 0; i < device->max_chan; i++) {
++		if (device->ch[i].in_use)
++			return -EAGAIN;
++	}
++#if 0
++	dmac1_mask_periphral_intr(device);
++#endif
++	device->state = SUSPENDED;
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_dma_suspend);
++
++/**
++* dma_resume - PCI resume function
++*
++* @pci:	PCI device structure
++*
++* This function is called by OS when a power event occurs
++*/
++int intel_qrk_dma_resume(struct middma_device *device)
++{
++	//return middma_resume(device);
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_dma_resume);
++
++static int intel_qrk_dma_runtime_suspend(struct middma_device *device)
++{
++	device->state = SUSPENDED;
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_dma_runtime_suspend);
++
++static int intel_qrk_dma_runtime_resume(struct middma_device *device)
++{
++	device->state = RUNNING;
++	iowrite32(REG_BIT0, device->dma_base + DMA_CFG);
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_dma_runtime_resume);
++
++
+diff --git a/drivers/tty/serial/8250/8250.c b/drivers/tty/serial/8250/8250.c
+index 733f22c..5f85dde 100644
+--- a/drivers/tty/serial/8250/8250.c
++++ b/drivers/tty/serial/8250/8250.c
+@@ -561,6 +561,59 @@ serial_port_out_sync(struct uart_port *p, int offset, int value)
+ 	}
+ }
+ 
++/* Uart divisor latch read */
++static inline int _serial_dl_read(struct uart_8250_port *up)
++{
++	return serial_in(up, UART_DLL) | serial_in(up, UART_DLM) << 8;
++}
++
++/* Uart divisor latch write */
++static inline void _serial_dl_write(struct uart_8250_port *up, int value)
++{
++	serial_out(up, UART_DLL, value & 0xff);
++	serial_out(up, UART_DLM, value >> 8 & 0xff);
++}
++
++#if defined(CONFIG_MIPS_ALCHEMY)
++/* Au1x00 haven't got a standard divisor latch */
++static int serial_dl_read(struct uart_8250_port *up)
++{
++	if (up->port.iotype == UPIO_AU)
++		return __raw_readl(up->port.membase + 0x28);
++	else
++		return _serial_dl_read(up);
++}
++
++static void serial_dl_write(struct uart_8250_port *up, int value)
++{
++	if (up->port.iotype == UPIO_AU)
++		__raw_writel(value, up->port.membase + 0x28);
++	else
++		_serial_dl_write(up, value);
++}
++#elif defined(CONFIG_SERIAL_8250_RM9K)
++static int serial_dl_read(struct uart_8250_port *up)
++{
++	return	(up->port.iotype == UPIO_RM9000) ?
++		(((__raw_readl(up->port.membase + 0x10) << 8) |
++		(__raw_readl(up->port.membase + 0x08) & 0xff)) & 0xffff) :
++		_serial_dl_read(up);
++}
++
++static void serial_dl_write(struct uart_8250_port *up, int value)
++{
++	if (up->port.iotype == UPIO_RM9000) {
++		__raw_writel(value, up->port.membase + 0x08);
++		__raw_writel(value >> 8, up->port.membase + 0x10);
++	} else {
++		_serial_dl_write(up, value);
++	}
++}
++#else
++#define serial_dl_read(up) _serial_dl_read(up)
++#define serial_dl_write(up, value) _serial_dl_write(up, value)
++#endif
++
+ /*
+  * For the 16C950
+  */
+diff --git a/drivers/tty/serial/8250/8250_pci.c b/drivers/tty/serial/8250/8250_pci.c
+index 5cdb092..c78da53 100644
+--- a/drivers/tty/serial/8250/8250_pci.c
++++ b/drivers/tty/serial/8250/8250_pci.c
+@@ -27,7 +27,13 @@
+ 
+ #include "8250.h"
+ 
+-#undef SERIAL_DEBUG_PCI
++/* QUARK FPGA */
++#define SERIAL_DEBUG_PCI
++
++/* TODO: Bryan remove ! */
++static unsigned int quark_enable_msi = 0;
++module_param(quark_enable_msi, uint, 0644);
++MODULE_PARM_DESC(quark_enable_msi, "Enable MSI operation on Quark 8250-PCI");
+ 
+ /*
+  * init function returns:
+@@ -156,6 +162,20 @@ afavlab_setup(struct serial_private *priv, const struct pciserial_board *board,
+ }
+ 
+ /*
++ * UART parameters for Intel Quark setup
++ */
++static int
++pci_intel_qrk_setup(struct serial_private *priv,
++		const struct pciserial_board *board,
++		struct uart_8250_port *port, int idx)
++{
++	unsigned int bar, offset = board->first_offset;
++	bar = FL_GET_BASE(board->flags);
++
++	return setup_port(priv, port, bar, offset, board->reg_shift);
++}
++
++/*
+  * HP's Remote Management Console.  The Diva chip came in several
+  * different versions.  N-class, L2000 and A500 have two Diva chips, each
+  * with 3 UARTs (the third UART on the second chip is unused).  Superdome
+@@ -1410,6 +1430,14 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
+ 		.subdevice	= PCI_ANY_ID,
+ 		.setup		= kt_serial_setup,
+ 	},
++	{
++		.vendor		= PCI_VENDOR_ID_INTEL,
++		.device		= 0x0936,
++		.subvendor	= PCI_ANY_ID,
++		.subdevice	= PCI_ANY_ID,
++		.setup		= pci_intel_qrk_setup,
++	},
++
+ 	/*
+ 	 * ITE
+ 	 */
+@@ -2139,6 +2167,8 @@ enum pci_board_num_t {
+ 	pbn_oxsemi_2_4000000,
+ 	pbn_oxsemi_4_4000000,
+ 	pbn_oxsemi_8_4000000,
++	pbn_intel_cb,
++	pbn_intel_qrk,
+ 	pbn_intel_i960,
+ 	pbn_sgi_ioc3,
+ 	pbn_computone_4,
+@@ -2725,6 +2755,12 @@ static struct pciserial_board pci_boards[] = {
+ 		.reg_shift	= 2,
+ 		.first_offset	= 0x10000,
+ 	},
++	[pbn_intel_qrk] = {
++		.flags		= FL_BASE0,
++		.num_ports	= 1,
++		.base_baud	= 2764800,
++		.reg_shift	= 2,
++	},
+ 	[pbn_sgi_ioc3] = {
+ 		.flags		= FL_BASE0|FL_NOIRQ,
+ 		.num_ports	= 1,
+@@ -3187,6 +3223,14 @@ pciserial_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
+ 	if (rc)
+ 		return rc;
+ 
++	/* TODO: Bryan remove ! */
++	if(quark_enable_msi == 1){
++		if(pci_enable_msi(dev)!=0){
++			printk(KERN_ERR "QUARK/DEBUG unable to enable MSIs on serial port!\n");
++		}
++	}
++
++
+ 	if (ent->driver_data == pbn_default) {
+ 		/*
+ 		 * Use a copy of the pci_board entry for this;
+@@ -3998,6 +4042,12 @@ static struct pci_device_id serial_pci_tbl[] = {
+ 	{	PCI_VENDOR_ID_MORETON, PCI_DEVICE_ID_RASTEL_2PORT,
+ 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+ 		pbn_b2_bt_2_115200 },
++ 	/*
++	 * Quark descriptor
++	 */
++	{	PCI_VENDOR_ID_INTEL, 0x0936,
++		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
++		pbn_intel_qrk },
+ 
+ 	/*
+ 	 * EKF addition for i960 Boards form EKF with serial port
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 02e706e..a8f5d91 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1327,6 +1327,26 @@ config SERIAL_IFX6X60
+ 	help
+ 	  Support for the IFX6x60 modem devices on Intel MID platforms.
+ 
++config SERIAL_QUARK_UART
++	tristate "Quark High Speed UART support"
++	depends on PCI
++	select SERIAL_CORE
++	select DMADEVICES
++	select INTEL_MID_DMAC
++	help
++	  This driver is for Intel(R) Quark X1000 UART with DMA enabled.
++	  If you don't want DMA then you should use the standard 8250_pci
++	  driver.
++
++config SERIAL_QUARK_UART_CONSOLE
++	bool "Support for console on Intel(R) Quark X1000 UART"
++	depends on SERIAL_QUARK_UART=y
++	select SERIAL_CORE_CONSOLE
++	help
++	  Say Y here if you wish to use the Quark UART as the system console
++	  (the system  console is the device which receives all kernel messages and
++	  warnings and which allows logins in single user mode).
++
+ config SERIAL_PCH_UART
+ 	tristate "Intel EG20T PCH/LAPIS Semicon IOH(ML7213/ML7223/ML7831) UART"
+ 	depends on PCI
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index df1b998..ccbc063 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -74,6 +74,7 @@ obj-$(CONFIG_SERIAL_VT8500) += vt8500_serial.o
+ obj-$(CONFIG_SERIAL_MRST_MAX3110)	+= mrst_max3110.o
+ obj-$(CONFIG_SERIAL_MFD_HSU)	+= mfd.o
+ obj-$(CONFIG_SERIAL_IFX6X60)  	+= ifx6x60.o
++obj-$(CONFIG_SERIAL_QUARK_UART)	+= intel_quark_uart.o
+ obj-$(CONFIG_SERIAL_PCH_UART)	+= pch_uart.o
+ obj-$(CONFIG_SERIAL_MSM_SMD)	+= msm_smd_tty.o
+ obj-$(CONFIG_SERIAL_MXS_AUART) += mxs-auart.o
+diff --git a/drivers/tty/serial/intel_quark_uart.c b/drivers/tty/serial/intel_quark_uart.c
+new file mode 100755
+index 0000000..5bb6a00
+--- /dev/null
++++ b/drivers/tty/serial/intel_quark_uart.c
+@@ -0,0 +1,2034 @@
++/*
++ *Copyright (C) 2011 LAPIS Semiconductor Co., Ltd.
++ *Copyright (C) 2014 Intel Corporation.
++ *
++ *This program is free software; you can redistribute it and/or modify
++ *it under the terms of the GNU General Public License as published by
++ *the Free Software Foundation; version 2 of the License.
++ *
++ *This program is distributed in the hope that it will be useful,
++ *but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *GNU General Public License for more details.
++ *
++ *You should have received a copy of the GNU General Public License
++ *along with this program; if not, write to the Free Software
++ *Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA.
++ */
++#if defined(CONFIG_SERIAL_QUARK_UART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
++#if defined(CONFIG_INTEL_QUARK_X1000_SOC)
++#include <asm/qrk.h>
++#endif
++#include <linux/kernel.h>
++#include <linux/serial_reg.h>
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/console.h>
++#include <linux/serial_core.h>
++#include <linux/tty.h>
++#include <linux/tty_flip.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/dmi.h>
++#include <linux/nmi.h>
++#include <linux/delay.h>
++#include <linux/intel_mid_dma.h>
++#include <linux/debugfs.h>
++#include <linux/dmaengine.h>
++#include <linux/spinlock.h>
++#include <linux/wait.h>
++#include <linux/workqueue.h>
++
++enum {
++	QUARK_UART_HANDLED_RX_INT_SHIFT,
++	QUARK_UART_HANDLED_TX_INT_SHIFT,
++	QUARK_UART_HANDLED_RX_ERR_INT_SHIFT,
++	QUARK_UART_HANDLED_RX_TRG_INT_SHIFT,
++	QUARK_UART_HANDLED_MS_INT_SHIFT,
++	QUARK_UART_HANDLED_LS_INT_SHIFT,
++};
++
++enum {
++	QUARK_UART_8LINE,
++	QUARK_UART_2LINE,
++};
++
++#define INFO(_max_chan, _ch_base, _block_size, _pimr_mask, _is_quark) \
++	((kernel_ulong_t)&(struct intel_mid_dma_probe_info) {	\
++		.max_chan = (_max_chan),			\
++		.ch_base = (_ch_base),				\
++		.block_size = (_block_size),			\
++		.pimr_mask = (_pimr_mask),			\
++		.is_quark = (_is_quark),			\
++	})
++
++#define QUARK_UART_DRIVER_DEVICE	"ttyQRK"
++#define QUARK_UART_FIFO_LEN		16
++#define QUARK_UART_MAXBURST		0x20
++#define QUARK_FIFO_FASTER_LEN		(QUARK_UART_MAXBURST/2)
++/* Set the max number of UART port
++ * Intel QUARK X1000 : 2 port
++*/
++#define QUARK_UART_NR 2
++
++/* Set the AHB address for DMA transfers */
++#define QUARK_UART_AHB_REG_BASE		0xFFFFF000
++
++#define QUARK_UART_HANDLED_RX_INT	(1<<((QUARK_UART_HANDLED_RX_INT_SHIFT)<<1))
++#define QUARK_UART_HANDLED_TX_INT	(1<<((QUARK_UART_HANDLED_TX_INT_SHIFT)<<1))
++#define QUARK_UART_HANDLED_RX_ERR_INT	(1<<((\
++					QUARK_UART_HANDLED_RX_ERR_INT_SHIFT)<<1))
++#define QUARK_UART_HANDLED_RX_TRG_INT	(1<<((\
++					QUARK_UART_HANDLED_RX_TRG_INT_SHIFT)<<1))
++#define QUARK_UART_HANDLED_MS_INT	(1<<((QUARK_UART_HANDLED_MS_INT_SHIFT)<<1))
++
++#define QUARK_UART_HANDLED_LS_INT	(1<<((QUARK_UART_HANDLED_LS_INT_SHIFT)<<1))
++
++#define QUARK_UART_RBR			0x00
++#define QUARK_UART_THR			0x00
++
++#define QUARK_UART_IER_MASK		(QUARK_UART_IER_ERBFI|QUARK_UART_IER_ETBEI|\
++					QUARK_UART_IER_ELSI|QUARK_UART_IER_EDSSI)
++#define QUARK_UART_IER_ERBFI		0x00000001
++#define QUARK_UART_IER_ETBEI		0x00000002
++#define QUARK_UART_IER_ELSI		0x00000004
++#define QUARK_UART_IER_EDSSI		0x00000008
++
++#define QUARK_UART_IIR_IP		0x00000001
++#define QUARK_UART_IIR_IID		0x00000006
++#define QUARK_UART_IIR_MSI		0x00000000
++#define QUARK_UART_IIR_TRI		0x00000002
++#define QUARK_UART_IIR_RRI		0x00000004
++#define QUARK_UART_IIR_REI		0x00000006
++#define QUARK_UART_IIR_TOI		0x00000008
++#define QUARK_UART_IIR_FIFO256		0x00000020
++#define QUARK_UART_IIR_FIFO64		QUARK_UART_IIR_FIFO256
++#define QUARK_UART_IIR_FE		0x000000C0
++
++#define QUARK_UART_FCR_FIFOE		0x00000001
++#define QUARK_UART_FCR_RFR		0x00000002
++#define QUARK_UART_FCR_TFR		0x00000004
++#define QUARK_UART_FCR_DMS		0x00000008
++#define QUARK_UART_FCR_FIFO256		0x00000020
++#define QUARK_UART_FCR_RFTL		0x000000C0
++
++#define QUARK_UART_FCR_RFTL1		0x00000000
++#define QUARK_UART_FCR_RFTL64		0x00000040
++#define QUARK_UART_FCR_RFTL128		0x00000080
++#define QUARK_UART_FCR_RFTL224		0x000000C0
++#define QUARK_UART_FCR_RFTL16		QUARK_UART_FCR_RFTL64
++#define QUARK_UART_FCR_RFTL32		QUARK_UART_FCR_RFTL128
++#define QUARK_UART_FCR_RFTL56		QUARK_UART_FCR_RFTL224
++#define QUARK_UART_FCR_RFTL4		QUARK_UART_FCR_RFTL64
++#define QUARK_UART_FCR_RFTL8		QUARK_UART_FCR_RFTL128
++#define QUARK_UART_FCR_RFTL14		QUARK_UART_FCR_RFTL224
++#define QUARK_UART_FCR_RFTL_SHIFT	6
++
++#define QUARK_UART_LCR_WLS		0x00000003
++#define QUARK_UART_LCR_STB		0x00000004
++#define QUARK_UART_LCR_PEN		0x00000008
++#define QUARK_UART_LCR_EPS		0x00000010
++#define QUARK_UART_LCR_SP		0x00000020
++#define QUARK_UART_LCR_SB		0x00000040
++#define QUARK_UART_LCR_DLAB		0x00000080
++#define QUARK_UART_LCR_NP		0x00000000
++#define QUARK_UART_LCR_OP		QUARK_UART_LCR_PEN
++#define QUARK_UART_LCR_EP		(QUARK_UART_LCR_PEN | QUARK_UART_LCR_EPS)
++#define QUARK_UART_LCR_1P		(QUARK_UART_LCR_PEN | QUARK_UART_LCR_SP)
++#define QUARK_UART_LCR_0P		(QUARK_UART_LCR_PEN | QUARK_UART_LCR_EPS |\
++					QUARK_UART_LCR_SP)
++
++#define QUARK_UART_LCR_5BIT		0x00000000
++#define QUARK_UART_LCR_6BIT		0x00000001
++#define QUARK_UART_LCR_7BIT		0x00000002
++#define QUARK_UART_LCR_8BIT		0x00000003
++
++#define QUARK_UART_MCR_DTR		0x00000001
++#define QUARK_UART_MCR_RTS		0x00000002
++#define QUARK_UART_MCR_OUT		0x0000000C
++#define QUARK_UART_MCR_LOOP		0x00000010
++#define QUARK_UART_MCR_AFE		0x00000020
++
++#define QUARK_UART_LSR_DR		0x00000001
++#define QUARK_UART_LSR_ERR		(1<<7)
++
++#define QUARK_UART_MSR_DCTS		0x00000001
++#define QUARK_UART_MSR_DDSR		0x00000002
++#define QUARK_UART_MSR_TERI		0x00000004
++#define QUARK_UART_MSR_DDCD		0x00000008
++#define QUARK_UART_MSR_CTS		0x00000010
++#define QUARK_UART_MSR_DSR		0x00000020
++#define QUARK_UART_MSR_RI		0x00000040
++#define QUARK_UART_MSR_DCD		0x00000080
++#define QUARK_UART_MSR_DELTA		(QUARK_UART_MSR_DCTS | QUARK_UART_MSR_DDSR |\
++					QUARK_UART_MSR_TERI | QUARK_UART_MSR_DDCD)
++
++#define QUARK_UART_DLL			0x00
++#define QUARK_UART_DLM			0x01
++
++#define QUARK_UART_BRCSR		0x0E
++
++#define QUARK_UART_IID_RLS		(QUARK_UART_IIR_REI)
++#define QUARK_UART_IID_RDR		(QUARK_UART_IIR_RRI)
++#define QUARK_UART_IID_RDR_TO		(QUARK_UART_IIR_RRI | QUARK_UART_IIR_TOI)
++#define QUARK_UART_IID_THRE		(QUARK_UART_IIR_TRI)
++#define QUARK_UART_IID_MS		(QUARK_UART_IIR_MSI)
++
++#define QUARK_UART_HAL_PARITY_NONE	(QUARK_UART_LCR_NP)
++#define QUARK_UART_HAL_PARITY_ODD		(QUARK_UART_LCR_OP)
++#define QUARK_UART_HAL_PARITY_EVEN	(QUARK_UART_LCR_EP)
++#define QUARK_UART_HAL_PARITY_FIX1	(QUARK_UART_LCR_1P)
++#define QUARK_UART_HAL_PARITY_FIX0	(QUARK_UART_LCR_0P)
++#define QUARK_UART_HAL_5BIT		(QUARK_UART_LCR_5BIT)
++#define QUARK_UART_HAL_6BIT		(QUARK_UART_LCR_6BIT)
++#define QUARK_UART_HAL_7BIT		(QUARK_UART_LCR_7BIT)
++#define QUARK_UART_HAL_8BIT		(QUARK_UART_LCR_8BIT)
++#define QUARK_UART_HAL_STB1		0
++#define QUARK_UART_HAL_STB2		(QUARK_UART_LCR_STB)
++
++#define QUARK_UART_HAL_CLR_TX_FIFO	(QUARK_UART_FCR_TFR)
++#define QUARK_UART_HAL_CLR_RX_FIFO	(QUARK_UART_FCR_RFR)
++#define QUARK_UART_HAL_CLR_ALL_FIFO	(QUARK_UART_HAL_CLR_TX_FIFO | \
++					QUARK_UART_HAL_CLR_RX_FIFO)
++
++#define QUARK_UART_HAL_DMA_MODE0	0
++#define QUARK_UART_HAL_FIFO_DIS		0
++#define QUARK_UART_HAL_FIFO16		(QUARK_UART_FCR_FIFOE)
++#define QUARK_UART_HAL_FIFO256		(QUARK_UART_FCR_FIFOE | \
++					QUARK_UART_FCR_FIFO256)
++#define QUARK_UART_HAL_FIFO64		(QUARK_UART_HAL_FIFO256)
++#define QUARK_UART_HAL_TRIGGER1		(QUARK_UART_FCR_RFTL1)
++#define QUARK_UART_HAL_TRIGGER64	(QUARK_UART_FCR_RFTL64)
++#define QUARK_UART_HAL_TRIGGER128	(QUARK_UART_FCR_RFTL128)
++#define QUARK_UART_HAL_TRIGGER224	(QUARK_UART_FCR_RFTL224)
++#define QUARK_UART_HAL_TRIGGER16	(QUARK_UART_FCR_RFTL16)
++#define QUARK_UART_HAL_TRIGGER32	(QUARK_UART_FCR_RFTL32)
++#define QUARK_UART_HAL_TRIGGER56	(QUARK_UART_FCR_RFTL56)
++#define QUARK_UART_HAL_TRIGGER4		(QUARK_UART_FCR_RFTL4)
++#define QUARK_UART_HAL_TRIGGER8		(QUARK_UART_FCR_RFTL8)
++#define QUARK_UART_HAL_TRIGGER14	(QUARK_UART_FCR_RFTL14)
++#define QUARK_UART_HAL_TRIGGER_L	(QUARK_UART_FCR_RFTL64)
++#define QUARK_UART_HAL_TRIGGER_M	(QUARK_UART_FCR_RFTL128)
++#define QUARK_UART_HAL_TRIGGER_H	(QUARK_UART_FCR_RFTL224)
++
++#define QUARK_UART_HAL_RX_INT		(QUARK_UART_IER_ERBFI)
++#define QUARK_UART_HAL_TX_INT		(QUARK_UART_IER_ETBEI)
++#define QUARK_UART_HAL_RX_ERR_INT	(QUARK_UART_IER_ELSI)
++#define QUARK_UART_HAL_MS_INT		(QUARK_UART_IER_EDSSI)
++#define QUARK_UART_HAL_ALL_INT		(QUARK_UART_IER_MASK)
++
++#define QUARK_UART_HAL_DTR		(QUARK_UART_MCR_DTR)
++#define QUARK_UART_HAL_RTS		(QUARK_UART_MCR_RTS)
++#define QUARK_UART_HAL_OUT		(QUARK_UART_MCR_OUT)
++#define QUARK_UART_HAL_LOOP		(QUARK_UART_MCR_LOOP)
++#define QUARK_UART_HAL_AFE		(QUARK_UART_MCR_AFE)
++
++#define PCI_VENDOR_ID_ROHM		0x10DB
++
++#define BOTH_EMPTY (UART_LSR_TEMT | UART_LSR_THRE)
++
++#define DEFAULT_UARTCLK			44236800	/* 2.76 MHz * 16 */
++
++/**
++ * struct inel_qrk_uart_buffer
++ *
++ * Descriptor for a UART bufer
++ */
++struct quark_uart_buffer {
++	dma_addr_t	dma_addr;
++	unsigned char	*buf;
++	u32		offs;
++	int		size;
++};
++
++struct x1000_port {
++	struct uart_port port;
++	int port_type;
++	void __iomem *membase;
++	resource_size_t mapbase;
++	struct pci_dev *pdev;
++	int fifo_size;
++	unsigned int uartclk;
++	int start_tx;
++	int start_rx;
++	int tx_empty;
++	int trigger;
++	int trigger_level;
++	unsigned int dmsr;
++	unsigned int fcr;
++	unsigned int mcr;
++	unsigned int ier;
++	bool use_dma;
++	struct dma_async_tx_descriptor	*desc_tx;
++	struct dma_async_tx_descriptor	*desc_rx;
++	struct dma_chan			*tx_chan;
++	struct dma_chan			*rx_chan;
++	struct middma_device		mid_dma;
++	struct quark_uart_buffer	txbuf;
++	struct quark_uart_buffer	rxbuf;
++	struct intel_mid_dma_slave	dmas_rx;
++	struct intel_mid_dma_slave	dmas_tx;
++	struct scatterlist		*sg_tx_p;
++	int				nent;
++	struct scatterlist		sg_rx;
++	int				tx_dma_use;
++	void				*rx_buf_virt;
++	dma_addr_t			rx_buf_dma;
++	struct dentry	*debugfs;
++	struct work_struct		work;
++	int dma_tx_in_flight;
++	/* protect the x1000_port private structure and io access to membase */
++	spinlock_t lock;
++	struct dma_slave_config tx_conf;
++	struct dma_slave_config rx_conf;
++	wait_queue_head_t 		w_queue;
++
++};
++
++static struct uart_driver quark_uart_driver;
++
++/**
++ * struct quark_uart_driver_data - private data structure for UART-DMA
++ * @port_type:			The number of DMA channel
++ * @line_no:			UART port line number (0, 1, 2...)
++ */
++struct quark_uart_driver_data {
++	int port_type;
++	int line_no;
++};
++
++/**
++ * intel_qrk_dma_chan_filter
++ *
++ * Simple descriptor disjunct function
++ */
++static bool intel_qrk_dma_chan_filter(struct dma_chan * chan, void *param)
++{
++	return 1;
++}
++
++
++/**
++ * serial_in
++ *
++ * @param up: pointer to uart descriptor
++ * @param offset: register offset
++ *
++ * Reads a register @ offset
++ */
++static inline unsigned int serial_in(struct x1000_port *up, int offset)
++{
++	int soffset = offset << 2;
++
++	return  (unsigned int)readb(up->membase + soffset);
++}
++
++/**
++ * serial_out
++ *
++ * @param up: pointer to uart descriptor
++ * @param offset: register offset
++ *
++ * Writes a register @ offset
++ */
++static inline void serial_out(struct x1000_port *up, int offset, int value)
++{
++	unsigned char val = value & 0xff;
++	int soffset = offset << 2;
++
++	writeb(val, up->membase + soffset);
++}
++
++#ifdef CONFIG_SERIAL_QUARK_UART_CONSOLE
++static struct x1000_port *quark_uart_ports[QUARK_UART_NR];
++#endif
++static unsigned int default_baud = 115200;
++static bool use_dma = true;
++static const int trigger_level_256[4] = { 1, 64, 128, 224 };
++static const int trigger_level_64[4] = { 1, 16, 32, 56 };
++static const int trigger_level_16[4] = { 1, 4, 8, 14 };
++static const int trigger_level_1[4] = { 1, 1, 1, 1 };
++
++#ifdef CONFIG_DEBUG_FS
++
++#define QUARK_REGS_BUFSIZE	1024
++
++static ssize_t port_show_regs(struct file *file, char __user *user_buf,
++				size_t count, loff_t *ppos)
++{
++	struct x1000_port *priv = file->private_data;
++	char *buf;
++	u32 len = 0;
++	ssize_t ret;
++	unsigned char lcr;
++
++	buf = kzalloc(QUARK_REGS_BUFSIZE, GFP_KERNEL);
++	if (!buf)
++		return 0;
++
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"QUARK X1000 port[%d] regs:\n", priv->port.line);
++
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"=================================\n");
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"IER: \t0x%02x\n", serial_in(priv, UART_IER));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"IIR: \t0x%02x\n", serial_in(priv, UART_IIR));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"LCR: \t0x%02x\n", serial_in(priv, UART_LCR));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"MCR: \t0x%02x\n", serial_in(priv, UART_MCR));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"LSR: \t0x%02x\n", serial_in(priv, UART_LSR));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"MSR: \t0x%02x\n", serial_in(priv, UART_MSR));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"BRCSR: \t0x%02x\n",
++			serial_in(priv, QUARK_UART_BRCSR));
++
++	lcr = serial_in(priv, UART_LCR);
++	serial_out(priv, UART_LCR, QUARK_UART_LCR_DLAB);
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"DLL: \t0x%02x\n", serial_in(priv, UART_DLL));
++	len += snprintf(buf + len, QUARK_REGS_BUFSIZE - len,
++			"DLM: \t0x%02x\n", serial_in(priv, UART_DLM));
++	serial_out(priv, UART_LCR, lcr);
++
++	if (len > QUARK_REGS_BUFSIZE)
++		len = QUARK_REGS_BUFSIZE;
++
++	ret =  simple_read_from_buffer(user_buf, count, ppos, buf, len);
++	kfree(buf);
++	return ret;
++}
++
++
++static const struct file_operations port_regs_ops = {
++	.owner		= THIS_MODULE,
++	.open		= simple_open,
++	.read		= port_show_regs,
++	.llseek		= default_llseek,
++};
++#endif	/* CONFIG_DEBUG_FS */
++
++/* Return UART clock, checking for board specific clocks. */
++static unsigned int quark_uart_get_uartclk(void)
++{
++	return DEFAULT_UARTCLK;
++}
++
++static void quark_uart_hal_enable_interrupt(struct x1000_port *priv,
++					  unsigned int flag)
++{
++	u8 ier = serial_in(priv, UART_IER);
++	ier |= flag & QUARK_UART_IER_MASK;
++	priv->ier = ier;
++	serial_out(priv, UART_IER, ier);
++}
++
++static void quark_uart_hal_disable_interrupt(struct x1000_port *priv,
++					   unsigned int flag)
++{
++	u8 ier = serial_in(priv, UART_IER);
++	ier &= ~(flag & QUARK_UART_IER_MASK);
++	priv->ier = ier;
++	serial_out(priv, UART_IER, ier);
++}
++
++static int quark_uart_hal_set_line(struct x1000_port *priv, unsigned int baud,
++				 unsigned int parity, unsigned int bits,
++				 unsigned int stb)
++{
++	unsigned int dll, dlm, lcr;
++	int div;
++
++	div = DIV_ROUND_CLOSEST(priv->uartclk / 16, baud);
++	if (div < 0 || USHRT_MAX <= div) {
++		dev_err(priv->port.dev, "Invalid Baud(div=0x%x)\n", div);
++		return -EINVAL;
++	}
++
++	dll = (unsigned int)div & 0x00FFU;
++	dlm = ((unsigned int)div >> 8) & 0x00FFU;
++
++	if (parity & ~(QUARK_UART_LCR_PEN | QUARK_UART_LCR_EPS | QUARK_UART_LCR_SP)) {
++		dev_err(priv->port.dev, "Invalid parity(0x%x)\n", parity);
++		return -EINVAL;
++	}
++
++	if (bits & ~QUARK_UART_LCR_WLS) {
++		dev_err(priv->port.dev, "Invalid bits(0x%x)\n", bits);
++		return -EINVAL;
++	}
++
++	if (stb & ~QUARK_UART_LCR_STB) {
++		dev_err(priv->port.dev, "Invalid STB(0x%x)\n", stb);
++		return -EINVAL;
++	}
++
++	lcr = parity;
++	lcr |= bits;
++	lcr |= stb;
++
++	serial_out(priv, UART_LCR, QUARK_UART_LCR_DLAB);
++	serial_out(priv, QUARK_UART_DLL, dll);
++	serial_out(priv, QUARK_UART_DLM, dlm);
++	serial_out(priv, UART_LCR, lcr);
++
++	return 0;
++}
++
++static int quark_uart_hal_fifo_reset(struct x1000_port *priv,
++				    unsigned int flag)
++{
++	if (flag & ~(QUARK_UART_FCR_TFR | QUARK_UART_FCR_RFR)) {
++		dev_err(priv->port.dev, "%s:Invalid flag(0x%x)\n",
++			__func__, flag);
++		return -EINVAL;
++	}
++
++	serial_out(priv, UART_FCR, QUARK_UART_FCR_FIFOE | priv->fcr);
++	serial_out(priv,
++		 UART_FCR, QUARK_UART_FCR_FIFOE | priv->fcr | flag);
++	serial_out(priv, UART_FCR, priv->fcr);
++
++	return 0;
++}
++
++static int quark_uart_hal_set_fifo(struct x1000_port *priv,
++				 unsigned int dmamode,
++				 unsigned int fifo_size, unsigned int trigger)
++{
++	u8 fcr;
++
++	if (dmamode & ~QUARK_UART_FCR_DMS) {
++		dev_err(priv->port.dev, "%s:Invalid DMA Mode(0x%x)\n",
++			__func__, dmamode);
++		return -EINVAL;
++	}
++
++	if (fifo_size & ~(QUARK_UART_FCR_FIFOE | QUARK_UART_FCR_FIFO256)) {
++		dev_err(priv->port.dev, "%s:Invalid FIFO SIZE(0x%x)\n",
++			__func__, fifo_size);
++		return -EINVAL;
++	}
++
++	if (trigger & ~QUARK_UART_FCR_RFTL) {
++		dev_err(priv->port.dev, "%s:Invalid TRIGGER(0x%x)\n",
++			__func__, trigger);
++		return -EINVAL;
++	}
++
++	switch (priv->fifo_size) {
++	case 256:
++		priv->trigger_level =
++		    trigger_level_256[trigger >> QUARK_UART_FCR_RFTL_SHIFT];
++		break;
++	case 64:
++		priv->trigger_level =
++		    trigger_level_64[trigger >> QUARK_UART_FCR_RFTL_SHIFT];
++		break;
++	case 16:
++		priv->trigger_level =
++		    trigger_level_16[trigger >> QUARK_UART_FCR_RFTL_SHIFT];
++		break;
++	default:
++		priv->trigger_level =
++		    trigger_level_1[trigger >> QUARK_UART_FCR_RFTL_SHIFT];
++		break;
++	}
++	fcr =
++	    dmamode | fifo_size | trigger | QUARK_UART_FCR_RFR | QUARK_UART_FCR_TFR;
++
++	serial_out(priv, UART_FCR, QUARK_UART_FCR_FIFOE);
++	serial_out(priv,
++		 UART_FCR, QUARK_UART_FCR_FIFOE | QUARK_UART_FCR_RFR | QUARK_UART_FCR_TFR);
++	serial_out(priv, UART_FCR, fcr);
++	priv->fcr = fcr;
++
++	return 0;
++}
++
++static u8 quark_uart_hal_get_modem(struct x1000_port *priv)
++{
++	unsigned int msr = serial_in(priv, UART_MSR);
++	priv->dmsr = msr & QUARK_UART_MSR_DELTA;
++	return (u8)msr;
++}
++
++static void quark_uart_hal_write(struct x1000_port *priv,
++			      const unsigned char *buf, int tx_size)
++{
++	int i;
++	unsigned int thr;
++
++	for (i = 0; i < tx_size;) {
++		thr = buf[i++];
++		serial_out(priv, QUARK_UART_THR, thr);
++	}
++}
++
++static int quark_uart_hal_read(struct x1000_port *priv, unsigned char *buf,
++			     int rx_size)
++{
++	int i;
++	u8 rbr, lsr;
++	struct uart_port *port = &priv->port;
++
++	lsr = serial_in(priv, UART_LSR);
++	for (i = 0, lsr = serial_in(priv, UART_LSR);
++	     i < rx_size && lsr & (UART_LSR_DR | UART_LSR_BI);
++	     lsr = serial_in(priv, UART_LSR)) {
++		rbr = serial_in(priv, QUARK_UART_RBR);
++
++		if (lsr & UART_LSR_BI) {
++			port->icount.brk++;
++			if (uart_handle_break(port))
++				continue;
++		}
++#ifdef SUPPORT_SYSRQ
++		if (port->sysrq) {
++			if (uart_handle_sysrq_char(port, rbr))
++				continue;
++		}
++#endif
++
++		buf[i++] = rbr;
++	}
++	return i;
++}
++
++static unsigned char quark_uart_hal_get_iid(struct x1000_port *priv)
++{
++	return serial_in(priv, UART_IIR) &\
++		      (QUARK_UART_IIR_IID | QUARK_UART_IIR_TOI | QUARK_UART_IIR_IP);
++}
++
++static u8 quark_uart_hal_get_line_status(struct x1000_port *priv)
++{
++	return serial_in(priv, UART_LSR);
++}
++
++static void quark_uart_hal_set_break(struct x1000_port *priv, int on)
++{
++	unsigned int lcr;
++
++	lcr = serial_in(priv, UART_LCR);
++	if (on)
++		lcr |= QUARK_UART_LCR_SB;
++	else
++		lcr &= ~QUARK_UART_LCR_SB;
++
++	serial_out(priv, UART_LCR, lcr);
++}
++
++static int push_rx(struct x1000_port *priv, const unsigned char *buf,
++		   int size)
++{
++	struct uart_port *port = &priv->port;
++	struct tty_struct *tty = tty_port_tty_get(&port->state->port);
++
++	tty_insert_flip_string(tty, buf, size);
++	tty_flip_buffer_push(tty);
++
++	return 0;
++}
++
++static int pop_tx_x(struct x1000_port *priv, unsigned char *buf)
++{
++	int ret = 0;
++	struct uart_port *port = &priv->port;
++
++	if (port->x_char) {
++		dev_dbg(priv->port.dev, "%s:X character send %02x (%lu)\n",
++			__func__, port->x_char, jiffies);
++		buf[0] = port->x_char;
++		port->x_char = 0;
++		ret = 1;
++	}
++
++	return ret;
++}
++
++static int dma_push_rx(struct x1000_port *priv, int size)
++{
++	int room;
++	struct uart_port *port = &priv->port;
++	struct tty_struct *tty = tty_port_tty_get(&port->state->port);
++
++	room = tty_buffer_request_room(tty, size);
++
++	if (room < size)
++		dev_warn(port->dev, "Rx overrun: dropping %u bytes\n",
++			 size - room);
++	if (!room)
++		return 0;
++
++	tty_insert_flip_string(tty, sg_virt(&priv->sg_rx), size);
++
++	port->icount.rx += room;
++
++	return room;
++}
++
++static void quark_dma_rx_complete(void *arg)
++{
++	struct x1000_port *priv = arg;
++	struct uart_port *port = &priv->port;
++	struct tty_struct *tty = tty_port_tty_get(&port->state->port);
++	int count;
++
++	dma_sync_sg_for_cpu(port->dev, &priv->sg_rx, 1, DMA_FROM_DEVICE);
++	count = dma_push_rx(priv, priv->trigger_level);
++	if (count)
++		tty_flip_buffer_push(tty);
++	async_tx_ack(priv->desc_rx);
++	quark_uart_hal_enable_interrupt(priv, QUARK_UART_HAL_RX_INT |
++					    QUARK_UART_HAL_RX_ERR_INT);
++}
++
++static void quark_dma_tx_complete(void *arg)
++{
++	struct x1000_port *priv = arg;
++	struct uart_port *port = &priv->port;
++	struct circ_buf *xmit = &port->state->xmit;
++	struct scatterlist *sg = priv->sg_tx_p;
++	int i;
++	unsigned long flags;
++
++	spin_lock_irqsave(&priv->lock, flags);
++
++	for (i = 0; i < priv->nent; i++, sg++) {
++		xmit->tail += sg_dma_len(sg);
++		port->icount.tx += sg_dma_len(sg);
++	}
++	/* Make sure that xmit->head and xmit->tail are equal
++	   to zero at the end of a transaction */
++	if(priv->tx_dma_use == 0)
++		xmit->head = xmit->tail = 0;
++	else
++		xmit->tail &= UART_XMIT_SIZE - 1;
++	async_tx_ack(priv->desc_tx);
++	dma_unmap_sg(port->dev, sg, priv->nent, DMA_TO_DEVICE);
++	priv->tx_dma_use = 0;
++	priv->nent = 0;
++	priv->tx_empty = 1;
++	kfree(priv->sg_tx_p);
++
++	quark_uart_hal_enable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++	priv->dma_tx_in_flight = 0;
++	wake_up(&priv->w_queue);
++
++	spin_unlock_irqrestore(&priv->lock, flags);
++}
++
++static int pop_tx(struct x1000_port *priv, int size)
++{
++	int count = 0;
++	struct uart_port *port = &priv->port;
++	struct circ_buf *xmit = &port->state->xmit;
++
++	if (uart_tx_stopped(port) || uart_circ_empty(xmit) || count >= size)
++		goto pop_tx_end;
++
++	do {
++		int cnt_to_end =
++		    CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
++		int sz = min(size - count, cnt_to_end);
++		quark_uart_hal_write(priv, &xmit->buf[xmit->tail], sz);
++		xmit->tail = (xmit->tail + sz) & (UART_XMIT_SIZE - 1);
++		count += sz;
++	} while (!uart_circ_empty(xmit) && count < size);
++
++pop_tx_end:
++	dev_dbg(priv->port.dev, "%d characters. Remained %d characters.(%lu)\n",
++		 count, size - count, jiffies);
++
++	return count;
++}
++
++static int handle_rx_to(struct x1000_port *priv)
++{
++	struct quark_uart_buffer *buf;
++	int rx_size;
++	int ret;
++	if (!priv->start_rx) {
++		quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_RX_INT |
++						     QUARK_UART_HAL_RX_ERR_INT);
++		return 0;
++	}
++	buf = &priv->rxbuf;
++	do {
++		rx_size = quark_uart_hal_read(priv, buf->buf, buf->size);
++		ret = push_rx(priv, buf->buf, rx_size);
++		if (ret)
++			return 0;
++	} while (rx_size == buf->size);
++
++	return QUARK_UART_HANDLED_RX_INT;
++}
++
++static int handle_rx(struct x1000_port *priv)
++{
++	return handle_rx_to(priv);
++}
++
++static int dma_handle_rx(struct x1000_port *priv)
++{
++	struct uart_port *port = &priv->port;
++	struct dma_async_tx_descriptor *desc;
++	struct scatterlist *sg;
++
++	priv = container_of(port, struct x1000_port, port);
++	sg = &priv->sg_rx;
++
++	sg_init_table(&priv->sg_rx, 1); /* Initialize SG table */
++
++	sg_dma_len(sg) = priv->trigger_level;
++
++	sg_set_page(&priv->sg_rx, virt_to_page(priv->rx_buf_virt),
++		     sg_dma_len(sg), (unsigned long)priv->rx_buf_virt &
++		     ~PAGE_MASK);
++
++	sg_dma_address(sg) = priv->rx_buf_dma;
++
++	/* Configure RX */
++	priv->rx_conf.dst_addr = sg_dma_address(sg);
++	priv->rx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	priv->rx_conf.dst_maxburst = LNW_DMA_MSIZE_1;
++
++	priv->rx_conf.src_addr = QUARK_UART_AHB_REG_BASE + QUARK_UART_THR;	/* Wants an AHB address */
++	priv->rx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	priv->rx_conf.src_maxburst = LNW_DMA_MSIZE_4; 
++	priv->rx_conf.direction = DMA_DEV_TO_MEM;
++	priv->rx_conf.device_fc = false;
++
++	dmaengine_slave_config(priv->rx_chan, &priv->rx_conf);
++	desc = dmaengine_prep_slave_sg(priv->rx_chan,
++					sg, 1, DMA_DEV_TO_MEM,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (!desc)
++		return 0;
++
++	priv->desc_rx = desc;
++	desc->callback = quark_dma_rx_complete;
++	desc->callback_param = priv;
++	desc->tx_submit(desc);
++	dma_async_issue_pending(priv->rx_chan);
++
++	return QUARK_UART_HANDLED_RX_INT;
++}
++
++static unsigned int handle_tx(struct x1000_port *priv)
++{
++	struct uart_port *port = &priv->port;
++	struct circ_buf *xmit = &port->state->xmit;
++	int fifo_size;
++	int tx_size;
++	int size;
++	int tx_empty;
++
++	if (!priv->start_tx) {
++		dev_dbg(priv->port.dev, "%s:Tx isn't started. (%lu)\n",
++			__func__, jiffies);
++		quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++		wake_up(&priv->w_queue);
++		priv->tx_empty = 1;
++		return 0;
++	}
++
++	fifo_size = max(priv->fifo_size, 1);
++	tx_empty = 1;
++	if (pop_tx_x(priv, xmit->buf)) {
++		quark_uart_hal_write(priv, xmit->buf, 1);
++		port->icount.tx++;
++		tx_empty = 0;
++		fifo_size--;
++	}
++	size = min(xmit->head - xmit->tail, fifo_size);
++	if (size < 0)
++		size = fifo_size;
++
++	tx_size = pop_tx(priv, size);
++	if (tx_size > 0) {
++		port->icount.tx += tx_size;
++		tx_empty = 0;
++	}
++
++	priv->tx_empty = tx_empty;
++	if (tx_empty) {
++		quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++		wake_up(&priv->w_queue);
++		if (port->state->port.tty != NULL)
++			uart_write_wakeup(port);
++	}
++
++	return QUARK_UART_HANDLED_TX_INT;
++}
++
++
++static unsigned int dma_handle_tx(struct x1000_port *priv)
++{
++	struct uart_port *port = &priv->port;
++	struct circ_buf *xmit = &port->state->xmit;
++	struct scatterlist *sg;
++	int nent;
++	int fifo_size;
++	int tx_empty;
++	int num;
++	int i;
++	int bytes;
++	int size;
++	int rem;
++	int ret;
++
++	if (!priv->start_tx) {
++		dev_dbg(priv->port.dev, "%s:Tx isn't started. (%lu)\n",
++			__func__, jiffies);
++		quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++		wake_up(&priv->w_queue);
++		priv->tx_empty = 1;
++		return 0;
++	}
++
++	if (priv->tx_dma_use) {
++		dev_dbg(priv->port.dev, "%s:Tx is not completed. (%lu)\n",
++			__func__, jiffies);
++		quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++		wake_up(&priv->w_queue);
++		priv->tx_empty = 1;
++		return 0;
++	}
++
++	fifo_size = QUARK_UART_MAXBURST;
++	tx_empty = 1;
++	if (pop_tx_x(priv, xmit->buf)) {
++		quark_uart_hal_write(priv, xmit->buf, 1);
++		port->icount.tx++;
++		tx_empty = 0;
++		fifo_size--;
++	}
++
++	bytes = min((int)CIRC_CNT(xmit->head, xmit->tail,
++			     UART_XMIT_SIZE), CIRC_CNT_TO_END(xmit->head,
++			     xmit->tail, UART_XMIT_SIZE));
++
++	if (!bytes) {
++		dev_dbg(priv->port.dev, "%s 0 bytes return\n", __func__);
++		quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++		wake_up(&priv->w_queue);
++		if (port->state->port.tty != NULL)
++			uart_write_wakeup(port);
++		return 0;
++	}
++
++	/* DMA block doesn't do !dword aligned */
++	if (bytes % 0x04){
++		if (bytes < 4){
++			ret = handle_tx(priv);
++			/* DMA transactions want to start DWORD aligned */
++			xmit->head = xmit->tail = 0;
++			return ret;
++		}
++		bytes &= 0xFFFFFFFC;
++	}
++
++	/* For small payloads its just faster to write the FIFO directly */
++	if (bytes < QUARK_FIFO_FASTER_LEN){
++		ret = handle_tx(priv);
++		/* DMA transactions want to start DWORD aligned */
++		xmit->head = xmit->tail = 0;
++		return ret;
++	}
++
++	if (bytes > fifo_size) {
++		num = bytes / fifo_size;
++		size = fifo_size;
++		rem = bytes % fifo_size;
++	} else {
++		num = 1;
++		size = bytes;
++		rem = bytes;
++	}
++
++	dev_dbg(priv->port.dev, "%s num=%d size=%d rem=%d\n",
++		__func__, num, size, rem);
++
++	priv->tx_dma_use = 1;
++
++	priv->sg_tx_p = kzalloc(sizeof(struct scatterlist)*num, GFP_ATOMIC);
++	if (!priv->sg_tx_p) {
++		dev_err(priv->port.dev, "%s:kzalloc Failed\n", __func__);
++		return 0;
++	}
++
++	sg_init_table(priv->sg_tx_p, num); /* Initialize SG table */
++	sg = priv->sg_tx_p;
++
++	for (i = 0; i < num; i++, sg++) {
++		BUG_ON((int)xmit->buf & ~PAGE_MASK);
++		if (i == (num - 1))
++			sg_set_page(sg, virt_to_page(xmit->buf),
++				    rem, fifo_size * i);
++		else
++			sg_set_page(sg, virt_to_page(xmit->buf),
++				    size, fifo_size * i);
++	}
++
++	sg = priv->sg_tx_p;
++	nent = dma_map_sg(port->dev, sg, num, DMA_TO_DEVICE);
++	if (!nent) {
++		dev_err(priv->port.dev, "%s:dma_map_sg Failed\n", __func__);
++		return 0;
++	}
++	priv->nent = nent;
++
++	for (i = 0; i < nent; i++, sg++) {
++		sg->offset = (xmit->tail & (UART_XMIT_SIZE - 1)) +
++			      fifo_size * i;
++		sg_dma_address(sg) = (sg_dma_address(sg) &
++				    ~(UART_XMIT_SIZE - 1)) + sg->offset;
++
++		if (i == (nent - 1))
++			sg_dma_len(sg) = bytes;
++		else
++			sg_dma_len(sg) = size;
++		bytes -= size;
++	}
++
++	priv->dma_tx_in_flight = 1;
++	quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++	wake_up(&priv->w_queue);
++	schedule_work(&priv->work);
++
++	return QUARK_UART_HANDLED_TX_INT;
++}
++
++static void quark_uart_err_ir(struct x1000_port *priv, unsigned int lsr)
++{
++	struct uart_port *port = &priv->port;
++	struct tty_struct *tty = tty_port_tty_get(&port->state->port);
++	char   *error_msg[5] = {};
++	int    i = 0;
++
++	if (lsr & QUARK_UART_LSR_ERR)
++		error_msg[i++] = "Error data in FIFO\n";
++
++	if (lsr & UART_LSR_FE) {
++		port->icount.frame++;
++		error_msg[i++] = "  Framing Error\n";
++	}
++
++	if (lsr & UART_LSR_PE) {
++		port->icount.parity++;
++		error_msg[i++] = "  Parity Error\n";
++	}
++
++	if (lsr & UART_LSR_OE) {
++		port->icount.overrun++;
++		error_msg[i++] = "  Overrun Error\n";
++	}
++
++	if (tty == NULL) {
++		for (i = 0; error_msg[i] != NULL; i++)
++			dev_err(&priv->pdev->dev, error_msg[i]);
++	} else {
++		tty_kref_put(tty);
++	}
++}
++
++#if defined(CONFIG_INTEL_QUARK_X1000_SOC)
++	#define mask_pvm(x) qrk_pci_pvm_mask(x)
++	#define unmask_pvm(x) qrk_pci_pvm_unmask(x)
++#else
++	#define mask_pvm(x)
++	#define unmask_pvm(x)
++#endif
++
++static void quark_uart_work(struct work_struct *work)
++{
++	struct x1000_port *priv = container_of(work, struct x1000_port,work);
++	struct dma_async_tx_descriptor *desc;
++
++	if (priv == NULL) {
++		pr_err("ERR_X1000: tasklet Null param\n");
++		return;
++	}
++	/* Configure TX */
++	priv->tx_conf.src_addr = sg_dma_address(priv->sg_tx_p);
++	priv->tx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	priv->tx_conf.src_maxburst = LNW_DMA_MSIZE_1;
++	priv->tx_conf.dst_addr = QUARK_UART_AHB_REG_BASE + QUARK_UART_THR;	/* Wants an AHB address */
++	priv->tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	priv->tx_conf.dst_maxburst = LNW_DMA_MSIZE_4;
++	priv->tx_conf.direction = DMA_MEM_TO_DEV;
++	priv->tx_conf.device_fc = false;
++
++	dmaengine_slave_config(priv->tx_chan, &priv->tx_conf);
++	desc = dmaengine_prep_slave_sg(priv->tx_chan,
++					priv->sg_tx_p, priv->nent, DMA_MEM_TO_DEV,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (!desc) {
++		dev_err(priv->port.dev, "%s:device_prep_slave_sg Failed\n",
++			__func__);
++		return;
++	}
++	dma_sync_sg_for_device(priv->port.dev, priv->sg_tx_p, priv->nent, DMA_TO_DEVICE);
++	priv->desc_tx = desc;
++	desc->callback = quark_dma_tx_complete;
++	desc->callback_param = priv;
++	desc->tx_submit(desc);
++	dma_async_issue_pending(priv->tx_chan);
++}
++
++static irqreturn_t quark_uart_interrupt(int irq, void *dev_id)
++{
++	struct x1000_port *priv = dev_id;
++	unsigned int handled;
++	u8 lsr;
++	int ret = 0;
++	unsigned char iid;
++	unsigned long flags;
++	int next = 1;
++	u8 msr;
++
++	spin_lock_irqsave(&priv->lock, flags);
++	handled = 0;
++	while (next) {
++		iid = quark_uart_hal_get_iid(priv);
++		if (iid & QUARK_UART_IIR_IP) /* No Interrupt */
++			break;
++		switch (iid) {
++		case QUARK_UART_IID_RLS:	/* Receiver Line Status */
++			lsr = quark_uart_hal_get_line_status(priv);
++			if (lsr & (QUARK_UART_LSR_ERR | UART_LSR_FE |
++						UART_LSR_PE | UART_LSR_OE)) {
++				quark_uart_err_ir(priv, lsr);
++				ret = QUARK_UART_HANDLED_RX_ERR_INT;
++			} else {
++				ret = QUARK_UART_HANDLED_LS_INT;
++			}
++			break;
++		case QUARK_UART_IID_RDR:	/* Received Data Ready */
++
++			(void)dma_handle_rx;   /*Not worth setup time*/
++			ret = handle_rx(priv);
++			break;
++		case QUARK_UART_IID_RDR_TO:	/* Received Data Ready
++						   (FIFO Timeout) */
++			ret = handle_rx_to(priv);
++			break;
++		case QUARK_UART_IID_THRE:	/* Transmitter Holding Register
++						   Empty */
++			if (priv->use_dma)
++				ret = dma_handle_tx(priv);
++			else
++				ret = handle_tx(priv);
++			break;
++		case QUARK_UART_IID_MS:	/* Modem Status */
++			msr = quark_uart_hal_get_modem(priv);
++			next = 0; /* MS ir prioirty is the lowest. So, MS ir
++				     means final interrupt */
++			if ((msr & UART_MSR_ANY_DELTA) == 0)
++				break;
++			ret |= QUARK_UART_HANDLED_MS_INT;
++			break;
++		default:	/* Never junp to this label */
++			dev_err(priv->port.dev, "%s:iid=%02x (%lu)\n", __func__,
++				iid, jiffies);
++			ret = -1;
++			next = 0;
++			break;
++		}
++		handled |= (unsigned int)ret;
++	}
++
++	spin_unlock_irqrestore(&priv->lock, flags);
++
++	return IRQ_RETVAL(handled);
++}
++
++/* This function tests whether the transmitter fifo and shifter for the port
++						described by 'port' is empty. */
++static unsigned int quark_uart_tx_empty(struct uart_port *port)
++{
++	struct x1000_port *priv;
++
++	priv = container_of(port, struct x1000_port, port);
++	if (priv->tx_empty)
++		return TIOCSER_TEMT;
++	else
++		return 0;
++}
++
++/* Returns the current state of modem control inputs. */
++static unsigned int quark_uart_get_mctrl(struct uart_port *port)
++{
++	struct x1000_port *priv;
++	u8 modem;
++	unsigned int ret = 0;
++
++	priv = container_of(port, struct x1000_port, port);
++	modem = quark_uart_hal_get_modem(priv);
++
++	if (modem & UART_MSR_DCD)
++		ret |= TIOCM_CAR;
++
++	if (modem & UART_MSR_RI)
++		ret |= TIOCM_RNG;
++
++	if (modem & UART_MSR_DSR)
++		ret |= TIOCM_DSR;
++
++	if (modem & UART_MSR_CTS)
++		ret |= TIOCM_CTS;
++
++	return ret;
++}
++
++static void quark_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
++{
++	u32 mcr = 0;
++	struct x1000_port *priv = container_of(port, struct x1000_port, port);
++
++	if (mctrl & TIOCM_DTR)
++		mcr |= UART_MCR_DTR;
++	if (mctrl & TIOCM_RTS)
++		mcr |= UART_MCR_RTS;
++	if (mctrl & TIOCM_LOOP)
++		mcr |= UART_MCR_LOOP;
++
++	if (priv->mcr & UART_MCR_AFE)
++		mcr |= UART_MCR_AFE;
++
++	if (mctrl)
++		serial_out(priv, UART_MCR, mcr);
++}
++
++static void quark_uart_stop_tx(struct uart_port *port)
++{
++	struct x1000_port *priv;
++	unsigned long flags;
++	priv = container_of(port, struct x1000_port, port);
++
++	spin_lock_irqsave(&priv->lock, flags);
++	priv->start_tx = 0;
++	priv->tx_dma_use = 0;
++
++	spin_unlock_irqrestore(&priv->lock, flags);
++}
++
++static void quark_uart_start_tx(struct uart_port *port)
++{
++	struct x1000_port *priv;
++
++	unsigned long flags;
++	priv = container_of(port, struct x1000_port, port);
++
++	spin_lock_irqsave(&priv->lock, flags);
++	if (priv->use_dma) {
++		if (priv->tx_dma_use) {
++			dev_dbg(priv->port.dev, "%s : Tx DMA is NOT empty.\n",
++				__func__);
++			goto done;
++		}
++	}
++
++	priv->start_tx = 1;
++	if( priv->dma_tx_in_flight == 0)
++		quark_uart_hal_enable_interrupt(priv, QUARK_UART_HAL_TX_INT);
++
++done:
++	spin_unlock_irqrestore(&priv->lock, flags);
++
++}
++
++static void quark_uart_stop_rx(struct uart_port *port)
++{
++	struct x1000_port *priv;
++	priv = container_of(port, struct x1000_port, port);
++
++	wait_event(priv->w_queue,!(priv->ier & QUARK_UART_HAL_TX_INT) && !priv->dma_tx_in_flight);
++	priv->start_rx = 0;
++	quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_RX_INT |
++					     QUARK_UART_HAL_RX_ERR_INT);
++}
++
++/* Enable the modem status interrupts. */
++static void quark_uart_enable_ms(struct uart_port *port)
++{
++	struct x1000_port *priv;
++	priv = container_of(port, struct x1000_port, port);
++	quark_uart_hal_enable_interrupt(priv, QUARK_UART_HAL_MS_INT);
++}
++
++/* Control the transmission of a break signal. */
++static void quark_uart_break_ctl(struct uart_port *port, int ctl)
++{
++	struct x1000_port *priv;
++	unsigned long flags;
++
++	priv = container_of(port, struct x1000_port, port);
++	spin_lock_irqsave(&priv->lock, flags);
++	quark_uart_hal_set_break(priv, ctl);
++	spin_unlock_irqrestore(&priv->lock, flags);
++}
++
++/* Grab any interrupt resources and initialise any low level driver state. */
++static int quark_uart_startup(struct uart_port *port)
++{
++	struct x1000_port *priv;
++	int ret;
++	int fifo_size;
++	int trigger_level;
++
++	priv = container_of(port, struct x1000_port, port);
++	priv->tx_empty = 1;
++
++	if (port->uartclk)
++		priv->uartclk = port->uartclk;
++	else
++		port->uartclk = priv->uartclk;
++
++	quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_ALL_INT);
++	ret = quark_uart_hal_set_line(priv, default_baud,
++			      QUARK_UART_HAL_PARITY_NONE, QUARK_UART_HAL_8BIT,
++			      QUARK_UART_HAL_STB1);
++
++	if (ret)
++		return ret;
++
++	switch (priv->fifo_size) {
++	case 256:
++		fifo_size = QUARK_UART_HAL_FIFO256;
++		break;
++	case 64:
++		fifo_size = QUARK_UART_HAL_FIFO64;
++		break;
++	case 16:
++		fifo_size = QUARK_UART_HAL_FIFO16;
++		break;
++	case 1:
++	default:
++		fifo_size = QUARK_UART_HAL_FIFO_DIS;
++		break;
++	}
++
++	switch (priv->trigger) {
++	case QUARK_UART_HAL_TRIGGER1:
++		trigger_level = 1;
++		break;
++	case QUARK_UART_HAL_TRIGGER_L:
++		trigger_level = priv->fifo_size / 4;
++		break;
++	case QUARK_UART_HAL_TRIGGER_M:
++		trigger_level = priv->fifo_size / 2;
++		break;
++	case QUARK_UART_HAL_TRIGGER_H:
++	default:
++		trigger_level = priv->fifo_size - (priv->fifo_size / 8);
++		break;
++	}
++
++	priv->trigger_level = trigger_level;
++	ret = quark_uart_hal_set_fifo(priv, QUARK_UART_HAL_DMA_MODE0,
++				    fifo_size, priv->trigger);
++	if (ret < 0)
++		return ret;
++	priv->start_rx = 1;
++	quark_uart_hal_enable_interrupt(priv, QUARK_UART_HAL_RX_INT |
++					    QUARK_UART_HAL_RX_ERR_INT);
++	uart_update_timeout(port, CS8, default_baud);
++	return 0;
++}
++
++static void quark_uart_shutdown(struct uart_port *port)
++{
++	struct x1000_port *priv;
++	int ret;
++
++	priv = container_of(port, struct x1000_port, port);
++
++	wait_event(priv->w_queue, !(priv->dma_tx_in_flight));
++
++	quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_ALL_INT);
++	quark_uart_hal_fifo_reset(priv, QUARK_UART_HAL_CLR_ALL_FIFO);
++	ret = quark_uart_hal_set_fifo(priv, QUARK_UART_HAL_DMA_MODE0,
++			      QUARK_UART_HAL_FIFO_DIS, QUARK_UART_HAL_TRIGGER1);
++	if (ret)
++		dev_err(priv->port.dev,
++			"quark_uart_hal_set_fifo Failed(ret=%d)\n", ret);
++}
++
++/* Change the port parameters, including word length, parity, stop
++ *bits.  Update read_status_mask and ignore_status_mask to indicate
++ *the types of events we are interested in receiving.  */
++static void quark_uart_set_termios(struct uart_port *port,
++				 struct ktermios *termios, struct ktermios *old)
++{
++	int rtn;
++	unsigned int baud, parity, bits, stb;
++	struct x1000_port *priv;
++	unsigned long flags;
++
++	priv = container_of(port, struct x1000_port, port);
++	switch (termios->c_cflag & CSIZE) {
++	case CS5:
++		bits = QUARK_UART_HAL_5BIT;
++		break;
++	case CS6:
++		bits = QUARK_UART_HAL_6BIT;
++		break;
++	case CS7:
++		bits = QUARK_UART_HAL_7BIT;
++		break;
++	default:		/* CS8 */
++		bits = QUARK_UART_HAL_8BIT;
++		break;
++	}
++	if (termios->c_cflag & CSTOPB)
++		stb = QUARK_UART_HAL_STB2;
++	else
++		stb = QUARK_UART_HAL_STB1;
++
++	if (termios->c_cflag & PARENB) {
++		if (termios->c_cflag & PARODD)
++			parity = QUARK_UART_HAL_PARITY_ODD;
++		else
++			parity = QUARK_UART_HAL_PARITY_EVEN;
++
++	} else
++		parity = QUARK_UART_HAL_PARITY_NONE;
++
++	/* Only UART0 has auto hardware flow function */
++	if ((termios->c_cflag & CRTSCTS) && (priv->fifo_size == 256))
++		priv->mcr |= UART_MCR_AFE;
++	else
++		priv->mcr &= ~UART_MCR_AFE;
++
++	termios->c_cflag &= ~CMSPAR; /* Mark/Space parity is not supported */
++
++	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
++	spin_lock_irqsave(&priv->lock, flags);
++	spin_lock(&port->lock);
++
++	uart_update_timeout(port, termios->c_cflag, baud);
++	rtn = quark_uart_hal_set_line(priv, baud, parity, bits, stb);
++	if (rtn)
++		goto out;
++
++	quark_uart_set_mctrl(&priv->port, priv->port.mctrl);
++	/* Don't rewrite B0 */
++	if (tty_termios_baud_rate(termios))
++		tty_termios_encode_baud_rate(termios, baud, baud);
++
++out:
++	spin_unlock(&port->lock);
++	spin_unlock_irqrestore(&priv->lock, flags);
++}
++
++static const char *quark_uart_type(struct uart_port *port)
++{
++	return KBUILD_MODNAME;
++}
++
++static void quark_uart_release_port(struct uart_port *port)
++{
++	struct x1000_port *priv;
++
++	priv = container_of(port, struct x1000_port, port);
++	pci_iounmap(priv->pdev, priv->membase);
++	pci_release_regions(priv->pdev);
++}
++
++static int quark_uart_request_port(struct uart_port *port)
++{
++	return 0;
++}
++
++static void quark_uart_config_port(struct uart_port *port, int type)
++{
++	struct x1000_port *priv;
++
++	priv = container_of(port, struct x1000_port, port);
++	if (type & UART_CONFIG_TYPE) {
++		port->type = priv->port_type;
++		quark_uart_request_port(port);
++	}
++}
++
++static int quark_uart_verify_port(struct uart_port *port,
++				struct serial_struct *serinfo)
++{
++	struct x1000_port *priv;
++	priv = container_of(port, struct x1000_port, port);
++
++	if (serinfo->flags & UPF_LOW_LATENCY) {
++		dev_info(priv->port.dev,
++			"QUARK UART : Use PIO Mode (without DMA)\n");
++		priv->use_dma = false;
++		serinfo->flags &= ~UPF_LOW_LATENCY;
++	} else {
++		dev_info(priv->port.dev, "QUARK UART : Use DMA Mode\n");
++		#if 0
++		if (!priv->use_dma)
++			quark_request_dma(port);
++		#endif
++		priv->use_dma = true;
++	}
++
++	return 0;
++}
++
++#if defined(CONFIG_CONSOLE_POLL) || defined(CONFIG_SERIAL_QUARK_UART_CONSOLE)
++/*
++ *	Wait for transmitter & holding register to empty
++ */
++static void wait_for_xmitr(struct x1000_port *up, int bits)
++{
++	unsigned int status, tmout = 10000;
++
++	/* Wait up to 10ms for the character(s) to be sent. */
++	for (;;) {
++		status = serial_in(up, UART_LSR);
++
++		if ((status & bits) == bits)
++			break;
++		if (--tmout == 0)
++			break;
++		udelay(1);
++	}
++
++	/* Wait up to 1s for flow control if necessary */
++	if (up->port.flags & UPF_CONS_FLOW) {
++		unsigned int tmout;
++		for (tmout = 1000000; tmout; tmout--) {
++			unsigned int msr = serial_in(up, UART_MSR);
++			if (msr & UART_MSR_CTS)
++				break;
++			udelay(1);
++			touch_nmi_watchdog();
++		}
++	}
++}
++#endif /* CONFIG_CONSOLE_POLL || CONFIG_SERIAL_QUARK_UART_CONSOLE */
++
++#ifdef CONFIG_CONSOLE_POLL
++/*
++ * Console polling routines for communicate via uart while
++ * in an interrupt or debug context.
++ */
++static int quark_uart_get_poll_char(struct uart_port *port)
++{
++	struct x1000_port *priv =
++		container_of(port, struct x1000_port, port);
++	u8 lsr = serial_in(priv, UART_LSR);
++
++	if (!(lsr & UART_LSR_DR))
++		return NO_POLL_CHAR;
++
++	return serial_in(priv, QUARK_UART_RBR);
++}
++
++
++static void quark_uart_put_poll_char(struct uart_port *port,
++			 unsigned char c)
++{
++	unsigned int ier;
++	struct x1000_port *priv =
++		container_of(port, struct x1000_port, port);
++
++	/*
++	 * First save the IER then disable the interrupts
++	 */
++	ier = serial_in(priv, UART_IER);
++	quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_ALL_INT);
++
++	wait_for_xmitr(priv, UART_LSR_THRE);
++	/*
++	 * Send the character out.
++	 * If a LF, also do CR...
++	 */
++	serial_out(priv, QUARK_UART_THR, c);
++	if (c == 10) {
++		wait_for_xmitr(priv, UART_LSR_THRE);
++		serial_out(priv, QUARK_UART_THR, 13);
++	}
++
++	/*
++	 * Finally, wait for transmitter to become empty
++	 * and restore the IER
++	 */
++	wait_for_xmitr(priv, BOTH_EMPTY);
++	serial_out(priv, UART_IER, ier);
++}
++#endif /* CONFIG_CONSOLE_POLL */
++
++static struct uart_ops quark_uart_ops = {
++	.tx_empty = quark_uart_tx_empty,
++	.set_mctrl = quark_uart_set_mctrl,
++	.get_mctrl = quark_uart_get_mctrl,
++	.stop_tx = quark_uart_stop_tx,
++	.start_tx = quark_uart_start_tx,
++	.stop_rx = quark_uart_stop_rx,
++	.enable_ms = quark_uart_enable_ms,
++	.break_ctl = quark_uart_break_ctl,
++	.startup = quark_uart_startup,
++	.shutdown = quark_uart_shutdown,
++	.set_termios = quark_uart_set_termios,
++/*	.pm		= quark_uart_pm,	Not supported yet */
++/*	.set_wake	= quark_uart_set_wake,	Not supported yet */
++	.type = quark_uart_type,
++	.release_port = quark_uart_release_port,
++	.request_port = quark_uart_request_port,
++	.config_port = quark_uart_config_port,
++	.verify_port = quark_uart_verify_port,
++#ifdef CONFIG_CONSOLE_POLL
++	.poll_get_char = quark_uart_get_poll_char,
++	.poll_put_char = quark_uart_put_poll_char,
++#endif
++};
++
++#ifdef CONFIG_SERIAL_QUARK_UART_CONSOLE
++
++static void quark_console_putchar(struct uart_port *port, int ch)
++{
++	struct x1000_port *priv =
++		container_of(port, struct x1000_port, port);
++
++	wait_for_xmitr(priv, UART_LSR_THRE);
++	serial_out(priv, QUARK_UART_THR, ch);
++}
++
++/*
++ *	Print a string to the serial port trying not to disturb
++ *	any possible real use of the port...
++ *
++ *	The console_lock must be held when we get here.
++ */
++static void
++quark_console_write(struct console *co, const char *s, unsigned int count)
++{
++	struct x1000_port *priv;
++	unsigned long flags;
++	int priv_locked = 1;
++	int port_locked = 1;
++	u8 ier;
++
++	priv = quark_uart_ports[co->index];
++
++	touch_nmi_watchdog();
++
++	local_irq_save(flags);
++	if (priv->port.sysrq) {
++		/* call to uart_handle_sysrq_char already took the priv lock */
++		priv_locked = 0;
++		/* serialquark_uart_handle_port() already took the port lock */
++		port_locked = 0;
++	} else if (oops_in_progress) {
++		priv_locked = spin_trylock(&priv->lock);
++		port_locked = spin_trylock(&priv->port.lock);
++	} else {
++		spin_lock(&priv->lock);
++		spin_lock(&priv->port.lock);
++	}
++
++	/*
++	 *	First save the IER then disable the interrupts
++	 */
++	ier = serial_in(priv, UART_IER);
++
++	quark_uart_hal_disable_interrupt(priv, QUARK_UART_HAL_ALL_INT);
++
++	uart_console_write(&priv->port, s, count, quark_console_putchar);
++
++	/*
++	 *	Finally, wait for transmitter to become empty
++	 *	and restore the IER
++	 */
++	wait_for_xmitr(priv, BOTH_EMPTY);
++	serial_out(priv, UART_IER, ier);
++
++	if (port_locked)
++		spin_unlock(&priv->port.lock);
++	if (priv_locked)
++		spin_unlock(&priv->lock);
++	local_irq_restore(flags);
++}
++
++static int __init quark_console_setup(struct console *co, char *options)
++{
++	struct uart_port *port;
++	int baud = default_baud;
++	int bits = 8;
++	int parity = 'n';
++	int flow = 'n';
++
++	/*
++	 * Check whether an invalid uart number has been specified, and
++	 * if so, search for the first available port that does have
++	 * console support.
++	 */
++	if (co->index >= QUARK_UART_NR)
++		co->index = 0;
++	port = &quark_uart_ports[co->index]->port;
++
++	if (!port || !port->membase)
++		return -ENODEV;
++
++	port->uartclk = quark_uart_get_uartclk();
++
++	if (options)
++		uart_parse_options(options, &baud, &parity, &bits, &flow);
++
++	return uart_set_options(port, co, baud, parity, bits, flow);
++}
++
++static struct console quark_console = {
++	.name		= QUARK_UART_DRIVER_DEVICE,
++	.write		= quark_console_write,
++	.device		= uart_console_device,
++	.setup		= quark_console_setup,
++	.flags		= CON_PRINTBUFFER | CON_ANYTIME,
++	.index		= -1,
++	.data		= &quark_uart_driver,
++};
++
++#define QUARK_CONSOLE	(&quark_console)
++#else
++#define QUARK_CONSOLE	NULL
++#endif	/* CONFIG_SERIAL_QUARK_UART_CONSOLE */
++
++static struct uart_driver quark_uart_driver = {
++	.owner = THIS_MODULE,
++	.driver_name = KBUILD_MODNAME,
++	.dev_name = QUARK_UART_DRIVER_DEVICE,
++	.nr = QUARK_UART_NR,
++	.cons = QUARK_CONSOLE,
++};
++
++static int line_no; /* eek! TODO */
++
++static struct x1000_port *quark_uart_init_port(struct pci_dev *pdev,
++					     const struct pci_device_id *id)
++{
++	struct x1000_port *priv;
++	int ret, len;
++	dma_cap_mask_t mask;
++	unsigned char *rxbuf;
++	char name[32];	/* for debugfs file name */
++	struct intel_mid_dma_probe_info * info = NULL;
++
++	dev_dbg(&pdev->dev,"QUARK UART-DMA (ID: %04x:%04x) pdev->irq %d\n",
++		pdev->vendor, pdev->device, pdev->irq);
++
++	info = (void*)id->driver_data;
++	dev_info(&pdev->dev,"QUARK UART-DMA : CH %d base %d block len %d per mask %x\n",
++		info->max_chan, info->ch_base, info->block_size, info->pimr_mask);
++
++	priv = kzalloc(sizeof(struct x1000_port), GFP_KERNEL);
++	if (priv == NULL)
++		goto init_port_alloc_err;
++
++	rxbuf = (unsigned char *)__get_free_page(GFP_KERNEL);
++	if (!rxbuf)
++		goto init_port_free_txbuf;
++
++	priv->mid_dma.pdev = pci_dev_get(pdev);
++	pci_set_master(pdev);
++
++	spin_lock_init(&priv->lock);
++
++	/* UART regs */
++	priv->mapbase = pci_resource_start(pdev, 0);
++	len = pci_resource_len(pdev, 0);
++	priv->membase = ioremap_nocache(priv->mapbase, len);
++	if(priv->membase == NULL){
++		ret = -ENODEV;
++		goto init_port_free_txbuf;
++	}
++
++	/* DMA driver */
++	priv->mid_dma.max_chan = info->max_chan;		/* Max channels */
++	priv->mid_dma.chan_base = info->ch_base;		/* Index start */
++	priv->mid_dma.block_size = info->block_size;		/* MAX DMA block */
++	priv->mid_dma.pimr_mask = info->pimr_mask;		/* Per int regs bool */
++	priv->mid_dma.is_quark = info->is_quark;
++
++	ret = intel_qrk_dma_probe(pdev, &priv->mid_dma);
++	if(ret != 0){
++		dev_err(&pdev->dev, "Unable to init DMA sub-system\n");
++		goto init_port_free_uart_iomem;
++	}
++
++	/* Request DMA channels TODO: move to startup() once debugged on hw */
++	dma_cap_zero(mask);
++	dma_cap_set(DMA_SLAVE, mask);
++
++	priv->rx_chan = dma_request_channel(mask, intel_qrk_dma_chan_filter, &priv->dmas_rx);
++	if(priv->rx_chan == NULL){
++		dev_err(&pdev->dev, "Unable to hook DMA RX channel\n");
++		goto init_port_free_dma_iomem;
++	};
++	priv->rx_buf_virt = dma_alloc_coherent(&pdev->dev, QUARK_UART_FIFO_LEN,
++				    &priv->rx_buf_dma, GFP_KERNEL);
++	if (priv->rx_buf_virt == NULL){
++		dev_err(&pdev->dev, "Unable to allocate %d bytes for DMA\n",
++			QUARK_UART_FIFO_LEN);
++		goto init_port_free_dma_iomem;
++	}
++
++	priv->dmas_rx.hs_mode = LNW_DMA_HW_HS;
++	priv->dmas_rx.cfg_mode = LNW_DMA_PER_TO_MEM;
++	/* Configure RX */
++
++	priv->tx_chan = dma_request_channel(mask, intel_qrk_dma_chan_filter, &priv->dmas_tx);
++	if(priv->tx_chan == NULL){
++		dev_err(&pdev->dev, "Unable to hook DMA RX channel\n");
++		goto init_port_free_dma_iomem;
++	};
++	priv->dmas_tx.hs_mode = LNW_DMA_HW_HS;
++	priv->dmas_tx.cfg_mode = LNW_DMA_MEM_TO_PER;
++
++	dev_info(&pdev->dev, "using %s for DMA RX %s for DMA TX DMA %s\n",
++			dev_name(&priv->rx_chan->dev->device),
++			dev_name(&priv->tx_chan->dev->device), use_dma ?
++			"enabled" : "disabled");
++
++	/* Setup UART port descriptor */
++	priv->pdev = pdev;
++	priv->tx_empty = 1;
++	priv->rxbuf.buf = rxbuf;
++	priv->rxbuf.size = PAGE_SIZE;
++	priv->fifo_size = QUARK_UART_FIFO_LEN;
++	priv->uartclk = quark_uart_get_uartclk();
++	priv->port_type = PORT_MAX_8250 + 1;	/* BOD what does this do ? TBD*/
++	priv->port.dev = &pdev->dev;
++	priv->port.membase = priv->membase;
++	priv->port.mapbase = priv->mapbase;
++	priv->port.irq = pdev->irq;
++	priv->port.iotype = UPIO_MEM;
++	priv->port.ops = &quark_uart_ops;
++	priv->port.flags = UPF_BOOT_AUTOCONF;
++	priv->port.fifosize = QUARK_UART_FIFO_LEN;
++	priv->port.line = line_no; 
++	priv->trigger = QUARK_UART_HAL_TRIGGER_L;
++	priv->use_dma = use_dma;
++	use_dma = 0;
++
++	spin_lock_init(&priv->port.lock);
++	pci_set_drvdata(pdev, priv);
++	priv->trigger_level = 1;
++	priv->fcr = 0;
++
++	ret = request_irq(pdev->irq, quark_uart_interrupt, IRQF_SHARED,
++			KBUILD_MODNAME, priv);
++	if (ret < 0){
++		dev_err(&pdev->dev, "Unable to request irq %d err %d\n",
++			pdev->irq, ret);
++		goto init_port_hal_free;
++	}
++
++#ifdef CONFIG_SERIAL_QUARK_UART_CONSOLE
++	quark_uart_ports[line_no++] = priv;
++#endif
++	ret = uart_add_one_port(&quark_uart_driver, &priv->port);
++
++	if (ret < 0){
++		dev_err(&pdev->dev, "uart_add_one_port fail %d\n", ret);
++		goto init_port_hal_free;
++	}
++
++#ifdef CONFIG_DEBUG_FS
++	snprintf(name, sizeof(name), "uart%d_regs", pdev->dev.id);
++	priv->debugfs = debugfs_create_file(name, S_IFREG | S_IRUGO,
++				NULL, priv, &port_regs_ops);
++#endif
++	INIT_WORK(&priv->work, quark_uart_work);
++	init_waitqueue_head(&priv->w_queue);
++	return priv;
++
++init_port_hal_free:
++	free_page((unsigned long)rxbuf);
++init_port_free_dma_iomem:
++init_port_free_uart_iomem:
++	if (sg_dma_address(&priv->sg_rx))
++		dma_free_coherent(priv->port.dev, priv->port.fifosize,
++			  sg_virt(&priv->sg_rx),
++			  sg_dma_address(&priv->sg_rx));
++
++	iounmap(priv->membase);
++init_port_free_txbuf:
++	kfree(priv);
++init_port_alloc_err:
++
++	return NULL;
++}
++
++static void quark_uart_exit_port(struct pci_dev *pdev, struct x1000_port *priv)
++{
++
++#ifdef CONFIG_DEBUG_FS
++	if (priv->debugfs)
++		debugfs_remove(priv->debugfs);
++#endif
++	/* Shutdown DMA */
++	intel_qrk_dma_remove(pdev, &priv->mid_dma);
++
++	/* TODO: move to remove() when h/w proved out */
++	if (priv->tx_chan) {
++		dma_release_channel(priv->tx_chan);
++		priv->tx_chan = NULL;
++	}
++	if (priv->rx_chan) {
++		dma_release_channel(priv->rx_chan);
++		priv->rx_chan = NULL;
++	}
++
++	if (sg_dma_address(&priv->sg_rx))
++		dma_free_coherent(priv->port.dev, priv->port.fifosize,
++				  sg_virt(&priv->sg_rx),
++				  sg_dma_address(&priv->sg_rx));
++
++	free_irq(priv->port.irq, priv);
++	uart_remove_one_port(&quark_uart_driver, &priv->port);
++	pci_set_drvdata(priv->pdev, NULL);
++	free_page((unsigned long)priv->rxbuf.buf);
++}
++
++static void quark_uart_pci_remove(struct pci_dev *pdev)
++{
++	struct x1000_port *priv = pci_get_drvdata(pdev);
++
++	pci_disable_msi(pdev);
++
++#ifdef CONFIG_SERIAL_QUARK_UART_CONSOLE
++	quark_uart_ports[priv->port.line] = NULL;
++#endif
++	quark_uart_exit_port(pdev, priv);
++	pci_disable_device(pdev);
++	kfree(priv);
++	return;
++}
++#ifdef CONFIG_PM
++static int quark_uart_pci_suspend(struct pci_dev *pdev, pm_message_t state)
++{
++	struct x1000_port *priv = pci_get_drvdata(pdev);
++
++	/* Suspend DMA regs */
++	intel_qrk_dma_suspend(&priv->mid_dma);
++
++	/* Suspend UART regs */
++	uart_suspend_port(&quark_uart_driver, &priv->port);
++
++	pci_save_state(pdev);
++	pci_set_power_state(pdev, pci_choose_state(pdev, state));
++	return 0;
++}
++
++static int quark_uart_pci_resume(struct pci_dev *pdev)
++{
++	struct x1000_port *priv = pci_get_drvdata(pdev);
++	int ret;
++
++	pci_set_power_state(pdev, PCI_D0);
++	pci_restore_state(pdev);
++
++	ret = pci_enable_device(pdev);
++	if (ret) {
++		dev_err(&pdev->dev,
++		"%s-pci_enable_device failed(ret=%d) ", __func__, ret);
++		return ret;
++	}
++
++	/* Resume UART regs */
++	uart_resume_port(&quark_uart_driver, &priv->port);
++
++	/* Resume DMA regs */
++	intel_qrk_dma_resume(&priv->mid_dma);
++
++	return 0;
++}
++#else
++#define quark_uart_pci_suspend NULL
++#define quark_uart_pci_resume NULL
++#endif
++
++struct pci_device_id quark_uart_pci_ids[] = {
++	/* channels = 2, offset = 0, block size = FIFO_LEN, pimr = 0 */
++        { PCI_VDEVICE(INTEL, 0x0936), INFO(2, 0, QUARK_UART_FIFO_LEN, 0, 1)},
++        { 0 }
++};
++
++static int quark_uart_pci_probe(struct pci_dev *pdev,
++					const struct pci_device_id *id)
++{
++	int ret;
++	struct x1000_port *priv;
++
++	ret = pci_enable_device(pdev);
++	if (ret < 0)
++		goto probe_error;
++
++	priv = quark_uart_init_port(pdev, id);
++	if (!priv) {
++		ret = -EBUSY;
++		goto probe_disable_device;
++	}
++	pci_set_drvdata(pdev, priv);
++
++	return ret;
++
++probe_disable_device:
++	pci_disable_msi(pdev);
++	pci_disable_device(pdev);
++probe_error:
++	return ret;
++}
++
++static struct pci_driver quark_uart_pci_driver = {
++	.name = "quark_uart",
++	.id_table = quark_uart_pci_ids,
++	.probe = quark_uart_pci_probe,
++	.remove = quark_uart_pci_remove,
++	.suspend = quark_uart_pci_suspend,
++	.resume = quark_uart_pci_resume,
++};
++
++static int __init quark_uart_module_init(void)
++{
++	int ret;
++
++	/* register as UART driver */
++	ret = uart_register_driver(&quark_uart_driver);
++	if (ret < 0)
++		return ret;
++
++	/* register as PCI driver */
++	ret = pci_register_driver(&quark_uart_pci_driver);
++	if (ret < 0)
++		uart_unregister_driver(&quark_uart_driver);
++
++	return ret;
++}
++module_init(quark_uart_module_init);
++
++static void __exit quark_uart_module_exit(void)
++{
++	pci_unregister_driver(&quark_uart_pci_driver);
++	uart_unregister_driver(&quark_uart_driver);
++}
++module_exit(quark_uart_module_exit);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Intel QUARK X1000 UART PCI Driver");
++module_param(default_baud, uint, S_IRUGO);
++MODULE_PARM_DESC(default_baud,
++                 "Default BAUD for initial driver state and console (default 115200)");
++module_param(use_dma, bool, S_IRUGO);
++MODULE_PARM_DESC(use_dma,
++                 "Use DMA (default true)");
+diff --git a/include/linux/intel_mid_dma.h b/include/linux/intel_mid_dma.h
+index 10496bd..717458b 100644
+--- a/include/linux/intel_mid_dma.h
++++ b/include/linux/intel_mid_dma.h
+@@ -26,8 +26,10 @@
+ #define __INTEL_MID_DMA_H__
+ 
+ #include <linux/dmaengine.h>
++#include <linux/interrupt.h>
+ 
+ #define DMA_PREP_CIRCULAR_LIST		(1 << 10)
++#define MAX_CHAN 4
+ 
+ /*DMA mode configurations*/
+ enum intel_mid_dma_mode {
+@@ -73,4 +75,191 @@ struct intel_mid_dma_slave {
+ 	struct dma_slave_config		dma_slave;
+ };
+ 
++/**
++ * struct intel_mid_dma_chan - internal mid representation of a DMA channel
++ * @chan: dma_chan strcture represetation for mid chan
++ * @ch_regs: MMIO register space pointer to channel register
++ * @dma_base: MMIO register space DMA engine base pointer
++ * @ch_id: DMA channel id
++ * @lock: channel spinlock
++ * @active_list: current active descriptors
++ * @queue: current queued up descriptors
++ * @free_list: current free descriptors
++ * @slave: dma slave struture
++ * @descs_allocated: total number of decsiptors allocated
++ * @dma: dma device struture pointer
++ * @busy: bool representing if ch is busy (active txn) or not
++ * @in_use: bool representing if ch is in use or not
++ * @raw_tfr: raw trf interrupt received
++ * @raw_block: raw block interrupt received
++ */
++struct intel_mid_dma_chan {
++	struct dma_chan		chan;
++	void __iomem		*ch_regs;
++	void __iomem		*dma_base;
++	int			ch_id;
++	spinlock_t		lock;
++	struct list_head	active_list;
++	struct list_head	queue;
++	struct list_head	free_list;
++	unsigned int		descs_allocated;
++	struct middma_device	*dma;
++	bool			busy;
++	bool			in_use;
++	u32			raw_tfr;
++	u32			raw_block;
++	struct intel_mid_dma_slave *mid_slave;
++};
++
++struct intel_mid_dma_desc {
++	void __iomem			*block; /*ch ptr*/
++	struct list_head		desc_node;
++	struct dma_async_tx_descriptor	txd;
++	size_t				len;
++	dma_addr_t			sar;
++	dma_addr_t			dar;
++	u32				cfg_hi;
++	u32				cfg_lo;
++	u32				ctl_lo;
++	u32				ctl_hi;
++	struct pci_pool			*lli_pool;
++	struct intel_mid_dma_lli	*lli;
++	dma_addr_t			lli_phys;
++	unsigned int			lli_length;
++	unsigned int			current_lli;
++	dma_addr_t			next;
++	enum dma_transfer_direction		dirn;
++	enum dma_status			status;
++	enum dma_slave_buswidth		width; /*width of DMA txn*/
++	enum intel_mid_dma_mode		cfg_mode; /*mode configuration*/
++
++};
++
++
++enum intel_mid_dma_state {
++	RUNNING = 0,
++	SUSPENDED,
++};
++/**
++ * struct middma_device - internal representation of a DMA device
++ * @pdev: PCI device
++ * @dma_base: MMIO register space pointer of DMA
++ * @dma_pool: for allocating DMA descriptors
++ * @common: embedded struct dma_device
++ * @tasklet: dma tasklet for processing interrupts
++ * @ch: per channel data
++ * @pci_id: DMA device PCI ID
++ * @intr_mask: Interrupt mask to be used
++ * @mask_reg: MMIO register for periphral mask
++ * @chan_base: Base ch index (read from driver data)
++ * @max_chan: max number of chs supported (from drv_data)
++ * @block_size: Block size of DMA transfer supported (from drv_data)
++ * @pimr_mask: MMIO register addr for periphral interrupt (from drv_data)
++ * @state: dma PM device state
++ */
++struct middma_device {
++	struct pci_dev		*pdev;
++	void __iomem		*dma_base;
++	struct pci_pool		*dma_pool;
++	struct dma_device	common;
++	struct tasklet_struct   tasklet;
++	struct intel_mid_dma_chan ch[MAX_CHAN];
++	unsigned int		pci_id;
++	unsigned int		intr_mask;
++	void __iomem		*mask_reg;
++	int			chan_base;
++	int			max_chan;
++	int			block_size;
++	bool			ispci_fn;
++	unsigned int		pimr_mask;
++	unsigned int		is_quark;
++	enum intel_mid_dma_state state;
++};
++
++/**
++ * struct intel_mid_dma_probe_info
++ *
++ * @max_chan: maximum channels to probe
++ * @ch_base: offset from register base
++ * @block_size: TBD
++ * @pimr_mask: indicates if mask registers to be mapped
++ * @is_quark: indicates if this is quark silicon
++ */
++struct intel_mid_dma_probe_info {
++	u8 max_chan;
++	u8 ch_base;
++	u16 block_size;
++	u32 pimr_mask;
++	u8 is_quark;
++};
++
++
++/**
++ * intel_mid_dma_interrupt -	DMA ISR
++ * @irq: IRQ where interrupt occurred
++ * @data: ISR cllback data (the controller structure)
++ *
++ * See if this is our interrupt if so then schedule the tasklet
++ * otherwise ignore
++ */
++irqreturn_t intel_mid_dma_interrupt(int irq, void *data);
++
++/**
++ * mid_setup_dma -	Setup DMA controller
++ * @pdev: Controller PCI device structure
++ *
++ * Called by remove
++ * Unregister DMa controller, clear all structures and free interrupt
++ */	
++int mid_setup_dma(struct pci_dev *pdev, struct middma_device *dma);
++
++/**
++ * middma_shutdown -	Shutdown the DMA controller
++ * @pdev: Controller PCI device structure
++ *
++ * Called by remove
++ * Unregister DMa controller, clear all structures and free interrupt
++ */	
++void middma_shutdown(struct pci_dev *pdev, struct middma_device *device);
++
++/**
++ * intel_mid_dma_probe -	PCI Probe
++ * @pdev: Controller PCI device structure
++ * @id: pci device id structure
++ *
++ * Initialize the PCI device, map BARs, query driver data.
++ * Call intel_setup_dma to complete contoller and chan initilzation
++ */
++int intel_qrk_dma_probe(struct pci_dev *pdev,
++			struct middma_device *device);
++/**
++ * intel_mid_dma_remove -	PCI remove
++ * @pdev: Controller PCI device structure
++ *
++ * Free up all resources and data
++ * Call shutdown_dma to complete contoller and chan cleanup
++ */
++void intel_qrk_dma_remove(struct pci_dev *pdev, struct middma_device *device);
++
++/* Power Management */
++/*
++* dma_suspend - PCI suspend function
++*
++* @pci: PCI device structure
++* @state: PM message
++*
++* This function is called by OS when a power event occurs
++*/
++int intel_qrk_dma_suspend(struct middma_device *device);
++
++/**
++* intel_qrk_dma_resume - PCI resume function
++*
++* @pci:	PCI device structure
++*
++* This function is called by OS when a power event occurs
++*/
++int intel_qrk_dma_resume(struct middma_device *device);
++
++
+ #endif /*__INTEL_MID_DMA_H__*/

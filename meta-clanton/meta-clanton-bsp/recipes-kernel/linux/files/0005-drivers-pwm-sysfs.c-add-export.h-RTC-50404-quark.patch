@@ -1,0 +1,23 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Josef Ahmad <josef.ahmad@linux.intel.com>
+Date: Mon, 9 Sep 2013 14:11:51 +0100
+Subject: [PATCH 05/21] drivers/pwm/sysfs.c: add export.h - RTC #50404
+
+Resolve THIS_MODULE macro.
+(cherry picked from commit b594e3ef2c9f7a2c61188e76a1c228f1d30556eb)
+---
+ drivers/pwm/sysfs.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index 8ca5de3..4cd6d78 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -16,6 +16,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/export.h>
+ #include <linux/device.h>
+ #include <linux/mutex.h>
+ #include <linux/err.h>

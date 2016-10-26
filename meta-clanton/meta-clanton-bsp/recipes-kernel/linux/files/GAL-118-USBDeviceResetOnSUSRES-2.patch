@@ -1,0 +1,119 @@
+diff --git a/drivers/usb/gadget/pch_udc.c b/drivers/usb/gadget/pch_udc.c
+index cc4e053..1155dc5 100644
+--- a/drivers/usb/gadget/pch_udc.c
++++ b/drivers/usb/gadget/pch_udc.c
+@@ -23,6 +23,17 @@ static unsigned int enable_msi = 1;
+ module_param(enable_msi, uint, S_IRUGO | S_IWUSR);
+ MODULE_PARM_DESC(enable_msi, "Enable PCI MSI mode");
+ 
++static unsigned int phy_err_max;
++module_param(phy_err_max, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(phy_err_max, "PHY ERR count before disconnect, 0 to disable");
++
++static unsigned int phy_err_time = 100;
++module_param(phy_err_time, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(phy_err_time, "delay time between disconnect in milliseconds");
++
++static unsigned long  phy_err_time_jiffies;	/* delay time between disconnect  */
++static unsigned long  phy_err_backoff_end;	/* timeout for PHY ERR disconnect */
++
+ /* GPIO port for VBUS detecting */
+ static int vbus_gpio_port = -1;		/* GPIO port number (-1:Not used) */
+ 
+@@ -350,6 +361,7 @@ struct pch_vbus_gpio_data {
+  * @base_addr:		for mapped device memory
+  * @bar:		Indicates which PCI BAR for USB regs
+  * @irq:		IRQ line for the device
++ * @phy_err_cnt:	Count of phy_errs on this device
+  * @cfg_data:		current cfg, intf, and alt in use
+  * @vbus_gpio:		GPIO informaton for detecting VBUS
+  */
+@@ -379,6 +391,7 @@ struct pch_udc_dev {
+ 	void __iomem			*base_addr;
+ 	unsigned			bar;
+ 	unsigned			irq;
++	unsigned			phy_err_cnt;
+ 	struct pch_udc_cfg_data		cfg_data;
+ 	struct pch_vbus_gpio_data	vbus_gpio;
+ };
+@@ -571,6 +584,7 @@ static inline void pch_udc_set_selfpowered(struct pch_udc_dev *dev)
+  */
+ static inline void pch_udc_set_disconnect(struct pch_udc_dev *dev)
+ {
++	dev_dbg(&dev->pdev->dev, "udc disconnect");
+ 	pch_udc_bit_set(dev, UDC_DEVCTL_ADDR, UDC_DEVCTL_SD);
+ }
+ 
+@@ -596,6 +610,7 @@ static void pch_udc_clear_disconnect(struct pch_udc_dev *dev)
+ static void pch_udc_init(struct pch_udc_dev *dev);
+ static void pch_udc_reconnect(struct pch_udc_dev *dev)
+ {
++	dev_dbg(&dev->pdev->dev, "udc reconnect");
+ 	pch_udc_init(dev);
+ 
+ 	/* enable device interrupts */
+@@ -1078,6 +1093,10 @@ static void pch_udc_init(struct pch_udc_dev *dev)
+ 	/* mask and clear all device interrupts */
+ 	pch_udc_bit_set(dev, UDC_DEVIRQMSK_ADDR, UDC_DEVINT_MSK);
+ 	pch_udc_bit_set(dev, UDC_DEVIRQSTS_ADDR, UDC_DEVINT_MSK);
++	if (phy_err_max)
++		/* Allow ES and US as they may come back when we hit PHY ERR*/
++		pch_udc_bit_clr(dev, UDC_DEVIRQMSK_ADDR, UDC_DEVINT_US |
++						UDC_DEVINT_ES);
+ 
+ 	/* mask and clear all ep interrupts */
+ 	pch_udc_bit_set(dev, UDC_EPIRQMSK_ADDR, UDC_EPINT_MSK_DISABLE_ALL);
+@@ -2627,6 +2646,7 @@ static void pch_udc_svc_enum_interrupt(struct pch_udc_dev *dev)
+ 		BUG();
+ 	}
+ 	dev->gadget.speed = speed;
++	dev->phy_err_cnt = 0;
+ 	pch_udc_activate_control_ep(dev);
+ 	pch_udc_enable_ep_interrupts(dev, UDC_EPINT_IN_EP0 | UDC_EPINT_OUT_EP0);
+ 	pch_udc_set_dma(dev, DMA_DIR_TX);
+@@ -2743,6 +2763,35 @@ static void pch_udc_dev_isr(struct pch_udc_dev *dev, u32 dev_intr)
+ 	/* Set Config Interrupt */
+ 	if (dev_intr & UDC_DEVINT_SC)
+ 		pch_udc_svc_cfg_interrupt(dev);
++
++	/* checking for PHY ERR is enabled */
++	if (phy_err_max) {
++		/* USB Suspend and IDLE interrupt together  */
++
++		if ((dev_intr & UDC_DEVINT_US)
++				&& (dev_intr & UDC_DEVINT_ES)) {
++			dev->phy_err_cnt += 1;
++			if (dev->phy_err_cnt >= phy_err_max
++				&& time_after(jiffies, phy_err_backoff_end)) {
++				/* HERE is a symptom of a state machine which
++				 * may need to be reset, so force a disconnect
++				 * and set a delay before allows again */
++				dev_dbg(&dev->pdev->dev,
++					"USB_SUSPEND & USB_ES phy_err_cnt count %d",
++					dev->phy_err_cnt);
++				phy_err_backoff_end = jiffies
++					+ phy_err_time_jiffies;
++				dev->phy_err_cnt = 0;
++				pch_udc_set_disconnect(dev);
++			} else  {
++				dev_dbg(&dev->pdev->dev,
++					"USB_SUSPEND & USB_ES");
++			}
++		} else {
++		/* received normal interrupt fault has cleared */
++			dev->phy_err_cnt = 0;
++		}
++	}
+ 	/* USB Suspend interrupt */
+ 	if (dev_intr & UDC_DEVINT_US) {
+ 		if (dev->driver
+@@ -3259,6 +3308,9 @@ static int pch_udc_probe(struct pci_dev *pdev,
+ 	if (enable_msi == 1){
+ 		pci_enable_msi(pdev);
+ 	}
++	dev->phy_err_cnt = 0;
++	phy_err_backoff_end = jiffies;
++	phy_err_time_jiffies  = msecs_to_jiffies(phy_err_time);
+ 
+ 	if (request_irq(pdev->irq, pch_udc_isr, IRQF_SHARED, KBUILD_MODNAME,
+ 			dev)) {

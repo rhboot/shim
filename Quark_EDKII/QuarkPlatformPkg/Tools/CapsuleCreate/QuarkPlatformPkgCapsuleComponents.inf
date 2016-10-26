@@ -1,0 +1,93 @@
+## @file
+# Capsule Components description files. 
+#
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+##
+
+#-----------------------------------------------------------
+# Capsule Components.inf
+#
+#
+# Description:
+#
+# This file contains all the information including the list
+# of components included to produce required capsule. 
+#
+#-----------------------------------------------------------
+
+#
+# Any component can be added
+# or removed by inserting BEGIN and END block or deleting BEGIN and END Block
+# 1) A maximum of MAX_IMAGES_PER_CAPSULE is allowed (currently 20)
+# 2) The maximum capsule size is MAX_CAPSULE_PAYLOAD_SIZE (currently 10MB)
+#
+
+[Components]
+
+#BEGIN
+#  FILE_NAME=QUARK.fd
+#  START_ADDRESS=0xFF800000
+#END
+
+BEGIN
+  FILE_NAME=EDKII_RECOVERY_IMAGE1.Fv.signed
+  START_ADDRESS=0xFFF90000
+END
+
+BEGIN
+  FILE_NAME=EDKII_BOOTROM_OVERRIDE.Fv
+  START_ADDRESS=0xFFFE0000
+END
+
+BEGIN
+  FILE_NAME=FlashModules/EDKII_NVRAM.bin
+  START_ADDRESS=0xFFF30000
+END
+
+BEGIN
+  FILE_NAME=FlashModules/RMU.bin
+  START_ADDRESS=0xFFF00000
+END
+
+BEGIN
+  FILE_NAME=EDKII_BOOT_STAGE1_IMAGE1.Fv.signed
+  START_ADDRESS=0xFFEC0000
+END
+
+BEGIN
+  FILE_NAME=EDKII_BOOT_STAGE1_IMAGE2.Fv.signed
+  START_ADDRESS=0xFFE80000
+END
+
+BEGIN
+  FILE_NAME=EDKII_BOOT_STAGE2_COMPACT.Fv.signed
+  START_ADDRESS=0xFFD00000
+END

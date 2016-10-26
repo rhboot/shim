@@ -1,0 +1,124 @@
+
+# WARNING: this file is indirectly included in a Makefile where it
+# defines Make targets and pre-requisites. As a consequence you MUST
+# run "make clean" BEFORE making changes to it. Failure to do so may
+# result in the make process being unable to clean files it no longer
+# has references to.
+
+[main]
+size=8388608
+type=global
+
+
+[MFH]
+version=0x1
+flags=0x0
+address=0xfff08000
+type=mfh
+
+
+[Flash Image Version]
+type=mfh.version
+meta=version
+value=@IMAGE_VERSION@
+
+[ROM_OVERLAY]
+address=0xfffe0000
+item_file=@EDK_PATH@/EDKII_BOOTROM_OVERRIDE.Fv
+type=some_type
+
+[signed-key-module]
+address=0xfffd8000
+item_file=config/SvpSignedKeyModule.bin
+svn_index=0
+type=some_type
+in_capsule=no
+
+# On a deployed system, the SVN area holds the last known secure
+# version of each signed asset.
+# TODO: generate this area by collecting the SVN from the assets
+# themselves.
+[svn-area]
+address=0xfffd0000
+item_file=config/SVNArea.bin
+type=some_type
+# A capsule upgrade must implement some smart logic to make sure the
+# highest Security Version Number always wins (rollback protection)
+in_capsule=no
+
+[fixed_recovery_image]
+address=0xfff90000
+item_file=@EDK_PATH@/EDKII_RECOVERY_IMAGE1.Fv
+sign=yes
+type=mfh.host_fw_stage1_signed
+svn_index=2
+# in_capsule=no
+
+[NV_Storage]
+address=0xfff30000
+item_file=@EDK_PATH@/EDKII_NVRAM.bin
+type=some_type
+
+[RMU]
+address=0xfff00000
+item_file=@EDK_PATH@/@MUNIT_NAME@
+type=none_registered
+
+[boot_stage1_image1]
+address=0xffec0000
+item_file=@EDK_PATH@/EDKII_BOOT_STAGE1_IMAGE1.Fv
+sign=yes
+boot_index=0
+type=mfh.host_fw_stage1_signed
+svn_index=1
+
+[boot_stage1_image2]
+address=0xffe80000
+item_file=@EDK_PATH@/EDKII_BOOT_STAGE1_IMAGE2.Fv
+sign=yes
+boot_index=1
+type=mfh.host_fw_stage1_signed
+svn_index=1
+
+[boot_stage_2_compact]
+address=0xffd00000
+item_file=@EDK_PATH@/EDKII_BOOT_STAGE2_COMPACT.Fv
+sign=yes
+type=mfh.host_fw_stage2_signed
+svn_index=3
+
+[Ramdisk]
+address=0xffa60000
+item_file=@ROOTFS_PATH@/image-spi-clanton.cpio.lzma
+sign=yes
+type=mfh.ramdisk_signed
+svn_index=7
+
+[LAYOUT.CONF_DUMP]
+address=0xffcff000
+type=mfh.build_information
+meta=layout
+
+[Kernel]
+address=0xff852000
+item_file=@KERNEL_PATH@/bzImage
+sign=yes
+type=mfh.kernel_signed
+svn_index=6
+
+[grub.conf]
+address=0xff851000
+item_file=grub/grub-spi.conf
+sign=yes
+type=mfh.bootloader_conf_signed
+svn_index=5
+
+[grub]
+address=0xff800000
+item_file=@GRUB_PATH@/grub.efi
+sign=yes
+fvwrap=yes
+guid=B43BD3E1-64D1-4744-9394-D0E1C4DE8C87
+type=mfh.bootloader_signed
+svn_index=4
+

@@ -1,0 +1,13 @@
+BaseTools               -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/BaseTools
+MdePkg                  -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/MdePkg
+MdeModulePkg            -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/MdeModulePkg
+IntelFrameworkPkg       -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/IntelFrameworkPkg
+IntelFrameworkModulePkg -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/IntelFrameworkModulePkg
+EdkShellBinPkg          -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/EdkShellBinPkg
+PcAtChipsetPkg          -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/PcAtChipsetPkg
+UefiCpuPkg              -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/UefiCpuPkg
+ShellPkg                -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/ShellPkg
+SourceLevelDebugPkg     -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/SourceLevelDebugPkg
+CryptoPkg               -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/CryptoPkg
+SecurityPkg             -r13937 http://svn.code.sf.net/p/edk2/code/branches/UDK2010.SR1/SecurityPkg
+FatPkg                  -r67    http://svn.code.sf.net/p/edk2-fatdriver2/code/trunk/FatPkg

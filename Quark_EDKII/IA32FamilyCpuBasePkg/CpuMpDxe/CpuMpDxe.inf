@@ -1,0 +1,179 @@
+## @file
+# Component description file for CPU MP DXE Driver.
+#
+# CPU DXE Driver that configures multi-processor environment, logs data to datahub
+#  for processor subclass and cache subclass, and installs CPU Architecture Protocol and MP
+#  Services Protocol
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = CpuMpDxe
+  FILE_GUID                      = 40BEAB40-CECE-4909-B133-20A413AE19E9
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = MultiProcessorInitialize
+
+#
+# The following information is for reference only and not required by the build tools.
+#
+#  VALID_ARCHITECTURES           = IA32 X64
+#
+#  Create Event Guid C Name:  Event Type: EVENT_TYPE_PERIODIC_TIMER
+#
+#  HOB Guid C Name: gEfiHtBistHobGuid Hob Type: GUID_EXTENSION
+#
+
+[Sources]
+  SMBIOS/ProcessorSubClass.c
+  SMBIOS/ProcessorData.c
+  SMBIOS/Processor.h
+  SMBIOS/CpuSmbios.c
+  SMBIOS/CacheSubClass.c
+  SMBIOS/Cache.h
+  Xd.h
+  Xd.c
+  Setting.c
+  SelectLfp.c
+  ProcessorConfig.c
+  MpService.h
+  MpService.c
+  MpCommon.h
+  MpCommon.c
+  LimitCpuIdValue.h
+  LimitCpuIdValue.c
+  Feature.h
+  DataCollection.c
+  Cpu.h
+  MpApic.c
+  MpApic.h
+  Analysis.c
+  Strings.uni
+
+[Sources.Ia32]
+  IA32/MpFuncs.asm
+  IA32/MpFuncs.S
+  IA32/CpuOnlyReset.h
+  IA32/CpuOnlyReset.c
+  IA32/CpuAsm.asm
+  IA32/CpuAsm.S
+  IA32/AsmInclude.inc
+  IA32/ArchSpecificDef.h
+  IA32/ArchSpecific.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  IntelFrameworkPkg/IntelFrameworkPkg.dec
+  IntelFrameworkModulePkg/IntelFrameworkModulePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+  IA32FamilyCpuBasePkg/IA32FamilyCpuBasePkg.dec
+
+[LibraryClasses]
+  TimerLib
+  DxeServicesTableLib
+  CpuConfigLib
+  CpuLib
+  IoLib
+  PcdLib
+  UefiRuntimeServicesTableLib
+  UefiBootServicesTableLib
+  MemoryAllocationLib
+  UefiDriverEntryPoint
+  ReportStatusCodeLib
+  BaseMemoryLib
+  HiiLib
+  HobLib
+  UefiLib
+  DebugLib
+  BaseLib
+  SynchronizationLib
+  CpuOnlyResetLib
+  UefiCpuLib
+  MtrrLib
+  S3BootScriptLib
+  DebugAgentLib
+  LocalApicLib
+  PrintLib
+
+[Guids]
+  gEfiHtBistHobGuid                             # ALWAYS_CONSUMED
+  gEfiEventExitBootServicesGuid                 # ALWAYS_CONSUMED
+  gIdleLoopEventGuid                            # ALWAYS_CONSUMED
+
+[Protocols]
+  gEfiSmbiosProtocolGuid                        # PROTOCOL ALWAYS_CONSUMED
+  gEfiMpServiceProtocolGuid                     # PROTOCOL ALWAYS_PRODUCED
+  gEfiCpuArchProtocolGuid                       # PROTOCOL ALWAYS_CONSUMED
+  gEfiGenericMemTestProtocolGuid                ## SOMETIMES_CONSUMES
+  gEfiLegacyBiosProtocolGuid                    ## SOMETIMES_CONSUMES
+  gEfiSmmConfigurationProtocolGuid              # PROTOCOL ALWAYS_CONSUMED
+  gEfiTimerArchProtocolGuid                     # PROTOCOL ALWAYS_CONSUMED
+  gEfiTcgProtocolGuid                           ## SOMETIMES_CONSUMES
+
+[FeaturePcd]
+  gEfiCpuTokenSpaceGuid.PcdCpuSelectLfpAsBspFlag
+  gEfiCpuTokenSpaceGuid.PcdCpuExecuteDisableBitFlag
+  gEfiCpuTokenSpaceGuid.PcdCpuMaxCpuIDValueLimitFlag
+
+[FixedPcd]
+  gEfiCpuTokenSpaceGuid.PcdCpuMaxLogicalProcessorNumber
+  gEfiCpuTokenSpaceGuid.PcdCpuApLoopMode
+
+[Pcd]
+  gEfiCpuTokenSpaceGuid.PcdPlatformType
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuAssetTags
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuSocketNames
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuSocketCount
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuFrequencyLists
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuMaxFsbFrequency
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuMaxCoreFrequency
+  gEfiCpuTokenSpaceGuid.PcdCpuApStackSize
+  gEfiCpuTokenSpaceGuid.PcdCpuApInitTimeOutInMicroSeconds
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureSetting
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureCapability
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureUserConfiguration
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureSettingEx1
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureCapabilityEx1
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureUserConfigurationEx1
+  gEfiCpuTokenSpaceGuid.PcdCpuConfigContextBuffer
+  gEfiCpuTokenSpaceGuid.PcdCpuCallbackSignal
+  gEfiCpuTokenSpaceGuid.PcdIsPowerOnReset
+  gEfiCpuTokenSpaceGuid.PcdCpuPageTableAddress
+  gEfiCpuTokenSpaceGuid.PcdCpuMtrrTableAddress
+  gEfiCpuTokenSpaceGuid.PcdCpuS3DataAddress
+  gEfiCpuTokenSpaceGuid.PcdCpuSocketId
+  gEfiIntelFrameworkModulePkgTokenSpaceGuid.PcdEbdaReservedMemorySize
+
+[Depex]
+  gEfiSmbiosProtocolGuid AND gEfiTimerArchProtocolGuid
+

@@ -1,0 +1,13 @@
+diff --git a/lib/remote.exp b/lib/remote.exp
+index f0bf269..715df24 100644
+--- a/lib/remote.exp
++++ b/lib/remote.exp
+@@ -252,7 +252,7 @@ proc remote_exec { hostname program args } {
+     if { [llength $args] > 3 } {
+ 	set timeout "[lindex $args 3]"
+     } else {
+-	set timeout 300
++	set timeout 3600
+     }
+ 
+     verbose -log "Executing on $hostname: $program $pargs $inp $outp (timeout = $timeout)" 2

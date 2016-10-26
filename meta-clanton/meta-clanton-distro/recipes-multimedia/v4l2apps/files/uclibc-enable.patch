@@ -1,0 +1,25 @@
+diff --git a/configure.ac b/configure.ac
+index 171c1cd..b05a143 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -126,7 +126,7 @@ LIBS=$dl_saved_libs
+ AC_CHECK_HEADER([argp.h],,AC_MSG_ERROR(Cannot continue: argp.h not found))
+ argp_saved_libs=$LIBS
+   AC_SEARCH_LIBS([argp_parse],
+-                 [argp],
++                 [argp uargp],
+                  [test "$ac_cv_search_argp_parse" = "none required" || ARGP_LIBS=$ac_cv_search_argp_parse],
+                  [AC_MSG_ERROR([unable to find the argp_parse() function])])
+   AC_SUBST([ARGP_LIBS])
+diff --git a/contrib/test/Makefile.am b/contrib/test/Makefile.am
+index ce1ba22..118154c 100644
+--- a/contrib/test/Makefile.am
++++ b/contrib/test/Makefile.am
+@@ -21,6 +21,7 @@ pixfmt_test_CFLAGS = $(X11_CFLAGS)
+ pixfmt_test_LDFLAGS = $(X11_LIBS)
+ 
+ v4l2grab_SOURCES = v4l2grab.c
++v4l2grab_LDFLAGS = $(ARGP_LIBS)
+ v4l2grab_LDADD = ../../lib/libv4l2/libv4l2.la
+ 
+ ioctl_test_SOURCES = ioctl-test.c

@@ -1,0 +1,118 @@
+## @file
+#  Instance of Base Memory Library using REP string instructions.
+#
+#  Base Memory Library that uses REP string instructions for
+#  high performance and small size. Optimized for use in PEI.
+#
+#  Copyright (c) 2013 Intel Corporation.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#  * Redistributions of source code must retain the above copyright
+#  notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#  notice, this list of conditions and the following disclaimer in
+#  the documentation and/or other materials provided with the
+#  distribution.
+#  * Neither the name of Intel Corporation nor the names of its
+#  contributors may be used to endorse or promote products derived
+#  from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+#  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+#  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+#  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+#  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = BaseMemoryLibRepStr
+  FILE_GUID                      = e7884bf4-51a1-485b-982a-ff89129983bc
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = BaseMemoryLib
+
+#
+#  VALID_ARCHITECTURES           = IA32 X64
+#
+
+[Sources]
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/MemLibInternals.h
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/ScanMem64Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/ScanMem32Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/ScanMem16Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/ScanMem8Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/ZeroMemWrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/CompareMemWrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/SetMem64Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/SetMem32Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/SetMem16Wrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/SetMemWrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/CopyMemWrapper.c
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/MemLibGuid.c
+
+[Sources.Ia32]
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ScanMem64.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ScanMem32.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ScanMem16.S
+  Ia32/ScanMem8.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/CompareMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ZeroMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem64.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem32.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem16.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/CopyMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ScanMem64.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ScanMem32.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ScanMem16.asm
+  Ia32/ScanMem8.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/CompareMem.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/ZeroMem.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem64.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem32.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem16.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/SetMem.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/Ia32/CopyMem.asm
+
+[Sources.X64]
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem64.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem32.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem16.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem8.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/CompareMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ZeroMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem64.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem32.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem16.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/CopyMem.S
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem64.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem32.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem16.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ScanMem8.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/CompareMem.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/ZeroMem.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem64.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem32.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem16.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/SetMem.asm
+  ../../../../../MdePkg/Library/BaseMemoryLibRepStr/X64/CopyMem.asm
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  DebugLib
+  BaseLib
+

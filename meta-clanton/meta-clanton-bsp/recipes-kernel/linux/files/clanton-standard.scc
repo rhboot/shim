@@ -1,0 +1,6 @@
+define KMACHINE clanton
+define KTYPE standard
+define KARCH i386
+
+kconf hardware quark.cfg
+

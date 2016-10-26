@@ -1,0 +1,6808 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Quark Team <noreply@intel.com>
+Date: Thu, 10 Apr 2014 11:58:52 +0100
+Subject: [PATCH 07/21] Quark Platform Code
+
+---
+ drivers/platform/x86/Kconfig                       |    4 +
+ drivers/platform/x86/Makefile                      |    1 +
+ drivers/platform/x86/quark/Kconfig                 |   41 +
+ drivers/platform/x86/quark/Makefile                |   15 +
+ drivers/platform/x86/quark/intel_qrk_audio_ctrl.c  |  507 +++++++++
+ drivers/platform/x86/quark/intel_qrk_audio_ctrl.h  |   38 +
+ drivers/platform/x86/quark/intel_qrk_board_data.c  |  257 +++++
+ drivers/platform/x86/quark/intel_qrk_esram.c       | 1137 ++++++++++++++++++++
+ drivers/platform/x86/quark/intel_qrk_esram.h       |  100 ++
+ drivers/platform/x86/quark/intel_qrk_esram_test.c  |  595 ++++++++++
+ drivers/platform/x86/quark/intel_qrk_esram_test.h  |   36 +
+ drivers/platform/x86/quark/intel_qrk_imr.c         |  690 ++++++++++++
+ drivers/platform/x86/quark/intel_qrk_imr.h         |  150 +++
+ drivers/platform/x86/quark/intel_qrk_imr_kernel.c  |  132 +++
+ drivers/platform/x86/quark/intel_qrk_imr_test.c    |  350 ++++++
+ .../x86/quark/intel_qrk_plat_clanton_hill.c        |  219 ++++
+ .../x86/quark/intel_qrk_plat_clanton_peak.c        |  220 ++++
+ .../platform/x86/quark/intel_qrk_plat_cross_hill.c |  430 ++++++++
+ .../platform/x86/quark/intel_qrk_plat_galileo.c    |  391 +++++++
+ .../x86/quark/intel_qrk_plat_galileo_gen2.c        |  392 +++++++
+ .../platform/x86/quark/intel_qrk_plat_kips_bay.c   |  169 +++
+ drivers/platform/x86/quark/intel_qrk_sb.c          |  246 +++++
+ drivers/platform/x86/quark/intel_qrk_thermal.c     |  353 ++++++
+ include/linux/intel_qrk_sb.h                       |   85 ++
+ include/linux/platform_data/quark.h                |   37 +
+ 25 files changed, 6595 insertions(+)
+ create mode 100644 drivers/platform/x86/quark/Kconfig
+ create mode 100644 drivers/platform/x86/quark/Makefile
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_audio_ctrl.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_audio_ctrl.h
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_board_data.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_esram.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_esram.h
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_esram_test.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_esram_test.h
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_imr.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_imr.h
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_imr_kernel.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_imr_test.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_plat_clanton_hill.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_plat_clanton_peak.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_plat_cross_hill.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_plat_galileo.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_plat_galileo_gen2.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_plat_kips_bay.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_sb.c
+ create mode 100644 drivers/platform/x86/quark/intel_qrk_thermal.c
+ create mode 100644 include/linux/intel_qrk_sb.h
+ create mode 100644 include/linux/platform_data/quark.h
+
+diff --git a/drivers/platform/x86/Kconfig b/drivers/platform/x86/Kconfig
+index c86bae8..6def5f6 100644
+--- a/drivers/platform/x86/Kconfig
++++ b/drivers/platform/x86/Kconfig
+@@ -672,6 +672,10 @@ config INTEL_MFLD_THERMAL
+          Say Y here to enable thermal driver support for the  Intel Medfield
+          platform.
+ 
++if INTEL_QUARK_X1000_SOC
++source "drivers/platform/x86/quark/Kconfig"
++endif
++
+ config INTEL_IPS
+ 	tristate "Intel Intelligent Power Sharing"
+ 	depends on ACPI
+diff --git a/drivers/platform/x86/Makefile b/drivers/platform/x86/Makefile
+index bf7e4f9..fce76ef 100644
+--- a/drivers/platform/x86/Makefile
++++ b/drivers/platform/x86/Makefile
+@@ -50,3 +50,4 @@ obj-$(CONFIG_INTEL_MID_POWER_BUTTON)	+= intel_mid_powerbtn.o
+ obj-$(CONFIG_INTEL_OAKTRAIL)	+= intel_oaktrail.o
+ obj-$(CONFIG_SAMSUNG_Q10)	+= samsung-q10.o
+ obj-$(CONFIG_APPLE_GMUX)	+= apple-gmux.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= quark/
+diff --git a/drivers/platform/x86/quark/Kconfig b/drivers/platform/x86/quark/Kconfig
+new file mode 100644
+index 0000000..0e2c722
+--- /dev/null
++++ b/drivers/platform/x86/quark/Kconfig
+@@ -0,0 +1,41 @@
++config INTEL_QRK_ESRAM
++	bool "eSRAM - embedded SRAM driver for Intel Quark platform"
++	depends on INTEL_QUARK_X1000_SOC && PM
++	select KALLSYMS
++	select CRC16
++	help
++	  Say Y here to enable eSRAM overlay and software-initiated ECC
++	  updates. eSRAM overlaying allows for code/data structures to be
++	  mapped into eSRAM thus providing far faster access to code/data
++	  than ordinary DRAM. Slower than cache RAM faster than DRAM.
++
++config INTEL_QRK_ECC_REFRESH_PERIOD
++	int "Choose eSRAM ECC coverage period"
++	depends on INTEL_QRK_ESRAM
++	default 24
++	help
++	  Select the period over which *RAM ECC codes should be refreshed.
++	  IA Core will periodically enable disabled eSRAM pages to ensure all of
++	  disabled eSRAM pages are 'address walked' in this period. A logical
++	  component within the silicon on Quark will ensure DRAM (and
++	  overlayed eSRAM) pages by extension are similarly updated over the
++	  same period. This variable controlls how long a time this address
++	  walking algorithm should take. For a noisy environment like a
++	  sub-station or a satellite update frequently. For less noisy
++	  environments this value should be lower. Default 24 hours is right for
++	  most people. Set to zero to disable - this is NOT recommended. Max 48
++	  hours.
++
++config INTEL_QRK_THERMAL
++	bool "Thermal driver for Intel Quark platform"
++	depends on INTEL_QUARK_X1000_SOC
++	help
++	  Say Y here to enable Quark's Thermal driver plus the MSI's
++	  that can be hooked from the thermal sub-system
++
++config INTEL_QRK_AUDIO_CTRL
++	tristate "Audio sub-system control driver for Intel Quark platform"
++	depends on INTEL_QUARK_X1000_SOC
++	help
++	  Say Y here to enable Quark's audio control driver
++
+diff --git a/drivers/platform/x86/quark/Makefile b/drivers/platform/x86/quark/Makefile
+new file mode 100644
+index 0000000..8c917a5
+--- /dev/null
++++ b/drivers/platform/x86/quark/Makefile
+@@ -0,0 +1,15 @@
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_board_data.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_plat_clanton_hill.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_plat_clanton_peak.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_plat_cross_hill.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_plat_kips_bay.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_plat_galileo.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_plat_galileo_gen2.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_sb.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_imr.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_imr_kernel.o
++obj-$(CONFIG_INTEL_QRK_ESRAM)	+= intel_qrk_esram.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_imr_test.o
++obj-$(CONFIG_INTEL_QRK_ESRAM)	+= intel_qrk_esram_test.o
++obj-$(CONFIG_INTEL_QRK_THERMAL)	+= intel_qrk_thermal.o
++obj-$(CONFIG_INTEL_QRK_AUDIO_CTRL) += intel_qrk_audio_ctrl.o
+diff --git a/drivers/platform/x86/quark/intel_qrk_audio_ctrl.c b/drivers/platform/x86/quark/intel_qrk_audio_ctrl.c
+new file mode 100644
+index 0000000..8d03f76
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_audio_ctrl.c
+@@ -0,0 +1,507 @@
++/*
++ * Intel Quark platform audio control driver
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * The Intel Clanton Hill platform hardware design includes an audio subsystem
++ * with a number of interconnected audio interfaces.  This driver enables
++ * applications to choose which audio connections to enable for various
++ * application use cases.  The interconnections are selectable using GPIO output
++ * pins on the CPU.  This driver is also responsible for configuring a Maxim
++ * 9867 audio codec, a component of this audio subsystem, connected to the CPU
++ * via I2C.
++ */
++
++#include <linux/module.h>
++#include <linux/printk.h>
++#include <linux/platform_device.h>
++#include <linux/types.h>
++#include <linux/err.h>
++#include <linux/i2c.h>
++#include <linux/gpio.h>
++#include <linux/cdev.h>
++#include <linux/fs.h>
++#include <uapi/linux/ioctl.h>
++#include <linux/mutex.h>
++#include <linux/sysfs.h>
++
++#include "intel_qrk_audio_ctrl.h"
++
++#define DRIVER_NAME			"intel_qrk_audio_ctrl"
++
++/*
++ * GPIO numbers to use for switching audio paths
++ */
++#define GPIO_AUDIO_S0   11
++#define GPIO_AUDIO_S1   12
++#define GPIO_AUDIO_S2   13
++
++#define GPIO_AUDIO_DEFAULT (INTEL_QRK_AUDIO_MODE_SPKR_MIC)
++
++/**
++ * struct intel_qrk_audio_ctrl_data
++ *
++ * Structure to represent module state/data/etc
++ */
++struct intel_qrk_audio_ctrl_priv {
++
++	/* i2c device descriptor for read/write access to MAX9867 registers */
++	struct i2c_client *max9867_i2c;
++
++	/* Char dev to provide user-space ioctl interface for audio control */
++	struct cdev cdev;
++	dev_t cdev_no;
++	struct class *cl;
++
++	/* Mutex to protect against concurrent access to the ioctl() handler */
++	struct mutex lock;
++
++	/* Current GPIO switch value */
++	unsigned char gpio_val;
++};
++
++static int
++intel_qrk_audio_ctrl_open(struct inode *inode, struct file *filp)
++{
++	struct intel_qrk_audio_ctrl_priv *priv;
++
++	priv = container_of(inode->i_cdev,
++			    struct intel_qrk_audio_ctrl_priv,
++			    cdev);
++	filp->private_data = priv;
++
++	return 0;
++}
++
++static int
++intel_qrk_audio_ctrl_release(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/*
++ * Logic truth table for AUDIO_S[0-3] outputs, illustrating which paths are
++ * connected between audio interfaces A, B, C.  Each audio interface has one
++ * effective input (I) port and one effective output (O) port
++ *
++ * A = USB Codec (to Quark CPU)
++ * B = Spkr/Mic  (to car audio system)
++ * C = I2S Codec (to Telit HE910)
++ *
++ * PATH examples:
++ *   AO-CO: A-Output connected to C-Output
++ *   BI-AI: B-Input connected to A-Input
++ *
++ * NOTE: Assume a CI-AI connection is available in ALL cases (sometimes unused)
++ *
++ * S2 S1 S0  PATHS             USE CASE
++ * -- -- --  ----------------- -------------------------------------------------
++ *  0  0  0  AO-CO             BT Headset call
++ *  0  0  1  AO-BO             Analog Driver Alerts (CI unused)
++ *  0  1  0  AO-CO,BI-AI       XX Unused/invalid (BI *and* CI connected to AI)
++ *  0  1  1  AO-BO,BI-AI       Archival Voice Record/Playback (or Driver Alerts)
++ *  1  0  0  AO-CO,BI-CO       XX Unused/invalid (A0 *and* BI connected to CO)
++ *  1  0  1  AO-BO,BI-CO       Analog hands-free call
++ *  1  1  0  AO-CO,BI-AI,BI-CO XX Unused/invalid (BI connected to AI *and* CO)
++ *  1  1  1  AO-BO,BI-AI,BI-CO XX Unused/invalid (BI connected to AI *and* CO)
++ *
++ *
++ * Mapping to IOCTLs (using more intuitive naming on the API):
++ *
++ * PATHS           IOCTL
++ * --------------- -------------------------------------------------------------
++ * AO-CO           INTEL_QRK_AUDIO_MODE_GSM_ONLY
++ * AO-BO           INTEL_QRK_AUDIO_MODE_SPKR_ONLY
++ * AO-BO,BI-AI     INTEL_QRK_AUDIO_MODE_SPKR_MIC
++ * AO-BO,BI-CO     INTEL_QRK_AUDIO_MODE_GSM_SPKR_MIC
++ */
++
++static int
++intel_qrk_audio_ctrl_gpio_update(struct intel_qrk_audio_ctrl_priv *priv)
++{
++	int ret = 0;
++	struct gpio audio_sw_gpios[] = {
++		{
++			GPIO_AUDIO_S2,
++			GPIOF_OUT_INIT_LOW,
++			"audio_s2"
++		},
++		{
++			GPIO_AUDIO_S1,
++			GPIOF_OUT_INIT_LOW,
++			"audio_s1"
++		},
++		{
++			GPIO_AUDIO_S0,
++			GPIOF_OUT_INIT_LOW,
++			"audio_s0"
++		}
++	};
++
++	/*
++	 * Update the Audio Switch GPIO outputs according to the user selection
++	 */
++	ret = gpio_request_array(audio_sw_gpios,
++				 ARRAY_SIZE(audio_sw_gpios));
++	if (ret) {
++		pr_err("%s: Failed to allocate audio control GPIO pins\n",
++		       __func__);
++		return ret;
++	}
++
++	gpio_set_value(GPIO_AUDIO_S2, (priv->gpio_val >> 2) & 0x1);
++	gpio_set_value(GPIO_AUDIO_S1, (priv->gpio_val >> 1) & 0x1);
++	gpio_set_value(GPIO_AUDIO_S0, (priv->gpio_val >> 0) & 0x1);
++
++	gpio_free_array(audio_sw_gpios,
++			ARRAY_SIZE(audio_sw_gpios));
++
++	return 0;
++}
++
++static long
++intel_qrk_audio_ctrl_ioctl(struct file *filp,
++			   unsigned int cmd,
++			   unsigned long arg)
++{
++	struct intel_qrk_audio_ctrl_priv *priv = filp->private_data;
++	int ret = 0;
++
++	ret = mutex_lock_interruptible(&priv->lock);
++	if (ret)
++		return ret;
++
++	switch (cmd) {
++	case INTEL_QRK_AUDIO_MODE_IOC_GSM_ONLY:
++	case INTEL_QRK_AUDIO_MODE_IOC_SPKR_ONLY:
++	case INTEL_QRK_AUDIO_MODE_IOC_SPKR_MIC:
++	case INTEL_QRK_AUDIO_MODE_IOC_GSM_SPKR_MIC:
++		break;
++	default:
++		ret = -EINVAL;
++		goto exit;
++	}
++
++	priv->gpio_val = _IOC_NR(cmd) & 0x7;
++	ret = intel_qrk_audio_ctrl_gpio_update(priv);
++exit:
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
++static const struct file_operations intel_qrk_audio_ctrl_fops = {
++	.owner = THIS_MODULE,
++	.open = intel_qrk_audio_ctrl_open,
++	.release = intel_qrk_audio_ctrl_release,
++	.unlocked_ioctl = intel_qrk_audio_ctrl_ioctl
++};
++
++static int
++intel_qrk_audio_ctrl_chrdev_init(struct intel_qrk_audio_ctrl_priv *priv)
++{
++	/* Register a character dev interface (with ioctls)
++	 * to allow control of the audio subsystem switch
++	 */
++	int ret;
++	struct device *dev;
++
++	ret = alloc_chrdev_region(&priv->cdev_no, 0, 1,
++				  "intel_qrk_audio_ctrl");
++	if (ret) {
++		pr_err("Failed to alloc chrdev: %d", ret);
++		return ret;
++	}
++
++	cdev_init(&priv->cdev, &intel_qrk_audio_ctrl_fops);
++
++	ret = cdev_add(&priv->cdev, priv->cdev_no, 1);
++	if (ret) {
++		pr_err("Failed to add cdev: %d", ret);
++		unregister_chrdev_region(priv->cdev_no, 1);
++		return ret;
++	}
++
++	priv->cl = class_create(THIS_MODULE, "char");
++	if (IS_ERR(priv->cl)) {
++		pr_err("Failed to create device class: %ld",
++		       PTR_ERR(priv->cl));
++		cdev_del(&priv->cdev);
++		unregister_chrdev_region(priv->cdev_no, 1);
++		return PTR_ERR(priv->cl);
++	}
++
++	dev = device_create(priv->cl, NULL, priv->cdev_no, NULL,
++			    "intel_qrk_audio_ctrl");
++	if (IS_ERR(dev)) {
++		pr_err("Failed to create device: %ld",
++		       PTR_ERR(priv->cl));
++		class_destroy(priv->cl);
++		cdev_del(&priv->cdev);
++		unregister_chrdev_region(priv->cdev_no, 1);
++		return PTR_ERR(dev);
++	}
++
++	return 0;
++}
++
++static int
++intel_qrk_audio_ctrl_chrdev_remove(struct intel_qrk_audio_ctrl_priv *priv)
++{
++	device_destroy(priv->cl, priv->cdev_no);
++	class_destroy(priv->cl);
++	cdev_del(&priv->cdev);
++	unregister_chrdev_region(priv->cdev_no, 1);
++
++	return 0;
++}
++
++
++ssize_t intel_qrk_audio_ctrl_sysfs_show_mode(struct device *dev,
++					     struct device_attribute *attr,
++					     char *buf)
++{
++	struct intel_qrk_audio_ctrl_priv *priv = dev_get_drvdata(dev);
++	int ret;
++	char *mode;
++
++	ret = mutex_lock_interruptible(&priv->lock);
++	if (ret)
++		return ret;
++
++	switch (priv->gpio_val) {
++	case INTEL_QRK_AUDIO_MODE_GSM_ONLY:
++		mode = "gsm";
++		break;
++	case INTEL_QRK_AUDIO_MODE_SPKR_ONLY:
++		mode = "spkr";
++		break;
++	case INTEL_QRK_AUDIO_MODE_SPKR_MIC:
++		mode = "spkr_mic";
++		break;
++	case INTEL_QRK_AUDIO_MODE_GSM_SPKR_MIC:
++		mode = "gsm_spkr_mic";
++		break;
++	default:
++		ret = -EINVAL;
++		goto exit;
++	}
++
++	ret = scnprintf(buf, PAGE_SIZE, "%s\n", mode);
++
++exit:
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
++ssize_t intel_qrk_audio_ctrl_sysfs_store_mode(struct device *dev,
++					      struct device_attribute *attr,
++					      const char *buf, size_t count)
++{
++	struct intel_qrk_audio_ctrl_priv *priv = dev_get_drvdata(dev);
++	char mode[16];
++	unsigned char gpio_val;
++	int ret = count;
++
++	sscanf(buf, "%15s", mode);
++
++	if (!strcmp(mode, "gsm"))
++		gpio_val = INTEL_QRK_AUDIO_MODE_GSM_ONLY;
++	else if (!strcmp(mode, "spkr"))
++		gpio_val = INTEL_QRK_AUDIO_MODE_SPKR_ONLY;
++	else if (!strcmp(mode, "spkr_mic"))
++		gpio_val = INTEL_QRK_AUDIO_MODE_SPKR_MIC;
++	else if (!strcmp(mode, "gsm_spkr_mic"))
++		gpio_val = INTEL_QRK_AUDIO_MODE_GSM_SPKR_MIC;
++	else
++		return -EINVAL;
++
++	ret = mutex_lock_interruptible(&priv->lock);
++	if (ret)
++		return ret;
++
++	priv->gpio_val = gpio_val;
++	ret = intel_qrk_audio_ctrl_gpio_update(priv);
++	if (ret)
++		goto exit;
++
++	ret = count;
++
++exit:
++	mutex_unlock(&priv->lock);
++
++	return ret;
++}
++
++/* Sysfs attribute descriptor (for alternative user-space interface) */
++static DEVICE_ATTR(audio_switch_mode, S_IWUSR | S_IRUGO,
++		   intel_qrk_audio_ctrl_sysfs_show_mode,
++		   intel_qrk_audio_ctrl_sysfs_store_mode);
++
++/******************************************************************************
++ *                                Module hooks
++ ******************************************************************************/
++
++static int
++intel_qrk_max9867_init(struct i2c_client *client)
++{
++	int ret;
++
++	/* MAX9867 register configuration, from Telit HE910 DVI app-note */
++
++	u8 reg_cfg_seq1[] = {
++		0x04, /* Starting register address, followed by data */
++		0x00, /* 0x04 Interrupt Enable */
++		0x10, /* 0x05 System Clock */
++		0x90, /* 0x06 Audio Clock High */
++		0x00, /* 0x07 Audio Clock Low */
++		0x10, /* 0x08 Interface 1a */
++		0x0A, /* 0x09 Interface 1d */
++		0x33, /* 0x0A Codec Filters */
++		0x00, /* 0x0B DAC Gain/Sidetone */
++		0x00, /* 0x0C DAC Level */
++		0x33, /* 0x0D ADC Level */
++		0x4C, /* 0x0E Left Line Input Level */
++		0x4C, /* 0x0F Right Line Input Level */
++		0x00, /* 0x10 Left Volume Control */
++		0x00, /* 0x11 Right Volume Control */
++		0x14, /* 0x12 Left Mic Gain */
++		0x14, /* 0x13 Right Mic Gain */
++		/* Configuration */
++		0xA0, /* 0x14 Input */
++		0x00, /* 0x15 Microphone */
++		0x65  /* 0x16 Mode */
++	};
++
++	u8 reg_cfg_seq2[] = {
++		0x17, /* Starting register address, followed by data */
++		0xEF  /* 0x17 System Shutdown */
++	};
++
++	ret = i2c_master_send(client,
++			      reg_cfg_seq1, sizeof(reg_cfg_seq1));
++	if (ret != sizeof(reg_cfg_seq1)) {
++		pr_err("Failed to write MAX9867 config registers (set 1/2)");
++		return -EIO;
++	}
++
++	ret = i2c_master_send(client,
++			      reg_cfg_seq2, sizeof(reg_cfg_seq2));
++	if (ret != sizeof(reg_cfg_seq2)) {
++		pr_err("Failed to write MAX9867 config registers (set 2/2)");
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int
++intel_qrk_max9867_get_chip_rev(struct i2c_client *client)
++{
++	struct i2c_msg msg[2];
++	u8 data[2];
++	int ret;
++
++	data[0] = 0xFF;  /* Chip-revision register address = 0xFF */
++	msg[0].addr = client->addr;
++	msg[0].flags = 0;
++	msg[0].buf = &data[0];
++	msg[0].len = 1;
++
++	msg[1].addr = client->addr;
++	msg[1].flags = I2C_M_RD;
++	msg[1].buf = &data[1];
++	msg[1].len = 1;
++
++	ret = i2c_transfer(client->adapter, &msg[0], 2);
++	return (ret == 2) ? data[1] : -EIO;
++}
++
++static int intel_qrk_max9867_i2c_probe(struct i2c_client *client,
++				       const struct i2c_device_id *id)
++{
++	struct intel_qrk_audio_ctrl_priv *priv;
++	int ret;
++
++	priv = devm_kzalloc(&client->dev, sizeof(*priv),
++			    GFP_KERNEL);
++	if (priv == NULL)
++		return -ENOMEM;
++
++	i2c_set_clientdata(client, priv);
++
++	priv->max9867_i2c = client;
++	mutex_init(&priv->lock);
++
++	ret = intel_qrk_max9867_get_chip_rev(client);
++	if (ret >= 0)
++		pr_info("%s: Detected MAX9867 chip revision 0x%02X\n",
++			__func__, ret);
++	else {
++		pr_err("%s: Failed to read MAX9867 chip revision\n", __func__);
++		goto exit;
++	}
++
++	ret = intel_qrk_max9867_init(client);
++	if (ret)
++		goto exit;
++
++	priv->gpio_val = GPIO_AUDIO_DEFAULT;
++	ret = intel_qrk_audio_ctrl_gpio_update(priv);
++	if (ret)
++		goto exit;
++
++	/* Create a char dev interface, providing an ioctl config option */
++	ret = intel_qrk_audio_ctrl_chrdev_init(priv);
++	if (ret)
++		goto exit;
++
++	/* Also create a sysfs interface, providing a cmd line config option */
++	ret = sysfs_create_file(&client->dev.kobj,
++				&dev_attr_audio_switch_mode.attr);
++
++exit:
++	return ret;
++}
++
++static int intel_qrk_max9867_i2c_remove(struct i2c_client *client)
++{
++	struct intel_qrk_audio_ctrl_priv *priv = i2c_get_clientdata(client);
++
++	intel_qrk_audio_ctrl_chrdev_remove(priv);
++
++	sysfs_remove_file(&client->dev.kobj, &dev_attr_audio_switch_mode.attr);
++
++	return 0;
++}
++
++static const struct i2c_device_id intel_qrk_max9867_i2c_id[] = {
++	{"intel-qrk-max9867", 0},
++	{}
++};
++MODULE_DEVICE_TABLE(i2c, intel_qrk_max9867_i2c_id);
++
++/* i2c codec control layer */
++static struct i2c_driver intel_qrk_audio_ctrl_i2c_driver = {
++	.driver = {
++		.name = "intel_qrk_audio_ctrl",
++		.owner = THIS_MODULE,
++	},
++	.probe = intel_qrk_max9867_i2c_probe,
++	.remove =  intel_qrk_max9867_i2c_remove,
++	.id_table = intel_qrk_max9867_i2c_id,
++};
++
++module_i2c_driver(intel_qrk_audio_ctrl_i2c_driver);
++
++MODULE_AUTHOR("Dan O'Donovan <dan@emutex.com>");
++MODULE_DESCRIPTION("Intel Quark platform audio control driver");
++MODULE_LICENSE("Dual BSD/GPL");
+diff --git a/drivers/platform/x86/quark/intel_qrk_audio_ctrl.h b/drivers/platform/x86/quark/intel_qrk_audio_ctrl.h
+new file mode 100644
+index 0000000..d4f05ad
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_audio_ctrl.h
+@@ -0,0 +1,38 @@
++/*
++ * Intel Quark platform audio control driver
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * See intel_qrk_audio_ctrl.c for a detailed description
++ *
++ */
++
++#ifndef __INTEL_QRK_AUDIO_CTRL_H__
++#define __INTEL_QRK_AUDIO_CTRL_H__
++
++#include <linux/module.h>
++
++#define INTEL_QRK_AUDIO_MODE_GSM_ONLY       0x0
++#define INTEL_QRK_AUDIO_MODE_SPKR_ONLY      0x1
++#define INTEL_QRK_AUDIO_MODE_SPKR_MIC       0x3
++#define INTEL_QRK_AUDIO_MODE_GSM_SPKR_MIC   0x5
++
++#define INTEL_QRK_AUDIO_MODE_IOC_GSM_ONLY \
++	_IO('x', INTEL_QRK_AUDIO_MODE_GSM_ONLY)
++#define INTEL_QRK_AUDIO_MODE_IOC_SPKR_ONLY \
++	_IO('x', INTEL_QRK_AUDIO_MODE_SPKR_ONLY)
++#define INTEL_QRK_AUDIO_MODE_IOC_SPKR_MIC \
++	_IO('x', INTEL_QRK_AUDIO_MODE_SPKR_MIC)
++#define INTEL_QRK_AUDIO_MODE_IOC_GSM_SPKR_MIC \
++	_IO('x', INTEL_QRK_AUDIO_MODE_GSM_SPKR_MIC)
++
++#endif /* __INTEL_QRK_AUDIO_CTRL_H__ */
+diff --git a/drivers/platform/x86/quark/intel_qrk_board_data.c b/drivers/platform/x86/quark/intel_qrk_board_data.c
+new file mode 100644
+index 0000000..c9d4f99
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_board_data.c
+@@ -0,0 +1,257 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark Legacy Platform Data accessor layer
++ *
++ * Simple Legacy SPI flash access layer
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com> 2013
++ */
++
++#include <asm/io.h>
++#include <linux/dmi.h>
++#include <linux/errno.h>
++#include <linux/ioport.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++
++#define DRIVER_NAME				"board_data"
++#define PFX					"MFH: "
++#define SPIFLASH_BASEADDR			0xFFF00000
++#define MFH_OFFSET				0x00008000
++#define PLATFORM_DATA_OFFSET			0x00010000
++#define MTD_PART_OFFSET				0x00050000
++#define MTD_PART_LEN				0x00040000
++#define MFH_PADDING				0x1E8
++#define MFH_MAGIC				0x5F4D4648
++#define FLASH_SIZE				0x00400000
++
++/* MFH types supported @ version #1 */
++#define MFH_ITEM_FW_STAGE1			0x00000000
++#define MFH_ITEM_FW_STAGE1_SIGNED		0x00000001
++#define MFH_ITEM_FW_STAGE2			0x00000003
++#define MFH_ITEM_FW_STAGE2_SIGNED		0x00000004
++#define MFH_ITEM_FW_STAGE2_CONFIG		0x00000005
++#define MFH_ITEM_FW_STAGE2_CONFIG_SIGNED	0x00000006
++#define MFH_ITEM_FW_PARAMS			0x00000007
++#define MFH_ITEM_FW_RECOVERY			0x00000008
++#define MFH_ITEM_FW_RECOVERY_SIGNED		0x00000009
++#define MFH_ITEM_BOOTLOADER			0x0000000B
++#define MFH_ITEM_BOOTLOADER_SIGNED		0x0000000C
++#define MFH_ITEM_BOOTLOADER_CONFIG		0x0000000D
++#define MFH_ITEM_BOOTLOADER_CONFIG_SIGNED	0x0000000E
++#define MFH_ITEM_KERNEL				0x00000010
++#define MFH_ITEM_KERNEL_SIGNED			0x00000011
++#define MFH_ITEM_RAMDISK			0x00000012
++#define MFH_ITEM_RAMDISK_SIGNED			0x00000013
++#define MFH_ITEM_LOADABLE_PROGRAM		0x00000015
++#define MFH_ITEM_LOADABLE_PROGRAM_SIGNED	0x00000016
++#define MFH_ITEM_BUILD_INFO			0x00000018
++#define MFH_ITEM_VERSION			0x00000019
++
++struct intel_qrk_mfh {
++	u32	id;
++	u32	ver;
++	u32	flags;
++	u32	next_block;
++	u32	item_count;
++	u32	boot_priority_list;
++	u8	padding[MFH_PADDING];
++};
++
++struct intel_qrk_mfh_item {
++	u32	type;
++	u32	addr;
++	u32	len;
++	u32	res0;
++};
++
++struct kobject * board_data_kobj;
++EXPORT_SYMBOL_GPL(board_data_kobj);
++
++static long unsigned int flash_version_data;
++static ssize_t flash_version_show(struct kobject *kobj,
++                                struct kobj_attribute *attr, char *buf)
++{
++        return snprintf(buf, 12, "%#010lx\n", flash_version_data);
++}
++
++static struct kobj_attribute flash_version_attr =
++        __ATTR(flash_version, 0644, flash_version_show, NULL);
++
++extern int intel_qrk_plat_probe(struct resource * pres);
++
++#define DEFAULT_BOARD "Galileo"
++
++static struct platform_device bsp_data [] = {
++	{
++		.name	= "QuarkEmulation",
++		.id	= -1,
++	},
++	{
++		.name	= "ClantonPeakSVP",
++		.id	= -1,
++	},
++	{
++		.name	= "KipsBay",
++		.id	= -1,
++	},
++	{
++		.name	= "CrossHill",
++		.id	= -1,
++	},
++	{
++		.name	= "ClantonHill",
++		.id	= -1,
++	},
++	{
++		.name	= "Galileo",
++		.id	= -1,
++	},
++	{
++		.name	= "GalileoGen2",
++		.id	= -1,
++	},
++
++};
++
++/**
++ * add_firmware_sysfs_entry
++ *
++ * Add an entry in sysfs consistent with Galileo IDE's expected location
++ * covers current software versions and legacy code < Intel Galileo BIOS 0.9.0
++ *
++ */
++static int add_firmware_sysfs_entry(const char * board_name)
++{
++	extern struct kobject * firmware_kobj;
++
++	pr_info("Intel Quark Board %s Firmware Version %#010lx\n",
++				board_name, flash_version_data);
++
++	/* board_data_kobj subordinate of firmware @ /sys/firmware/board_data */
++	board_data_kobj = kobject_create_and_add("board_data", firmware_kobj);
++	if (!board_data_kobj) {
++		pr_err(PFX"kset create error\n");
++		return -ENODEV;
++	}
++	return sysfs_create_file(board_data_kobj, &flash_version_attr.attr);
++}
++
++/**
++ * intel_qrk_board_data_init_legacy
++ *
++ * Module entry point for older BIOS versions
++ * Allows more recent kernels to boot on Galileo boards with BIOS before release
++ * 0.9.0
++ */
++static int __init intel_qrk_board_data_init_legacy(void)
++{
++	struct intel_qrk_mfh __iomem * mfh;
++	struct intel_qrk_mfh_item __iomem * item;
++	struct platform_device * pdev;
++	u32 i;
++	char * board_name = NULL;
++	void __iomem * spi_data;
++	int ret = 0;
++
++	spi_data = ioremap(SPIFLASH_BASEADDR, FLASH_SIZE);
++	if (!spi_data)
++		return -ENODEV;
++
++	/* get mfh and first item pointer */	
++	mfh = spi_data + MFH_OFFSET;
++	if (mfh->id != MFH_MAGIC){
++		pr_err(PFX"Bad MFH magic want 0x%08x found 0x%08x @ 0x%p\n",
++		MFH_MAGIC, mfh->id, &mfh->id);
++		return -ENODEV;
++	}
++
++	pr_info(PFX"Booting on an old BIOS assuming %s board\n", DEFAULT_BOARD);
++	pr_info(PFX"mfh @ 0x%p: id 0x%08lx ver 0x%08lx entries 0x%08lx\n",
++		mfh, (unsigned long)mfh->id, (unsigned long)mfh->ver,
++		(unsigned long)mfh->item_count);
++	item = (struct intel_qrk_mfh_item __iomem *)
++		&mfh->padding [sizeof(u32) * mfh->boot_priority_list];
++
++	/* Register a default board */
++	for (i = 0; i < sizeof(bsp_data)/sizeof(struct platform_device); i++){
++		if (!strcmp(bsp_data[i].name, DEFAULT_BOARD)){
++			board_name = (char*)bsp_data[i].name;
++			platform_device_register(&bsp_data[i]);
++		}
++	}
++
++	/* Register flash regions as seperate platform devices */
++	for (i = 0; i < mfh->item_count; i++, item++){
++		pdev = NULL;
++
++		switch (item->type){
++		case MFH_ITEM_VERSION:
++			flash_version_data = item->res0;
++			ret = add_firmware_sysfs_entry(board_name);
++			break;
++		default:
++			break;
++		}
++	}
++	iounmap(spi_data);
++	return ret;
++}
++
++/**
++ * intel_qrk_board_data_init_legacy
++ *
++ * Module entry point for older BIOS versions
++ */
++static int __init intel_qrk_board_data_init(void)
++{
++	bool found = false;
++	const char * bios_version = dmi_get_system_info(DMI_BIOS_VERSION);
++	const char * board_name = dmi_get_system_info(DMI_BOARD_NAME);
++	int ret = 0;
++	u32 i;
++
++	/* BIOS later than version 0.9.0 contains the right DMI data */
++	for (i = 0; board_name != NULL && bios_version != NULL && 
++		i < sizeof(bsp_data)/sizeof(struct platform_device); i++){
++	
++		if (!strcmp(bsp_data[i].name, board_name)){
++
++			/* Register board */
++			platform_device_register(&bsp_data[i]);
++			found = true;
++
++			/* Galileo IDE expects this entry */
++			flash_version_data = simple_strtoul(bios_version, NULL, 16);
++			ret = add_firmware_sysfs_entry(bsp_data[i].name);
++
++			break;
++		}
++	}
++
++	/* For older BIOS without DMI data we read the data directly from flash */
++	if (found == false){
++		ret = intel_qrk_board_data_init_legacy();
++	}
++
++	return ret;
++}
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Intel Quark SPI Data API");
++MODULE_LICENSE("Dual BSD/GPL");
++subsys_initcall(intel_qrk_board_data_init);
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_esram.c b/drivers/platform/x86/quark/intel_qrk_esram.c
+new file mode 100644
+index 0000000..62ae521
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_esram.c
+@@ -0,0 +1,1137 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark eSRAM overlay driver
++ *
++ * eSRAM is an on-chip fast access SRAM.
++ *
++ * This driver provides the ability to map a kallsyms derived symbol of
++ * arbitrary length or a struct page entitiy.
++ * A sysfs interface is provided to allow map of kernel structures, without
++ * having to use the API from your code directly.
++ *
++ * Example:
++ * echo idt_table > /sys/devices/intel-qrk-esram.0/map
++ *
++ * An API is provided to allow for mapping of a) kernel symbols or b) pages.
++ * eSRAM requires 4k physically aligned addresses to work - so a struct page
++ * fits neatly into this.
++ *
++ * intel_qrk_esram_map_sym(ohci_irq);
++ * intel_qrk_esram_map_page(virt_to_page(ohci_irq), "ohci_irq");
++ * Are equivalent - with the exception that map_sym() can detect if a mapping
++ * crosses a page-boundary, whereas map_page just maps one page. Generally use
++ * map_sym() for code and map_page() for data
++ *
++ * To populte eSRAM we must copy data to a temporary buffer, overlay and
++ * then copy data back to the eSRAM region.
++ * 
++ * When entering S3 - we must save eSRAM state to DRAM, and similarly on restore
++ * to S0 we must repopulate eSRAM
++ * Unmap code is included for reference however the cache coherency of unmap is
++ * not guaranteed so the functionality is not exported by this code
++ * 
++ */
++#include <asm/cacheflush.h>
++#include <asm/desc.h>
++#include <asm/io.h>
++#include <asm/pgtable.h>
++#include <asm/special_insns.h>
++#include <asm-generic/uaccess.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/fs.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/kallsyms.h>
++#include <linux/list.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/printk.h>
++#include <linux/platform_device.h>
++#include <linux/pm.h>
++#include <linux/seq_file.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/timer.h>
++
++#include "intel_qrk_esram.h"
++
++#define DRIVER_NAME			"intel-qrk-esram"
++
++/* Shorten fn names to fit 80 char limit */
++#ifndef sb_read
++#define sb_read				intel_qrk_sb_read_reg
++#endif
++#ifndef sb_write
++#define sb_write			intel_qrk_sb_write_reg
++#endif
++
++/* Define size of pages, ECC scrub demark etc */
++#define MAX_PAGE_RETRIES		(100)
++#define MS_PER_HOUR			(3600000UL)
++#define ESRAM_PAGE_COUNT		INTEL_QRK_ESRAM_PAGE_COUNT
++#define ESRAM_PAGE_MASK			(0xFFFFF000)
++#define ESRAM_PAGE_SIZE			INTEL_QRK_ESRAM_PAGE_SIZE
++#define ESRAM_TOTAL_SIZE		(ESRAM_PAGE_COUNT * ESRAM_PAGE_SIZE)
++#define ECC_MAX_REFRESH_PERIOD		(48)
++#define ECC_DEFAULT_REFRESH_PERIOD	(24)
++#define ECC_DRAM_READSIZE		(512)		/* bytes per DRAM ECC */
++#define ECC_ESRAM_READSIZE		ESRAM_PAGE_SIZE	/* bytes per SRAM ECC */
++
++/* Register ID */
++#define ESRAM_PGPOOL_REG		(0x80)		/* PGPOOL */
++#define ESRAM_CTRL_REG			(0x81)		/* ESRAMCTRL */
++#define ESRAM_PGBLOCK_REG		(0x82)		/* Global page ctrl */
++#define ESCRM_ECCCERR_REG		(0x83)		/* Correctable ECC */
++#define ESRAM_ECCUCERR_REG		(0x84)		/* Uncorrectable ECC */
++
++/* Reg commands */
++#define ESRAM_CTRL_READ			(0x10)		/* Config reg */
++#define ESRAM_CTRL_WRITE		(0x11)		/* Config reg */
++#define ESRAM_PAGE_READ			(0x12)		/* Page config read */
++#define ESRAM_PAGE_WRITE		(0x13)		/* Page config write */
++
++/* ESRAMPGPOOL reg 0x80 - r/w opcodes 0x10/0x11 */
++#define ESRAM_PGPOOL_FLUSHING(x)	((x>>18)&0x1FF)
++#define ESRAM_PGPOOL_PGBUSY(x)		((x>>9)&0x1FF)
++
++/* ESRAMCTRL reg 0x81 - r/w opcodes 0x10/0x11 */
++#define ESRAM_CTRL_FLUSHPRI(x)		((x>>25)&0x03)	/* DRAM flush priority */
++#define ESRAM_CTRL_SIZE(x)		((x>>16)&0xFF)	/* # of 4k pages */
++#define ESRAM_CTRL_ECCTHRESH(x)		((x>>8)&0xFF)	/* ECC threshold */
++#define ESRAM_CTRL_THRESHMSG_EN		(0x00000080)	/* ECC notification */
++#define ESRAM_CTRL_ISAVAIL		(0x00000010)	/* ESRAM on die ? */
++#define ESRAM_CTRL_BLOCK_MODE		(0x00000008)	/* Block mode enable */
++#define ESRAM_CTRL_GLOBAL_LOCK		(0x00000004)	/* Global lock status */
++#define ESRAM_CTRL_FLUSHDISABLE		(0x00000002)	/* Global flush/dis */
++#define ESRAM_CTRL_SECDEC		(0x00000001)	/* ECC enable bit */
++
++/* PGBLOCK reg 0x82 - opcode 0x10/0x11 */
++#define ESRAM_PGBLOCK_FLUSHEN		(0x80000000)	/* Block flush enable */
++#define ESRAM_PGBLOCK_PGFLUSH		(0x40000000)	/* Flush the block */
++#define ESRAM_PGBLOCK_DISABLE		(0x20000000)	/* Block mode disable */
++#define ESRAM_PGBLOCK_ENABLE		(0x10000000)	/* Block mode enable */
++#define ESRAM_PGBLOCK_LOCK		(0x08000000)	/* Block mode lock en */
++#define ESRAM_PGBLOCK_INIT		(0x04000000)	/* Block init in prog */
++#define ESRAM_PGBLOCK_BUSY		(0x01000000)	/* Block is enabled */
++#define ESRAM_PGBLOCK_SYSADDR(x)	(x&0x000000FF)
++
++/* ESRAMPGCTRL - opcode 0x12/0x13 */
++#define ESRAM_PAGE_FLUSH_PAGE_EN	(0x80000000)	/* S3 autoflush */
++#define ESRAM_PAGE_FLUSH		(0x40000000)	/* Flush page to DRAM */
++#define ESRAM_PAGE_DISABLE		(0x20000000)	/* page disable bit */
++#define ESRAM_PAGE_EN			(0x10000000)	/* Page enable */
++#define ESRAM_PAGE_LOCK			(0x08000000)	/* Page lock en */
++#define ESRAM_PAGE_INITIALISING		(0x04000000)	/* Init in progress */
++#define ESRAM_PAGE_BUSY			(0x01000000)	/* Page busy */
++#define ESRAM_PAGE_MAP_SHIFT		(12)		/* Shift away 12 LSBs */
++
++/* Extra */
++#define ESRAM_MAP_OP			(0x01)
++#define ESRAM_UNMAP_OP			(0x00)
++
++/**
++ * struct esram_refname
++ *
++ * Structure to hold a linked list of names
++ */
++struct esram_refname {
++	char name[KSYM_SYMBOL_LEN];	/* Name of mapping */
++	struct list_head list;
++};
++
++/**
++ * struct esram_page
++ *
++ * Represents an eSRAM page in our linked list
++ */
++struct esram_page {
++
++	struct list_head list;		/* List entry descriptor */
++	struct list_head name_list;	/* Linked list for name references */
++	u32 id;				/* Page ID */
++	u32 phys_addr;			/* Physial address of page */
++	u32 refcount;			/* Reference count */
++	u32 vaddr;			/* Virtual address of page */
++
++};
++
++/**
++ * struct intel_qrk_esram_dev
++ *
++ * Structre to represent module state/data/etc
++ */
++struct intel_qrk_esram_dev{
++
++	/* Linux kernel structures */
++	struct list_head page_used;	/* Used pages */
++	struct list_head page_free;	/* Free pages */
++	spinlock_t slock;		/* Spinlock */
++	struct platform_device *pldev;	/* Platform device */
++
++	/* Actual data */
++	struct esram_page * pages;
++	u8 cbuf[ESRAM_PAGE_SIZE];
++
++	/* Stats */
++	u32 page_count;			/* As reported by silicon */
++	u32 page_disable_retries;	/* Aggreate count on disable */
++	u32 page_enable_retries;	/* Aggregate spin count page enable */
++	u32 page_free_ct;		/* Free pages for mapping code section */
++};
++
++static struct intel_qrk_esram_dev esram_dev;
++
++/* 
++ * Kallsyms does not provide data addresses. To map important structures such as
++ * the idt and gdt, we need to frig the lookup with the below. Other entities
++ * can similarly be added. Note we map a page from the given address - anything
++ * larger will require additional code to handle
++ */
++struct esram_symex {
++	char * name;
++	void * vaddr;
++	u32 size;
++};
++
++static struct esram_symex esram_symex[] = 
++{
++	{
++		.name = "idt_table",
++		.vaddr = &idt_table,
++		.size = ESRAM_PAGE_SIZE,
++	},
++	{
++		.name = "gdt_page",
++		.vaddr = &gdt_page,
++		.size = ESRAM_PAGE_SIZE,
++	},
++};
++
++/**
++ * intel_qrk_esram_stat_show
++ *
++ * @param dev: pointer to device
++ * @param attr: attribute pointer
++ * @param buf: output buffer
++ * @return number of bytes successfully read
++ *
++ * Populates eSRAM state via /sys/device/intel-qrk-esram.0/stat
++ */
++static ssize_t intel_qrk_esram_stat_show(struct device *dev,
++					 struct device_attribute *attr,
++					 char *buf)
++
++{
++	struct esram_page * epage = NULL;
++	int len = 0;
++	unsigned int count = PAGE_SIZE, size;
++	u32 pgpool = 0, ctrl = 0, pgblock = 0;
++	char * enabled = "enabled";
++	char * disabled = "disabled";
++
++	/* Display page-pool relevant data */
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_PGPOOL_REG, &pgpool, 1);
++	size = snprintf(buf, count,
++			"esram-pgpool\t\t\t: 0x%08x\n" 
++			"esram-pgpool.free\t\t: %u\n"
++			"esram-pgpool.flushing\t\t: %u\n",
++			pgpool,	ESRAM_PGPOOL_PGBUSY(pgpool)+1,
++			ESRAM_PGPOOL_FLUSHING(pgpool) + 1);
++	len += size;
++	count -= size;
++	
++	/* Display ctrl reg - most of this is of interest */
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_CTRL_REG, &ctrl, 1);
++	size = snprintf(buf + len, count - len,
++			"esram-ctrl\t\t\t: 0x%08x\n"
++			"esram-ctrl.ecc\t\t\t: %s\n"
++			"esram-ctrl.ecc-theshold\t\t: %u\n"
++			"esram-ctrl.pages\t\t: %u\n"
++			"esram-ctrl.dram-flush-priorityi\t: %u\n",
++			ctrl, (ctrl & ESRAM_CTRL_SECDEC) ? enabled : disabled,
++			ESRAM_CTRL_ECCTHRESH(ctrl), ESRAM_CTRL_SIZE(ctrl)+1,
++			ESRAM_CTRL_FLUSHPRI(ctrl));
++	len += size;
++	count -= size;
++
++	/* Display block ctrl/stat - we should be !block mode */
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_PGBLOCK_REG, &pgblock, 1);
++	size = snprintf(buf + len, count - len, "esram-block\t\t\t: 0x%08x\n",
++			pgblock);
++	len += size;
++	count -= size;
++
++	/* Print ECC status regs */
++
++	/* Print per-page info */
++	size = snprintf(buf + len, count - len, 
++			"free page\t\t\t: %u\nused page\t\t\t: %u\n"
++			"refresh  \t\t\t: %ums\npage enable retries\t\t: %u\n"
++			"page disable retries\t: %u\n",
++			esram_dev.page_free_ct, 
++			esram_dev.page_count-esram_dev.page_free_ct,
++			0,
++			esram_dev.page_enable_retries,
++			esram_dev.page_disable_retries);
++	len += size;
++	count -= size;
++
++	spin_lock(&esram_dev.slock);
++	if(!list_empty(&esram_dev.page_free)){
++
++		epage = list_first_entry(&esram_dev.page_free, struct esram_page, list);
++		size = snprintf(buf + len, count - len, 
++			"ecc next page \t\t\t: %u\n",epage->id);
++		len += size;
++		count -= size;
++
++
++	}
++	spin_unlock(&esram_dev.slock);
++
++	/* Return len indicate eof */
++	return len;
++}
++
++/**
++ * intel_qrk_esram_map_show
++ *
++ * @param dev: pointer to device
++ * @param attr: attribute pointer
++ * @param buf: output buffer
++ * @return number of bytes successfully read
++ * 
++ * Read back eSRAM mapped entries
++ */
++static ssize_t
++intel_qrk_esram_map_show(struct device *dev,struct device_attribute *attr,
++			 char *buf)
++{
++	struct esram_page * epage = NULL;
++	struct esram_refname * refname = NULL;
++	int len = 0, size = 0;
++	unsigned int count = PAGE_SIZE;
++
++	spin_lock(&esram_dev.slock);
++	list_for_each_entry(epage, &esram_dev.page_used, list){
++		/* Print references */
++		list_for_each_entry(refname, &epage->name_list, list){
++			size = snprintf(buf + len, count - len,
++				"%s ", refname->name);
++			len += size;
++			count -= size;
++		}
++		/* Print data */
++		size += snprintf(buf + len, count - len,
++			"\n\tPage virt 0x%08x phys 0x%08x\n"
++			"\tRefcount %u\n",
++			epage->vaddr, epage->phys_addr,
++			epage->refcount);
++		len += size;
++		count -= size;
++	}
++	spin_unlock(&esram_dev.slock);
++
++	/* Return len indicate eof */
++	return len;
++}
++
++/**
++ * intel_qrk_esram_map_store
++ *
++ * @param dev: pointer to device
++ * @param attr: attribute pointer
++ * @param buf: input buffer
++ * @param size: size of input data
++ * @return number of bytes successfully written
++ *
++ * Function allows user-space to switch mappings on/off with a simple
++ * echo idt_table > /sys/devices/intel-qrk-esram.0/map type command
++ */
++static ssize_t
++intel_qrk_esram_map_store(struct device *dev, struct device_attribute *attr,
++			  const char *buf, size_t size)
++{
++	ssize_t ret = 0;
++	char * sbuf = NULL;
++	unsigned long vaddr = 0, i = 0;
++	unsigned int count = PAGE_SIZE;
++
++	if(count <= 1){
++		return -EINVAL;
++	}
++
++	/* Get input */
++	sbuf = (char*)buf;
++
++	/* Fixup entity to scrub spaces */
++	while(sbuf < (buf + count)){
++		if(*sbuf == ' ' || *sbuf == '\r' || *sbuf =='\n'){
++			*sbuf = 0;
++			break;
++		}
++		sbuf++;
++	}
++
++	/* Check to see if we are being asked to map a non-kallsyms addr */
++	for(i = 0; i < sizeof(esram_symex)/sizeof(struct esram_symex); i++){
++		if(strcmp(buf, esram_symex[i].name) == 0){
++			ret = intel_qrk_esram_map_range(
++				esram_symex[i].vaddr,
++				esram_symex[i].size,
++				esram_symex[i].name);
++			goto done;
++		}
++	}
++
++	/* This path relies on kallsyms to provide name/address data */
++	vaddr = kallsyms_lookup_name(buf);
++	if(vaddr == 0)
++		goto done;
++
++	ret = intel_qrk_esram_map_symbol((void*)vaddr);
++done:
++	if(ret == 0)
++		ret = (ssize_t)count;
++	return ret;
++}
++
++static struct device_attribute dev_attr_stats = {
++	.attr = {
++		.name = "stats",
++		.mode = 0444,
++		},
++	.show = intel_qrk_esram_stat_show,
++};
++
++static struct device_attribute dev_attr_map = {
++	.attr = {
++		.name = "map",
++		.mode = 0644,
++		},
++	.show = intel_qrk_esram_map_show,
++	.store = intel_qrk_esram_map_store,
++};
++
++static struct attribute *platform_attributes[] = {
++	&dev_attr_stats.attr,
++	&dev_attr_map.attr,
++	NULL,
++};
++
++static struct attribute_group esram_attrib_group = {
++	.attrs = platform_attributes
++};
++
++/******************************************************************************
++ *                                eSRAM Core
++ ******************************************************************************/
++
++/**
++ * intel_qrk_esram_page_busy
++ *
++ * @param epage: Pointer to the page descriptor
++ * @return boolean indicating whether or not a page is enabled
++ */
++static int intel_qrk_esram_page_busy(struct esram_page * epage, u8 lock)
++{
++	u32 reg = 0;
++
++	sb_read(SB_ID_ESRAM, ESRAM_PAGE_READ, epage->id, &reg, lock);
++	return (reg&(ESRAM_PAGE_BUSY | ESRAM_PAGE_FLUSH | ESRAM_PAGE_DISABLE));
++}
++
++/**
++ * intel_qrk_esram_fault
++ *
++ * Dump eSRAM registers and kernel panic
++ * Nothing else to do at this point
++ */
++void intel_qrk_esram_fault(struct esram_page * epage, u32 lineno)
++{
++	u32 reg = 0, next = 0, prev = 0, prev_reg = 0;
++	u32 next_reg = 0, block = 0, ctrl = 0;
++
++	pr_err("eSRAM: fault @ %s:%d\n", __FILE__, lineno);
++	sb_read(SB_ID_ESRAM, ESRAM_PAGE_READ, epage->id, &reg, 1);
++	pr_err("read page %d state 0x%08x\n", epage->id, reg);
++	if(epage->id == 0){
++		next = 1; prev = 127;
++	}else if(epage->id == 127){
++		next = 0; prev = 126;
++	}else{
++		next = epage->id+1;
++		prev = epage->id-1;
++	}
++	sb_read(SB_ID_ESRAM, ESRAM_PAGE_READ, next, &next_reg, 1);
++	sb_read(SB_ID_ESRAM, ESRAM_PAGE_READ, prev, &prev_reg, 1);
++
++	/* Get state */
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_CTRL_REG, &ctrl, 1);
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_PGBLOCK_REG, &block, 1);
++
++	pr_err("eSRAM: CTRL 0x%08x block 0x%08x\n", ctrl, block);
++	pr_err("Prev page %d state 0x%08x Next page %d state 0x%08x\n"
++		, next, next_reg, prev, prev_reg);
++	BUG();
++}
++
++
++/**
++ * intel_qrk_esram_page_enable
++ *
++ * @param epage: struct esram_page carries data to program to register
++ * @param lock: Indicates whether to attain sb spinlock or not
++ * 
++ * Enable an eSRAM page spinning for page to become ready.
++ */
++static void intel_qrk_esram_page_enable(struct esram_page *epage, u8 lock)
++{
++	u32 ret = 0;
++
++	/* Fault if we try to enable a disabled page */
++	if(intel_qrk_esram_page_busy(epage, lock)){
++		intel_qrk_esram_fault(epage, __LINE__);
++	}
++
++	/* Program page mapping */
++	sb_write(SB_ID_ESRAM, ESRAM_PAGE_WRITE, epage->id, 
++		ESRAM_PAGE_FLUSH_PAGE_EN | ESRAM_PAGE_EN | 
++			(epage->phys_addr>>ESRAM_PAGE_MAP_SHIFT), lock);
++	do {
++		/* Poll until page busy bit becomes true */
++		ret = intel_qrk_esram_page_busy(epage, lock);
++
++		/* This branch should rarely if ever be true */
++		if(unlikely(ret == 0)){
++			esram_dev.page_enable_retries++;
++		}
++		
++	}while(ret == 0);
++}
++
++/**
++ * intel_qrk_esram_page_disable_sync
++ *
++ * @param epage: pointer to eSRAM page descriptor
++ *
++ * This function spins waiting for disable bit to clear, useful right after a
++ * disable/disable-flush command. Interrupts are enabled here, sleeping is OK
++ */
++static void intel_qrk_esram_page_disable_sync(struct esram_page * epage)
++{
++	u32 ret = 0, retries = 0;
++	do {
++		/* Poll for busy bit clear */
++		ret = intel_qrk_esram_page_busy(epage, 1);
++
++		/* This branch should rarely if ever be true */
++		if(unlikely(ret)){
++			esram_dev.page_disable_retries++;
++			retries++;
++		}
++
++		if(retries == MAX_PAGE_RETRIES){
++			intel_qrk_esram_fault(epage, __LINE__);
++		}
++	}while(ret);
++}
++
++/**
++ * intel_qrk_esram_page_disable
++ *
++ * @param epage: struct esram_page carries data to program to register
++ *
++ * Disable the eSRAM page no flush. Interrupts are enabled here, sleeping is OK
++ */
++static void intel_qrk_esram_page_disable(struct esram_page *epage)
++{
++	sb_write(SB_ID_ESRAM, ESRAM_PAGE_WRITE, epage->id,
++		ESRAM_PAGE_DISABLE, 1);
++	intel_qrk_esram_page_disable_sync(epage);	
++}
++
++/**
++ * intel_qrk_esram_page_flush_disable
++ *
++ * @param epage: struct esram_page carries data to program to register
++ *
++ * Disable the eSRAM page - with flush. Note the architecture will block access
++ * to the overlayed region until the flush has completed => irqs may be switched
++ * on during this operation.
++ */
++static void intel_qrk_esram_page_flush_disable(struct esram_page *epage)
++{
++	
++
++	/* Do flush */
++	sb_write(SB_ID_ESRAM, ESRAM_PAGE_WRITE, epage->id,
++		ESRAM_PAGE_FLUSH | ESRAM_PAGE_DISABLE, 1);
++
++	intel_qrk_esram_page_disable_sync(epage);	
++}
++
++#if 0
++/**
++ * intel_qrk_esram_flush_disable_all
++ *
++ * Flushes and disables all enabled eSRAM pages
++ */
++static void intel_qrk_esram_page_flush_disable_all(void)
++{
++	struct esram_page * epage = NULL;
++	
++	spin_lock(&esram_dev.slock);
++	list_for_each_entry(epage, &esram_dev.page_used, list){
++		intel_qrk_esram_page_flush_disable(epage);
++	}
++	spin_unlock(&esram_dev.slock);
++}
++#endif
++
++/**
++ * intel_qrk_esram_page_populate_atomic
++ *
++ * @param epage: Pointer to eSRAM page desciptor.
++ * @return 0 placeholder, later versions may return error
++ *
++ * Function takes the mappings given in epage and uses the values to populate
++ * an eSRAM page. The copy/enable/copy routine must be done atomically, since we
++ * may be doing a memcpy() of an ISR for example.
++ * For this reason we wrapper this entire call into a callback provided by 
++ * side-band, which does a spin_lock_irqsave calls this function and then does
++ * a spin_lock_irqrestore - thus guaranteeing atomicity of the below code and
++ * respect for the locking strategy of the side-band driver
++  */
++static int intel_qrk_esram_page_populate_atomic(struct esram_page * epage)
++{
++	unsigned long crz;
++
++	/* Copy away */	
++	memcpy(&esram_dev.cbuf, (void*)epage->vaddr, ESRAM_PAGE_SIZE);
++
++	/* If CR0.WP is true - flip it HSD # 4930660 */
++	crz = read_cr0();
++	if (crz & X86_CR0_WP){
++		write_cr0(crz & (~X86_CR0_WP));
++	}
++
++	/* Disable NMI */
++	outb(0x80, 0x70);
++	
++	/*  Enable page mapping */
++	intel_qrk_esram_page_enable(epage, 0);
++	
++	/* Copy back - populating memory overlay */
++	memcpy((void*)epage->vaddr, &esram_dev.cbuf,  ESRAM_PAGE_SIZE);
++
++	/* Re-enable NMI */
++	outb(0x00, 0x70);
++
++	/* Restore CR0.WP if appropriate HSD # 4930660 */
++	if (crz & X86_CR0_WP){
++		write_cr0(crz);
++	}
++	return 0;
++}
++
++/**
++ * intel_qrk_esram_page_populate
++ *
++ * @param epage: Pointer to eSRAM page desciptor.
++ * @return 0 on success < 0 on failure
++ *
++ * Populates the page. set_memory_rw/set_memory_ro require local irqs enabled.
++ * intel_qrk_esram_page_populate_atomic - needs irqs switched off since memory
++ * can be inconsistent during the populate operation. Depopulate operations are
++ * architecturally guaranteed
++ */
++static int intel_qrk_esram_page_populate(struct esram_page * epage)
++{
++	int flip_rw = 0, level = 0, ret = 0;
++	pte_t * pte = epage != NULL ? lookup_address(epage->vaddr, &level):NULL;
++
++	if(unlikely(pte == NULL)){
++		return -EINVAL;
++	}
++
++	/* Determine if we need to set writable */
++	flip_rw = !(pte_write(*pte));
++	
++	/* Ensure memory is r/w - do so before spin_lock_irqsave */
++	if(flip_rw){
++		ret = set_memory_rw(epage->vaddr, 1);
++		if (ret != 0){
++			pr_err("%s error during set_memory_rw = %d\n",
++				__func__, ret);
++			return ret;
++		}
++	}
++
++	/* Force ECC update @ disable only */
++	intel_qrk_esram_page_enable(epage, 1);
++	intel_qrk_esram_page_disable(epage);
++
++	/* Enable and populate eSRAM page using callback in sb with irqs off */
++	ret |= intel_qrk_sb_runfn_lock(
++		(int (*)(void*))intel_qrk_esram_page_populate_atomic,(void*)epage);
++
++	/* If we set memory writable - restore previous state */
++	if(flip_rw){
++		ret |= set_memory_ro(epage->vaddr, 1);
++		if (ret != 0){
++			pr_err("%s error during set_memory_ro = %d\n",
++				__func__, ret);
++			return ret;
++		}
++	}
++
++	return ret;
++}
++/**
++ * intel_qrk_esram_page_addref
++ *
++ * @param epage: eSRAM page descriptor
++ * @param name: Name of reference to add
++ * @return zero on success negative on error
++ *
++ */
++static int intel_qrk_esram_page_addref(struct esram_page * epage, char * name)
++{
++	struct esram_refname * refname = NULL;
++	if(unlikely(epage == NULL || name == NULL)){
++		return -EINVAL;
++	}
++
++	refname = kzalloc(sizeof(struct esram_refname), GFP_KERNEL);
++	if(unlikely(refname == NULL)){
++		return -ENOMEM;
++	}
++		
++	/* Add to list */
++	strncpy(refname->name, name, sizeof(refname->name));
++	list_add(&refname->list, &epage->name_list);
++
++	/* Bump reference count */
++	epage->refcount++;
++	return 0;
++}
++
++
++/**
++ * __intel_qrk_esram_map_page
++ *
++ * @param page: Page to map
++ * @param name: Name of the mapping
++ * @return 0 success < 0 failure
++ *
++ * Overlay a vritual address rangne eeds to be aligned to a 4k address.
++ * Since multiple items can live in a 4k range, it is possible when calling
++ * into map_page() that a previous mapping will have already covered some or all
++ * of the mapping we want. This is not an error case, if the map function finds
++ * it is being asked to map a 4k range already mapped it returns 0, to indicate
++ * the mapping has suceeded i.e. it's already been mapped. This is logical if
++ * you think about it. In contrast being asked to unmap a region not mapped is
++ * clearly an error...
++ *
++ */
++static int __intel_qrk_esram_map_page(u32 vaddr, char * name)
++{
++	int ret = 0;	
++	struct esram_page * epage = NULL;
++	struct esram_refname * refname = NULL;
++
++	if(unlikely(name == NULL)){
++		return -EINVAL;
++	}
++
++	if(unlikely(esram_dev.page_free_ct == 0)){
++		return -ENOMEM;
++	}
++
++	/* Verify if we have already mapped */
++	list_for_each_entry(epage, &esram_dev.page_used, list){
++		if(epage->vaddr == vaddr){
++
++			/* Page already mapped */
++			list_for_each_entry(refname, &epage->name_list, list){
++				if(strcmp(refname->name, name)==0){
++					/* Page mapped at this name */
++					return -EINVAL;
++				}
++			}
++			/* New symbol in previous mapping */
++			return intel_qrk_esram_page_addref(epage, name);
++		}
++	}
++
++	/* Enumerate eSRAM page structure */
++	epage = list_first_entry(&esram_dev.page_free, struct esram_page, list);
++	epage->phys_addr = virt_to_phys((void*)vaddr);
++	epage->vaddr = vaddr;
++	ret = intel_qrk_esram_page_addref(epage, name);
++	if(unlikely(ret < 0)){
++		return ret;
++	}
++	
++	/* Populate page */
++	ret = intel_qrk_esram_page_populate(epage);
++
++	/* Move to used list */
++	list_move(&epage->list, &esram_dev.page_used);
++	esram_dev.page_free_ct--;
++
++	return ret;
++}
++
++/**
++ * __intel_qrk_esram_unmap_page
++ *
++ * @param page: Page to unmap
++ * @param name: Name of the mapping
++ * @return 0 success < 0 failure
++ *
++ * Unmap a previously mapped virutal address range.
++ * Must be 4k aligned
++ *
++ */
++static int __intel_qrk_esram_unmap_page(u32 vaddr, char * name)
++{
++	u8 found = 0;
++	struct esram_page * epage = NULL;
++	struct esram_refname * refname = NULL;
++
++	/* Find physical address */
++	list_for_each_entry(epage, &esram_dev.page_used, list){
++		if(epage->vaddr == vaddr){
++			found = 1;
++			break;
++		}
++	}
++
++	/* Bail out on error */
++	if(found == 0){
++		pr_err("0x%08x not mapped\n", vaddr);
++		return -EINVAL;
++	}
++
++	/* Determine reference to delete */
++	found = 0;
++	list_for_each_entry(refname, &epage->name_list, list){
++		if(strcmp(refname->name,name)==0){
++			found = 1;
++			break;
++		}
++	}
++	if(unlikely(found == 0)){
++		pr_err("No mapping %s!\n", name);
++		return -EINVAL;
++	}
++
++	/* Remove entry decrement reference count */	
++	list_del(&refname->list);
++	kfree(refname);
++	if(--epage->refcount > 0){
++		return 0;
++	}
++
++	/* Flush and disable page */
++	intel_qrk_esram_page_flush_disable(epage);
++
++	/* Move to free list tail - scrub entries come from head */
++	list_move_tail(&epage->list, &esram_dev.page_free);
++	esram_dev.page_free_ct++;
++
++	return 0;
++}
++
++/**
++ *
++ * __intel_qrk_esram_page_op
++ *
++ * @param vaddr: Virtual address of symbol
++ * @param size: Size/length of symbol
++ * @param name: Name of mapping
++ * @param map: Boolean indicates whether to map or unmap the page
++ * @return 0 success < 0 failure
++ *
++ * This function maps/unmaps a pages/pages given at the given vaddr. If
++ * the extent of the symbol @ vaddr crosses a page boundary, then we map
++ * multiple pages. Other stuff inside the page, gets a performance boost 'for
++ * free'. Any other data in the page that crosses the physical page boundary
++ * will be partially mapped.
++ */
++static int __intel_qrk_esram_page_op(u32 vaddr, u32 size, char *name, u8 map)
++{
++	unsigned long offset = 0, page_offset = 0;
++	u32  pages = size/ESRAM_PAGE_SIZE + ((size%ESRAM_PAGE_SIZE) ? 1 : 0);
++	int ret = 0;
++
++	/* Compare required pages to available pages */
++	if(map == ESRAM_MAP_OP){
++		if(pages > esram_dev.page_free_ct)
++			return -ENOMEM;
++	}else{
++		if(pages > esram_dev.page_count - esram_dev.page_free_ct)
++			return -ENOMEM;
++	}
++
++	/* Align to 4k and iterate the mappings */	
++	vaddr = vaddr&ESRAM_PAGE_MASK;
++	while(size > 0){
++
++		/* Map the page */
++		spin_lock(&esram_dev.slock);
++		if(map == ESRAM_MAP_OP){
++			ret = __intel_qrk_esram_map_page(vaddr, name);
++							 
++		}else{
++			ret = __intel_qrk_esram_unmap_page(vaddr, name);
++		}
++		spin_unlock(&esram_dev.slock);
++		if(unlikely(ret != 0)){
++			break;
++		}
++
++		/* Calc appropriate offsets */
++		page_offset = offset_in_page(vaddr);
++		if(page_offset + size > ESRAM_PAGE_SIZE){
++
++			offset = ESRAM_PAGE_SIZE - page_offset;
++			size -= offset;
++			vaddr += ESRAM_PAGE_SIZE; 
++
++		}else{
++			size = 0;
++		}
++	}
++
++	return ret;
++}
++
++/******************************************************************************
++ *                                 eSRAM API
++ ******************************************************************************/
++
++/**
++ * intel_qrk_esram_map_range
++ *
++ * @param vaddr: Virtual address to start mapping (must be 4k aligned)
++ * @param size: Size to map from
++ * @param mapname: Mapping name
++ * @return 0 success < 0 failure
++ *
++ * Map 4k increments at given address to eSRAM.
++ */
++int intel_qrk_esram_map_range(void * vaddr, u32 size, char * mapname)
++{
++	if(size == 0 || mapname == NULL || vaddr == NULL){
++		return -EINVAL;
++	}
++	return __intel_qrk_esram_page_op((u32)vaddr, size, mapname, ESRAM_MAP_OP);
++}
++EXPORT_SYMBOL(intel_qrk_esram_map_range);
++
++/**
++ * intel_qrk_esram_map_symbol
++ *
++ * @param vaddr: Virtual address of the symbol
++ * @return 0 success < 0 failure
++ *
++ * Maps a series of 4k chunks starting at vaddr&0xFFFFF000. vaddr shall be a
++ * kernel text section symbol (kernel or loaded module)
++ *
++ * We get the size of the symbol from kallsyms. We guarantee to map the entire
++ * size of the symbol - plus whatever padding is necessary to get alignment to
++ * eSRAM_PAGE_SIZE 
++ * Other stuff inside the mapped pages will get a performance boost 'for free'.
++ * If this free boost is not what you want then 
++ *
++ *	1. Align to 4k
++ *	2. Pad to 4k
++ *	3. Call intel_qrk_esram_map_range()
++ */
++int intel_qrk_esram_map_symbol(void * vaddr)
++{
++	long unsigned int size = 0, offset = 0;
++	char symname[KSYM_SYMBOL_LEN];
++	
++	kallsyms_lookup_size_offset((long unsigned int)vaddr, &size, &offset);
++	if(size == 0){
++		return -EINVAL;
++	}
++	sprint_symbol(symname, (u32)vaddr);
++
++	return __intel_qrk_esram_page_op((u32)vaddr, size, symname, 1);
++}
++EXPORT_SYMBOL(intel_qrk_esram_map_symbol);
++
++/******************************************************************************
++ *                        Module/PowerManagement hooks 
++ ******************************************************************************/
++
++/**
++ * intel_qrk_esram_suspend
++ *
++ * @param pdev: Platform device structure (unused)
++ * @param pm: Power managment descriptor
++ * @return 0 success < 0 failure
++ *
++ * For each enabled page - flush to DRAM and disable eSRAM page.
++ * For each 4k region the architecture guarantees atomicity of flush/disable.
++ * Hence any memory transactions to the affected region will stall until
++ * flush/disable completes - hence interrupts are left on.
++ */
++static int intel_qrk_esram_suspend(struct device * pdev)
++{
++	/* Flush and disable of eSRAM pages is carried out automatically */
++	return 0;
++}
++
++/**
++ * intel_qrk_esram_resume
++ *
++ * @param pm: Power management descriptor
++ * @return 0 success < 0 failure
++ *
++ * Runs after resume_noirq. Switches pages back to ro, if appropriate. We do
++ * this here since interrupts will be on, as required by the function
++ * set_memory_ro. If it were possible to set memory ro in resume_noirq we would
++ * do it there instead
++ */
++static int intel_qrk_esram_resume(struct device * pdev)
++{
++	struct esram_page * epage = NULL;
++	int ret = 0;
++
++	list_for_each_entry(epage, &esram_dev.page_used, list){
++		ret |= intel_qrk_esram_page_populate(epage);
++	}
++	
++	return ret;
++}
++
++
++/**
++ * intel_qrk_esram_probe
++ *
++ * @param pdev: Platform device
++ * @return 0 success < 0 failure
++ *
++ * Callback from platform sub-system to probe
++ *
++ * This driver manages eSRAM on a per-page basis. Therefore if we find block
++ * mode is enabled, or any global, block-level or page-level locks are in place
++ * at module initialisation time - we bail out.
++ */
++static int intel_qrk_esram_probe(struct platform_device * pdev)
++{
++	int ret = 0;
++	u32 block = 0, ctrl = 0, i = 0, pgstat = 0;
++
++	memset(&esram_dev, 0x00, sizeof(esram_dev));
++	INIT_LIST_HEAD(&esram_dev.page_used);
++	INIT_LIST_HEAD(&esram_dev.page_free);
++	spin_lock_init(&esram_dev.slock);
++	esram_dev.page_free_ct = 0;
++	
++	/* Ensure block mode disabled */
++	block = ESRAM_PGBLOCK_DISABLE;
++	sb_write(SB_ID_ESRAM, ESRAM_CTRL_WRITE, ESRAM_PGBLOCK_REG, block, 1);
++
++	/* Get state */
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_CTRL_REG, &ctrl, 1);
++	sb_read(SB_ID_ESRAM, ESRAM_CTRL_READ, ESRAM_PGBLOCK_REG, &block, 1);
++
++	/* Verify state is good to go */
++	if (ctrl & ESRAM_CTRL_GLOBAL_LOCK){
++		pr_err ("eSRAM: global lock @ 0x%08x\n", ctrl);
++		return -ENODEV;
++	}
++
++	if (block & (ESRAM_PGBLOCK_LOCK | ESRAM_PGBLOCK_ENABLE)){
++		pr_err ("eSRAM: lock @ 0x%08x\n", block);
++		return -ENODEV;
++	}
++	pr_info("eSRAM: CTRL 0x%08x block 0x%08x\n", ctrl, block);
++
++	/* Calculate # of pages silicon supports */
++	esram_dev.page_count = ESRAM_CTRL_SIZE(ctrl) + 1;
++	esram_dev.page_free_ct = esram_dev.page_count;
++	pr_info("eSRAM: pages %d\n", esram_dev.page_free_ct);
++
++	if(esram_dev.page_free_ct <= 1){
++		pr_err("Too few pages reported by eSRAM sub-system\n");
++		return -ENOMEM;
++	}
++
++	/* Allocate an appropriate number of pages */
++	esram_dev.pages = kzalloc(esram_dev.page_count *
++		sizeof(struct esram_page), GFP_KERNEL);
++	if (esram_dev.pages == NULL){
++		return -ENOMEM;
++	}
++
++	/* Initialise list of free pages, explicitely disable as we go */
++	for(i = 0; i < esram_dev.page_count; i++){
++		INIT_LIST_HEAD(&esram_dev.pages[i].name_list);
++		esram_dev.pages[i].id = i;
++		
++		/* Read & verify page state */
++		sb_read(SB_ID_ESRAM, ESRAM_PAGE_READ, i, &pgstat, 1);
++		if(pgstat & (ESRAM_PAGE_BUSY | ESRAM_PAGE_LOCK)){
++			pr_err("eSRAM: page %d state 0x%08x err\n", i, pgstat);
++			ret = -ENODEV;
++			goto err;
++		}
++
++		list_add(&esram_dev.pages[i].list, &esram_dev.page_free);
++	}
++
++	ret = sysfs_create_group(&pdev->dev.kobj, &esram_attrib_group);
++	if (ret)
++		goto err;
++
++	return 0;
++err:
++	kfree(esram_dev.pages);
++	return ret;
++}
++
++/*
++ * Power management operations
++ */
++static const struct dev_pm_ops intel_qrk_esram_pm_ops = {
++	.suspend = intel_qrk_esram_suspend,
++	.resume = intel_qrk_esram_resume,
++};
++
++/*
++ * Platform structures useful for interface to PM subsystem
++ */
++static struct platform_driver intel_qrk_esram_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.owner = THIS_MODULE,
++		.pm = &intel_qrk_esram_pm_ops,
++	},
++	.probe = intel_qrk_esram_probe,
++};
++
++module_platform_driver(intel_qrk_esram_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>");
++MODULE_DESCRIPTION("Intel Quark eSRAM overlay/ECC-scrub driver");
++MODULE_LICENSE("Dual BSD/GPL");
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_esram.h b/drivers/platform/x86/quark/intel_qrk_esram.h
+new file mode 100644
+index 0000000..a4c9636
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_esram.h
+@@ -0,0 +1,100 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark eSRAM overlay driver
++ *
++ * eSRAM is an on-chip fast access SRAM.
++ *
++ * This driver provides the ability to map a kallsyms derived symbol of
++ * arbitrary length or a struct page entitiy.
++ * A proc interface is provided to allow map/unmap of kernel structures, without
++ * having to use the API from your code directly.
++ *
++ * Example:
++ * echo ehci_irq on > /proc/driver/esram/map
++ * echo ehci_irq off > /proc/driver/esram/map
++ *
++ * An API is provided to allow for mapping of a) kernel symbols or b) pages.
++ * eSRAM requires 4k physically aligned addresses to work - so a struct page
++ * fits neatly into this.
++ *
++ * To populte eSRAM we must copy data to a temporary buffer, overlay and
++ * then copy data back to the eSRAM region.
++ * 
++ * When entering S3 - we must save eSRAM state to DRAM, and similarly on restore
++ * to S0 we must repopulate eSRAM
++ * 
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>
++ */
++#ifndef __INTEL_QRK_ESRAM_H__
++#define __INTEL_QRK_ESRAM_H__
++
++#include <linux/module.h>
++
++/* Basic size of an eSRAM page */
++#define	INTEL_QRK_ESRAM_PAGE_SIZE	(0x1000)
++#define INTEL_QRK_ESRAM_PAGE_COUNT	(0x80)
++/**
++ * intel_qrk_esram_map_range
++ *
++ * @param vaddr: Virtual address to start mapping (must be 4k aligned)
++ * @param size: Size to map from
++ * @param mapname: Mapping name
++ * @return 0 success < 0 failure
++ *
++ * Map 4k increments at given address to eSRAM.
++ */
++int intel_qrk_esram_map_range(void * vaddr, u32 size, char * mapname);
++
++/**
++ * intel_qrk_esram_unmap_range
++ *
++ * @param vaddr: The virtual address to unmap
++ * @return 0 success < 0 failure
++ *
++ * Logical corollary of esram_map_page
++ */
++int intel_qrk_esram_unmap_range(void * vaddr, u32 size, char * mapname);
++
++/**
++ * intel_qrk_esram_map_symbol
++ *
++ * @param vaddr: Virtual address of the symbol
++ * @return 0 success < 0 failure
++ *
++ * Maps a series of 4k chunks starting at vaddr&0xFFFFF000. vaddr shall be a
++ * kernel text section symbol (kernel or loaded module)
++ *
++ * We get the size of the symbol from kallsyms. We guarantee to map the entire
++ * size of the symbol - plus whatever padding is necessary to get alignment to
++ * eSRAM_PAGE_SIZE 
++ * Other stuff inside the mapped pages will get a performance boost 'for free'.
++ * If this free boost is not what you want then 
++ *	1. Align to 4k
++ *	2. Pad to 4k
++ *	3. Call intel_qrk_esram_map_range()
++ */
++int intel_qrk_esram_map_symbol(void * vaddr);
++
++/**
++ * intel_qrk_esram_unmap_symbol
++ *
++ * @param vaddr: Virtual address of the symbol
++ * @return 0 success < 0 failure
++ *
++ * Logical corollary to intel_qrk_esram_map_symbol
++ * Undoes any mapping of pages starting at sym for sym's size
++ */
++int intel_qrk_esram_unmap_symbol(void * vaddr);
++
++#endif /* __INTEL_QRK_ESRAM_H__ */
+diff --git a/drivers/platform/x86/quark/intel_qrk_esram_test.c b/drivers/platform/x86/quark/intel_qrk_esram_test.c
+new file mode 100644
+index 0000000..c337dc5
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_esram_test.c
+@@ -0,0 +1,595 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/**
++ * intel_qrk_esram_test.c
++ *
++ * Simple test module to provide test cases for ITS integration
++ *
++ */
++#include <linux/cdev.h>
++#include <linux/crc32.h>
++#include <linux/crc32c.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/fs.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/kallsyms.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/slab.h>
++
++#include "intel_qrk_esram.h"
++#include "intel_qrk_esram_test.h"
++
++#define DRIVER_NAME			"intel_qrk_esram_test"
++
++/**
++ * struct intel_qrk_esram_dev
++ *
++ * Structre to represent module state/data/etc
++ */
++struct intel_qrk_esram_test_dev{
++	unsigned int opened;
++	struct platform_device *pldev;	/* Platform device */
++	struct cdev cdev;
++	struct mutex open_lock;
++	char * pdata;
++	u32 size;
++};
++
++static struct intel_qrk_esram_test_dev esram_test_dev;
++static struct class *esram_test_class;
++static DEFINE_MUTEX(esram_test_mutex);
++static int esram_test_major;
++static char * name = "testmap";
++
++/******************************************************************************
++ *                                eSRAM BIST
++ ******************************************************************************/
++
++static int crc_cache = 0;
++
++unsigned long long tsc_delta(unsigned long long first, unsigned long long end)
++{
++	if (first < end)
++		return end - first;
++	else
++		return (ULLONG_MAX - first) + end;	
++}
++
++
++/**
++ * intel_qrk_crctest
++ *
++ * Do a CRC32 of the specified region. Return the time taken in jiffies
++ */
++static unsigned long long intel_qrk_crctest(char * pdata, u32 crcsize)
++{
++	unsigned long long j1 = 0, j2 = 0;
++	
++	rdtscll(j1);
++
++	/* Flush LMT cache to introduce cache miss to our test */
++	__asm__ __volatile__("wbinvd\n");
++	crc32(0, pdata, crcsize);
++
++	rdtscll(j2);
++
++	return tsc_delta(j1, j2);
++}
++
++#ifdef __DEBUG__
++#define bist_err(x){\
++	pr_err("eSRAM bist err line %d errno %d\n", (__LINE__-2), x);\
++	return x;\
++}
++#else
++#define bist_err(x){\
++	return x;\
++}
++#endif
++/**
++ * intel_qrk_esram_perpage_overlay
++ *
++ * Maps to integration test spec ID CLN.F.SW.APP.eSRAM.0
++ */
++int intel_qrk_esram_test_perpage_overlay(void)
++{
++
++	int ret = 0;
++	u32 idx = 0, size = INTEL_QRK_ESRAM_PAGE_SIZE;
++
++	/* Set a known state */
++	for(idx = 0; idx < size; idx += sizeof(u32)){
++		*((u32*)&esram_test_dev.pdata[idx]) = idx;
++	}
++
++
++	/* Basic test of full range of memory */
++	ret = intel_qrk_esram_map_range(esram_test_dev.pdata, size, name);
++	if(ret){
++		bist_err(ret);
++	}
++	for(idx = 0; idx < size; idx += sizeof(u32)){
++		if(*((u32*)&esram_test_dev.pdata[idx]) != idx){
++			pr_err("Entry %d is 0x%08x require 0x%08x",
++				idx, esram_test_dev.pdata[idx], idx);
++			bist_err(-EIO);
++		}
++	}
++
++#if 0
++	ret = intel_qrk_esram_unmap_range(esram_test_dev.pdata, size, name);
++	if(ret){
++		bist_err(ret);
++	}
++#endif
++	return 0;
++}
++
++/**
++ * intel_qrk_esram_test_pageref_count
++ *
++ * Ensure page reference couting works as expected
++ */
++int intel_qrk_esram_test_pagref_count(void)
++{
++	u32 size = INTEL_QRK_ESRAM_PAGE_SIZE;
++	int ret = 0;
++
++	return 0;
++	/* Map a page */
++	ret = intel_qrk_esram_map_range(esram_test_dev.pdata, size, name);
++	if(ret){
++		bist_err(ret);
++	}
++
++	/* Map a second time - and verify mapping fails */
++	ret = intel_qrk_esram_map_range(esram_test_dev.pdata, size, name);
++	if(ret == 0){
++		bist_err(-EFAULT);
++	}
++
++#if 0
++	/* Unmap - OK */
++	ret = intel_qrk_esram_unmap_range(esram_test_dev.pdata, size, name);
++	if(ret){
++		bist_err(ret);
++	}
++
++	/* Verify second unmap operation fails */
++	ret = intel_qrk_esram_unmap_range(esram_test_dev.pdata, size, name);
++	if(ret == 0){
++		bist_err(-EFAULT);
++	}
++#endif	
++	return 0;
++}
++
++extern uint32_t get_crc32table_le(void);
++
++/**
++ * intel_qrk_esram_test_contig_perfmetric
++ *
++ * Do a CRC16 for a contigous area of memory
++ * Map contigous area and get a CRC16
++ *
++ * Ensure overlayed data takes less time than regular unoverlayed DRAM
++ */
++int intel_qrk_esram_test_contig_perfmetric(void)
++{
++	u32 crcsize = 0x60000;
++	unsigned long long crc32_fullmap = 0, crc32_fullunmap = 0;
++	uint32_t crc32table_le = kallsyms_lookup_name("crc32table_le");
++	int ret = 0;
++
++	if (crc32table_le == 0){
++		pr_err("%s unable to fine symbol crc32table_le\n", __func__);
++		return -ENODEV;
++	}
++
++	/* Get raw data metric */
++	crc_cache = 1;
++	crc32_fullunmap = intel_qrk_crctest(esram_test_dev.pdata, crcsize);
++
++	/* Map CRC16 symbol (algorithm) + code (data) */
++	ret = intel_qrk_esram_map_symbol(crc32_le);
++	if(ret){
++		bist_err(ret);
++	}
++	ret = intel_qrk_esram_map_symbol((void*)crc32table_le);
++	if(ret){
++		bist_err(ret);
++	}
++
++	/* Map test data */
++	ret = intel_qrk_esram_map_range(esram_test_dev.pdata, crcsize, name);
++	if(ret){
++		bist_err(ret);
++	}
++	
++	/* Get metric */
++	crc_cache = 1;
++	crc32_fullmap = intel_qrk_crctest(esram_test_dev.pdata, crcsize);
++#if 0
++	/* Tidy up */
++	ret = intel_qrk_esram_unmap_range(esram_test_dev.pdata, crcsize, name);
++	if(ret){
++		bist_err(ret);
++	}
++	ret = intel_qrk_esram_unmap_range(((void*)crc32_table),
++					  sizeof(crc32_table), name);
++	if(ret){
++		bist_err(ret);
++	}
++	ret = intel_qrk_esram_unmap_symbol(crc32);
++	if(ret){
++		bist_err(ret);
++	}
++#endif
++	pr_info("%s did crctest - mapped - in %llu ticks\n", __func__, crc32_fullmap);
++	pr_info("%s mapped count %llu unmapped %llu\n",
++		__func__, crc32_fullmap, crc32_fullunmap);
++	return crc32_fullmap < crc32_fullunmap;
++}
++
++/**
++ * intel_qrk_esram_test_kernel_codemap
++ *
++ * Maps some kernel code - a data section and then calls the code contained
++ * therein. Proves out the running overlayed eSRAM works
++ */
++int intel_qrk_esram_test_kernel_codemap(void)
++{
++#if 0
++	int ret = intel_qrk_esram_map_symbol(msleep);
++	if(ret){
++		printk(KERN_ERR "%s map symbol msleep fail\n", __FUNCTION__);
++		bist_err(ret);
++	}
++	
++	/* run the mapped code */
++	msleep(1);
++
++	/* unmap */	
++	ret = intel_qrk_esram_unmap_symbol(msleep);
++	if(ret){
++		printk(KERN_ERR "%s unmap symbol msleep fail\n", __FUNCTION__);
++		bist_err(ret);
++	}
++#endif
++	return 0;
++}
++
++/**
++ * intel_qrk_esram_test_kernel_datamap
++ *
++ * Tests mapping/unmapping of a kernel data structure
++ */
++int intel_qrk_esram_test_kernel_datamap(void)
++{
++#if 0
++	unsigned long jtag = 0;
++	unsigned long ctrl = 0;
++
++	/* Map the interrupt descriptor table */
++	int ret = intel_qrk_esram_map_range(idt_table, INTEL_QRK_ESRAM_PAGE_SIZE, name);
++	if(ret){
++		bist_err(ret);
++	}
++	
++	jtag = jiffies;
++	/* Wait for jiffies to tick or timeout to occur (failure) */
++	while(jtag == jiffies){
++		ctrl++;
++	}
++
++	/* unmap */	
++	ret = intel_qrk_esram_unmap_range(idt_table, INTEL_QRK_ESRAM_PAGE_SIZE, name);
++	if(ret){
++		bist_err(ret);
++	}
++#endif
++	return 0;
++}
++
++/**
++ * intel_qrk_esram_test_sub_unsub
++ *
++ * Subscribe and unsubscribe 100% of available eSRAM
++ */
++int intel_qrk_esram_test_sub_unsub(void)
++{
++	int ret = 0;
++	u32 idx = 0, size = INTEL_QRK_ESRAM_PAGE_SIZE * INTEL_QRK_ESRAM_PAGE_COUNT;
++
++	/* Set a known state */
++	for(idx = 0; idx < size; idx += sizeof(u32)){
++		*((u32*)&esram_test_dev.pdata[idx]) = idx;
++	}
++
++	/* Basic test of full range of memory */
++	ret = intel_qrk_esram_map_range(esram_test_dev.pdata, size, name);
++	if(ret){
++		bist_err(ret);
++	}
++	for(idx = 0; idx < size; idx += sizeof(u32)){
++		if(*((u32*)&esram_test_dev.pdata[idx]) != idx){
++			pr_err("Entry %d is 0x%08x require 0x%08x",
++				idx, esram_test_dev.pdata[idx], idx);
++			bist_err(-EIO);
++		}
++	}
++#if 0
++	ret = intel_qrk_esram_unmap_range(esram_test_dev.pdata, size, name);
++	if(ret){
++		bist_err(ret);
++	}
++#endif
++	return 0;
++}
++
++/**
++ * intel_qrk_esram_test_over_sub
++ *
++ * Test oversubscription of eSRAM
++ */
++int intel_qrk_esram_test_over_sub(void)
++{
++	int ret = 0;
++	u32 size = INTEL_QRK_ESRAM_PAGE_SIZE * (INTEL_QRK_ESRAM_PAGE_COUNT + 1);
++
++	/* Over subscribe should fail */
++	ret = intel_qrk_esram_map_range(esram_test_dev.pdata, size, name);
++	if(ret == 0){
++		//intel_qrk_esram_unmap_range(esram_test_dev.pdata, size, name);
++		bist_err(-EFAULT);
++	}
++	return 0;
++}
++
++/*
++ * File ops
++ */
++static long esram_test_ioctl(struct file *file, unsigned int cmd,
++		unsigned long arg)
++{
++	int ret = -EINVAL;
++
++	cmd -= QRK_ESRAM_IOCTL_BASE;
++	switch (cmd) {
++		case QRK_F_SW_APP_ESRAM_0:
++			/* Per page overlay */
++			ret = intel_qrk_esram_test_perpage_overlay();
++			break;
++
++		case QRK_F_SW_APP_ESRAM_1:
++			/* Verify page reference counting */
++			ret = intel_qrk_esram_test_pagref_count();
++			break;
++
++		case QRK_F_SW_APP_ESRAM_2:
++			/* Performance metric or overlay contig RAM */
++			ret = intel_qrk_esram_test_contig_perfmetric();
++			if (ret == 1)
++				ret = 0;
++			break;
++
++		case QRK_F_SW_APP_ESRAM_3:
++			/* Verify mapping of kernel code section */
++			/* Covered by test #2 */
++			ret = 0; //intel_qrk_esram_test_kernel_codemap();
++			break;
++
++		case QRK_F_SW_APP_ESRAM_4:
++			/* Verify mapping of kernel data section (IDT) */
++			/* Covered by test #2 */
++			ret = 0; //intel_qrk_esram_test_kernel_datamap();
++			break;
++
++		case QRK_F_SW_APP_ESRAM_5:
++			/* Complete subscribe/unsubscribe eSRAM */
++			ret = intel_qrk_esram_test_sub_unsub();
++			break;
++
++		case QRK_F_SW_APP_ESRAM_6:
++			/* Over subscribe eSRAM */
++			ret = intel_qrk_esram_test_over_sub();
++			break;
++
++		default:
++			break;
++	}
++
++	return ret;
++}
++
++static int esram_test_open(struct inode *inode, struct file *file)
++{
++	mutex_lock(&esram_test_mutex);
++	nonseekable_open(inode, file);
++
++	if (mutex_lock_interruptible(&esram_test_dev.open_lock)) {
++		mutex_unlock(&esram_test_mutex);
++		return -ERESTARTSYS;
++	}
++
++	if (esram_test_dev.opened) {
++		mutex_unlock(&esram_test_dev.open_lock);
++		mutex_unlock(&esram_test_mutex);
++		return -EINVAL;
++	}
++
++	esram_test_dev.opened++;
++	mutex_unlock(&esram_test_dev.open_lock);
++	mutex_unlock(&esram_test_mutex);
++
++	return 0;
++}
++
++static int esram_test_release(struct inode *inode, struct file *file)
++{
++	mutex_lock(&esram_test_dev.open_lock);
++	esram_test_dev.opened = 0;
++	mutex_unlock(&esram_test_dev.open_lock);
++
++	return 0;
++}
++
++static const struct file_operations esram_test_file_ops = {
++	.open = esram_test_open,
++	.release = esram_test_release,
++	.unlocked_ioctl = esram_test_ioctl,
++	.llseek = no_llseek,
++};
++
++
++/**
++ * intel_qrk_esram_test_probe
++ *
++ * @param pdev: Platform device
++ * @return 0 success < 0 failure
++ *
++ * Callback from platform sub-system to probe
++ *
++ * This driver manages eSRAM on a per-page basis. Therefore if we find block
++ * mode is enabled, or any global, block-level or page-level locks are in place
++ * at module initialisation time - we bail out.
++ */
++static int intel_qrk_esram_test_probe(struct platform_device * pdev)
++{
++	int retval = 0;
++	unsigned int minor = 0;
++
++	esram_test_dev.size = INTEL_QRK_ESRAM_PAGE_COUNT * INTEL_QRK_ESRAM_PAGE_SIZE;
++
++	/* Get memory */
++	esram_test_dev.pdata = kzalloc(esram_test_dev.size, GFP_KERNEL);
++	if(unlikely(esram_test_dev.pdata == NULL)){
++		pr_err("Can't allocate %d bytes\n", esram_test_dev.size);
++		return -ENOMEM;
++	}
++
++	mutex_init(&esram_test_dev.open_lock);
++	cdev_init(&esram_test_dev.cdev, &esram_test_file_ops);
++	esram_test_dev.cdev.owner = THIS_MODULE;
++
++	retval = cdev_add(&esram_test_dev.cdev, MKDEV(esram_test_major, minor), 1);
++	if (retval) {
++		printk(KERN_ERR "chardev registration failed\n");
++		kfree(esram_test_dev.pdata);
++		return -EINVAL;
++	}
++	if (IS_ERR(device_create(esram_test_class, NULL,
++				 MKDEV(esram_test_major, minor), NULL,
++				 "esramtest%u", minor))){
++		dev_err(&pdev->dev, "can't create device\n");
++		kfree(esram_test_dev.pdata);
++		return -EINVAL;
++	}
++	printk(KERN_INFO "%s/%s/%s complete OK !!\n", __FUNCTION__, __DATE__,__TIME__);
++	return 0;
++
++}
++
++/**
++ * intel_qrk_esram_remove
++ *
++ * @return 0 success < 0 failure
++ *
++ * Removes a platform device
++ */
++static int intel_qrk_esram_test_remove(struct platform_device * pdev)
++{
++	unsigned int minor = MINOR(esram_test_dev.cdev.dev);
++
++	device_destroy(esram_test_class, MKDEV(esram_test_major, minor));
++	cdev_del(&esram_test_dev.cdev);
++	kfree(esram_test_dev.pdata);
++
++	return 0;
++}
++
++/*
++ * Platform structures useful for interface to PM subsystem
++ */
++static struct platform_driver intel_qrk_esram_test_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.owner = THIS_MODULE,
++	},
++	.remove = intel_qrk_esram_test_remove,
++};
++
++/**
++ * intel_qrk_esram_init
++ *
++ * @return 0 success < 0 failure
++ *
++ * Module entry point
++ */
++static int __init intel_qrk_esram_test_init(void)
++{
++	int retval = 0;
++	dev_t dev;
++
++	esram_test_class = class_create(THIS_MODULE,"qrk_esram_test");
++	if (IS_ERR(esram_test_class)) {
++		retval = PTR_ERR(esram_test_class);
++		printk(KERN_ERR "esram_test: can't register earam_test class\n");
++		goto err;
++	}
++
++	retval = alloc_chrdev_region(&dev, 0, 1, "esram_test");
++	if (retval) {
++		printk(KERN_ERR "earam_test: can't register character device\n");
++		goto err_class;
++	}
++	esram_test_major = MAJOR(dev);
++
++	memset(&esram_test_dev, 0x00, sizeof(esram_test_dev));
++	esram_test_dev.pldev = platform_create_bundle(
++		&intel_qrk_esram_test_driver, intel_qrk_esram_test_probe, NULL, 0, NULL, 0);
++
++	if(IS_ERR(esram_test_dev.pldev)){
++		printk(KERN_ERR "platform_create_bundle fail!\n"); 
++		retval = PTR_ERR(esram_test_dev.pldev);
++		goto err_class;
++	}
++
++	return 0;
++
++err_class:
++	class_destroy(esram_test_class);
++err:
++	return retval;
++}
++
++/**
++ * intel_qrk_esram_exit
++ *
++ * Module exit
++ */
++static void __exit intel_qrk_esram_test_exit(void)
++{
++	platform_device_unregister(esram_test_dev.pldev);
++	platform_driver_unregister(&intel_qrk_esram_test_driver);
++}
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>");
++MODULE_DESCRIPTION("Intel Quark eSRAM ITS driver");
++MODULE_LICENSE("Dual BSD/GPL");
++
++module_init(intel_qrk_esram_test_init);
++module_exit(intel_qrk_esram_test_exit);
+diff --git a/drivers/platform/x86/quark/intel_qrk_esram_test.h b/drivers/platform/x86/quark/intel_qrk_esram_test.h
+new file mode 100644
+index 0000000..5adf7ca
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_esram_test.h
+@@ -0,0 +1,36 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/**
++ * intel_qrk_esram_test.h
++ *
++ * Define integers for ioctl operation
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>
++ */
++
++#ifndef __INTEL_QRK_ESRAM_TEST_H__
++#define __INTEL_QRK_ESRAM_TEST_H__
++
++#define QRK_ESRAM_IOCTL_BASE	255
++#define QRK_F_SW_APP_ESRAM_0	0x00000000
++#define QRK_F_SW_APP_ESRAM_1	0x00000001
++#define QRK_F_SW_APP_ESRAM_2	0x00000002
++#define QRK_F_SW_APP_ESRAM_3	0x00000003
++#define QRK_F_SW_APP_ESRAM_4	0x00000004
++#define QRK_F_SW_APP_ESRAM_5	0x00000005
++#define QRK_F_SW_APP_ESRAM_6	0x00000006
++#define QRK_F_SW_APP_ESRAM_7	0x00000007
++#define QRK_F_SW_APP_ESRAM_8	0x00000008
++
++#endif /* __INTEL_QRK_ESRAM_TEST_H__ */
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_imr.c b/drivers/platform/x86/quark/intel_qrk_imr.c
+new file mode 100644
+index 0000000..fcae59a
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_imr.c
+@@ -0,0 +1,690 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark IMR driver
++ *
++ * IMR stand for Insolate Memory Region, supported by Quark SoC.
++ *
++ * A total number of 8 IMRs have implemented by Quark SoC,
++ * Some IMRs might be already occupied by BIOS or Linux during
++ * booting time.
++ *
++ * A user can cat /sys/devices/platform/intel-qrk-imr/status for current IMR
++ * status 
++ *
++ * To allocate an IMR addresses must be alinged to 1k
++ *
++ * The IMR alloc API will locate the next available IMR slot set up
++ * with input memory region, then apply the input access right masks
++ *
++ * The IMR can be freed with the pre-allocated memory addresses.
++ */
++
++#include <asm-generic/uaccess.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/proc_fs.h>
++
++#include "intel_qrk_imr.h"
++#include <asm/imr.h>
++
++#define DRIVER_NAME	"intel-qrk-imr"
++
++#define IMR_READ_MASK	0x1
++#define IMR_MAX_ID	7
++
++#ifndef phys_to_virt
++#define phys_to_virt __va
++#endif
++
++/* IMR HW register address structre */
++struct qrk_imr_reg_t {
++	u8  imr_xl;   /* high address register */
++	u8  imr_xh;   /* low address register */
++	u8  imr_rm;   /* read mask register */
++	u8  imr_wm;   /* write mask register */
++} qrk_imr_reg_t;
++
++/**
++ * struct qrk_imr_addr_t
++ *
++ * IMR memory address structure
++ */
++struct qrk_imr_addr_t {
++	u32 addr_low;      /* low boundary memroy address */
++	u32 addr_high;     /* high boundary memory address */
++	u32 read_mask;     /* read access right mask */
++	u32 write_mask;    /* write access right mask */
++} qrk_imr_addr_t;
++
++/**
++ * struct qrk_imr_pack
++ *
++ * local IMR pack structure
++ */
++struct qrk_imr_pack {
++	bool occupied;       /* IMR occupied */
++	bool locked;         /* IMR lock */
++	struct qrk_imr_reg_t reg;   /* predefined imr register address */
++	struct qrk_imr_addr_t addr; /* IMR address region structure */
++	unsigned char info[MAX_INFO_SIZE]; /* IMR info */
++} qrk_imr_pack;
++
++
++/* Predefined HW register address */
++static struct qrk_imr_reg_t imr_reg_value[] = {
++	{ IMR0L, IMR0H, IMR0RM, IMR0WM },
++	{ IMR1L, IMR1H, IMR1RM, IMR1WM },
++	{ IMR2L, IMR2H, IMR2RM, IMR2WM },
++	{ IMR3L, IMR3H, IMR3RM, IMR3WM },
++	{ IMR4L, IMR4H, IMR4RM, IMR4WM },
++	{ IMR5L, IMR5H, IMR5RM, IMR5WM },
++	{ IMR6L, IMR6H, IMR6RM, IMR6WM },
++	{ IMR7L, IMR7H, IMR7RM, IMR7WM }
++};
++
++static struct platform_device *pdev;
++
++/**
++ * module parameter
++ * IMR slot should repersant the available IMR region from
++ * linux boot and BIOS.
++ *
++ * For example: imr_bit_mask = 0x10111001
++ * occupied IMR: 0, 3, 4, 5, 7
++ * un-occupied IMR: 1, 2, 6
++ */
++static int imr_bit_mask = 0xFF;
++module_param(imr_bit_mask, int, S_IRUGO|S_IWUSR);
++MODULE_PARM_DESC(imr_bit_mask, "IMR bit mask");
++
++/**
++ * module parameter
++ * if IMR lock is a nozero value, all unlocked
++ * imrs will be locked regardless the usage.
++ */
++static int imr_lock = 0;
++module_param(imr_lock, int, S_IRUGO|S_IWUSR);
++MODULE_PARM_DESC(imr_lock, "switch to lock unused IMR");
++
++/* local IMR data structure */
++struct qrk_imr_pack local_imr[IMR_MAXID];
++
++static unsigned short host_id;
++
++/**
++ * intel_qrk_imr_read_reg
++ *
++ * @param reg: register address
++ * @return nothing
++ *
++ * return register value from input address.
++ */
++static inline uint32_t intel_qrk_imr_read_reg(uint8_t reg)
++{
++	uint32_t temp = 0;
++
++	intel_qrk_sb_read_reg(SB_ID_ESRAM, CFG_READ_OPCODE, reg, &temp, 0);
++	return temp;
++}
++
++/**
++ * intel_clm_imr_latch_data
++ *
++ * @return nothing
++ *
++ * Populate IMR data structure from HW.
++ */
++static inline void intel_clm_imr_latch_data(void)
++{
++	int i = 0;
++
++	for (i = 0; i < IMR_MAXID; i++) {
++
++		local_imr[i].addr.addr_low =
++			intel_qrk_imr_read_reg(imr_reg_value[i].imr_xl);
++		local_imr[i].addr.addr_high =
++			intel_qrk_imr_read_reg(imr_reg_value[i].imr_xh);
++		local_imr[i].addr.read_mask =
++			intel_qrk_imr_read_reg(imr_reg_value[i].imr_rm);
++		local_imr[i].addr.write_mask =
++			intel_qrk_imr_read_reg(imr_reg_value[i].imr_wm);
++
++		if (local_imr[i].addr.addr_low & IMR_LOCK_BIT)
++			local_imr[i].locked = true;
++
++		if (local_imr[i].addr.read_mask > 0 &&
++			local_imr[i].addr.read_mask < IMR_READ_ENABLE_ALL){
++			local_imr[i].occupied = true;
++		} else {
++			local_imr[i].occupied = false;
++			memcpy(local_imr[i].info, "NOT USED", MAX_INFO_SIZE);
++		}
++	}
++}
++
++/**
++ * prepare_input_addr
++ *
++ * @param addr: input physical memory address
++ * @return formated memory address
++ *
++ * 1. verify input memory address alignment
++ * 2. apply IMR_REG_MASK to match the format required by HW
++ */
++static inline uint32_t prepare_input_addr(uint32_t addr)
++{
++	if (addr & (IMR_MEM_ALIGN - 1))
++		return 0;
++
++	addr = (addr >> 8) & IMR_REG_MASK;
++	return addr;
++}
++
++/**
++ * intel_qrk_imr_find_free_entry
++ *
++ * @return the next free imr slot
++ */
++static int intel_qrk_imr_find_free_entry(void)
++{
++	int i = 0;
++
++	intel_clm_imr_latch_data();
++
++	for (i = 0; i < IMR_MAXID; i++) {
++		if ((!local_imr[i].occupied) && (!local_imr[i].locked))
++			return i;
++	}
++
++	pr_err("%s: No more free IMR available.\n", __func__);
++	return -ENOMEM;
++}
++
++
++/**
++ * sb_write_chk
++ *
++ * @param id: Sideband identifier
++ * @param cmd: Command to send to destination identifier
++ * @param reg: Target register w/r to qrk_sb_id
++ * @param data: Data to write to target register
++ * @return nothing
++ *
++ * Set SB register and read back to verify register has been updated.
++ */
++static void sb_write_chk(qrk_sb_id id, u8 cmd, u8 reg, u32 data)
++{
++	u32 data_verify = 0;
++
++	intel_qrk_sb_write_reg(id, cmd, reg, data, 0);
++	intel_qrk_sb_read_reg(id, cmd, reg, &data_verify, 0);
++	BUG_ON(data != data_verify);
++}
++
++/**
++ * imr_add_entry
++ *
++ * @param id: imr slot id
++ * @param hi: hi memory address
++ * @param lo: lo memory address
++ * @param read: read access mask
++ * @param write: write access mask
++ * @return nothing
++ *
++ */
++static inline void imr_add_entry(int id, uint32_t hi, uint32_t lo,
++				 uint32_t read, uint32_t write, bool lock)
++{
++	u32 val = 0;
++
++	intel_qrk_sb_read_reg(SB_ID_ESRAM, CFG_READ_OPCODE,
++			      imr_reg_value[id].imr_xl, &val, 0);
++	val &= ~IMR_EN;
++	sb_write_chk(SB_ID_ESRAM, CFG_WRITE_OPCODE, imr_reg_value[id].imr_xl,
++		     val);
++
++	sb_write_chk(SB_ID_ESRAM, CFG_WRITE_OPCODE, imr_reg_value[id].imr_rm,
++		     read);
++	sb_write_chk(SB_ID_ESRAM, CFG_WRITE_OPCODE, imr_reg_value[id].imr_wm,
++		     write);
++	sb_write_chk(SB_ID_ESRAM, CFG_WRITE_OPCODE, imr_reg_value[id].imr_xh,
++		      hi);
++	sb_write_chk(SB_ID_ESRAM, CFG_WRITE_OPCODE, imr_reg_value[id].imr_xl,
++		      lo);
++}
++
++/**
++ * x1000_imr_add_entry
++ *
++ * @param id: imr slot id
++ * @param hi: hi memory address
++ * @param lo: lo memory address
++ * @param read: read access mask
++ * @param write: write access mask
++ * @return nothing
++ *
++ */
++static inline void x1000_imr_add_entry(int id, uint32_t hi, uint32_t lo,
++				       uint32_t read, uint32_t write, bool lock)
++{
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_xl, lo, 0);
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_xh, hi, 0);
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_rm, read, 0);
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_wm, write, 0);
++}
++
++/**
++ * intel_qrk_imr_add_entry
++ *
++ * @param id: imr slot id
++ * @param hi: hi memory address
++ * @param lo: lo memory address
++ * @param read: read access mask
++ * @param write: write access mask
++ * @return nothing
++ *
++ * Setup an IMR entry
++ */
++static void intel_qrk_imr_add_entry(int id, uint32_t hi,
++		uint32_t lo, uint32_t read, uint32_t write, bool lock)
++{
++	if (PCI_DEVICE_ID_X1000_HOST_BRIDGE == host_id)
++		x1000_imr_add_entry(id, hi, lo, read, write, lock);
++	else
++		imr_add_entry(id, hi, lo, read, write, lock);
++
++	if (lock) {
++		lo |= IMR_LOCK_BIT;
++		intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++					imr_reg_value[id].imr_xl, lo, 0);
++	}
++}
++
++/**
++ * get_phy_addr
++ * @return phy address value
++ *
++ * convert register format to physical address format.
++ */
++static uint32_t get_phy_addr(uint32_t reg_value)
++{
++	reg_value = ((reg_value & IMR_REG_MASK) << 8);
++	return reg_value;
++}
++
++
++
++/**
++ * intel_qrk_imr_init_mask
++ *
++ * @param mask: module parameter
++ * @return nothing
++ *
++ * prepare local IMR data structure from input module parameter.
++ */
++static void intel_qrk_imr_init_mask(int mask)
++{
++	int i = 0;
++
++	BUG_ON((mask > 255 || mask < 0));
++
++	for (i = 0; i < IMR_MAXID; i++) {
++		local_imr[i].addr.addr_low =
++			intel_qrk_imr_read_reg(imr_reg_value[i].imr_xl);
++
++		/* mask bit 1 means imr occupied*/
++		if (((mask>>i) & IMR_READ_MASK) == 0) {
++			if (!(local_imr[i].addr.addr_low & IMR_LOCK_BIT))
++				intel_qrk_remove_imr_entry(i);
++		}
++	}
++}
++
++/**
++ * imr_rm_entry
++ *
++ * @param id: imr slot id
++ * @return nothing
++ *
++ */
++static inline void imr_rm_entry(int id)
++{
++	u32 val = 0;
++
++	intel_qrk_sb_read_reg(SB_ID_ESRAM, CFG_READ_OPCODE,
++			      imr_reg_value[id].imr_xl, &val, 0);
++	val &= ~IMR_EN;
++	sb_write_chk(SB_ID_ESRAM, CFG_WRITE_OPCODE, imr_reg_value[id].imr_xl,
++		     val);
++}
++
++/**
++ * x1000_imr_rm_entry
++ *
++ * @param id: imr slot id
++ * @return nothing
++ *
++ */
++static inline void x1000_imr_rm_entry(int id)
++{
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_rm, IMR_READ_ENABLE_ALL,
++				0);
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_wm, IMR_WRITE_ENABLE_ALL,
++				0);
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_xl, IMR_BASE_ADDR, 0);
++	intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++				imr_reg_value[id].imr_xh, IMR_BASE_ADDR, 0);
++}
++
++/**
++ * intel_qrk_remove_imr_entry
++ *
++ * @param id: imr slot id
++ * @return nothing
++ *
++ * remove imr slot based on input id
++ */
++void intel_qrk_remove_imr_entry(int id)
++{
++	if (id >= IMR_MAXID || local_imr[id].locked)
++		return;
++
++	if (PCI_DEVICE_ID_X1000_HOST_BRIDGE == host_id)
++		x1000_imr_rm_entry(id);
++	else
++		imr_rm_entry(id);
++
++	intel_clm_imr_latch_data();
++
++}
++EXPORT_SYMBOL(intel_qrk_remove_imr_entry);
++
++/**
++ * intel_qrk_imr_alloc
++ *
++ * @param high: high boundary of memory address
++ * @param low: low boundary of memorry address
++ * @param read: IMR read mask value
++ * @param write: IMR write mask value
++ * @return nothing
++ *
++ * setup the next available IMR with customized read and write masks
++ */
++int intel_qrk_imr_alloc(uint32_t high, uint32_t low, uint32_t read,
++			uint32_t write, unsigned char *info, bool lock)
++{
++	int id = 0;
++
++	if (info == NULL)
++		return -EINVAL;
++
++	if ((low & IMR_LOCK_BIT) || (read == 0 || write == 0)) {
++		pr_err("%s: Invalid acces mode\n", __func__);
++		return -EINVAL;
++	}
++
++	/* Calculate aligned addresses and validate range */
++	high = prepare_input_addr(high);
++	low = prepare_input_addr(low);
++
++	/* Find a free entry */
++	id = intel_qrk_imr_find_free_entry();
++	if (id < 0)
++		return -ENOMEM;
++
++	/* Add entry - locking as necessary */
++	intel_qrk_imr_add_entry(id, high, low, (read & IMR_READ_ENABLE_ALL),
++				write, lock);
++
++	/* Name the new entry */
++	memcpy(local_imr[id].info, info, MAX_INFO_SIZE);
++
++	/* Update local data structures */
++	intel_clm_imr_latch_data();
++
++	pr_info("IMR alloc id %d 0x%08x - 0x%08x %s\n", id, low, high,
++		lock ? "locked" : "unlocked");
++
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_imr_alloc);
++
++/**
++ * intel_qrk_imr_free
++ *
++ * @param high: high boundary of memory address
++ * @param low: low boundary of memorry address
++ * @return nothing
++ *
++ * remove the imr based on input memory region
++ */
++int intel_qrk_imr_free(uint32_t high, uint32_t low)
++{
++	int i = 0;
++
++	if (low > high) {
++		pr_err("%s: Invalid input address values.\n", __func__);
++		return -EINVAL;
++	}
++
++	high = prepare_input_addr(high);
++	if (!high) {
++		pr_err("%s: Invalid input memory address.\n", __func__);
++		return -EINVAL;
++	}
++
++	low = prepare_input_addr(low);
++	if (!low) {
++		pr_err("%s: Invalid input memory address.\n", __func__);
++		return -EINVAL;
++	}
++
++	for (i = 0; i < IMR_MAXID; i++) {
++		if (local_imr[i].occupied
++			&& (local_imr[i].addr.addr_low == low)
++			&& (local_imr[i].addr.addr_high == high)
++			&& (!local_imr[i].locked)) {
++				intel_qrk_remove_imr_entry(i);
++				return 0;
++			}
++	}
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL(intel_qrk_imr_free);
++
++/**
++ * intel_qrk_imr_init_data
++ *
++ * @return nothing
++ * initialize local_imr data structure
++ */
++static void intel_qrk_imr_init_data(void)
++{
++	int i = 0;
++	char * res_str = "System Reserved Region";
++	int len = strlen(res_str);
++
++	intel_clm_imr_latch_data();
++
++	for (i = 0; i < IMR_MAXID; i++) {
++		local_imr[i].reg = imr_reg_value[i];
++		memcpy(local_imr[i].info, res_str, len);
++	}
++}
++
++/**
++ * intel_qrk_imr_lockall
++ *
++ * @param mask: module parameter
++ * @return nothing
++ *
++ * lock up all un-locked IMRs
++ */
++int intel_qrk_imr_lockall(void)
++{
++	int i = 0;
++	uint32_t temp_addr;
++
++	/* Enumerate IMR data structures */
++	intel_qrk_imr_init_data();
++	intel_qrk_imr_init_mask(imr_bit_mask);
++
++	/* Cycle through IMRs locking whichever are unlocked */
++	for (i = 0; i < IMR_MAXID; i++) {
++
++		temp_addr = local_imr[i].addr.addr_low;
++		if (!(temp_addr & IMR_LOCK_BIT)) {
++
++			DBG("%s: locking IMR %d\n", __func__, i);
++			temp_addr |= IMR_LOCK_BIT;
++			intel_qrk_sb_write_reg(SB_ID_ESRAM, CFG_WRITE_OPCODE,
++						local_imr[i].reg.imr_xl,
++						temp_addr, 0);
++		}
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_imr_lockall);
++
++/**
++ * intel_qrk_imr_stat_show
++ *
++ * @param dev: pointer to device
++ * @param attr: attribute pointer
++ * @param buf: output buffer
++ * @return number of bytes successfully read
++ *
++ * Populates IMR state via /sys/device/intel-qrk-imr/stat
++ */
++static int intel_qrk_imr_stat_show(struct device *dev,
++				   struct device_attribute *attr,
++				   char *buf)
++{
++	int len = 0;
++	int i = 0;
++	int size, count = PAGE_SIZE;
++	uint32_t hi_phy_addr, lo_phy_addr;
++
++	for (i = 0; i < IMR_MAXID; i++) {
++
++		/* read back the actual  input physical memory address */
++		hi_phy_addr = get_phy_addr(local_imr[i].addr.addr_high);
++		lo_phy_addr = get_phy_addr(local_imr[i].addr.addr_low);
++
++		/* the IMR always protect extra 1k memory size above the input
++		 * high reg value
++		 */
++		size = ((hi_phy_addr - lo_phy_addr) / IMR_MEM_ALIGN) + 1;
++
++		size = snprintf(buf+len, count,
++				"imr - id : %d\n"
++				"info     : %s\n"
++				"occupied : %s\n"
++				"locked   : %s\n"
++				"size     : %d kb\n"
++				"hi addr (phy): 0x%08x\n"
++				"lo addr (phy): 0x%08x\n"
++				"hi addr (vir): 0x%08x\n"
++				"lo addr (vir): 0x%08x\n"
++				"read mask  : 0x%08x\n"
++				"write mask : 0x%08x\n\n",
++				i,
++				local_imr[i].info,
++				local_imr[i].occupied ? "yes" : "no",
++				local_imr[i].locked ? "yes" : "no",
++				size,
++				hi_phy_addr,
++				lo_phy_addr,
++				(uint32_t)phys_to_virt(hi_phy_addr),
++				(uint32_t)phys_to_virt(lo_phy_addr),
++				local_imr[i].addr.read_mask,
++				local_imr[i].addr.write_mask);
++		len += size;
++		count -= size;
++	}
++	return len;
++}
++
++static struct device_attribute dev_attr_stats = {
++	.attr = {
++		.name = "stat",
++		.mode = 0444, },
++	.show = intel_qrk_imr_stat_show,
++};
++
++static struct attribute *platform_attributes[] = {
++	&dev_attr_stats.attr,
++	NULL,
++};
++
++static struct attribute_group imr_attrib_group = {
++	.attrs = platform_attributes
++};
++
++/**
++ * intel_qrk_imr_init
++ *
++ * @param dev_id: Host Bridge's PCI device ID
++ * @return 0 success < 0 failue
++ *
++ * module entry point
++ */
++int intel_qrk_imr_init(unsigned short dev_id)
++{
++	int ret;
++
++	host_id = dev_id;
++
++	pdev = platform_device_alloc(DRIVER_NAME, -1);
++	if (!pdev)
++		return -ENOMEM;
++
++	ret = platform_device_add(pdev);
++	if (ret)
++		goto fail_platform;
++
++	/* initialise local imr data structure */
++	intel_qrk_imr_init_data();
++
++	ret = sysfs_create_group(&pdev->dev.kobj, &imr_attrib_group);
++	if (ret)
++		goto fail_platform;
++
++	if(intel_qrk_imr_runt_setparams() == 0 && imr_lock == 1){
++                intel_qrk_imr_lockall();
++        }
++
++	return 0;
++
++fail_platform:
++	platform_device_del(pdev);
++	return ret;
++}
++EXPORT_SYMBOL(intel_qrk_imr_init);
++
++MODULE_DESCRIPTION("Intel Quark SOC IMR API ");
++MODULE_AUTHOR("Intel Corporation");
++MODULE_LICENSE("Dual BSD/GPL");
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_imr.h b/drivers/platform/x86/quark/intel_qrk_imr.h
+new file mode 100644
+index 0000000..a6f4730
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_imr.h
+@@ -0,0 +1,150 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark IMR driver
++ *
++ * IMR stand for Insolate Memory Region, supported by Quark SoC.
++ *
++ * A total number of 8 IMRs have implemented by Quark SoC,
++ * some IMRs might be already occupied by BIOS or Linux booting time.
++ *
++ * Input addresses parameter required the actual Physical address.
++ *
++ * The IMR alloc API will locate the next available IMR slot set up
++ * with input memory region, and apply with the default access right
++ * (CPU & CPU_snoop enable).
++ *
++ * The alloc_mask API takes input read & write masks values to set up
++ * IMR with customized access right.
++ *
++ * User can free IMR with pre-alloc specified addresses.
++ */
++
++#ifndef __INTEL_QRK_IMR_H__
++#define __INTEL_QRK_IMR_H__
++
++#include <linux/intel_qrk_sb.h>
++#include "asm/io.h"
++
++#define CFG_READ_OPCODE         0x10    /* BUnit Control Read */
++#define CFG_WRITE_OPCODE        0x11    /* BUnit control write */
++
++/* DRAM IMR register addresses */
++#define IMR0L			0x40
++#define IMR0H			0x41
++#define IMR0RM			0x42
++#define IMR0WM			0x43
++#define IMR1L			0x44
++#define IMR1H			0x45
++#define IMR1RM			0x46
++#define IMR1WM			0x47
++#define IMR2L			0x48
++#define IMR2H			0x49
++#define IMR2RM			0x4A
++#define IMR2WM			0x4B
++#define IMR3L			0x4C
++#define IMR3H			0x4D
++#define IMR3RM			0x4E
++#define IMR3WM			0x4F
++#define IMR4L			0x50
++#define IMR4H			0x51
++#define IMR4RM			0x52
++#define IMR4WM			0x53
++#define IMR5L			0x54
++#define IMR5H			0x55
++#define IMR5RM			0x56
++#define IMR5WM			0x57
++#define IMR6L			0x58
++#define IMR6H			0x59
++#define IMR6RM			0x5A
++#define IMR6WM			0x5B
++#define IMR7L			0x5C
++#define IMR7H			0x5D
++#define IMR7RM			0x5E
++#define IMR7WM			0x5F
++
++#define IMR_EN			0x40000000
++#define IMR_LOCK_BIT            0x80000000
++#define IMR_WRITE_ENABLE_ALL    0xFFFFFFFF
++#define IMR_READ_ENABLE_ALL     0xBFFFFFFF
++#define IMR_REG_MASK            0xFFFFFC
++
++#define IMR_ESRAM_FLUSH_INIT	0x80000000  /* esram flush */
++#define IMR_SNOOP_ENABLE	0x40000000  /* core snoops */
++#define IMR_PUNIT_ENABLE	0x20000000
++#define IMR_SMM_ENABLE		0x02        /* core SMM access */
++#define IMR_NON_SMM_ENABLE	0x01        /* core non-SMM access */
++#define IMR_BASE_ADDR           0x00
++#define IMR_MEM_ALIGN           0x400
++
++#define MAX_INFO_SIZE           64
++#define IMR_MAXID		8
++
++/* snoop + Non SMM write mask */
++#define IMR_DEFAULT_MASK	(IMR_SNOOP_ENABLE \
++				+ IMR_ESRAM_FLUSH_INIT \
++				+ IMR_NON_SMM_ENABLE)
++
++/* debug printk */
++#ifdef DEBUG
++#define DBG(args...) pr_info(args)
++#else
++#define DBG(args...)
++#endif
++
++extern unsigned long  _text;
++extern unsigned long  __init_begin;
++
++/**
++ * intel_qrk_imr_alloc
++ *
++ * @param high: the end of physical memory address
++ * @param low: the start of physical memory address
++ * @param read: IMR read mask value
++ * @param write: IMR write maks value
++ * @param info: imr information
++ * @param lock: imr lock
++ *
++ * Setup imr with customised read/ write masks
++ */
++int intel_qrk_imr_alloc(u32 high, u32 low, u32 read, u32 write,
++			unsigned char *info, bool lock);
++
++/**
++ * intel_qrk_imr_free
++ *
++ * @param high: high boundary of memory address
++ * @param low: low boundary of memorry address
++ *
++ * remove the imr based on input memory region
++ */
++int intel_qrk_imr_free(u32 high, u32 low);
++
++/**
++ * intel_qrk_remove_imr_entry
++ *
++ * @param id: internal imr data struct id
++ *
++ * Remove imr based on input imr data structure id
++ */
++void intel_qrk_remove_imr_entry(int id);
++
++/**
++ * intel_qrk_imr_init
++ *
++ * @param dev_id: Host Bridge's PCI device ID
++ * Initialise IMRs
++ */
++int intel_qrk_imr_init(unsigned short dev_id);
++
++#endif
+diff --git a/drivers/platform/x86/quark/intel_qrk_imr_kernel.c b/drivers/platform/x86/quark/intel_qrk_imr_kernel.c
+new file mode 100644
+index 0000000..1cf922d
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_imr_kernel.c
+@@ -0,0 +1,132 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark IMR driver
++ *
++ * IMR stand for Insolate Memory Region, supported by Quark SoC.
++ *
++ * The IMR id 3 is pre-defined as the use for kernel data protection
++ *
++ * The early imr protects entire memory (from the beginning of kernel text
++ * section to the top of memory) during linux boot time. In the linux run
++ * time, the protection need to resize down to memory region that only
++ * contains: kernel text, read only data, and initialized data section.
++ *
++ */
++#include <linux/errno.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/platform_data/quark.h>
++#include <linux/printk.h>
++#include "intel_qrk_imr.h"
++
++/* pre-defined imr id for uncompressed kernel */
++#define IMR_KERNEL_ID	3
++
++/**
++ * addr_hw_ready
++ *
++ * shift input address value to match HW required 1k aligned format
++ */
++static inline uint32_t addr_hw_ready(uint32_t addr)
++{
++	/* memory alignment */
++	addr &= (~((1 << 10) - 1));
++
++	/* prepare input addr in HW required format */
++	addr = (addr >> 8) & IMR_REG_MASK;
++	return addr;
++}
++
++/**
++ * void intel_qrk_imr_runt_kerndata_setup
++ *
++ * Setup imr for kernel text, read only data section
++ *
++ * The read only data (rodata) section placed between text and initialized data
++ * section by kernel.
++ */
++static void intel_qrk_imr_runt_kerndata_setup(void)
++{
++	uint32_t hi;
++	uint32_t lo;
++
++	hi = (uint32_t)virt_to_phys(&__init_begin);
++	lo = (uint32_t)virt_to_phys(&_text);
++
++	/* Set a locked IMR around the kernel .text section */
++	if (intel_qrk_imr_alloc((hi - IMR_MEM_ALIGN), lo,
++				IMR_DEFAULT_MASK, IMR_DEFAULT_MASK,
++				"KERNEL RUNTIME DATA", 1)) {
++		pr_err("IMR: Set up runtime kernel data imr faild!\n");
++		return;
++	}
++}
++
++/**
++ * intel_qrk_imr_teardown_unlocked
++ *
++ * Remove any unlocked IMR
++ *
++ */
++static void intel_qrk_imr_teardown_unlocked(void)
++{
++	int i = 0;
++	for (i = 0; i < IMR_MAXID; i++)
++		intel_qrk_remove_imr_entry(i);
++}
++
++/**
++ * intel_qrk_imr_runt_setparams
++ *
++ * set imr range for text, read only, initialised data in linux run time
++ */
++int intel_qrk_imr_runt_setparams(void)
++{
++	/* Setup an IMR around the kernel .text area */
++	intel_qrk_imr_runt_kerndata_setup();
++
++	/* Remove any other unlocked IMR */
++	intel_qrk_imr_teardown_unlocked();
++
++	return 0;
++}
++EXPORT_SYMBOL(intel_qrk_imr_runt_setparams);
++
++/**
++ * intel_qrk_imr_runt_init
++ *
++ * module entry point
++ */
++static int  __init intel_qrk_imr_runt_init(void)
++{
++	return 0;
++}
++
++/**
++ * intel_qrk_imr_runt_exit
++ *
++ * Module exit
++ */
++static void __exit intel_qrk_imr_runt_exit(void)
++{
++	/* do nothing */
++}
++
++MODULE_DESCRIPTION("Intel Quark SOC IMR API ");
++MODULE_AUTHOR("Intel Corporation");
++MODULE_LICENSE("Dual BSD/GPL");
++
++subsys_initcall(intel_qrk_imr_runt_init);
++module_exit(intel_qrk_imr_runt_exit);
+diff --git a/drivers/platform/x86/quark/intel_qrk_imr_test.c b/drivers/platform/x86/quark/intel_qrk_imr_test.c
+new file mode 100644
+index 0000000..549bb61
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_imr_test.c
+@@ -0,0 +1,350 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark IMR Test module
++ *
++ */
++
++#include <linux/cdev.h>
++#include <linux/device.h>
++#include <linux/fs.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/slab.h>
++#include "intel_qrk_imr.h"
++
++#define DRIVER_NAME			"intel_qrk_imr_test"
++
++/**
++ * XXX intel_qrk_sb.h needs to be updated with SB_ID_PUNIT and change
++ * propagated. This is a workaround to make it look less ugly. */
++#define SB_ID_PUNIT			SB_ID_THERMAL
++
++/* Memory-mapped SPI Flash address */
++#define ILB_SPIFLASH_BASEADDR			0xFF800000
++/* PUnit DMA block transfer size, in bytes */
++#define SPI_DMA_BLOCK_SIZE			512
++
++/**************************** Exported to LISA *******************************/
++
++/*
++ * Internally-used ioctl code. At the moment it is not reserved by any mainline
++ * driver.
++ */
++#define IMR_TEST_IOCTL_CODE			0xE1
++
++/*
++ * Integers for ioctl operation.
++ */
++#define IOCTL_QRK_SANITY_CHECK_PUNIT_DMA	_IO(IMR_TEST_IOCTL_CODE, 0x00)
++#define IOCTL_QRK_IMR_1				_IO(IMR_TEST_IOCTL_CODE, 0x01)
++
++/*****************************************************************************/
++
++/**
++ * struct intel_qrk_imr_dev
++ *
++ * Structure to represent module state/data/etc
++ */
++struct intel_qrk_imr_test_dev {
++	unsigned int opened;
++	struct platform_device *pldev;	/* Platform device */
++	struct cdev cdev;
++	struct mutex open_lock;
++};
++
++static struct intel_qrk_imr_test_dev imr_test_dev;
++static struct class *imr_test_class;
++static DEFINE_MUTEX(imr_test_mutex);
++static int imr_test_major;
++
++/* PUnit DMA registers over side-band */
++#define PUNIT_SPI_DMA_COUNT_REG		0x60
++#define PUNIT_SPI_DMA_DEST_REG		0x61
++#define PUNIT_SPI_DMA_SRC_REG		0x62
++
++/**
++ * ilb_spi_dma_read 
++ *
++ * @param src: physical address in Legacy SPI Flash
++ * @param dst: physical address of destination
++ * @param dma_block_count: number of 512B SPI Flash blocks to be transferred
++ *
++ * Read-access iLB SPI via PUnit DMA engine.
++ * 
++ */
++static void ilb_spi_dma_read(u32 *src, u32 *dst, u32 dma_block_count)
++{
++	pr_info("%s: src=%p, dst=%p, count=%u\n", __func__, src, dst,
++		dma_block_count);
++
++	/* Setup source and destination addresses. */
++	intel_qrk_sb_write_reg(SB_ID_PUNIT, CFG_WRITE_OPCODE,
++		PUNIT_SPI_DMA_SRC_REG, (u32) src, 0);
++	intel_qrk_sb_write_reg(SB_ID_PUNIT, CFG_WRITE_OPCODE,
++		PUNIT_SPI_DMA_DEST_REG, (u32) dst, 0);
++
++	pr_info("%s: starting transaction\n", __func__);
++
++	/*
++	 * Setup the number of block to be copied over. Transaction will start
++	 * as soon as the register is filled with value.
++	 */
++	intel_qrk_sb_write_reg(SB_ID_PUNIT, CFG_WRITE_OPCODE,
++		PUNIT_SPI_DMA_COUNT_REG, dma_block_count, 0);
++
++	/* Poll for completion. */
++	while (dma_block_count > 0) {
++		intel_qrk_sb_read_reg(SB_ID_PUNIT, CFG_READ_OPCODE,
++			PUNIT_SPI_DMA_COUNT_REG, &dma_block_count, 0); 
++	}
++
++	pr_info("%s: transaction completed\n", __func__);
++}
++
++/**
++ * punit_dma_sanity_check 
++ *
++ * @return 0 if success, 1 if failure
++ *
++ * Perform a basic sanity check for PUnit DMA engine. Copy over a 512B SPI
++ * Flash block. 
++ */
++static int punit_dma_sanity_check(void)
++{
++	int err = 0;
++	u32 *buffer = NULL;
++	u32 buf_ph_addr = 0;
++
++	/* Allocate 512B buffer for 1 SPI Flash block */
++	buffer = kzalloc(SPI_DMA_BLOCK_SIZE, GFP_KERNEL);
++        if (!buffer) {
++		err = -ENOMEM;
++		goto end;
++	}
++
++	/* DMA first SPI Flash block into buffer */
++	buf_ph_addr = (u32)virt_to_phys(buffer);
++	ilb_spi_dma_read((u32 *)ILB_SPIFLASH_BASEADDR, (u32 *)buf_ph_addr, 1);
++
++	kfree(buffer);
++end:
++	return err;
++}
++
++/**
++ * imr_violate_kernel_punit_dma 
++ *
++ * @return always 0
++ *
++ * PUnit-DMA access to the Uncompressed Kernel IMR.
++ * This is based on set_imr_kernel_data() in intel_qrk_imr.c. Find the physical
++ * address of .text section and copy a 512B chunk of legacy SPI via PuUnit DMA.
++ * 
++ */
++static int imr_violate_kernel_punit_dma(void)
++{
++	extern unsigned long _text;
++	u32 kernel_text = (u32)virt_to_phys(&_text);
++
++	/* We expect this to trigger an IMR violation reset */
++	ilb_spi_dma_read((u32 *)ILB_SPIFLASH_BASEADDR, (u32 *)kernel_text, 1);
++
++	/*
++	 * If we're still alive, we have a serious bug:
++	 * - we didn't appropriately target the IMR?
++	 * - if we have, weren't we prevented from accessing?
++	 * - if we weren't prevented, it's unlikely we're alive with a dirty
++	 *   text section
++	 */
++	pr_err("%s: BUG: still running after DMAing into kernel text!?\n",
++		__func__);
++
++	return 0;
++}
++
++/*
++ * File ops
++ */
++static long imr_test_ioctl(struct file *file, unsigned int cmd,
++		unsigned long arg)
++{
++	int ret = -EINVAL;
++
++	switch (cmd) {
++		case IOCTL_QRK_SANITY_CHECK_PUNIT_DMA:
++			/* Check PUnit DMA actually works */
++			ret = punit_dma_sanity_check();
++			break;
++		case IOCTL_QRK_IMR_1:
++			/* Kernel IMR violation: PUnit DMA access */
++			ret = imr_violate_kernel_punit_dma();
++			break;
++		default:
++			break;
++	}
++
++	return ret;
++}
++
++static int imr_test_open(struct inode *inode, struct file *file)
++{
++	mutex_lock(&imr_test_mutex);
++	nonseekable_open(inode, file);
++
++	if (mutex_lock_interruptible(&imr_test_dev.open_lock)) {
++		mutex_unlock(&imr_test_mutex);
++		return -ERESTARTSYS;
++	}
++
++	if (imr_test_dev.opened) {
++		mutex_unlock(&imr_test_dev.open_lock);
++		mutex_unlock(&imr_test_mutex);
++		return -EINVAL;
++	}
++
++	imr_test_dev.opened++;
++	mutex_unlock(&imr_test_dev.open_lock);
++	mutex_unlock(&imr_test_mutex);
++	return 0;
++}
++
++static int imr_test_release(struct inode *inode, struct file *file)
++{
++	mutex_lock(&imr_test_dev.open_lock);
++	imr_test_dev.opened = 0;
++	mutex_unlock(&imr_test_dev.open_lock);
++
++	return 0;
++}
++
++static const struct file_operations imr_test_file_ops = {
++	.open = imr_test_open,
++	.release = imr_test_release,
++	.unlocked_ioctl = imr_test_ioctl,
++	.llseek = no_llseek,
++};
++
++/**
++ * intel_qrk_imr_test_probe
++ *
++ * @param pdev: Platform device
++ * @return 0 success < 0 failure
++ *
++ * Callback from platform sub-system to probe
++ */
++static int intel_qrk_imr_test_probe(struct platform_device * pdev)
++{
++	int retval = 0;
++	unsigned int minor = 0;
++
++	mutex_init(&imr_test_dev.open_lock);
++	cdev_init(&imr_test_dev.cdev, &imr_test_file_ops);
++	imr_test_dev.cdev.owner = THIS_MODULE;
++
++	retval = cdev_add(&imr_test_dev.cdev, MKDEV(imr_test_major, minor), 1);
++	if (retval) {
++		printk(KERN_ERR "chardev registration failed\n");
++		return -EINVAL;
++	}
++	if (IS_ERR(device_create(imr_test_class, NULL,
++				 MKDEV(imr_test_major, minor), NULL,
++				 "imrtest%u", minor))){
++		dev_err(&pdev->dev, "can't create device\n");
++		return -EINVAL;
++	}
++
++	return 0;
++
++}
++
++static int intel_qrk_imr_test_remove(struct platform_device * pdev)
++{
++	unsigned int minor = MINOR(imr_test_dev.cdev.dev);
++
++	device_destroy(imr_test_class, MKDEV(imr_test_major, minor));
++	cdev_del(&imr_test_dev.cdev);
++
++	class_destroy(imr_test_class);
++
++	return 0;
++}
++
++/*
++ * Platform structures useful for interface to PM subsystem
++ */
++static struct platform_driver intel_qrk_imr_test_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.owner = THIS_MODULE,
++	},
++	.remove = intel_qrk_imr_test_remove,
++};
++
++/**
++ * intel_qrk_imr_test_init
++ *
++ * Load module.
++ */
++static int __init intel_qrk_imr_test_init(void)
++{
++	int retval = 0;
++	dev_t dev;
++
++	imr_test_class = class_create(THIS_MODULE,"qrk_imr_test");
++	if (IS_ERR(imr_test_class)) {
++		retval = PTR_ERR(imr_test_class);
++		printk(KERN_ERR "imr_test: can't register imr_test class\n");
++		goto err;
++	}
++
++	retval = alloc_chrdev_region(&dev, 0, 1, "imr_test");
++	if (retval) {
++		printk(KERN_ERR "earam_test: can't register character device\n");
++		goto err_class;
++	}
++	imr_test_major = MAJOR(dev);
++
++	memset(&imr_test_dev, 0x00, sizeof(imr_test_dev));
++	imr_test_dev.pldev = platform_create_bundle(
++		&intel_qrk_imr_test_driver, intel_qrk_imr_test_probe, NULL, 0, NULL, 0);
++
++	if(IS_ERR(imr_test_dev.pldev)){
++		printk(KERN_ERR "platform_create_bundle fail!\n"); 
++		retval = PTR_ERR(imr_test_dev.pldev);
++		goto err_class;
++	}
++
++	return 0;
++
++err_class:
++	class_destroy(imr_test_class);
++err:
++	return retval;
++}
++
++static void __exit intel_qrk_imr_test_exit(void)
++{
++	platform_device_unregister(imr_test_dev.pldev);
++	platform_driver_unregister(&intel_qrk_imr_test_driver);
++}
++
++module_init(intel_qrk_imr_test_init);
++module_exit(intel_qrk_imr_test_exit);
++
++MODULE_AUTHOR("Josef Ahmad <josef.ahmad@intel.com>");
++MODULE_DESCRIPTION("Quark IMR test module");
++MODULE_LICENSE("Dual BSD/GPL");
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_plat_clanton_hill.c b/drivers/platform/x86/quark/intel_qrk_plat_clanton_hill.c
+new file mode 100644
+index 0000000..baa277c
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_plat_clanton_hill.c
+@@ -0,0 +1,219 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark Legacy Platform Data Layout.conf accessor
++ *
++ * Simple Legacy SPI flash access layer
++ *
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spi/pxa2xx_spi.h>
++#include <linux/spi/spi.h>
++
++#define DRIVER_NAME		"ClantonHill"
++#define GPIO_RESTRICT_NAME	"qrk-gpio-restrict-nc"
++
++/******************************************************************************
++ *             Analog Devices AD7298 SPI Device Platform Data
++ ******************************************************************************/
++#include "linux/platform_data/ad7298.h"
++
++/* Maximum input voltage allowed for each ADC input, in milliVolts */
++#define AD7298_MAX_EXT_VIN 5000
++#define AD7298_MAX_EXT_VIN_EXT_BATT 30000
++#define AD7298_MAX_EXT_VIN_INT_BATT 9200
++
++static const struct ad7298_platform_data ad7298_platform_data = {
++	.ext_ref = false,
++	.ext_vin_max = { AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN_EXT_BATT, AD7298_MAX_EXT_VIN_INT_BATT }
++};
++
++/******************************************************************************
++ *                 Intel Quark SPI Controller Data
++ ******************************************************************************/
++static struct pxa2xx_spi_chip qrk_ffrd_spi_0_cs_0 = {
++	.gpio_cs = 8,
++};
++
++static struct spi_board_info spi_onboard_devs[] = {
++	{
++		.modalias = "ad7298",
++		.max_speed_hz = 5000000,
++		.platform_data = &ad7298_platform_data,
++		.mode = SPI_MODE_2,
++		.bus_num = 0,
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_0_cs_0,
++	},
++};
++
++/******************************************************************************
++ *             ST Microelectronics LIS331DLH I2C Device Platform Data
++ ******************************************************************************/
++#include <linux/platform_data/lis331dlh_intel_qrk.h>
++
++/* GPIO interrupt pins connected to the LIS331DLH */
++#define ST_ACCEL_INT1_GPIO 15
++#define ST_ACCEL_INT2_GPIO 4
++
++static struct lis331dlh_intel_qrk_platform_data lis331dlh_i2c_platform_data = {
++	.irq1_pin = ST_ACCEL_INT1_GPIO,
++};
++
++static struct gpio reserved_gpios[] = {
++	{
++		ST_ACCEL_INT1_GPIO,
++		GPIOF_IN,
++		"st_accel_i2c-int1"
++	},
++	{
++		ST_ACCEL_INT2_GPIO,
++		GPIOF_IN,
++		"st_accel_i2c-int2"
++	},
++};
++
++/* I2C device addresses */
++#define MAX9867_ADDR				0x18
++#define LIS331DLH_ADDR				0x19
++
++static struct i2c_adapter *i2c_adap;
++static struct i2c_board_info probed_i2c_lis331dlh = {
++	.platform_data = &lis331dlh_i2c_platform_data,
++};
++static struct i2c_board_info probed_i2c_max9867;
++static const unsigned short max9867_i2c_addr[] =
++	{ MAX9867_ADDR, I2C_CLIENT_END };
++static const unsigned short lis331dlh_i2c_addr[] =
++	{ LIS331DLH_ADDR, I2C_CLIENT_END };
++
++static int i2c_probe(struct i2c_adapter *adap, unsigned short addr)
++{
++	/* Always return success: the I2C clients are already known.  */
++	return 1;
++}
++
++/**
++ * intel_qrk_spi_add_onboard_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers onboard SPI device(s) present on the Clanton Hill platform
++ */
++static int intel_qrk_spi_add_onboard_devs(void)
++{
++	return spi_register_board_info(spi_onboard_devs,
++				       ARRAY_SIZE(spi_onboard_devs));
++}
++
++/**
++ * intel_qrk_gpio_restrict_probe
++ *
++ * Make GPIOs pertaining to Firmware inaccessible by requesting them.  The
++ * GPIOs are never released nor accessed by this driver.
++ */
++static int intel_qrk_gpio_restrict_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++	static int gpio_done, spi_done;
++	struct i2c_client *max9867 = NULL, *lis331dlh = NULL;
++
++	if (gpio_done)
++		goto spi;
++	ret = gpio_request_array(reserved_gpios, ARRAY_SIZE(reserved_gpios));
++	if (ret)
++		goto end;
++	gpio_done = 1;
++
++spi:
++	if (spi_done)
++		goto i2c;
++	ret = intel_qrk_spi_add_onboard_devs();
++	if (ret)
++		goto end;
++	spi_done = 1;
++i2c:
++	i2c_adap = i2c_get_adapter(0);
++	if (NULL == i2c_adap) {
++		pr_info("%s: i2c adapter not ready yet. Deferring..\n",
++			__func__);
++		ret = -EPROBE_DEFER;
++		goto end;
++	}
++	strlcpy(probed_i2c_max9867.type, "intel-qrk-max9867", I2C_NAME_SIZE);
++	max9867 = i2c_new_probed_device(i2c_adap, &probed_i2c_max9867,
++					max9867_i2c_addr, i2c_probe);
++	strlcpy(probed_i2c_lis331dlh.type, "lis331dlh_qrk", I2C_NAME_SIZE);
++	lis331dlh = i2c_new_probed_device(i2c_adap, &probed_i2c_lis331dlh,
++					lis331dlh_i2c_addr, i2c_probe);
++	i2c_put_adapter(i2c_adap);
++
++	if (NULL == max9867 || NULL == lis331dlh) {
++		pr_err("%s: can't probe I2C devices\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++end:
++	return ret;
++}
++
++static struct platform_driver gpio_restrict_pdriver = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe,
++};
++
++static int intel_qrk_plat_clanton_hill_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++
++	ret = platform_driver_register(&gpio_restrict_pdriver);
++
++	return ret;
++}
++
++static int intel_qrk_plat_clanton_hill_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver qrk_clanton_hill_driver = {
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_plat_clanton_hill_probe,
++	.remove		= intel_qrk_plat_clanton_hill_remove,
++};
++
++module_platform_driver(qrk_clanton_hill_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Clanton Hill BSP Data");
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_ALIAS("platform:"DRIVER_NAME);
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_plat_clanton_peak.c b/drivers/platform/x86/quark/intel_qrk_plat_clanton_peak.c
+new file mode 100644
+index 0000000..b0a8255
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_plat_clanton_peak.c
+@@ -0,0 +1,220 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Clanton Peak board entry point
++ *
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/spi_bitbang.h>
++#include <linux/spi/spi_gpio.h>
++
++#define DRIVER_NAME		"ClantonPeakSVP"
++#define GPIO_RESTRICT_NAME_NC	"qrk-gpio-restrict-nc"
++#define GPIO_RESTRICT_NAME_SC	"qrk-gpio-restrict-sc"
++
++
++/* GPIO connected to Test Equipment */
++#define SUT_GPIO_NC_3				0x03
++#define SUT_GPIO_NC_4				0x04
++#define SUT_GPIO_NC_5				0x05
++#define SUT_GPIO_NC_6				0x06
++#define SUT_GPIO_SC_2				0x0A
++#define SUT_GPIO_SC_3				0x0B
++#define SUT_GPIO_SC_4				0x0C
++#define SUT_GPIO_SC_5				0x0D
++
++#define GPIO_NC_BITBANG_SPI_BUS			2
++#define GPIO_SC_BITBANG_SPI_BUS			3
++
++static struct spi_board_info spi_onboard_devs[] = {
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.max_speed_hz = 50000000,
++		.bus_num = 0,
++	},
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.max_speed_hz = 50000000,
++		.bus_num = 1,
++	},
++};
++
++/*
++ * Define platform data for bitbanged SPI devices.
++ * Assign GPIO to SCK/MOSI/MISO
++ */
++static struct spi_gpio_platform_data spi_gpio_nc_data = {
++	.sck = SUT_GPIO_NC_3,
++	.mosi = SUT_GPIO_NC_4,
++	.miso = SUT_GPIO_NC_5,
++	.num_chipselect = 1,
++};
++static struct spi_gpio_platform_data spi_gpio_sc_data = {
++	.sck = SUT_GPIO_SC_2,
++	.mosi = SUT_GPIO_SC_3,
++	.miso = SUT_GPIO_SC_4,
++	.num_chipselect = 1,
++};
++
++/*
++ * Board information for bitbanged SPI devices.
++ */
++static const struct spi_board_info spi_gpio_nc_bi[] = {
++	{
++	.modalias	= "spidev",
++	.max_speed_hz	= 1000,
++	.bus_num	= GPIO_NC_BITBANG_SPI_BUS,
++	.mode		= SPI_MODE_0,
++	.platform_data	= &spi_gpio_nc_data,
++	/* Assign GPIO to CS */
++	.controller_data = (void *)SUT_GPIO_NC_6,
++	},
++};
++static const struct spi_board_info spi_gpio_sc_bi[] = {
++	{
++	.modalias	= "spidev",
++	.max_speed_hz	= 1000,
++	.bus_num	= GPIO_SC_BITBANG_SPI_BUS,
++	.mode		= SPI_MODE_0,
++	.platform_data	= &spi_gpio_sc_data,
++	/* Assign GPIO to CS */
++	.controller_data = (void *)SUT_GPIO_SC_5,
++	},
++};
++
++static struct platform_device spi_gpio_nc_pd = {
++	.name	= "spi_gpio",
++	.id	= GPIO_NC_BITBANG_SPI_BUS,
++	.dev	= {
++		.platform_data = &spi_gpio_nc_data,
++	},
++};
++
++static struct platform_device spi_gpio_sc_pd = {
++	.name	= "spi_gpio",
++	.id	= GPIO_SC_BITBANG_SPI_BUS,
++	.dev	= {
++		.platform_data = &spi_gpio_sc_data,
++	},
++};
++
++/**
++ * intel_qrk_spi_add_onboard_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers onboard SPI device(s) present on the Clanton Peak platform
++ */
++static int intel_qrk_spi_add_onboard_devs(void)
++{
++	return spi_register_board_info(spi_onboard_devs,
++			ARRAY_SIZE(spi_onboard_devs));
++}
++
++static int register_bitbanged_spi(int nc)
++{
++	int ret = 0;
++
++	ret = platform_device_register(nc ? &spi_gpio_nc_pd : &spi_gpio_sc_pd);
++	if (ret)
++		goto err;
++
++	ret = spi_register_board_info(nc ? spi_gpio_nc_bi : spi_gpio_sc_bi,
++				      nc ? ARRAY_SIZE(spi_gpio_nc_bi) : 
++				           ARRAY_SIZE(spi_gpio_sc_bi));
++	if (ret)
++		goto err_unregister;
++
++	return 0;
++
++err_unregister:
++	platform_device_unregister(nc ? &spi_gpio_nc_pd : &spi_gpio_sc_pd);
++err:
++	return ret;
++}
++
++static int intel_qrk_gpio_restrict_probe_nc(struct platform_device *pdev)
++{
++	return register_bitbanged_spi(1);
++}
++
++static int intel_qrk_gpio_restrict_probe_sc(struct platform_device *pdev)
++{
++	return register_bitbanged_spi(0);
++}
++
++static struct platform_driver gpio_restrict_pdriver_nc = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME_NC,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe_nc,
++};
++
++static struct platform_driver gpio_restrict_pdriver_sc = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME_SC,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe_sc,
++};
++
++static int intel_qrk_plat_clanton_peak_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++
++	ret = platform_driver_register(&gpio_restrict_pdriver_nc);
++	if (ret) {
++		pr_err("%s: couldn't register %s platform driver\n",
++		       __func__, gpio_restrict_pdriver_nc.driver.name);
++	}
++
++	ret = platform_driver_register(&gpio_restrict_pdriver_sc);
++	if (ret) {
++		pr_err("%s: couldn't register %s platform driver\n",
++		       __func__, gpio_restrict_pdriver_sc.driver.name);
++	}
++		
++	return intel_qrk_spi_add_onboard_devs();
++}
++
++static int intel_qrk_plat_clanton_peak_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver clanton_peak_driver = {
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_plat_clanton_peak_probe,
++	.remove		= intel_qrk_plat_clanton_peak_remove,
++};
++
++module_platform_driver(clanton_peak_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Clanton Peak BSP Data");
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_ALIAS("platform:"DRIVER_NAME);
+diff --git a/drivers/platform/x86/quark/intel_qrk_plat_cross_hill.c b/drivers/platform/x86/quark/intel_qrk_plat_cross_hill.c
+new file mode 100644
+index 0000000..74cb09f
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_plat_cross_hill.c
+@@ -0,0 +1,430 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * CrossHill board entry point
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spi/pxa2xx_spi.h>
++#include <linux/spi/spi.h>
++
++#define DRIVER_NAME		"CrossHill"
++#define GPIO_RESTRICT_NAME_NC	"qrk-gpio-restrict-nc"
++#define GPIO_RESTRICT_NAME_SC	"qrk-gpio-restrict-sc"
++
++/*
++ * GPIO numbers to use for reading 4-bit Blackburn Peak SPI daughterboard ID
++ */
++#define SPI_BPEAK_RESET_GPIO 4
++#define SPI_BPEAK_ID0_GPIO   3
++#define SPI_BPEAK_ID1_GPIO   2
++#define SPI_BPEAK_ID2_GPIO   15
++#define SPI_BPEAK_ID3_GPIO   14
++
++/*
++ * GPIO number for eADC interrupt (MAX78M6610+LMU)
++ */
++#define GPIO_78M6610_INT	2
++
++static int nc_gpio_reg;
++static int sc_gpio_reg;
++
++static int cross_hill_probe;
++/*
++ * GPIOs used as interrupts by MAX78M6610+LMU eADC
++ * 
++ * Extend this array adding new elements at the end.
++ */
++static struct gpio crh_eadc_int_gpios[] = {
++	{
++		GPIO_78M6610_INT,
++		GPIOF_IN,
++		"max78m6610-int"
++	},
++};
++
++
++/*
++ * Blackburn Peak SPI daughterboard ID values
++ */
++enum {
++	QRK_SPI_BPEAK_ID_ZB_TI = 0xA,
++	QRK_SPI_BPEAK_ID_ZB_DIGI,
++	QRK_SPI_BPEAK_ID_ZB_INFR_NXP,
++	QRK_SPI_BPEAK_ID_ZB_EXEGIN_ATMEL,
++	QRK_SPI_BPEAK_ID_ADC_MAXIM,
++	QRK_SPI_BPEAK_ID_NONE
++};
++
++
++/******************************************************************************
++ *             Analog Devices AD7298 SPI Device Platform Data
++ ******************************************************************************/
++#include "linux/platform_data/ad7298.h"
++
++/* Maximum input voltage allowed for each ADC input, in milliVolts */
++#define AD7298_MAX_EXT_VIN 5000
++
++static const struct ad7298_platform_data ad7298_platform_data = {
++	.ext_ref = false,
++	.ext_vin_max = { AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN }
++};
++
++/******************************************************************************
++ *             Maxim 78M6610+LMU SPI Device Platform Data
++ ******************************************************************************/
++#include "linux/platform_data/max78m6610_lmu.h"
++
++static const struct max78m6610_lmu_platform_data max78m6610_lmu_pdata = {
++	.reset_gpio = SPI_BPEAK_RESET_GPIO,
++};
++
++/******************************************************************************
++ *                 Intel Quark SPI Controller Data
++ ******************************************************************************/
++static struct pxa2xx_spi_chip qrk_ffrd_spi_0_cs_0 = {
++	.gpio_cs = 8,
++};
++
++static struct pxa2xx_spi_chip qrk_ffrd_spi_1_cs_0 = {
++	.gpio_cs = 10,
++};
++
++static struct pxa2xx_spi_chip qrk_ffrd_spi_1_cs_1 = {
++	.gpio_cs = 11,
++};
++
++static struct spi_board_info spi_generic_devs[] = {
++	{
++		.modalias = "spidev",
++		.max_speed_hz = 50000000,
++		.platform_data = NULL,
++		.mode = SPI_MODE_0,
++		.bus_num = 1,
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_1_cs_0,
++	},
++
++	{
++		.modalias = "spidev",
++		.max_speed_hz = 50000000,
++		.platform_data = NULL,
++		.mode = SPI_MODE_0,
++		.bus_num = 1,
++		.chip_select = 1,
++		.controller_data = &qrk_ffrd_spi_1_cs_1,
++	},
++
++};
++
++/* For compatibility reason, new SPI energy modules must be added at the end */
++static struct spi_board_info spi_energy_adc_devs[] = {
++	{
++		.modalias = "max78m6610_lmu",
++		.max_speed_hz = 2000000,
++		.platform_data = &max78m6610_lmu_pdata,
++		.mode = SPI_MODE_3,
++		.bus_num = 1,
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_1_cs_0,
++		.irq = -1,
++	},
++};
++
++
++
++/**
++ * intel_qrk_spi_add_onboard_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers onboard SPI device(s) present on the Cross Hill platform
++ */
++static int intel_qrk_spi_add_onboard_devs(void)
++{
++	struct spi_board_info spi_onboard_devs[] = {
++		{
++			.modalias = "ad7298",
++			.max_speed_hz = 5000000,
++			.platform_data = &ad7298_platform_data,
++			.mode = SPI_MODE_2,
++			.bus_num = 0,
++			.chip_select = 0,
++			.controller_data = &qrk_ffrd_spi_0_cs_0,
++		},
++	};
++
++	return spi_register_board_info(spi_onboard_devs,
++			ARRAY_SIZE(spi_onboard_devs));
++}
++
++
++/**
++ * intel_qrk_spi_get_bpeak_id
++ *
++ * @param bpeak_id: The Blackburn Peak SPI ID obtained from the daughterboard
++ * @return 0 on success or standard errnos on failure
++ *
++ * Reads an ID from GPIO-connected pins on Blackburn peak SPI daughterboard
++ */
++static int intel_qrk_spi_get_bpeak_id(u8 *bpeak_id)
++{
++	int ret = 0;
++	struct gpio spi_bpeak_id_gpios[] = {
++		{
++			SPI_BPEAK_RESET_GPIO,
++			GPIOF_OUT_INIT_HIGH,
++			"spi_bpeak_reset"
++		},
++		{
++			SPI_BPEAK_ID0_GPIO,
++			GPIOF_IN,
++			"spi_bpeak_id0"
++		},
++		{
++			SPI_BPEAK_ID1_GPIO,
++			GPIOF_IN,
++			"spi_bpeak_id1"
++		},
++		{
++			SPI_BPEAK_ID2_GPIO,
++			GPIOF_IN,
++			"spi_bpeak_id2"
++		},
++		{
++			SPI_BPEAK_ID3_GPIO,
++			GPIOF_IN,
++			"spi_bpeak_id3"
++		}
++	};
++
++	/*
++	 * Read a 4-bit ID value from ID GPIO inputs, which are only valid
++	 * while a RESET GPIO output is asserted (active-low)
++	 */
++	ret = gpio_request_array(spi_bpeak_id_gpios,
++			ARRAY_SIZE(spi_bpeak_id_gpios));
++	if (ret) {
++		pr_err("%s: Failed to allocate Blackburn Peak ID GPIO pins\n",
++				__func__);
++		return ret;
++	}
++
++	gpio_set_value(SPI_BPEAK_RESET_GPIO, 0);
++	*bpeak_id =
++		(gpio_get_value(SPI_BPEAK_ID3_GPIO) ? 1 << 3 : 0) |
++		(gpio_get_value(SPI_BPEAK_ID2_GPIO) ? 1 << 2 : 0) |
++		(gpio_get_value(SPI_BPEAK_ID1_GPIO) ? 1 << 1 : 0) |
++		(gpio_get_value(SPI_BPEAK_ID0_GPIO) ? 1      : 0);
++	gpio_set_value(SPI_BPEAK_RESET_GPIO, 1);
++
++	gpio_free_array(spi_bpeak_id_gpios,
++			ARRAY_SIZE(spi_bpeak_id_gpios));
++
++	return 0;
++}
++
++/**
++ * intel_qrk_spi_add_bpeak_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers SPI device(s) indicated by the ID value obtained from a
++ * Blackburn Peak SPI daughterboard
++ */
++static int intel_qrk_spi_add_bpeak_devs(void)
++{
++	u8 spi_bpeak_id = 0;
++	int ret = 0;
++
++	ret = intel_qrk_spi_get_bpeak_id(&spi_bpeak_id);
++	if (ret) {
++		pr_err("%s: failed to obtain Blackburn Peak ID\n",
++				__func__);
++		return ret;
++	}
++
++	switch (spi_bpeak_id) {
++
++	case QRK_SPI_BPEAK_ID_NONE:
++		break;
++
++	case QRK_SPI_BPEAK_ID_ADC_MAXIM:
++		{
++			ret = gpio_request_array(crh_eadc_int_gpios,
++					ARRAY_SIZE(crh_eadc_int_gpios));
++			if (ret) {
++				pr_err("%s: Failed to allocate eADC interrupt GPIO pins!\n",
++						__func__);
++				return ret;
++			}
++			ret = gpio_to_irq(GPIO_78M6610_INT);
++			if (ret < 0) {
++				pr_err("%s: Failed to request IRQ for GPIO %u!\n",
++						__func__, GPIO_78M6610_INT);
++				goto error_gpio_free;
++			}
++			spi_energy_adc_devs[0].irq = ret;
++			ret = spi_register_board_info(spi_energy_adc_devs,
++					ARRAY_SIZE(spi_energy_adc_devs));
++			if (ret) {
++				pr_err("%s: Failed to register eADC module!\n",
++						__func__);
++				goto error_gpio_free;
++			}
++			return 0;
++error_gpio_free:
++			gpio_free_array(crh_eadc_int_gpios,
++					ARRAY_SIZE(crh_eadc_int_gpios));
++			spi_energy_adc_devs[0].irq = -1;
++			return ret;
++		}
++	case QRK_SPI_BPEAK_ID_ZB_EXEGIN_ATMEL:
++		{
++			pr_debug("QRK_SPI_BPEAK_ID_ZB_EXEGIN_ATMEL.\n");
++			return spi_register_board_info(spi_generic_devs,
++					ARRAY_SIZE(spi_generic_devs));
++		}
++	case QRK_SPI_BPEAK_ID_ZB_DIGI:
++		{
++			pr_debug("QRK_SPI_BPEAK_ID_ZB_DIGI load.\n");
++			return spi_register_board_info(spi_generic_devs,
++					ARRAY_SIZE(spi_generic_devs));
++
++		}
++	default:
++			pr_err("%s: Unsupported Blackburn Peak SPI ID %u\n",
++					__func__, spi_bpeak_id);
++			ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++/** intel_qrk_spi_devs_addon
++ *
++ * addon spi device when gpio support in place
++ */
++static int intel_qrk_spi_devs_addon(void)
++{
++	int ret = 0;
++
++	if (cross_hill_probe != 1) {
++
++		ret = intel_qrk_spi_add_onboard_devs();
++		if (ret)
++			return ret;
++
++		ret = intel_qrk_spi_add_bpeak_devs();
++
++		cross_hill_probe = 1;
++	}
++
++	return ret;
++}
++
++/**
++ * intel_qrk_gpio_restrict_probe_nc
++ *
++ * Make GPIOs pertaining to Firmware inaccessible by requesting them.  The
++ * GPIOs are never released nor accessed by this driver.
++ */
++static int intel_qrk_gpio_restrict_probe_nc(struct platform_device *pdev)
++{
++	int ret;
++	nc_gpio_reg = 1;
++
++	if (nc_gpio_reg == 1 && sc_gpio_reg == 1) {
++		ret = intel_qrk_spi_devs_addon();
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
++/**
++ * intel_qrk_gpio_restrict_probe_sc
++ *
++ * Make GPIOs pertaining to Firmware inaccessible by requesting them.  The
++ * GPIOs are never released nor accessed by this driver.
++ */
++static int intel_qrk_gpio_restrict_probe_sc(struct platform_device *pdev)
++{
++	int ret;
++	sc_gpio_reg = 1;
++
++	if (nc_gpio_reg == 1 && sc_gpio_reg == 1) {
++		ret = intel_qrk_spi_devs_addon();
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
++static struct platform_driver gpio_restrict_pdriver_nc = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME_NC,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe_nc,
++};
++
++static struct platform_driver gpio_restrict_pdriver_sc = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME_SC,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe_sc,
++};
++
++static int intel_qrk_plat_cross_hill_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++
++	ret = platform_driver_register(&gpio_restrict_pdriver_nc);
++	if (ret)
++		return ret;
++
++	return platform_driver_register(&gpio_restrict_pdriver_sc);
++}
++
++static int intel_qrk_plat_cross_hill_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver qrk_cross_hill_driver = {
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_plat_cross_hill_probe,
++	.remove		= intel_qrk_plat_cross_hill_remove,
++};
++
++module_platform_driver(qrk_cross_hill_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Cross Hill BSP Data");
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_ALIAS("platform:"DRIVER_NAME);
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_plat_galileo.c b/drivers/platform/x86/quark/intel_qrk_plat_galileo.c
+new file mode 100644
+index 0000000..a45f6a0
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_plat_galileo.c
+@@ -0,0 +1,391 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark Legacy Platform Data Layout.conf accessor
++ *
++ * Simple Legacy SPI flash access layer
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com> 2013
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/module.h>
++#include <linux/mfd/cy8c9540a.h>
++#include <linux/mfd/intel_qrk_gip_pdata.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/physmap.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spi/pxa2xx_spi.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/flash.h>
++#include <linux/i2c/at24.h>
++
++#define DRIVER_NAME 		"Galileo"
++#define GPIO_RESTRICT_NAME 	"qrk-gpio-restrict-sc"
++#define LPC_SCH_SPINAME		"spi-lpc-sch"
++
++/* GPIO line used to detect the LSB of the Cypress i2c address */
++#define GPIO_CYPRESS_A0			7
++/* GPIO line Cypress interrupts are routed to (in S0 power state) */
++#define GPIO_CYPRESS_INT_S0		13
++/* GPIO line Cypress interrupts are routed to (in S3 power state) */
++#define GPIO_CYPRESS_INT_S3		2
++
++/* Cypress i2c address depending on A0 value */
++#define CYPRESS_ADDR_A0_1		0x20
++#define CYPRESS_ADDR_A0_0		0x21
++#define EEPROM_ADDR_A0_1		0x50
++#define EEPROM_ADDR_A0_0		0x51
++
++/******************************************************************************
++ *                   Cypress I/O Expander Platform Data
++ ******************************************************************************/
++static struct cy8c9540a_pdata cy8c9540a_platform_data = {
++	.por_default		= {
++		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,	/* Output */
++		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, /* Int mask */
++		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* PWM */
++		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* Inversion */
++		0xe0, 0xe0, 0xff, 0xf3, 0x00, 0xff, 0xff, 0xff, /* Direction */
++		0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f,	/* P0 drive */
++		0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f,	/* P1 drive */
++		0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* P2 drive */
++		0xf3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c,	/* P3 drive */
++		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff,	/* P4 drive */
++		0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* P5 drive */
++		0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* P6 drive */
++		0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* P7 drive */
++		0x00, 0xff, 0x00,				/* PWM0 */
++		0x00, 0xff, 0x00,				/* PWM1 */
++		0x00, 0xff, 0x00,				/* PWM2 */
++		0x00, 0xff, 0x00,				/* PWM3 */
++		0x00, 0xff, 0x00,				/* PWM4 */
++		0x00, 0xff, 0x00,				/* PWM5 */
++		0x00, 0xff, 0x00,				/* PWM6 */
++		0x00, 0xff, 0x00,				/* PWM7 */
++		0x00, 0xff, 0x00,				/* PWM8 */
++		0x00, 0xff, 0x00,				/* PWM9 */
++		0x00, 0xff, 0x00,				/* PWM10 */
++		0x00, 0xff, 0x00,				/* PWM11 */
++		0x00, 0xff, 0x00,				/* PWM12 */
++		0x00, 0xff, 0x00,				/* PWM13 */
++		0x00, 0xff, 0x00,				/* PWM14 */
++		0x00, 0xff, 0x00,				/* PWM15 */
++		0xff,						/* PWM CLKdiv */
++		0x02,						/* EEPROM en */
++		0x00						/* CRC */
++	},
++	.pwm2gpio_mapping	= {
++		CY8C9540A_PWM_UNUSED,
++		3,
++		CY8C9540A_PWM_UNUSED,
++		2,
++		9,
++		1,
++		8,
++		0,
++	},
++	.gpio_base		= 16,
++	.pwm_base		= 0,
++	.irq_base		= 64, 
++}; 
++
++/* Cypress expander requires i2c master to operate @100kHz 'standard mode' */
++static struct intel_qrk_gip_pdata gip_pdata = {
++	.i2c_std_mode = 1,
++};
++static struct intel_qrk_gip_pdata *galileo_gip_get_pdata(void)
++{
++	return &gip_pdata;
++}
++
++/******************************************************************************
++ *             Analog Devices AD7298 SPI Device Platform Data
++ ******************************************************************************/
++#include "linux/platform_data/ad7298.h"
++
++/* Maximum input voltage allowed for each ADC input, in milliVolts */
++#define AD7298_MAX_EXT_VIN 5000
++
++static const struct ad7298_platform_data ad7298_platform_data = {
++	.ext_ref = false,
++	.ext_vin_max = { AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN }
++};
++
++static struct at24_platform_data at24_platform_data = {
++	.byte_len = (11 * 1024),
++	.page_size = 1,
++	.flags = AT24_FLAG_ADDR16,
++};
++
++/******************************************************************************
++ *                        Intel Izmir i2c clients
++ ******************************************************************************/
++static struct i2c_board_info probed_i2c_cypress = {
++	.platform_data = &cy8c9540a_platform_data,
++};
++static struct i2c_board_info probed_i2c_eeprom = {
++	.platform_data = &at24_platform_data,
++};
++static struct i2c_adapter *i2c_adap;
++static const unsigned short cypress_i2c_addr[] =
++	{ CYPRESS_ADDR_A0_1, CYPRESS_ADDR_A0_0, I2C_CLIENT_END };
++static const unsigned short eeprom_i2c_addr[] =
++	{ EEPROM_ADDR_A0_1, EEPROM_ADDR_A0_0, I2C_CLIENT_END };
++
++/******************************************************************************
++ *                 Intel Quark SPI Controller Data
++ ******************************************************************************/
++static struct pxa2xx_spi_chip qrk_ffrd_spi_0_cs_0 = {
++	.gpio_cs = 8,
++};
++
++static struct pxa2xx_spi_chip qrk_ffrd_spi_1_cs_0 = {
++	.gpio_cs = 10,
++};
++
++#define LPC_SCH_SPI_BUS_ID 0x03
++
++/* TODO: extract this data from layout.conf encoded in flash */
++struct mtd_partition ilb_partitions [] = {
++	{
++		.name		= "grub",
++		.size		= 4096,
++		.offset		= 0,
++	},
++	{
++		.name		= "grub.conf",
++		.size		= 0xA00,
++		.offset		= 0x50500,
++	},
++	{
++		.name		= "layout.conf",
++		.size		= 4096,
++		.offset		= 0x708000,
++	},
++	{
++		.name		= "sketch",
++		.size		= 0x40000,
++		.offset		= 0x750000,
++	},
++	{
++		.name		= "raw",
++		.size		= 8192000,
++		.offset		= 0,
++
++	},
++};
++
++static struct flash_platform_data ilb_flash = {
++	.type = "s25fl064k",
++	.parts = ilb_partitions,
++	.nr_parts = ARRAY_SIZE(ilb_partitions),
++};
++
++static struct spi_board_info spi_onboard_devs[] = {
++	{
++		.modalias = "m25p80",
++		.platform_data = &ilb_flash,
++		.bus_num = LPC_SCH_SPI_BUS_ID,
++		.chip_select = 0,
++	},
++	{
++		.modalias = "ad7298",
++		.max_speed_hz = 5000000,
++		.platform_data = &ad7298_platform_data,
++		.mode = SPI_MODE_2,
++		.bus_num = 0,
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_0_cs_0,
++	},
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_1_cs_0,
++		.max_speed_hz = 50000000,
++		.bus_num = 1,
++	},
++};
++
++static struct gpio reserved_gpios[] = {
++	{
++		GPIO_CYPRESS_A0,
++		GPIOF_IN,
++		"cy8c9540a-a0",
++	},
++	{
++		GPIO_CYPRESS_INT_S0,
++		GPIOF_IN,
++		"cy8c9540a-int-s0",
++	},
++	{
++		GPIO_CYPRESS_INT_S3,
++		GPIOF_IN,
++		"cy8c9540a-int-s3",
++	},
++};
++
++static int eeprom_i2c_probe(struct i2c_adapter *adap, unsigned short addr)
++{
++	if (gpio_get_value(GPIO_CYPRESS_A0) && EEPROM_ADDR_A0_1 == addr)
++		return 1;
++	if (!gpio_get_value(GPIO_CYPRESS_A0) && EEPROM_ADDR_A0_0 == addr)
++		return 1;
++	return 0;
++}
++static int cypress_i2c_probe(struct i2c_adapter *adap, unsigned short addr)
++{
++	if (gpio_get_value(GPIO_CYPRESS_A0) && CYPRESS_ADDR_A0_1 == addr)
++		return 1;
++	if (!gpio_get_value(GPIO_CYPRESS_A0) && CYPRESS_ADDR_A0_0 == addr)
++		return 1;
++	return 0;
++}
++
++/**
++ * intel_qrk_spi_add_onboard_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers onboard SPI device(s) present on the Izmir platform
++ */
++static int intel_qrk_spi_add_onboard_devs(void)
++{
++
++	return spi_register_board_info(spi_onboard_devs,
++			ARRAY_SIZE(spi_onboard_devs));
++}
++
++
++/**
++ * intel_qrk_gpio_restrict_probe
++ *
++ * Register devices that depend on GPIOs.
++ * Note this function makes extensive use of the probe deferral mechanism:
++ * gpio_request() for a GPIO that is not yet available returns
++ * -EPROBE_DEFER.
++ */
++static int intel_qrk_gpio_restrict_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++	struct i2c_client *cypress = NULL, *eeprom = NULL;
++	static int spi_done;
++	static int gpios_done;
++
++	if (spi_done)
++		goto gpios;
++
++	ret = intel_qrk_spi_add_onboard_devs();
++	if (ret)
++		goto end;
++
++	spi_done = 1;
++
++gpios:
++	if (gpios_done)
++		goto i2c;
++
++	ret = gpio_request_array(reserved_gpios, ARRAY_SIZE(reserved_gpios));
++	if (ret)
++		goto end;
++
++	probed_i2c_cypress.irq = gpio_to_irq(GPIO_CYPRESS_INT_S0);
++
++	gpios_done = 1;
++
++i2c:
++	i2c_adap = i2c_get_adapter(0);
++	if (NULL == i2c_adap) {
++		pr_info("%s: i2c adapter not ready yet. Deferring..\n",
++			__func__);
++		ret = -EPROBE_DEFER;
++		goto end;
++	}
++	strlcpy(probed_i2c_cypress.type, "cy8c9540a", I2C_NAME_SIZE);
++	cypress = i2c_new_probed_device(i2c_adap, &probed_i2c_cypress,
++					cypress_i2c_addr, cypress_i2c_probe);
++	strlcpy(probed_i2c_eeprom.type, "at24", I2C_NAME_SIZE);
++	eeprom = i2c_new_probed_device(i2c_adap, &probed_i2c_eeprom,
++					eeprom_i2c_addr, eeprom_i2c_probe);
++	i2c_put_adapter(i2c_adap);
++
++	if (NULL == cypress || NULL == eeprom) {
++		pr_err("%s: can't probe Cypress Expander\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++end:
++	return ret;
++}
++
++static struct platform_driver gpio_restrict_pdriver = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe,
++};
++
++static int intel_qrk_plat_galileo_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++
++	/* Assign GIP driver handle for board-specific settings */
++	intel_qrk_gip_get_pdata = galileo_gip_get_pdata;
++
++	/* gpio */
++	ret = platform_driver_register(&gpio_restrict_pdriver);
++	if (ret)
++		goto end;
++
++#if 0
++	/* legacy SPI - TBD */
++	ret = platform_driver_register(&intel_qrk_plat_galileo_lpcspi_pdriver);
++	if (ret)
++		goto end;
++#endif	
++end:
++	return ret;
++}
++
++static int intel_qrk_plat_galileo_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver qrk_galileo_driver = {
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_plat_galileo_probe,
++	.remove		= intel_qrk_plat_galileo_remove,
++};
++
++module_platform_driver(qrk_galileo_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Galileo BSP Data");
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_ALIAS("platform:"DRIVER_NAME);
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_plat_galileo_gen2.c b/drivers/platform/x86/quark/intel_qrk_plat_galileo_gen2.c
+new file mode 100644
+index 0000000..7c09add
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_plat_galileo_gen2.c
+@@ -0,0 +1,392 @@
++/*
++ * Intel Quark Legacy Platform Data Layout.conf accessor
++ *
++ * Simple Legacy SPI flash access layer
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com> 2013
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/i2c/at24.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/module.h>
++#include <linux/mfd/intel_qrk_gip_pdata.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/physmap.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spi/pxa2xx_spi.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/flash.h>
++#include <linux/i2c/pca953x.h>
++
++#define DRIVER_NAME		"GalileoGen2"
++#define GPIO_RESTRICT_NAME	"qrk-gpio-restrict-sc"
++#define LPC_SCH_SPINAME		"spi-lpc-sch"
++
++#define GPIO_PCAL9555A_EXP2_INT		9
++
++/* Option to allow GPIO 10 to be used for SPI1 chip-select */
++static int gpio_cs;
++
++module_param(gpio_cs, int, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(gpio_cs, "Enable GPIO chip-select for SPI channel 1");
++
++/* Galileo Gen2 boards require i2c master to operate @400kHz 'fast mode' */
++static struct intel_qrk_gip_pdata gip_pdata = {
++	.i2c_std_mode = 0,
++};
++static struct intel_qrk_gip_pdata *galileo_gen2_gip_get_pdata(void)
++{
++	return &gip_pdata;
++}
++
++/******************************************************************************
++ *             Texas Instruments ADC1x8S102 SPI Device Platform Data
++ ******************************************************************************/
++#include "linux/platform_data/adc1x8s102.h"
++
++/* Maximum input voltage allowed for each ADC input, in milliVolts */
++#define ADC1x8S102_MAX_EXT_VIN 5000
++
++static const struct adc1x8s102_platform_data adc1x8s102_platform_data = {
++	.ext_vin = ADC1x8S102_MAX_EXT_VIN
++};
++
++#include "linux/i2c/pca953x.h"
++#define PCAL9555A_GPIO_BASE_OFFSET 16
++
++static struct pca953x_platform_data pcal9555a_platform_data_exp0 = {
++	.gpio_base = PCAL9555A_GPIO_BASE_OFFSET,
++	.irq_base = -1,
++};
++
++static struct pca953x_platform_data pcal9555a_platform_data_exp1 = {
++	.gpio_base = PCAL9555A_GPIO_BASE_OFFSET + 16,
++	.irq_base = -1,
++};
++
++static struct pca953x_platform_data pcal9555a_platform_data_exp2 = {
++	.gpio_base = PCAL9555A_GPIO_BASE_OFFSET + 32,
++};
++
++#include "linux/platform_data/pca9685.h"
++
++static struct pca9685_pdata pca9685_platform_data = {
++	.chan_mapping = {
++		PWM_CH_GPIO, PWM_CH_PWM,
++		PWM_CH_GPIO, PWM_CH_PWM,
++		PWM_CH_GPIO, PWM_CH_PWM,
++		PWM_CH_GPIO, PWM_CH_PWM,
++		PWM_CH_GPIO, PWM_CH_PWM,
++		PWM_CH_GPIO, PWM_CH_PWM,
++		PWM_CH_GPIO, PWM_CH_GPIO,
++		PWM_CH_GPIO, PWM_CH_GPIO,
++		PWM_CH_DISABLED /* ALL_LED disabled */
++	},
++	.gpio_base = PCAL9555A_GPIO_BASE_OFFSET + 48,
++};
++
++/******************************************************************************
++ *                        Intel Galileo Gen2 i2c clients
++ ******************************************************************************/
++#define EEPROM_ADDR				0x54
++#define PCAL9555A_EXP0_ADDR			0x25
++#define PCAL9555A_EXP1_ADDR			0x26
++#define PCAL9555A_EXP2_ADDR			0x27
++#define PCA9685_ADDR				0x47
++
++static struct i2c_board_info probed_i2c_eeprom;
++static struct i2c_board_info probed_i2c_pcal9555a_exp0 = {
++	.platform_data = &pcal9555a_platform_data_exp0,
++};
++static struct i2c_board_info probed_i2c_pcal9555a_exp1 = {
++	.platform_data = &pcal9555a_platform_data_exp1,
++};
++static struct i2c_board_info probed_i2c_pcal9555a_exp2 = {
++	.platform_data = &pcal9555a_platform_data_exp2,
++};
++static struct i2c_board_info probed_i2c_pca9685 = {
++	.platform_data = &pca9685_platform_data,
++};
++
++static const unsigned short eeprom_i2c_addr[] = {
++	EEPROM_ADDR, I2C_CLIENT_END
++};
++static const unsigned short pcal9555a_exp0_i2c_addr[] = {
++	PCAL9555A_EXP0_ADDR, I2C_CLIENT_END
++};
++static const unsigned short pcal9555a_exp1_i2c_addr[] = {
++	PCAL9555A_EXP1_ADDR, I2C_CLIENT_END
++};
++static const unsigned short pcal9555a_exp2_i2c_addr[] = {
++	PCAL9555A_EXP2_ADDR, I2C_CLIENT_END
++};
++static const unsigned short pca9685_i2c_addr[] = {
++	PCA9685_ADDR, I2C_CLIENT_END
++};
++
++static int i2c_probe(struct i2c_adapter *adap, unsigned short addr)
++{
++	/* Always return success: the I2C clients are already known.  */
++	return 1;
++}
++
++/******************************************************************************
++ *                 Intel Quark SPI Controller Data
++ ******************************************************************************/
++static struct pxa2xx_spi_chip qrk_ffrd_spi_0_cs_0 = {
++	.gpio_cs = 8,
++};
++
++static struct pxa2xx_spi_chip qrk_ffrd_spi_1_cs_0 = {
++	.gpio_cs = 10,
++};
++
++#define LPC_SCH_SPI_BUS_ID 0x03
++
++/* TODO: extract this data from layout.conf encoded in flash */
++struct mtd_partition galileo_gen2_ilb_partitions[] = {
++	{
++		.name		= "grub",
++		.size		= 4096,
++		.offset		= 0,
++	},
++	{
++		.name		= "grub.conf",
++		.size		= 0xA00,
++		.offset		= 0x50500,
++	},
++	{
++		.name		= "layout.conf",
++		.size		= 4096,
++		.offset		= 0x708000,
++	},
++	{
++		.name		= "sketch",
++		.size		= 0x40000,
++		.offset		= 0x750000,
++	},
++	{
++		.name		= "raw",
++		.size		= 8192000,
++		.offset		= 0,
++
++	},
++};
++
++static struct flash_platform_data ilb_flash = {
++	.type = "s25fl064k",
++	.parts = galileo_gen2_ilb_partitions,
++	.nr_parts = ARRAY_SIZE(galileo_gen2_ilb_partitions),
++};
++
++static struct spi_board_info spi0_onboard_devs[] = {
++	{
++		.modalias = "m25p80",
++		.platform_data = &ilb_flash,
++		.bus_num = LPC_SCH_SPI_BUS_ID,
++		.chip_select = 0,
++	},
++	{
++		.modalias = "adc1x8s102",
++		.max_speed_hz = 16667000,
++		.platform_data = &adc1x8s102_platform_data,
++		.mode = SPI_MODE_3,
++		.bus_num = 0,
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_0_cs_0,
++	},
++};
++
++static struct spi_board_info spi1_onboard_devs_gpiocs[] = {
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.controller_data = NULL,
++		.max_speed_hz = 50000000,
++		.bus_num = 1,
++		.controller_data = &qrk_ffrd_spi_1_cs_0,
++	},
++};
++
++static struct spi_board_info spi1_onboard_devs[] = {
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.controller_data = NULL,
++		.max_speed_hz = 50000000,
++		.bus_num = 1,
++	},
++};
++
++
++/**
++ * intel_qrk_spi_add_onboard_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers onboard SPI device(s) present on the Izmir platform
++ */
++static int intel_qrk_spi_add_onboard_devs(void)
++{
++	int ret = 0;
++
++	ret = spi_register_board_info(spi0_onboard_devs,
++				      ARRAY_SIZE(spi0_onboard_devs));
++	if (ret)
++		return ret;
++
++	if (gpio_cs)
++		return spi_register_board_info(spi1_onboard_devs_gpiocs,
++					ARRAY_SIZE(spi1_onboard_devs_gpiocs));
++	else
++		return spi_register_board_info(spi1_onboard_devs,
++					ARRAY_SIZE(spi1_onboard_devs));
++}
++
++
++static struct gpio reserved_gpios[] = {
++	{
++		GPIO_PCAL9555A_EXP2_INT,
++		GPIOF_IN,
++		"pcal9555a-exp2-int",
++	},
++};
++
++/**
++ * intel_qrk_gpio_restrict_probe
++ *
++ * Make GPIOs pertaining to Firmware inaccessible by requesting them.  The
++ * GPIOs are never released nor accessed by this driver.
++ *
++ * Registers devices which are dependent on this GPIO driver
++ */
++static int intel_qrk_gpio_restrict_probe(struct platform_device *pdev)
++{
++	int ret = 0;
++	struct i2c_adapter *i2c_adap = NULL;
++	struct i2c_client *client = NULL;
++
++	/* Need to tell the PCA953X driver which GPIO IRQ to use for signalling
++	 * interrupts.  We can't get the IRQ until the GPIO driver is loaded.
++	 * Hence, we defer registration of the I2C devices until now
++	 */
++	i2c_adap = i2c_get_adapter(0);
++	if (NULL == i2c_adap) {
++		pr_info("%s: i2c adapter not ready yet. Deferring..\n",
++			__func__);
++		return -EPROBE_DEFER;
++	}
++
++	ret = gpio_request_array(reserved_gpios, ARRAY_SIZE(reserved_gpios));
++	if (ret) {
++		dev_err(&client->dev, "failed to request reserved gpios\n");
++		goto end;
++	}
++
++	strlcpy(probed_i2c_eeprom.type, "24c08", I2C_NAME_SIZE);
++	client = i2c_new_probed_device(i2c_adap, &probed_i2c_eeprom,
++				       eeprom_i2c_addr, i2c_probe);
++	if (client == NULL) {
++		pr_err("%s: Failed to probe 24c08 I2C device\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++	strlcpy(probed_i2c_pcal9555a_exp0.type, "pcal9555a", I2C_NAME_SIZE);
++	client = i2c_new_probed_device(i2c_adap, &probed_i2c_pcal9555a_exp0,
++				       pcal9555a_exp0_i2c_addr, i2c_probe);
++	if (client == NULL) {
++		pr_err("%s: Failed to probe pcal9555a I2C device\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++	strlcpy(probed_i2c_pcal9555a_exp1.type, "pcal9555a", I2C_NAME_SIZE);
++	client = i2c_new_probed_device(i2c_adap, &probed_i2c_pcal9555a_exp1,
++				       pcal9555a_exp1_i2c_addr, i2c_probe);
++	if (client == NULL) {
++		pr_err("%s: Failed to probe pcal9555a I2C device\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++	strlcpy(probed_i2c_pcal9555a_exp2.type, "pcal9555a", I2C_NAME_SIZE);
++	probed_i2c_pcal9555a_exp2.irq = gpio_to_irq(GPIO_PCAL9555A_EXP2_INT);
++	client = i2c_new_probed_device(i2c_adap, &probed_i2c_pcal9555a_exp2,
++				       pcal9555a_exp2_i2c_addr, i2c_probe);
++	if (client == NULL) {
++		pr_err("%s: Failed to probe pcal9555a I2C device\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++	strlcpy(probed_i2c_pca9685.type, "pca9685", I2C_NAME_SIZE);
++	client = i2c_new_probed_device(i2c_adap, &probed_i2c_pca9685,
++				       pca9685_i2c_addr, i2c_probe);
++	if (client == NULL) {
++		pr_err("%s: Failed to probe pca9685 I2C device\n", __func__);
++		ret = -ENODEV;
++		goto end;
++	}
++
++	ret = intel_qrk_spi_add_onboard_devs();
++
++end:
++	i2c_put_adapter(i2c_adap);
++
++	return ret;
++}
++
++static struct platform_driver gpio_restrict_pdriver = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe,
++};
++
++static int intel_qrk_plat_galileo_gen2_probe(struct platform_device *pdev)
++{
++	/* Assign GIP driver handle for board-specific settings */
++	intel_qrk_gip_get_pdata = galileo_gen2_gip_get_pdata;
++
++	/* gpio */
++	return platform_driver_register(&gpio_restrict_pdriver);
++}
++
++static int intel_qrk_plat_galileo_gen2_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver qrk_galileo_driver = {
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_plat_galileo_gen2_probe,
++	.remove		= intel_qrk_plat_galileo_gen2_remove,
++};
++
++module_platform_driver(qrk_galileo_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Galileo Gen2 BSP Data");
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_ALIAS("platform:"DRIVER_NAME);
+diff --git a/drivers/platform/x86/quark/intel_qrk_plat_kips_bay.c b/drivers/platform/x86/quark/intel_qrk_plat_kips_bay.c
+new file mode 100644
+index 0000000..7a33d36
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_plat_kips_bay.c
+@@ -0,0 +1,169 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark Legacy Platform Data Layout.conf accessor
++ *
++ * Simple Legacy SPI flash access layer
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com> 2013
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/ioport.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spi/pxa2xx_spi.h>
++#include <linux/spi/spi.h>
++
++#define DRIVER_NAME		"KipsBay"
++#define GPIO_RESTRICT_NAME	"qrk-gpio-restrict-sc"
++
++static int gpio_cs = 1;
++
++module_param(gpio_cs, int, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(gpio_cs, "Enable GPIO chip-select for SPI channel 1");
++
++
++/******************************************************************************
++ *             Analog Devices AD7298 SPI Device Platform Data
++ ******************************************************************************/
++#include "linux/platform_data/ad7298.h"
++
++/* Maximum input voltage allowed for each ADC input, in milliVolts */
++#define AD7298_MAX_EXT_VIN 5000
++
++static const struct ad7298_platform_data ad7298_platform_data = {
++	.ext_ref = false,
++	.ext_vin_max = { AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN,
++		AD7298_MAX_EXT_VIN, AD7298_MAX_EXT_VIN }
++};
++
++/******************************************************************************
++ *                 Intel Quark SPI Controller Data
++ ******************************************************************************/
++static struct pxa2xx_spi_chip qrk_ffrd_spi_0_cs_0 = {
++	.gpio_cs = 8,
++};
++
++static struct pxa2xx_spi_chip qrk_ffrd_spi_1_cs_0 = {
++	.gpio_cs = 10,
++};
++
++static struct spi_board_info spi0_onboard_devs[] = {
++	{
++		.modalias = "ad7298",
++		.max_speed_hz = 5000000,
++		.platform_data = &ad7298_platform_data,
++		.mode = SPI_MODE_2,
++		.bus_num = 0,
++		.chip_select = 0,
++		.controller_data = &qrk_ffrd_spi_0_cs_0,
++	}
++};
++
++static struct spi_board_info spi1_onboard_devs_gpiocs[] = {
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.controller_data = NULL,
++		.max_speed_hz = 50000000,
++		.bus_num = 1,
++		.controller_data = &qrk_ffrd_spi_1_cs_0,
++	},
++};
++
++static struct spi_board_info spi1_onboard_devs[] = {
++	{
++		.modalias = "spidev",
++		.chip_select = 0,
++		.controller_data = NULL,
++		.max_speed_hz = 50000000,
++		.bus_num = 1,
++	},
++};
++
++/**
++ * intel_qrk_spi_add_onboard_devs
++ *
++ * @return 0 on success or standard errnos on failure
++ *
++ * Registers onboard SPI device(s) present on the Kips Bay platform
++ */
++static int intel_qrk_spi_add_onboard_devs(void)
++{
++	int ret = 0;
++
++	ret = spi_register_board_info(spi0_onboard_devs,
++				      ARRAY_SIZE(spi0_onboard_devs));
++	if (ret)
++		return ret;
++
++	if (gpio_cs)
++		return spi_register_board_info(spi1_onboard_devs_gpiocs,
++					ARRAY_SIZE(spi1_onboard_devs_gpiocs));
++	else
++		return spi_register_board_info(spi1_onboard_devs,
++					ARRAY_SIZE(spi1_onboard_devs));
++}
++
++
++/**
++ * intel_qrk_gpio_restrict_probe
++ *
++ * Make GPIOs pertaining to Firmware inaccessible by requesting them.  The
++ * GPIOs are never released nor accessed by this driver.
++ */
++static int intel_qrk_gpio_restrict_probe(struct platform_device *pdev)
++{
++	return intel_qrk_spi_add_onboard_devs();
++}
++
++static struct platform_driver gpio_restrict_pdriver = {
++	.driver		= {
++		.name	= GPIO_RESTRICT_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_gpio_restrict_probe,
++};
++
++static int intel_qrk_plat_kips_bay_probe(struct platform_device *pdev)
++{
++	return platform_driver_register(&gpio_restrict_pdriver);
++}
++
++static int intel_qrk_plat_kips_bay_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver qrk_kips_bay_driver = {
++	.driver		= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe		= intel_qrk_plat_kips_bay_probe,
++	.remove		= intel_qrk_plat_kips_bay_remove,
++};
++
++module_platform_driver(qrk_kips_bay_driver);
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@intel.com>");
++MODULE_DESCRIPTION("Kips Bay BSP Data");
++MODULE_LICENSE("Dual BSD/GPL");
++MODULE_ALIAS("platform:"DRIVER_NAME);
++
+diff --git a/drivers/platform/x86/quark/intel_qrk_sb.c b/drivers/platform/x86/quark/intel_qrk_sb.c
+new file mode 100644
+index 0000000..17e4ddd
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_sb.c
+@@ -0,0 +1,246 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark side-band driver
++ *
++ * Thread-safe sideband read/write routine.
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com> 2012
++ */
++
++#include <linux/errno.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/spinlock.h>
++#include <linux/pci.h>
++#include "intel_qrk_imr.h"
++
++#define INTEL_QRK_SB_CMD_ADDR	(0x000000D0)
++#define INTEL_QRK_SB_DATA_ADDR	(0x000000D4)
++
++#define INTEL_QRK_SB_MCR_SHIFT	(24)
++#define INTEL_QRK_SB_PORT_SHIFT	(16)
++#define INTEL_QRK_SB_REG_SHIFT	(8)
++#define INTEL_QRK_SB_BYTEEN	(0xF0)	/* enable all 32 bits */
++
++/* Simple structure for module */
++struct intel_qrk_sb_dev{
++	struct pci_dev * pdev;
++	spinlock_t slock;
++	u8 initialized;
++};
++
++static struct intel_qrk_sb_dev sb_dev = {
++	.initialized = 0
++};
++
++/* Dependant drivers */
++static struct platform_device pdev [] = {
++	{
++		.name = "intel-qrk-esram",
++	},
++	{
++		.name = "intel-qrk-ecc",
++	},
++	{
++		.name = "intel-qrk-thrm",
++	},
++};
++
++/**
++ * intel_qrk_sb_read_reg
++ *
++ * @param qrk_sb_id: Sideband identifier
++ * @param command: Command to send to destination identifier
++ * @param reg: Target register w/r to qrk_sb_id
++ * @return nothing
++ *
++ * Utility function to allow thread-safe read of side-band
++ * command - can be different read op-code types - which is why we don't
++ * hard-code this value directly into msg
++ */
++void intel_qrk_sb_read_reg(qrk_sb_id id, u8 cmd, u8 reg, u32 *data, u8 lock)
++{
++	u32 msg = (cmd << INTEL_QRK_SB_MCR_SHIFT) | 
++		  ((id << INTEL_QRK_SB_PORT_SHIFT) & 0xFF0000)| 
++		  ((reg << INTEL_QRK_SB_REG_SHIFT) & 0xFF00)|
++		  INTEL_QRK_SB_BYTEEN;
++
++	if(data == NULL)
++		return;
++
++	if (likely(lock == 1)) {
++		spin_lock(&sb_dev.slock);
++	}
++
++	pci_write_config_dword(sb_dev.pdev, INTEL_QRK_SB_CMD_ADDR, msg);
++	pci_read_config_dword(sb_dev.pdev, INTEL_QRK_SB_DATA_ADDR, data);
++
++	if(likely(lock == 1)){
++		spin_unlock(&sb_dev.slock);
++	}
++
++}
++EXPORT_SYMBOL(intel_qrk_sb_read_reg);
++
++/**
++ * intel_qrk_sb_write_reg
++ *
++ * @param qrk_sb_id: Sideband identifier
++ * @param command: Command to send to destination identifier
++ * @param reg: Target register w/r to qrk_sb_id
++ * @return nothing
++ *
++ * Utility function to allow thread-safe write of side-band
++ */
++void intel_qrk_sb_write_reg(qrk_sb_id id, u8 cmd, u8 reg, u32 data, u8 lock)
++{
++	u32 msg = (cmd << INTEL_QRK_SB_MCR_SHIFT) | 
++		  ((id << INTEL_QRK_SB_PORT_SHIFT) & 0xFF0000)| 
++		  ((reg << INTEL_QRK_SB_REG_SHIFT) & 0xFF00)|
++		  INTEL_QRK_SB_BYTEEN;
++
++	if(likely(lock == 1)){
++		spin_lock(&sb_dev.slock);
++	}
++
++	pci_write_config_dword(sb_dev.pdev, INTEL_QRK_SB_DATA_ADDR, data);
++	pci_write_config_dword(sb_dev.pdev, INTEL_QRK_SB_CMD_ADDR, msg);
++	
++	if(likely(lock == 1)){
++		spin_unlock(&sb_dev.slock);
++	}
++}
++EXPORT_SYMBOL(intel_qrk_sb_write_reg);
++
++/**
++ * intel_qrk_sb_runfn_lock
++ *
++ * @param fn: Callback function - which requires side-band spinlock and !irq
++ * @param arg: Callback argument
++ * @return 0 on success < 0 on failure
++ *
++ * Runs the given function pointer inside of a call to the local spinlock using
++ * spin_lock_irqsave/spin_unlock_irqrestore. Needed for the eSRAMv1 driver to
++ * guarantee atomicity, but, available to any other user of sideband provided
++ * rules are respected.
++ * Rules:
++ *	fn may not sleep
++ *	fn may not change the state of irqs	
++ */
++int intel_qrk_sb_runfn_lock(int (*fn)( void * arg ), void * arg)
++{
++	unsigned long flags = 0;
++	int ret = 0;
++
++	if(unlikely(fn == NULL)){
++		return -EINVAL;
++	}
++	
++	/* Get spinlock with IRQs off */
++	spin_lock_irqsave(&sb_dev.slock, flags);
++
++	/* Run function atomically */
++	ret = fn(arg);
++
++	/* Release lock */
++	spin_unlock_irqrestore(&sb_dev.slock, flags);
++
++	return ret;
++}
++EXPORT_SYMBOL(intel_qrk_sb_runfn_lock);
++
++/**
++ * sb_probe
++ *
++ * @param dev: the PCI device matching
++ * @param id: entry in the match table
++ * @return 0
++ *
++ * Callback from PCI layer when dev/vendor ids match.
++ * Sets up necessary resources
++ */
++static int intel_qrk_sb_probe(struct pci_dev *dev, const struct pci_device_id *id)
++{
++	int i = 0;
++
++	/* Init struct */
++	memset(&sb_dev, 0x00, sizeof(sb_dev));
++
++	/* Hook device */
++	sb_dev.pdev = dev;
++
++	/* Init locking structures */
++	spin_lock_init(&sb_dev.slock);
++
++	/* Set state */
++	sb_dev.initialized = 1;
++
++	/* Register side-band sub-ordinate drivers */
++	for (i = 0; i < sizeof(pdev)/sizeof(struct platform_device); i++){
++		/* Register side-band sub-ordinate drivers */
++		platform_device_register(&pdev[i]);
++	}
++	pr_info("Intel Quark side-band driver registered\n");
++
++	/* Switch off boot-time IMRs nice and early */
++	return intel_qrk_imr_init(dev->device);
++}
++
++/**
++ * sb_remove
++ *
++ * @param pdev: PCI device
++ * @return nothing
++ *
++ * Callback from PCI sub-system upon PCI dev removal
++ */
++static void intel_qrk_sb_remove(struct pci_dev *pdev)
++{
++}
++
++/* Quark hardware */
++struct pci_device_id intel_qrk_sb_ids[] = {
++        { PCI_VDEVICE(INTEL, PCI_DEVICE_ID_X1000_HOST_BRIDGE), 0},
++        { PCI_VDEVICE(INTEL, 0x12C0), 0},
++        { 0 }
++};
++
++MODULE_DEVICE_TABLE(pci, intel_qrk_sb_ids);
++
++/* PCI callbacks */
++static struct pci_driver intel_qrk_sb_driver = {
++	.name = "intel_qrk_sb",
++	.id_table = intel_qrk_sb_ids,
++	.probe = intel_qrk_sb_probe,
++	.remove = intel_qrk_sb_remove,
++};
++
++/**
++ * intel_qrk_sb_init
++ *
++ * Module entry point
++ */
++static int __init intel_qrk_sb_init(void)
++{
++	return pci_register_driver(&intel_qrk_sb_driver);
++}
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>");
++MODULE_DESCRIPTION("Intel Quark SOC side-band driver");
++MODULE_LICENSE("Dual BSD/GPL");
++
++/* Initialise early since other drivers eSRAM, DRAM ECC and thermal depend */
++subsys_initcall(intel_qrk_sb_init);
+diff --git a/drivers/platform/x86/quark/intel_qrk_thermal.c b/drivers/platform/x86/quark/intel_qrk_thermal.c
+new file mode 100644
+index 0000000..189bb5c
+--- /dev/null
++++ b/drivers/platform/x86/quark/intel_qrk_thermal.c
+@@ -0,0 +1,353 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark Thermal driver
++ */
++#include <linux/err.h>
++#include <linux/fs.h>
++#include <linux/intel_qrk_sb.h>
++#include <linux/list.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/printk.h>
++#include <linux/platform_device.h>
++#include <linux/pm.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/thermal.h>
++#include <linux/timer.h>
++
++#define DRIVER_NAME		"intel-qrk-thrm"
++
++/* Definition of register locations for thermal management */
++#define THRM_CTRL_REG		(0x80)		/* Thermal control */
++#define THRM_MODE_REG		(0xB0)		/* Thermal mode */
++#define THRM_MODE_SENSOR_EN	(0x00008000)	/* Thermal mode sensor enable */
++#define THRM_TEMP_REG		(0xB1)		/* Thermal sensor temperature */
++#define THRM_TRPCLR_REG		(0xB2)		/* Catastropic/Hot trip/clear */
++#define THRM_AUXTRP_REG		(0xB3)		/* Aux0-Aux3 trip point */
++#define THRM_AUXCLR_REG		(0xB4)		/* Aux0-Aux3 clear trip */
++#define THRM_STATUS_REG		(0xB5)		/* Thermal sensor status */
++#define THRM_TRIPBEHAVE_REG	(0xB6)		/* Trip point behavior */
++#define THRM_MSIADDR_REG	(0xC5)		/* Thermal MSI addres reg */
++#define THRM_MSIDATA_REG	(0xC6)		/* Thermal MSI data reg */
++#define THRM_CTRL_READ		(0x10)		/* Config reg */
++#define THRM_CTRL_WRITE		(0x11)		/* Config reg */
++
++#define SOC_TSENSOR_REG		(0x34)
++#define SOC_TSENSOR_RST		(0x00000001)
++#define SOC_CTRL_READ		(0x06)
++#define SOC_CTRL_WRITE		(0x07)
++
++
++#define THRM_ZONE_COUNT		2		/* Only hot/critical relevant */
++#define ACTIVE_INTERVAL		(1000)
++#define IDLE_INTERVAL		(20000)
++#define MCELSIUS(x)		((x) * 1000)
++
++/* CPU Zone information */
++#define CATASTROPIC_ZONE	0
++#define HOT_ZONE		1
++#define AUX0_ZONE		2		/* Unused */
++#define AUX1_ZONE		3		/* Unused */
++#define AUX2_ZONE		4		/* Unused */
++#define AUX3_ZONE		5		/* Unused */
++#define MIN_USED_ZONE		CATASTROPIC_ZONE
++#define MAX_USED_ZONE		HOT_ZONE
++/*
++ * Default catastrophic/hot trip values - in degrees celsius
++ * Maximum temperature is 105 degrees
++ */
++#define CRIT_TEMP	104
++#define HOT_TEMP	95
++#define RAW2CELSIUS_DIFF	50
++
++static int driver_enable = 1;
++module_param(driver_enable, int, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(driver_enable, "Disable Thermal Driver Polling");
++
++/* Shorten fn names to fit 80 char limit */
++#ifndef sb_read
++#define sb_read				intel_qrk_sb_read_reg
++#endif
++#ifndef sb_write
++#define sb_write			intel_qrk_sb_write_reg
++#endif
++
++struct intel_qrk_therm_zone {
++	enum thermal_trip_type type;
++	int trip_value;
++};
++
++/**
++ * struct intel_qrk_thermal_dev
++ *
++ */
++struct intel_qrk_thermal_dev {
++	enum thermal_device_mode mode;
++	struct intel_qrk_therm_zone tzone[THRM_ZONE_COUNT];
++	struct mutex lock;
++	struct platform_device *pldev;		/* Platform device */
++	struct thermal_zone_device *therm_dev;	/* Thermal device */
++};
++
++static struct intel_qrk_thermal_dev qrk_tdev;
++
++/******************************************************************************
++ *                        Thermal API implementation
++ ******************************************************************************/
++
++/**
++ * get_temp
++ *
++ * @param tz: Thermal zone descriptor
++ *
++ * Get the current temperature
++ * We have exactly one thermal zone/sensor
++ * Value passed is an unsigned long - our sensor reports up to -50 celsius so we
++ * just clip at zero if the temperature is negative.
++ */
++static int intel_qrk_thermal_get_temp(struct thermal_zone_device *tz,
++				unsigned long *temp)
++{
++	sb_read(SB_ID_THERMAL, THRM_CTRL_READ, THRM_TEMP_REG, (u32 *)temp, 1);
++	*temp -= RAW2CELSIUS_DIFF;
++
++	/* Clip to unsigned output value if sensor is reporting sub-zero */
++	if ((int)*temp < 0)
++		*temp = 0;
++
++	*temp = MCELSIUS(*temp&0x000000FF);
++
++	return 0;
++}
++
++/**
++ * get_trend
++ *
++ * Wears good clothes
++ */
++static int intel_qrk_thermal_get_trend(struct thermal_zone_device *tz,
++			int trip, enum thermal_trend *trend)
++{
++	if (tz->temperature >= trip)
++		*trend = THERMAL_TREND_RAISING;
++	else
++		*trend = THERMAL_TREND_DROPPING;
++
++	return 0;
++}
++
++/**
++ * intel_qrk_thermal_get_mode
++ *
++ * Get the mode
++ */
++static int intel_qrk_thermal_get_mode(struct thermal_zone_device *tz,
++				enum thermal_device_mode *mode)
++{
++	mutex_lock(&qrk_tdev.lock);
++	*mode = qrk_tdev.mode;
++	mutex_unlock(&qrk_tdev.lock);
++
++	return 0;
++}
++
++/**
++ * intel_qrk_thermal_set_mode
++ *
++ * Set the mode
++ */
++static int intel_qrk_thermal_set_mode(struct thermal_zone_device *tz,
++				enum thermal_device_mode mode)
++{
++	mutex_lock(&qrk_tdev.lock);
++
++	if (mode == THERMAL_DEVICE_ENABLED)
++		qrk_tdev.therm_dev->polling_delay = IDLE_INTERVAL;
++	else
++		qrk_tdev.therm_dev->polling_delay = 0;
++	qrk_tdev.mode = mode;
++
++	mutex_unlock(&qrk_tdev.lock);
++
++	thermal_zone_device_update(qrk_tdev.therm_dev);
++	pr_info("thermal polling set for duration=%d msec\n",
++				qrk_tdev.therm_dev->polling_delay);
++	return 0;
++}
++
++/**
++ * intel_qrk_thermal_get_trip_type
++ *
++ * Get trip type
++ */
++static int intel_qrk_thermal_get_trip_type(struct thermal_zone_device *tz,
++				int trip, enum thermal_trip_type *type)
++{
++	if (trip < MIN_USED_ZONE || trip > MAX_USED_ZONE)
++		return -EINVAL;
++
++	*type = qrk_tdev.tzone[trip].type;
++	return 0;
++}
++
++/**
++ * intel_qrk_thermal_get_trip_temp
++ *
++ * Get trip temp
++ */
++static int intel_qrk_thermal_get_trip_temp(struct thermal_zone_device *tz,
++				int trip, unsigned long *temp)
++{
++	if (trip < MIN_USED_ZONE || trip > MAX_USED_ZONE)
++		return -EINVAL;
++
++	/* Convert the temperature into millicelsius */
++	*temp = qrk_tdev.tzone[trip].trip_value;
++
++	return 0;
++}
++
++/**
++ * intel_qrk_thermal_get_trip_type
++ *
++ * Get trip temp
++ */
++static int intel_qrk_thermal_get_crit_temp(struct thermal_zone_device *tz,
++				unsigned long *temp)
++{
++	/* Critical zone */
++	*temp = qrk_tdev.tzone[CATASTROPIC_ZONE].trip_value;
++	return 0;
++}
++
++static struct thermal_zone_device_ops intel_qrk_thrm_dev_ops = {
++	.get_temp = intel_qrk_thermal_get_temp,
++	.get_trend = intel_qrk_thermal_get_trend,
++	.get_mode = intel_qrk_thermal_get_mode,
++	.set_mode = intel_qrk_thermal_set_mode,
++	.get_trip_type = intel_qrk_thermal_get_trip_type,
++	.get_trip_temp = intel_qrk_thermal_get_trip_temp,
++	.get_crit_temp = intel_qrk_thermal_get_crit_temp,
++};
++
++
++
++/**
++ * intel_qrk_init_zone
++ *
++ * Initialise a zone
++ */
++static void intel_qrk_thermal_init_zone(struct intel_qrk_therm_zone *tz,
++				enum thermal_trip_type type, int trip_value)
++{
++	tz->type = type;
++	tz->trip_value = MCELSIUS(trip_value);
++}
++
++/******************************************************************************
++ *                        Module Entry/Exit hooks
++ ******************************************************************************/
++
++/**
++ * intel_qrk_thermal_probe
++ *
++ * @param pdev: Platform device
++ * @return 0 success < 0 failure
++ *
++ * Callback from platform sub-system to probe
++ *
++ * This routine registers a thermal device with the kernel's thermal management
++ * sub-system
++ */
++static int intel_qrk_thermal_probe(struct platform_device *pdev)
++{
++	int err = 0;
++	int critical_temp = 0, hot_temp = 0;
++	uint32_t regval = 0;
++
++	if (driver_enable == 0)
++		return 0;
++
++	memset(&qrk_tdev, 0x00, sizeof(qrk_tdev));
++
++	critical_temp = CRIT_TEMP;
++	hot_temp = HOT_TEMP;
++
++	/* Enumerate zone type data */
++	memset(&qrk_tdev, 0x00, sizeof(qrk_tdev));
++	mutex_init(&qrk_tdev.lock);
++
++	/* Set initial state disabled */
++	qrk_tdev.mode = THERMAL_DEVICE_ENABLED;
++
++	intel_qrk_thermal_init_zone(&qrk_tdev.tzone[CATASTROPIC_ZONE],
++				  THERMAL_TRIP_CRITICAL, critical_temp);
++	intel_qrk_thermal_init_zone(&qrk_tdev.tzone[HOT_ZONE],
++				  THERMAL_TRIP_HOT, hot_temp);
++
++	/* Register a thermal zone */
++	qrk_tdev.therm_dev = thermal_zone_device_register(DRIVER_NAME,
++			THRM_ZONE_COUNT, 0, 0, &intel_qrk_thrm_dev_ops,
++			0, IDLE_INTERVAL, ACTIVE_INTERVAL);
++
++	if (IS_ERR(qrk_tdev.therm_dev)) {
++		err = PTR_ERR(qrk_tdev.therm_dev);
++		return err;
++	}
++
++	/* Read the BIOS configured hardware catastrophic trip temp */
++	sb_read(SB_ID_THERMAL, THRM_CTRL_READ, THRM_TRPCLR_REG, &regval, 1);
++	regval = (regval & 0xff) - 50;
++
++	pr_info("THRM: critical reset %d c hot %d c hardware failover %d c\n",
++		critical_temp, hot_temp, regval);
++
++	return 0;
++}
++
++/**
++ * intel_qrk_thermal_remove
++ *
++ * @return 0 success < 0 failure
++ *
++ * Removes a platform device
++ */
++static int intel_qrk_thermal_remove(struct platform_device *pdev)
++{
++	if (qrk_tdev.therm_dev != NULL) {
++		thermal_zone_device_unregister(qrk_tdev.therm_dev);
++		return 0;
++	}
++	return -EINVAL;
++}
++
++/*
++ * Platform structures useful for interface to PM subsystem
++ */
++static struct platform_driver intel_qrk_thermal_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.owner = THIS_MODULE,
++	},
++	.probe = intel_qrk_thermal_probe,
++	.remove = intel_qrk_thermal_remove,
++};
++
++module_platform_driver(intel_qrk_thermal_driver);
++
++
++MODULE_AUTHOR("Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>");
++MODULE_DESCRIPTION("Intel Quark Thermal driver");
++MODULE_LICENSE("Dual BSD/GPL");
+diff --git a/include/linux/intel_qrk_sb.h b/include/linux/intel_qrk_sb.h
+new file mode 100644
+index 0000000..4290070
+--- /dev/null
++++ b/include/linux/intel_qrk_sb.h
+@@ -0,0 +1,85 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark side-band driver
++ *
++ * Thread-safe sideband read/write routine.
++ *
++ * Author : Bryan O'Donoghue <bryan.odonoghue@linux.intel.com> 2012
++ */
++
++#ifndef __INTEL_QRK_SB_H__
++#define __INTEL_QRK_SB_H__
++
++#include <linux/types.h>
++
++#define PCI_DEVICE_ID_X1000_HOST_BRIDGE			0x0958
++
++typedef enum {
++	SB_ID_HUNIT = 0x03,
++	SB_ID_THERMAL = 0x04,
++	SB_ID_ESRAM = 0x05,
++	SB_ID_SOC = 0x31,
++}qrk_sb_id;
++
++/**
++ * intel_qrk_sb_read_reg
++ *
++ * @param qrk_sb_id: Sideband identifier
++ * @param command: Command to send to destination identifier
++ * @param reg: Target register w/r to qrk_sb_id
++ * @return nothing
++ *
++ * Utility function to allow thread-safe read of side-band
++ * command - can be different read op-code types - which is why we don't
++ * hard-code this value directly into msg
++ */
++void intel_qrk_sb_read_reg(qrk_sb_id id, u8 cmd, u8 reg, u32 *data, u8 lock);
++
++/**
++ * intel_qrk_sb_write_reg
++ *
++ * @param qrk_sb_id: Sideband identifier
++ * @param command: Command to send to destination identifier
++ * @param reg: Target register w/r to qrk_sb_id
++ * @return nothing
++ *
++ * Utility function to allow thread-safe write of side-band
++ */
++void intel_qrk_sb_write_reg(qrk_sb_id id, u8 cmd, u8 reg, u32 data, u8 lock);
++
++/**
++ * intel_qrk_sb_runfn_lock
++ *
++ * @param fn: Callback function - which requires side-band spinlock and !irq
++ * @param arg: Callback argument
++ * @return 0 on success < 0 on failure
++ *
++ * Runs the given function pointer inside of a call to the local spinlock using
++ * spin_lock_irqsave/spin_unlock_irqrestore. Needed for the eSRAMv1 driver to
++ * guarantee atomicity, but, available to any other user of sideband provided
++ * rules are respected.
++ * Rules:
++ *	fn may not sleep
++ *	fn may not change the state of irqs	
++ */
++int intel_qrk_sb_runfn_lock(int (*fn)( void * arg ), void * arg);
++
++/**
++ * intel_qrk_sb_initialized
++ *
++ * False if sideband running on non-Quark system
++ */
++int intel_qrk_sb_initialized(void);
++
++#endif /* __INTEL_QRK_SB_H__ */
+diff --git a/include/linux/platform_data/quark.h b/include/linux/platform_data/quark.h
+new file mode 100644
+index 0000000..e9b2d55d
+--- /dev/null
++++ b/include/linux/platform_data/quark.h
+@@ -0,0 +1,37 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark platform data definition
++ */
++
++#ifndef _PDATA_QUARK_H
++#define _PDATA_QUARK_H
++
++typedef enum  {
++	QUARK_PLAT_UNDEFINED = 0,
++	QUARK_EMULATION = 1,
++	QUARK_PEAK = 2,
++	KIPS_BAY = 3,
++	CROSS_HILL = 4,
++	QUARK_HILL = 5,
++	GALILEO = 6,
++}qrk_plat_id_t;
++
++typedef enum {
++	PLAT_DATA_ID = 1,
++	PLAT_DATA_SN = 2,
++	PLAT_DATA_MAC0 = 3,
++	PLAT_DATA_MAC1 = 4,
++}plat_dataid_t;
++
++#endif /* _PDATA_QUARK_H */

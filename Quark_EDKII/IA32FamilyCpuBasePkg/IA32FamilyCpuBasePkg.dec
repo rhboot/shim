@@ -1,0 +1,144 @@
+## @file
+# Package for support of IA32 family processors
+#
+# This package supports IA32 family processors, with CPU DXE module, CPU PEIM, CPU S3 module,
+# SMM modules, related libraries, and corresponding definitions.
+#
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = IA32FamilyCpuBasePkg
+  PACKAGE_GUID                   = 6E0E3B55-5650-4265-A4D9-849D19D6D609
+  PACKAGE_VERSION                = 0.4
+
+[Includes]
+  Include
+
+[LibraryClasses]
+  CpuConfigLib|Include/Library/CpuConfigLib.h
+  CpuOnlyResetLib|Include/Library/CpuOnlyResetLib.h
+  PlatformSecLib|Include/Library/PlatformSecLib.h
+  Socket775LgaLib|Include/Library/SocketLga775Lib.h
+  SmmCpuPlatformHookLib|Include/Library/SmmCpuPlatformHookLib.h
+
+[Guids]
+  gEfiHtBistHobGuid              = { 0xBE644001, 0xE7D4, 0x48B1, { 0xB0, 0x96, 0x8B, 0xA0, 0x47, 0xBC, 0x7A, 0xE7 }}
+  gEfiCpuTokenSpaceGuid          = { 0x2ADA836D, 0x0A3D, 0x43D6, { 0xA2, 0x5A, 0x38, 0x45, 0xCA, 0xD2, 0xD4, 0x00 }}
+
+[Ppis]
+  gPeiCachePpiGuid               = { 0xC153205A, 0xE898, 0x4C24, { 0x86, 0x89, 0xA4, 0xB4, 0xBC, 0xC5, 0xC8, 0xA2 }}
+
+[Protocols]
+  gSmmCpuSyncProtocolGuid        = { 0xd5950985, 0x8be3, 0x4b1c, { 0xb6, 0x3f, 0x95, 0xd1, 0x5a, 0xb3, 0xb6, 0x5f }}
+  gSmmCpuSync2ProtocolGuid       = { 0x9db72e22, 0x9262, 0x4a18, { 0x8f, 0xe0, 0x85, 0xe0, 0x3d, 0xfa, 0x96, 0x73 }}
+  gEfiSmmCpuServiceProtocolGuid  = { 0x1d202cab, 0xc8ab, 0x4d5c, { 0x94, 0xf7, 0x3c, 0xfc, 0xc0, 0xd3, 0xd3, 0x35 }}
+
+[PcdsFeatureFlag]
+  gEfiCpuTokenSpaceGuid.PcdCpuMaxCpuIDValueLimitFlag|TRUE|BOOLEAN|0x10000008
+  gEfiCpuTokenSpaceGuid.PcdCpuSelectLfpAsBspFlag|FALSE|BOOLEAN|0x1000000F
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmEnableBspElection|TRUE|BOOLEAN|0x32132106
+  gEfiCpuTokenSpaceGuid.PcdCpuExecuteDisableBitFlag|TRUE|BOOLEAN|0x10000009
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmDebug|FALSE|BOOLEAN|0x1000001B
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmStackGuard|FALSE|BOOLEAN|0x1000001C
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmBlockStartupThisAp|FALSE|BOOLEAN|0x32132108
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmProfileEnable|FALSE|BOOLEAN|0x32132109
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmProfileRingBuffer|FALSE|BOOLEAN|0x3213210a
+
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmUncacheCpuSyncData|FALSE|BOOLEAN|0x3213210D
+  gEfiCpuTokenSpaceGuid.PcdCpuHotPlugSupport|FALSE|BOOLEAN|0x3213210C
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmFeatureControlMsrLock|TRUE|BOOLEAN|0x3213210B
+
+[PcdsFixedAtBuild]
+  gEfiCpuTokenSpaceGuid.PcdCpuMaxLogicalProcessorNumber|64|UINT32|0x30000002
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmApSyncTimeout|1000000|UINT64|0x32132104
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmStackSize|0x2000|UINT32|0x32132105
+  ##
+  #  The PCD is used to specify memory size with bytes to save SMM profile data.
+  #  The value should be a multiple of 4KB.
+  ##
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmProfileSize|0x200000|UINT32|0x32132107
+
+  ##
+  #  Maximum number of Ppi is provided by SecCore.
+  ##
+  gEfiCpuTokenSpaceGuid.PcdSecCoreMaxPpiSupported|0x6|UINT32|0x10001010
+  gEfiCpuTokenSpaceGuid.PcdTemporaryRamBase|0xfef00000|UINT32|0x10001001
+  gEfiCpuTokenSpaceGuid.PcdTemporaryRamSize|0x2000|UINT32|0x10001002
+  gEfiCpuTokenSpaceGuid.PcdSecMaximumNumberOfProcessors|1|UINT32|0x10001000
+
+[PcdsFixedAtBuild, PcdsPatchableInModule]
+  ## Stack size in the temporary RAM.
+  #   0 means half of TemporaryRamSize.
+  gEfiCpuTokenSpaceGuid.PcdPeiTemporaryRamStackSize|0|UINT32|0x10001003
+
+[PcdsFixedAtBuild, PcdsPatchableInModule, PcdsDynamic, PcdsDynamicEx]
+  gEfiCpuTokenSpaceGuid.PcdCpuApInitTimeOutInMicroSeconds|50000|UINT32|0x30000001
+  gEfiCpuTokenSpaceGuid.PcdCpuApStackSize|0x8000|UINT32|0x30000003
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureUserConfiguration|0|UINT32|0x40000001
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureUserConfigurationEx1|0|UINT32|0x40000006
+  gEfiCpuTokenSpaceGuid.PcdPlatformHighPowerLoadLineSupport|TRUE|BOOLEAN|0x60000001
+  gEfiCpuTokenSpaceGuid.PcdPlatformDynamicVidSupport|TRUE|BOOLEAN|0x60000002
+  gEfiCpuTokenSpaceGuid.PcdPlatformType|0|UINT8|0x60000003
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuMaxCoreFrequency|0x0|UINT32|0x60000004
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuMaxFsbFrequency|0x0|UINT32|0x60000005
+  ## Base address of the LVL_2 register visible to software.
+  # 16-bit IO port address.
+  gEfiCpuTokenSpaceGuid.PcdCpuAcpiLvl2Addr|0x0|UINT16|0x60008001
+  ## This PCD specifies the AP wait loop mode during POST.
+  #  The value is defined as below.
+  #  1: ApInHltLoop,   AP is in the Hlt-Loop state.
+  #  2: ApInMwaitLoop, AP is in the Mwait-Loop state.
+  #  3: ApInRunLoop,   AP is in the Run-Loop state.
+  gEfiCpuTokenSpaceGuid.PcdCpuApLoopMode|1|UINT8|0x60008006
+
+  gEfiCpuTokenSpaceGuid.PcdCpuSmmCodeAccessCheckEnable|TRUE|BOOLEAN|0x60000013
+  ## This PCD specifies the TCC Activation Offset value
+  gEfiCpuTokenSpaceGuid.PcdCpuTccActivationOffset|0|UINT8|0x6000001B
+
+[PcdsDynamic, PcdsDynamicEx]
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureCapability|0|UINT32|0x40000002
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureSetting|0|UINT32|0x40000003
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureCapabilityEx1|0|UINT32|0x40000004
+  gEfiCpuTokenSpaceGuid.PcdCpuProcessorFeatureSettingEx1|0|UINT32|0x40000005
+  gEfiCpuTokenSpaceGuid.PcdCpuConfigContextBuffer|0x0|UINT64|0x50000001
+  gEfiCpuTokenSpaceGuid.PcdCpuCallbackSignal|0x0|UINT8|0x50000002
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuFrequencyLists|0x0|UINT64|0x60000006
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuSocketCount|0x0|UINT32|0x60000012
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuSocketNames|0x0|UINT64|0x60000007
+  gEfiCpuTokenSpaceGuid.PcdPlatformCpuAssetTags|0x0|UINT64|0x60000008
+  gEfiCpuTokenSpaceGuid.PcdIsPowerOnReset|FALSE|BOOLEAN|0x6000000F
+  gEfiCpuTokenSpaceGuid.PcdCpuPageTableAddress|0x0|UINT64|0x6000000E
+  gEfiCpuTokenSpaceGuid.PcdCpuMtrrTableAddress|0x0|UINT64|0x6000000D
+  gEfiCpuTokenSpaceGuid.PcdCpuS3DataAddress|0x0|UINT64|0x60000010
+  gEfiCpuTokenSpaceGuid.PcdCpuSocketId|{0}|VOID*|0x60008007
+  gEfiCpuTokenSpaceGuid.PcdCpuHotPlugDataAddress|0x0|UINT64|0x60000011
+

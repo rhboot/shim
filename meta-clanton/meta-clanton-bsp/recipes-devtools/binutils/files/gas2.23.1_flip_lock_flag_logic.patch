@@ -1,0 +1,66 @@
+diff --git i/gas/config/tc-i386.c w/gas/config/tc-i386.c
+index 11f8384..d9af830 100644
+--- i/gas/config/tc-i386.c
++++ w/gas/config/tc-i386.c
+@@ -449,7 +449,7 @@ static int allow_naked_reg = 0;
+ /* 1 if pseudo index register, eiz/riz, is allowed .  */
+ static int allow_index_reg = 0;
+ 
+-static int fix_quark_lock = 0;
++static int quark_strip_lock = 1;
+ 
+ static enum
+   {
+@@ -6234,7 +6234,7 @@ output_insn (void)
+       unsigned int prefix;
+ 
+       /* Workaround for a Quark errata.  */
+-      if (fix_quark_lock)
++      if (quark_strip_lock)
+        {
+          if (i.tm.base_opcode == 240 /* lock */)
+              return;
+@@ -8421,7 +8421,7 @@ const char *md_shortopts = "qn";
+ #define OPTION_MSSE_CHECK (OPTION_MD_BASE + 11)
+ #define OPTION_MAVXSCALAR (OPTION_MD_BASE + 12)
+ #define OPTION_X32 (OPTION_MD_BASE + 13)
+-#define OPTION_FIX_QUARK_LOCK (OPTION_MD_BASE + 14)
++#define OPTION_QUARK_STRIP_LOCK (OPTION_MD_BASE + 14)
+ 
+ struct option md_longopts[] =
+ {
+@@ -8444,7 +8444,7 @@ struct option md_longopts[] =
+   {"msse2avx", no_argument, NULL, OPTION_MSSE2AVX},
+   {"msse-check", required_argument, NULL, OPTION_MSSE_CHECK},
+   {"mavxscalar", required_argument, NULL, OPTION_MAVXSCALAR},
+-  {"mfix-quark-lock", no_argument, NULL, OPTION_FIX_QUARK_LOCK},
++  {"mquark-strip-lock", required_argument, NULL, OPTION_QUARK_STRIP_LOCK},
+   {NULL, no_argument, NULL, 0}
+ };
+ size_t md_longopts_size = sizeof (md_longopts);
+@@ -8691,8 +8691,13 @@ md_parse_option (int c, char *arg)
+ 	as_fatal (_("invalid -mavxscalar= option: `%s'"), arg);
+       break;
+ 
+-    case OPTION_FIX_QUARK_LOCK:
+-      fix_quark_lock = 1;
++    case OPTION_QUARK_STRIP_LOCK:
++      if (strcasecmp (arg, "yes") == 0)
++        quark_strip_lock = 1;
++      else if (strcasecmp (arg, "no") == 0)
++        quark_strip_lock = 0;
++      else
++        as_fatal (_("invalid -mquark-strip-lock= option: `%s'"), arg);
+       break;
+ 
+     default:
+@@ -8836,6 +8841,9 @@ md_show_usage (FILE *stream)
+   -mnaked-reg             don't require `%%' prefix for registers\n"));
+   fprintf (stream, _("\
+   -mold-gcc               support old (<= 2.8.1) versions of gcc\n"));
++  fprintf (stream, _("\
++  -mquark-strip-lock=[yes|no]\n\
++                          strip all lock prefixes; default is yes\n"));
+ }
+ 
+ #if ((defined (OBJ_MAYBE_COFF) && defined (OBJ_MAYBE_AOUT)) \

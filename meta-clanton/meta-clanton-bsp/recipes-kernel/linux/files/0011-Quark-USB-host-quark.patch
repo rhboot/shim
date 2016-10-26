@@ -1,0 +1,92 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Bryan O'Donoghue <bryan.odonoghue@intel.com>
+Date: Thu, 13 Feb 2014 13:03:44 +0000
+Subject: [PATCH 11/21] Quark USB host
+
+---
+ drivers/usb/host/ehci-pci.c   |  4 ++++
+ drivers/usb/host/pci-quirks.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/pci-quirks.h |  2 ++
+ 3 files changed, 48 insertions(+)
+
+diff --git a/drivers/usb/host/ehci-pci.c b/drivers/usb/host/ehci-pci.c
+index 170b939..5eac9db 100644
+--- a/drivers/usb/host/ehci-pci.c
++++ b/drivers/usb/host/ehci-pci.c
+@@ -50,6 +50,10 @@ static int ehci_pci_reinit(struct ehci_hcd *ehci, struct pci_dev *pdev)
+ 	if (!retval)
+ 		ehci_dbg(ehci, "MWI active\n");
+ 
++	/* Reset the threshold limit */
++	if(unlikely(usb_is_intel_qrk(pdev)))
++		usb_set_qrk_bulk_thresh(pdev);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/usb/host/pci-quirks.c b/drivers/usb/host/pci-quirks.c
+index 4c338ec..c4c072a 100644
+--- a/drivers/usb/host/pci-quirks.c
++++ b/drivers/usb/host/pci-quirks.c
+@@ -722,6 +722,48 @@ static int handshake(void __iomem *ptr, u32 mask, u32 done,
+ 	return -ETIMEDOUT;
+ }
+ 
++#define PCI_DEVICE_ID_INTEL_QUARK_X1000_SOC		0x0939
++bool usb_is_intel_qrk(struct pci_dev *pdev)
++{
++	return pdev->vendor == PCI_VENDOR_ID_INTEL &&
++		pdev->device == PCI_DEVICE_ID_INTEL_QUARK_X1000_SOC;
++
++}
++EXPORT_SYMBOL_GPL(usb_is_intel_qrk);
++
++#define EHCI_INSNREG01		0x84
++#define EHCI_INSNREG01_THRESH	0x007F007F	/* Threshold value */
++void usb_set_qrk_bulk_thresh(struct pci_dev *pdev)
++{
++	void __iomem *base, *op_reg_base;
++	u8 cap_length;
++	u32 val;
++
++	if (!mmio_resource_enabled(pdev, 0))
++		return;
++
++	base = pci_ioremap_bar(pdev, 0);
++	if (base == NULL)
++		return;
++
++	cap_length = readb(base);
++	op_reg_base = base + cap_length;
++
++	val = readl(op_reg_base + EHCI_INSNREG01);
++	dev_printk(KERN_INFO, &pdev->dev, "INSNREG01 is 0x%08x\n", val);
++
++	val = EHCI_INSNREG01_THRESH;
++
++	writel(val, op_reg_base + EHCI_INSNREG01);
++
++	val = readl(op_reg_base + EHCI_INSNREG01);
++	dev_printk(KERN_INFO, &pdev->dev, "INSNREG01 is 0x%08x\n", val);
++
++	iounmap(base);
++
++}
++EXPORT_SYMBOL_GPL(usb_set_qrk_bulk_thresh);
++
+ #define PCI_DEVICE_ID_INTEL_LYNX_POINT_XHCI	0x8C31
+ #define PCI_DEVICE_ID_INTEL_LYNX_POINT_LP_XHCI	0x9C31
+ 
+diff --git a/drivers/usb/host/pci-quirks.h b/drivers/usb/host/pci-quirks.h
+index 7f69a39..80ffdee 100644
+--- a/drivers/usb/host/pci-quirks.h
++++ b/drivers/usb/host/pci-quirks.h
+@@ -9,6 +9,8 @@ void usb_amd_dev_put(void);
+ void usb_amd_quirk_pll_disable(void);
+ void usb_amd_quirk_pll_enable(void);
+ bool usb_is_intel_switchable_xhci(struct pci_dev *pdev);
++bool usb_is_intel_qrk(struct pci_dev *pdev);
++void usb_set_qrk_bulk_thresh(struct pci_dev *pdev);
+ void usb_enable_xhci_ports(struct pci_dev *xhci_pdev);
+ void usb_disable_xhci_ports(struct pci_dev *xhci_pdev);
+ #else

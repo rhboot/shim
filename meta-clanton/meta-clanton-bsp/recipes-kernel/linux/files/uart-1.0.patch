@@ -1,0 +1,44 @@
+diff --git a/drivers/tty/serial/intel_quark_uart.c b/drivers/tty/serial/intel_quark_uart.c
+index 5bb6a00..2297691 100755
+--- a/drivers/tty/serial/intel_quark_uart.c
++++ b/drivers/tty/serial/intel_quark_uart.c
+@@ -769,6 +769,12 @@ static int handle_rx_to(struct x1000_port *priv)
+ 			return 0;
+ 	} while (rx_size == buf->size);
+ 
++	if(!rx_size){
++		quark_uart_hal_fifo_reset(priv, QUARK_UART_HAL_CLR_ALL_FIFO);
++		ret = quark_uart_hal_set_fifo(priv, QUARK_UART_HAL_DMA_MODE0,
++				      QUARK_UART_HAL_FIFO_DIS, QUARK_UART_HAL_TRIGGER1);
++		return 0;
++	}
+ 	return QUARK_UART_HANDLED_RX_INT;
+ }
+ 
+@@ -1059,16 +1065,16 @@ static void quark_uart_work(struct work_struct *work)
+ 		return;
+ 	}
+ 	/* Configure TX */
+-	priv->tx_conf.src_addr = sg_dma_address(priv->sg_tx_p);
+-	priv->tx_conf.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+-	priv->tx_conf.src_maxburst = LNW_DMA_MSIZE_1;
+-	priv->tx_conf.dst_addr = QUARK_UART_AHB_REG_BASE + QUARK_UART_THR;	/* Wants an AHB address */
+-	priv->tx_conf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+-	priv->tx_conf.dst_maxburst = LNW_DMA_MSIZE_4;
+-	priv->tx_conf.direction = DMA_MEM_TO_DEV;
+-	priv->tx_conf.device_fc = false;
+-
+-	dmaengine_slave_config(priv->tx_chan, &priv->tx_conf);
++	priv->dmas_tx.dma_slave.src_addr = sg_dma_address(priv->sg_tx_p);
++	priv->dmas_tx.dma_slave.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
++	priv->dmas_tx.dma_slave.src_maxburst = LNW_DMA_MSIZE_1;
++	priv->dmas_tx.dma_slave.dst_addr = QUARK_UART_AHB_REG_BASE + QUARK_UART_THR;	/* Wants an AHB address */
++	priv->dmas_tx.dma_slave.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++	priv->dmas_tx.dma_slave.dst_maxburst = LNW_DMA_MSIZE_4;
++	priv->dmas_tx.dma_slave.direction = DMA_MEM_TO_DEV;
++	priv->dmas_tx.dma_slave.device_fc = false;
++
++	dmaengine_slave_config(priv->tx_chan, &priv->dmas_tx.dma_slave);
+ 	desc = dmaengine_prep_slave_sg(priv->tx_chan,
+ 					priv->sg_tx_p, priv->nent, DMA_MEM_TO_DEV,
+ 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);

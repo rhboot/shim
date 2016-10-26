@@ -1,0 +1,104 @@
+## @file
+# Component description file for CPU Arch DXE Driver.
+#
+# CPU DXE Driver that configures multi-processor environment, logs data to datahub
+#  for processor subclass and cache subclass, and installs CPU Architecture Protocol and MP
+#  Services Protocol
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = CpuArchDxe
+  FILE_GUID                      = 62D171CB-78CD-4480-8678-C6A2A797A8DE
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = InitializeCpu
+
+#
+# The following information is for reference only and not required by the build tools.
+#
+#  VALID_ARCHITECTURES           = IA32 X64
+#
+#  Create Event Guid C Name:  Event Type: EVENT_TYPE_PERIODIC_TIMER
+#
+#  HOB Guid C Name: gEfiHtBistHobGuid Hob Type: GUID_EXTENSION
+#
+
+[Sources]
+  Cpu.c
+  Cpu.h
+  Exception.h
+  MemoryAttribute.c
+  MemoryAttribute.h
+  MtrrSync.c
+  MtrrSync.h
+
+[Sources.Ia32]
+  IA32/Exception.c
+  IA32/CpuAsm.asm
+  IA32/CpuAsm.S
+  IA32/ArchSpecificDef.h
+  IA32/ArchSpecific.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+  IA32FamilyCpuBasePkg/IA32FamilyCpuBasePkg.dec
+
+[LibraryClasses]
+  MtrrLib
+  TimerLib
+  DxeServicesTableLib
+  IoLib
+  PcdLib
+  UefiBootServicesTableLib
+  MemoryAllocationLib
+  UefiDriverEntryPoint
+  ReportStatusCodeLib
+  BaseMemoryLib
+  DebugLib
+  BaseLib
+  UefiLib
+  LocalApicLib
+  UefiCpuLib
+
+[Protocols]
+  gEfiMpServiceProtocolGuid                     # PROTOCOL ALWAYS_CONSUMED
+  gEfiCpuArchProtocolGuid                       # PROTOCOL ALWAYS_PRODUCED
+
+[Pcd]
+  gEfiCpuTokenSpaceGuid.PcdCpuPageTableAddress
+  gEfiCpuTokenSpaceGuid.PcdCpuMtrrTableAddress
+
+[Depex]
+  TRUE
+

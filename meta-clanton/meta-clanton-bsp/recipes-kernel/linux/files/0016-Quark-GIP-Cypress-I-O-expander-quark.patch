@@ -1,0 +1,4622 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Josef Ahmad <josef.ahmad@linux.intel.com>
+Date: Mon, 31 Mar 2014 18:03:09 +0100
+Subject: [PATCH 16/21] Quark GIP + Cypress I/O expander
+
+---
+ drivers/mfd/Kconfig                     |   48 ++
+ drivers/mfd/Makefile                    |   10 +
+ drivers/mfd/cy8c9540a.c                 |  963 ++++++++++++++++++++++++++
+ drivers/mfd/intel_qrk_gip.h             |   97 +++
+ drivers/mfd/intel_qrk_gip_core.c        |  328 +++++++++
+ drivers/mfd/intel_qrk_gip_gpio.c        |  652 ++++++++++++++++++
+ drivers/mfd/intel_qrk_gip_i2c.c         |  241 +++++++
+ drivers/mfd/intel_qrk_gip_pdata.c       |   18 +
+ drivers/mfd/intel_qrk_gip_test.c        | 1124 +++++++++++++++++++++++++++++++
+ drivers/mfd/lpc_sch.c                   |   76 ++-
+ drivers/mfd/pca9685-core.c              |  283 ++++++++
+ drivers/mfd/pca9685-gpio.c              |  108 +++
+ drivers/mfd/pca9685-pwm.c               |  262 +++++++
+ drivers/mfd/pca9685.h                   |  110 +++
+ include/linux/mfd/cy8c9540a.h           |   31 +
+ include/linux/mfd/intel_qrk_gip_pdata.h |   25 +
+ include/linux/platform_data/pca9685.h   |   51 ++
+ 17 files changed, 4414 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/mfd/cy8c9540a.c
+ create mode 100644 drivers/mfd/intel_qrk_gip.h
+ create mode 100644 drivers/mfd/intel_qrk_gip_core.c
+ create mode 100644 drivers/mfd/intel_qrk_gip_gpio.c
+ create mode 100644 drivers/mfd/intel_qrk_gip_i2c.c
+ create mode 100644 drivers/mfd/intel_qrk_gip_pdata.c
+ create mode 100644 drivers/mfd/intel_qrk_gip_test.c
+ create mode 100644 drivers/mfd/pca9685-core.c
+ create mode 100644 drivers/mfd/pca9685-gpio.c
+ create mode 100644 drivers/mfd/pca9685-pwm.c
+ create mode 100644 drivers/mfd/pca9685.h
+ create mode 100644 include/linux/mfd/cy8c9540a.h
+ create mode 100644 include/linux/mfd/intel_qrk_gip_pdata.h
+ create mode 100644 include/linux/platform_data/pca9685.h
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index ff553ba..74358c2 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -907,6 +907,54 @@ config MFD_TIMBERDALE
+ 	The timberdale FPGA can be found on the Intel Atom development board
+ 	for in-vehicle infontainment, called Russellville.
+ 
++config CY8C9540A
++	tristate "Cypress CY8C9540 GPIO/PWM expander"
++	depends on GPIOLIB
++	depends on I2C
++	depends on PWM
++	help
++	  Select this option to enable support for the CY8C9540 I/O expander.
++	  This device provides 40 interrupt-capable GPIOs, 8 PWMs and an EEPROM.
++
++config MFD_PCA9685
++	tristate "NPX Semiconductors PCA9685 (PWM/GPIO) driver"
++	depends on GPIOLIB && I2C && PWM
++	select REGMAP_I2C
++	help
++	  NPX PCA9685 I2C-bus PWM controller with GPIO output interface support.
++	  The I2C-bus LED controller provides 16-channel, 12-bit PWM Fm+.
++	  Additionally, the driver allows the channels to be configured as GPIO
++	  interface (output only).
++
++config INTEL_QRK_GIP
++	tristate "Intel Quark GIP"
++	depends on PCI && X86 && INTEL_QUARK_X1000_SOC
++	depends on I2C
++	select GENERIC_IRQ_CHIP
++	help
++	  GIP driver for Quark SoC.
++	  Quark GIP is a single PCI function exporting a GPIO and an I2C
++	  controller, namely Synopsys DesignWare GPIO and Synopsys DesignWare
++	  I2C.  The GPIO interface exports a total amount of 8 interrupt-capable
++	  GPIOs.
++
++config INTEL_QRK_GIP_TEST
++	tristate "Intel Quark GIP support for Integration Testing"
++	depends on INTEL_QRK_GIP
++	select I2C_CHARDEV
++	select GPIO_SYSFS
++	select SPI
++	select SPI_BITBANG
++	select SPI_GPIO
++	select SPI_MASTER
++	select SPI_SPIDEV
++	help
++	  Quark GIP automated Integration Testing package.
++	  It selects kernel components needed for GPIO and I2C tests as per
++	  Integration Test Specification, and it also adds a kernel-space
++	  facility for testing the GPIO.
++	  Note this module is also used to test the Quark Legacy GPIO.
++
+ config LPC_SCH
+ 	tristate "Intel SCH LPC"
+ 	depends on PCI
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 8b977f8..38706ff 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -123,6 +123,16 @@ obj-$(CONFIG_MFD_DB8500_PRCMU)	+= db8500-prcmu.o
+ obj-$(CONFIG_AB8500_CORE)	+= ab8500-core.o ab8500-sysctrl.o
+ obj-$(CONFIG_MFD_TIMBERDALE)    += timberdale.o
+ obj-$(CONFIG_PMIC_ADP5520)	+= adp5520.o
++obj-$(CONFIG_CY8C9540A)		+= cy8c9540a.o
++pca9685-objs			:= pca9685-core.o pca9685-gpio.o pca9685-pwm.o
++obj-$(CONFIG_MFD_PCA9685)	+= pca9685.o
++obj-$(CONFIG_INTEL_QRK_GIP)	+= intel_qrk_gip.o
++intel_qrk_gip-objs		:= intel_qrk_gip_core.o \
++					intel_qrk_gip_gpio.o \
++					intel_qrk_gip_i2c.o \
++					../i2c/busses/i2c-designware-core.o
++obj-$(CONFIG_INTEL_QUARK_X1000_SOC)	+= intel_qrk_gip_pdata.o
++obj-$(CONFIG_INTEL_QRK_GIP_TEST)+=intel_qrk_gip_test.o
+ obj-$(CONFIG_LPC_SCH)		+= lpc_sch.o
+ obj-$(CONFIG_LPC_ICH)		+= lpc_ich.o
+ obj-$(CONFIG_MFD_RDC321X)	+= rdc321x-southbridge.o
+diff --git a/drivers/mfd/cy8c9540a.c b/drivers/mfd/cy8c9540a.c
+new file mode 100644
+index 0000000..9e3966a
+--- /dev/null
++++ b/drivers/mfd/cy8c9540a.c
+@@ -0,0 +1,963 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++/*
++ * Driver for Cypress CY8C9540A I/O Expander and PWM
++ *
++ * The I/O Expander is I2C-controlled and provides 40 interrupt-capable GPIOs,
++ * 8 PWMs and an EEPROM.
++ * Note the device only supports I2C standard speed 100kHz.
++ *
++ * Based on gpio-adp5588.
++ */
++
++#include <linux/delay.h>
++#include <linux/i2c.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/gpio.h>
++#include <linux/kernel.h>
++#include <linux/mfd/cy8c9540a.h>
++#include <linux/module.h>
++#include <linux/pwm.h>
++#include <linux/slab.h>
++
++#define DRV_NAME			"cy8c9540a"
++
++/* CY8C9540A settings */
++#define NGPIO				40
++#define PWM_MAX_PERIOD			0xff
++#define DEVID_FAMILY_CY8C9540A		0x40
++#define DEVID_FAMILY_MASK		0xf0
++#define NPORTS				6
++#define PWM_CLK				0x00	/* see resulting PWM_TCLK_NS */
++#define PWM_TCLK_NS			31250	/* 32kHz */
++
++/* Register offset  */
++#define REG_INPUT_PORT0			0x00
++#define REG_OUTPUT_PORT0		0x08
++#define REG_INTR_STAT_PORT0		0x10
++#define REG_PORT_SELECT			0x18
++#define REG_INTR_MASK			0x19
++#define REG_SELECT_PWM			0x1a
++#define REG_PIN_DIR			0x1c
++#define REG_DRIVE_PULLUP		0x1d
++#define REG_PWM_SELECT			0x28
++#define REG_PWM_CLK			0x29
++#define REG_PWM_PERIOD			0x2a
++#define REG_PWM_PULSE_W			0x2b
++#define REG_ENABLE			0x2d
++#define REG_DEVID_STAT			0x2e
++#define REG_CMD				0x30
++
++/* Commands */
++#define CMD_W_EEPROM_POR		0x03
++#define CMD_R_EEPROM_POR		0x04
++#define CMD_RECONF			0x07
++
++/* Max retries after I2C NAK */
++#define MAX_RETRIES			3
++
++/*
++ * Wait time for device to be ready.
++ * Note the time the part takes depends on the user configuration (mainly on
++ * the number of active interrupts).  The minimum delay here covers the
++ * worst-case scenario.
++ */
++#define SLEEP_US_MIN			4000
++#define SLEEP_US_MAX			4500
++
++/* Command string to store platform POR settings */
++#define POR_CMD_W_OFFS			2
++static u8 por_set[CY8C9540A_POR_SETTINGS_LEN + POR_CMD_W_OFFS] = {
++	[0] = REG_CMD,
++	[1] = CMD_W_EEPROM_POR,
++};
++
++struct cy8c9540a {
++	struct i2c_client *client;
++	struct gpio_chip gpio_chip;
++	struct pwm_chip pwm_chip;
++	struct mutex lock;
++	/* IRQ base stored from platform data */
++	int irq_base;
++	/* protect serialized access to the interrupt controller bus */
++	struct mutex irq_lock;
++	/* cached output registers */
++	u8 outreg_cache[NPORTS];
++	/* cached IRQ mask */
++	u8 irq_mask_cache[NPORTS];
++	/* IRQ mask to be applied */
++	u8 irq_mask[NPORTS];
++	/* Descriptor for raw i2c transactions */
++	struct i2c_msg i2c_segments[2];
++	/* POR settings stored in the EEPROM */
++	u8 por_stored[CY8C9540A_POR_SETTINGS_LEN];
++	/* PWM-to-GPIO mapping (0 == first gpio pin)  */
++	int pwm2gpio_mapping[CY8C9540A_NPWM];
++};
++
++/* Per-port GPIO offset */
++static const u8 cy8c9540a_port_offs[] = {
++	0,
++	8,
++	16,
++	20,
++	28,
++	36,
++};
++
++static inline u8 cypress_get_port(unsigned gpio)
++{
++	u8 i = 0;
++	for (i = 0; i < sizeof(cy8c9540a_port_offs) - 1; i ++) {
++		if (! (gpio / cy8c9540a_port_offs[i + 1]))
++			break;
++	}
++	return i;
++}
++
++static inline u8 cypress_get_offs(unsigned gpio, u8 port)
++{
++	return gpio - cy8c9540a_port_offs[port];
++}
++
++static int cy8c9540a_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
++{
++	s32 ret = 0;
++	u8 port = 0;
++	u8 in_reg = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, gpio_chip);
++	struct i2c_client *client = dev->client;
++
++	port = cypress_get_port(gpio);
++	in_reg = REG_INPUT_PORT0 + port;
++
++	ret = i2c_smbus_read_byte_data(client, in_reg);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't read input port%u\n", in_reg);
++	}
++
++	return !!(ret & BIT(cypress_get_offs(gpio, port)));
++}
++
++static void cy8c9540a_gpio_set_value(struct gpio_chip *chip,
++				   unsigned gpio, int val)
++{
++	s32 ret = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, gpio_chip);
++	struct i2c_client *client = dev->client;
++	u8 port = cypress_get_port(gpio);
++	u8 out_reg = REG_OUTPUT_PORT0 + port;
++
++	mutex_lock(&dev->lock);
++
++	if (val) {
++		dev->outreg_cache[port] |= BIT(cypress_get_offs(gpio, port));
++	} else {
++		dev->outreg_cache[port] &= ~BIT(cypress_get_offs(gpio, port));
++	}
++
++	ret = i2c_smbus_write_byte_data(client, out_reg,
++					dev->outreg_cache[port]);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write output port%u\n", port);
++	}
++
++	mutex_unlock(&dev->lock);
++}
++
++static int cy8c9540a_gpio_set_drive(struct gpio_chip *chip, unsigned gpio,
++					unsigned mode)
++{
++	s32 ret = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, gpio_chip);
++	struct i2c_client *client = dev->client;
++	u8 port = cypress_get_port(gpio);
++	u8 pin = cypress_get_offs(gpio, port);
++	u8 offs = 0;
++	u8 val = 0;
++
++	switch(mode) {
++	case GPIOF_DRIVE_PULLUP:
++		offs = 0x0;
++		break;
++	case GPIOF_DRIVE_STRONG:
++		offs = 0x4;
++		break;
++	case GPIOF_DRIVE_HIZ:
++		offs = 0x6;
++		break;
++	default:
++		/*
++		 * See databook for alternative modes.  This driver won't
++		 * support them though.
++		 */
++		return -EINVAL;
++		break;
++	}
++
++	mutex_lock(&dev->lock);
++
++	ret = i2c_smbus_write_byte_data(client, REG_PORT_SELECT, port);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't select port %u\n", port);
++		goto end;
++	}
++
++	ret = i2c_smbus_read_byte_data(client, REG_DRIVE_PULLUP + offs);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't read pin direction\n");
++		goto end;
++	}
++
++	val = (u8)(ret | BIT(pin));
++
++	ret = i2c_smbus_write_byte_data(client, REG_DRIVE_PULLUP + offs, val);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't set drive mode port %u\n", port);
++		goto end;
++	}
++
++	ret = 0;
++
++end:
++	mutex_unlock(&dev->lock);
++	return ret;
++}
++
++static int cy8c9540a_gpio_direction(struct gpio_chip *chip, unsigned gpio,
++					int out, int val)
++{
++	s32 ret = 0;
++	u8 pins = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, gpio_chip);
++	struct i2c_client *client = dev->client;
++	u8 port = cypress_get_port(gpio);
++
++	ret = cy8c9540a_gpio_set_drive(chip, gpio, out ?
++				       GPIOF_DRIVE_STRONG : GPIOF_DRIVE_HIZ);
++	if (ret) {
++		return ret;
++	}
++
++	mutex_lock(&dev->lock);
++
++	ret = i2c_smbus_write_byte_data(client, REG_PORT_SELECT, port);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't select port %u\n", port);
++		goto end;
++	}
++
++	ret = i2c_smbus_read_byte_data(client, REG_PIN_DIR);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't read pin direction\n");
++		goto end;
++	}
++
++	pins = (u8)ret & 0xff;
++	if (out) {
++		pins &= ~BIT(cypress_get_offs(gpio, port));
++	} else {
++		pins |= BIT(cypress_get_offs(gpio, port));
++	}
++
++	ret = i2c_smbus_write_byte_data(client, REG_PIN_DIR, pins);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write pin direction\n");
++	}
++
++end:
++	mutex_unlock(&dev->lock);
++	return ret;
++}
++
++static int cy8c9540a_gpio_direction_output(struct gpio_chip *chip,
++					unsigned gpio, int val)
++{
++	return cy8c9540a_gpio_direction(chip, gpio, 1, val);
++}
++
++static int cy8c9540a_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
++{
++	return cy8c9540a_gpio_direction(chip, gpio, 0, 0);
++}
++
++static void cy8c9540a_irq_bus_lock(struct irq_data *d)
++{
++	struct cy8c9540a *dev = irq_data_get_irq_chip_data(d);
++	mutex_lock(&dev->irq_lock);
++}
++
++static void cy8c9540a_irq_bus_sync_unlock(struct irq_data *d)
++{
++	struct cy8c9540a *dev = irq_data_get_irq_chip_data(d);
++	struct i2c_client *client = dev->client;
++	int ret = 0;
++	int i = 0;
++
++	for (i = 0; i < NPORTS; i++) {
++		if (dev->irq_mask_cache[i] ^ dev->irq_mask[i]) {
++			dev->irq_mask_cache[i] = dev->irq_mask[i];
++			ret = i2c_smbus_write_byte_data(client, REG_PORT_SELECT, i);
++			if (ret < 0) {
++				dev_err(&client->dev, "can't select port %u\n", i);
++				goto end;
++			}
++
++			ret = i2c_smbus_write_byte_data(client, REG_INTR_MASK, dev->irq_mask[i]);
++			if (ret < 0) {
++				dev_err(&client->dev, "can't write int mask on port %u\n", i);
++				goto end;
++			}
++
++		}
++	}
++
++end:
++	mutex_unlock(&dev->irq_lock);
++}
++
++static void cy8c9540a_irq_mask(struct irq_data *d)
++{
++	struct cy8c9540a *dev = irq_data_get_irq_chip_data(d);
++	unsigned gpio = d->irq - dev->irq_base;
++	u8 port = cypress_get_port(gpio);
++
++	dev->irq_mask[port] |= BIT(cypress_get_offs(gpio, port));
++}
++
++static void cy8c9540a_irq_unmask(struct irq_data *d)
++{
++	struct cy8c9540a *dev = irq_data_get_irq_chip_data(d);
++	unsigned gpio = d->irq - dev->irq_base;
++	u8 port = cypress_get_port(gpio);
++
++	dev->irq_mask[port] &= ~BIT(cypress_get_offs(gpio, port));
++}
++
++static int cy8c9540a_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
++{
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, gpio_chip);
++	return dev->irq_base + gpio;
++}
++
++static int cy8c9540a_irq_set_type(struct irq_data *d, unsigned int type)
++{
++	struct cy8c9540a *dev = irq_data_get_irq_chip_data(d);
++	int ret = 0;
++
++	if ((type != IRQ_TYPE_EDGE_BOTH)) {
++		dev_err(&dev->client->dev, "irq %d: unsupported type %d\n",
++			d->irq, type);
++		ret = -EINVAL;
++		goto end;
++	}
++
++end:
++	return ret; 
++}
++
++static struct irq_chip cy8c9540a_irq_chip = {
++	.name			= "cy8c9540a-irq",
++	.irq_mask		= cy8c9540a_irq_mask,
++	.irq_unmask		= cy8c9540a_irq_unmask,
++	.irq_bus_lock		= cy8c9540a_irq_bus_lock,
++	.irq_bus_sync_unlock	= cy8c9540a_irq_bus_sync_unlock,
++	.irq_set_type		= cy8c9540a_irq_set_type,
++};
++
++static irqreturn_t cy8c9540a_irq_handler(int irq, void *devid)
++{
++	struct cy8c9540a *dev = devid;
++	u8 stat[NPORTS], pending = 0;
++	unsigned port = 0, gpio = 0, gpio_irq = 0;
++	int ret = 0;
++
++	ret = i2c_smbus_read_i2c_block_data(dev->client, REG_INTR_STAT_PORT0,
++		NPORTS, stat);	/* W1C  */
++	if (ret < 0) {
++		memset(stat, 0, sizeof(stat));
++	}
++
++	ret = IRQ_NONE;
++
++	for (port = 0; port < NPORTS; port ++) {
++		/* Databook doesn't specify if this is a post-mask status
++		   register or not.  Consider it 'raw' for safety.  */
++		mutex_lock(&dev->irq_lock);
++		pending = stat[port] & (~dev->irq_mask[port]);
++		mutex_unlock(&dev->irq_lock);
++
++		while (pending) {
++			ret = IRQ_HANDLED;
++			gpio = __ffs(pending);
++			pending &= ~BIT(gpio);
++			gpio_irq = dev->irq_base + cy8c9540a_port_offs[port]
++				+ gpio;
++			handle_nested_irq(gpio_irq);
++		}
++	}
++
++	return ret;
++}
++
++static int cy8c9540a_irq_setup(struct cy8c9540a *dev)
++{
++	struct i2c_client *client = dev->client;
++	u8 dummy[NPORTS];
++	unsigned gpio = 0;
++	int ret = 0;
++	int i = 0;
++
++	mutex_init(&dev->irq_lock);
++
++	/* Clear interrupt state */
++
++	ret = i2c_smbus_read_i2c_block_data(dev->client, REG_INTR_STAT_PORT0,
++		NPORTS, dummy);	/* W1C  */
++	if (ret < 0) {
++		dev_err(&client->dev, "couldn't clear int status\n");
++		goto err;
++	}
++
++	/* Initialise interrupt mask */
++
++	memset(dev->irq_mask_cache, 0xff, sizeof(dev->irq_mask_cache));
++	memset(dev->irq_mask, 0xff, sizeof(dev->irq_mask));
++	for (i = 0; i < NPORTS; i++) {
++		ret = i2c_smbus_write_byte_data(client, REG_PORT_SELECT, i);
++		if (ret < 0) {
++			dev_err(&client->dev, "can't select port %u\n", i);
++			goto err;
++		}
++
++		ret = i2c_smbus_write_byte_data(client, REG_INTR_MASK, dev->irq_mask[i]);
++		if (ret < 0) {
++			dev_err(&client->dev, "can't write int mask on port %u\n", i);
++			goto err;
++		}
++	}
++
++	/* Allocate IRQ descriptors for Cypress GPIOs and set handler */
++
++	ret = irq_alloc_descs(dev->irq_base, dev->irq_base, NGPIO, 0);
++	if (ret < 0) {
++		dev_err(&client->dev, "failed to allocate IRQ numbers\n");
++		goto err;
++	}
++
++	for (gpio = 0; gpio < NGPIO; gpio++) {
++		int irq = gpio + dev->irq_base;
++		irq_set_chip_data(irq, dev);
++		irq_set_chip_and_handler(irq, &cy8c9540a_irq_chip,
++					 handle_edge_irq);
++		irq_set_nested_thread(irq, 1);
++		irq_set_noprobe(irq);
++	}
++
++	ret = request_threaded_irq(client->irq, NULL, cy8c9540a_irq_handler,
++				   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
++				   dev_name(&client->dev), dev);
++	if (ret) {
++		dev_err(&client->dev, "failed to request irq %d\n",
++			client->irq);
++		goto err_free_irq_descs;
++	}
++
++	return 0;
++
++err_free_irq_descs:
++	irq_free_descs(dev->irq_base, NGPIO);
++err:
++	mutex_destroy(&dev->irq_lock);
++	return ret;
++}
++
++static void cy8c9540a_irq_teardown(struct cy8c9540a *dev)
++{
++	struct i2c_client *client = dev->client;
++
++	irq_free_descs(dev->irq_base, NGPIO);
++	free_irq(client->irq, dev);
++	mutex_destroy(&dev->irq_lock);
++}
++
++static int cy8c9540a_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++			     int duty_ns, int period_ns)
++{
++	int ret = 0;
++	int period = 0, duty = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, pwm_chip);
++	struct i2c_client *client = dev->client;
++
++	if (pwm->pwm >= CY8C9540A_NPWM) {
++		return -EINVAL;
++	}
++
++	period = period_ns / PWM_TCLK_NS;
++	duty = duty_ns / PWM_TCLK_NS;
++
++	/*
++	 * Check period's upper bound.  Note the duty cycle is already sanity
++	 * checked by the PWM framework.
++	 */
++	if (period > PWM_MAX_PERIOD) {
++		dev_err(&client->dev, "period must be within [0-%d]ns\n",
++			PWM_MAX_PERIOD * PWM_TCLK_NS);
++		return -EINVAL;
++	}
++
++	mutex_lock(&dev->lock);
++
++	ret = i2c_smbus_write_byte_data(client, REG_PWM_SELECT, (u8)pwm->pwm);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write to REG_PWM_SELECT\n");
++		goto end;
++	}
++
++	ret = i2c_smbus_write_byte_data(client, REG_PWM_PERIOD, (u8)period);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write to REG_PWM_PERIOD\n");
++		goto end;
++	}
++
++	ret = i2c_smbus_write_byte_data(client, REG_PWM_PULSE_W, (u8)duty);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write to REG_PWM_PULSE_W\n");
++		goto end;
++	}
++
++end:
++	mutex_unlock(&dev->lock);
++
++	return ret;
++}
++
++static int cy8c9540a_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	s32 ret = 0;
++	int gpio = 0;
++	int port = 0, pin = 0;
++	u8 out_reg = 0;
++	u8 val = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, pwm_chip);
++	struct i2c_client *client = dev->client;
++
++	if (pwm->pwm >= CY8C9540A_NPWM) {
++		return -EINVAL;
++	}
++
++	gpio = dev->pwm2gpio_mapping[pwm->pwm];
++	port = cypress_get_port(gpio);
++	pin = cypress_get_offs(gpio, port);
++	out_reg = REG_OUTPUT_PORT0 + port;
++
++	/* Set pin as output driving high */
++	ret = cy8c9540a_gpio_direction(&dev->gpio_chip, gpio, 1, 1);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't set pwm%u as output\n", pwm->pwm);
++		return ret;
++	}
++
++	mutex_lock(&dev->lock);
++
++	/* Enable PWM */
++	ret = i2c_smbus_read_byte_data(client, REG_SELECT_PWM);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't read REG_SELECT_PWM\n");
++		goto end;
++	}
++	val = (u8)(ret | BIT((u8)pin));
++	ret = i2c_smbus_write_byte_data(client, REG_SELECT_PWM, val);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write to SELECT_PWM\n");
++		goto end;
++	}
++
++end:
++	mutex_unlock(&dev->lock);
++
++	return ret;
++}
++
++static void cy8c9540a_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	s32 ret = 0;
++	int gpio = 0;
++	int port = 0, pin = 0;
++	u8 val = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, pwm_chip);
++	struct i2c_client *client = dev->client;
++
++	if (pwm->pwm >= CY8C9540A_NPWM) {
++		return;
++	}
++
++	gpio = dev->pwm2gpio_mapping[pwm->pwm];
++	if (CY8C9540A_PWM_UNUSED == gpio) {
++		dev_err(&client->dev, "pwm%d is unused\n", pwm->pwm);
++		return;
++	}
++
++	port = cypress_get_port(gpio);
++	pin = cypress_get_offs(gpio, port);
++
++	mutex_lock(&dev->lock);
++
++	/* Disable PWM */
++	ret = i2c_smbus_read_byte_data(client, REG_SELECT_PWM);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't read REG_SELECT_PWM\n");
++		goto end;
++	}
++	val = (u8)(ret & ~BIT((u8)pin));
++	ret = i2c_smbus_write_byte_data(client, REG_SELECT_PWM, val);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't write to SELECT_PWM\n");
++	}
++
++end:
++	mutex_unlock(&dev->lock);
++
++	return;
++}
++
++/* 
++ * Some PWMs may be unavailable.  Prevent user from reserving them.
++ */
++static int cy8c9540a_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	int gpio = 0;
++	struct cy8c9540a *dev =
++	    container_of(chip, struct cy8c9540a, pwm_chip);
++	struct i2c_client *client = dev->client;
++
++	if (pwm->pwm >= CY8C9540A_NPWM) {
++		return -EINVAL;
++	}
++
++	gpio = dev->pwm2gpio_mapping[pwm->pwm];
++	if (CY8C9540A_PWM_UNUSED == gpio) {
++		dev_err(&client->dev, "pwm%d unavailable\n", pwm->pwm);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static const struct pwm_ops cy8c9540a_pwm_ops = {
++	.request = cy8c9540a_pwm_request,
++	.config = cy8c9540a_pwm_config,
++	.enable = cy8c9540a_pwm_enable,
++	.disable = cy8c9540a_pwm_disable,
++};
++
++/*
++ * cy8c9540a_set_por_default
++ *
++ * Ensure the expander is using platform-specific POR settings.
++ *
++ * Note SMBUS max transaction length is 32 bytes, so we have to fall back to
++ * raw i2c transfers.
++ */
++static int cy8c9540a_set_por_default(struct cy8c9540a *dev)
++{
++	int ret = 0;
++	struct i2c_client *client = dev->client;
++	struct cy8c9540a_pdata *pdata = client->dev.platform_data;
++	int i = 0;
++	int segments = -1;
++	int crc_index = sizeof(por_set) - 1;
++	u8 reg_cmd_r_por[] = { REG_CMD, CMD_R_EEPROM_POR };
++
++	/* Populate platform POR setting table */
++	memcpy(por_set + POR_CMD_W_OFFS, pdata->por_default,
++	       sizeof(pdata->por_default));
++
++	/* Read POR settings stored in EEPROM */
++	dev->i2c_segments[0].addr	= client->addr;
++	dev->i2c_segments[0].flags	= 0;	/* write */
++	dev->i2c_segments[0].len	= sizeof(reg_cmd_r_por);
++	dev->i2c_segments[0].buf	= reg_cmd_r_por;
++	dev->i2c_segments[1].addr	= client->addr;
++	dev->i2c_segments[1].flags	= I2C_M_RD;
++	dev->i2c_segments[1].len	= sizeof(dev->por_stored);
++	dev->i2c_segments[1].buf	= dev->por_stored;
++	segments = 2;
++	ret = i2c_transfer(client->adapter, dev->i2c_segments, segments);
++	if (segments != ret) {
++		dev_err(&client->dev, "can't read POR settings (ret=%d)\n", ret);
++		goto end;
++	} else {
++		ret = 0; 
++	}
++
++	/* Compute CRC for platform-defined POR settings */
++	por_set[crc_index] = 0;
++	for (i = POR_CMD_W_OFFS; i < crc_index; i ++) {
++		por_set[crc_index] ^= por_set[i];
++	}
++
++	/* Compare POR settings with platform-defined ones */
++	for (i = 0; i < sizeof(dev->por_stored); i ++) {
++		if (dev->por_stored[i] != por_set[i + POR_CMD_W_OFFS]) {
++			break;
++		}
++	}
++	if (sizeof(dev->por_stored) == i) {
++		goto end;
++	}
++
++	/* Update POR settings to EEPROM */
++
++	dev_info(&client->dev, "updating EEPROM with platform POR settings\n");
++
++	/* Store default POR settings into EEPROM */
++	dev->i2c_segments[0].addr	= client->addr;
++	dev->i2c_segments[0].flags	= 0;	/* write */
++	dev->i2c_segments[0].len	= sizeof(por_set);
++	dev->i2c_segments[0].buf	= por_set;
++	segments = 1;
++	ret = i2c_transfer(client->adapter, dev->i2c_segments, segments);
++	if (segments != ret) {
++		dev_err(&client->dev, "can't write POR settings (ret=%d)\n", ret);
++		goto end;
++	} else {
++		ret = 0; 
++	}
++
++	/* Reconfigure device with newly stored POR settings */
++	for (i = 0; i < MAX_RETRIES; i++) {
++		usleep_range(SLEEP_US_MIN, SLEEP_US_MAX);
++
++		ret = i2c_smbus_write_byte_data(client, REG_CMD, CMD_RECONF);
++		if (0 == ret) {
++			break;
++		}
++	}
++	
++	if (ret < 0) {
++		dev_err(&client->dev, "can't reconfigure device\n");
++	}
++
++end:
++	return ret;
++}
++
++/*
++ * cy8c9540a_setup
++ *
++ * Initialise the device with default setup.
++ * No need to roll back if this fails.
++ */
++static int cy8c9540a_setup(struct cy8c9540a *dev)
++{
++	int ret = 0;
++	struct i2c_client *client = dev->client;
++	const u8 eeprom_enable_seq[] = {0x43, 0x4D, 0x53, 0x2};
++
++	/* Test/set platform-specific POR settings */
++	ret = cy8c9540a_set_por_default(dev);
++	if (ret) {
++		dev_err(&client->dev, "can't set POR settings (err=%d)\n", ret);
++		goto end;
++	}
++
++	/* Cache the output registers */
++	ret = i2c_smbus_read_i2c_block_data(dev->client, REG_OUTPUT_PORT0,
++					    sizeof(dev->outreg_cache),
++					    dev->outreg_cache);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't cache output registers\n");
++		goto end;
++	}
++
++	/* Enable the EEPROM */
++	ret = i2c_smbus_write_i2c_block_data(client, REG_ENABLE,
++					     sizeof(eeprom_enable_seq),
++					     eeprom_enable_seq);
++	if (ret < 0) {
++		dev_err(&client->dev, "can't enable EEPROM\n");
++		goto end;
++	}
++
++end:
++	return ret;
++}
++
++static int cy8c9540a_probe(struct i2c_client *client,
++			   const struct i2c_device_id *id)
++{
++	struct cy8c9540a *dev;
++	struct gpio_chip *gc;
++	struct cy8c9540a_pdata *pdata = client->dev.platform_data;
++	int ret = 0;
++	s32 dev_id = 0;
++
++	if (NULL == pdata) {
++		pr_err("%s: platform data is missing\n", __func__);
++		return -EINVAL;
++	}
++
++	if (!i2c_check_functionality(client->adapter,
++					I2C_FUNC_I2C |
++					I2C_FUNC_SMBUS_I2C_BLOCK |
++					I2C_FUNC_SMBUS_BYTE_DATA)) {
++		dev_err(&client->dev, "i2c adapter doesn't support required "
++			"functionality\n");
++		return -EIO;
++	}
++
++	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++	if (dev == NULL) {
++		dev_err(&client->dev, "failed to alloc memory\n");
++		return -ENOMEM;
++	}
++
++	dev->client = client;
++	dev->irq_base = pdata->irq_base;
++
++	gc = &dev->gpio_chip;
++	gc->direction_input = cy8c9540a_gpio_direction_input;
++	gc->direction_output = cy8c9540a_gpio_direction_output;
++	gc->get = cy8c9540a_gpio_get_value;
++	gc->set = cy8c9540a_gpio_set_value;
++	gc->set_drive = cy8c9540a_gpio_set_drive;
++
++	gc->can_sleep = 1;
++
++	gc->base = pdata->gpio_base;
++	gc->ngpio = NGPIO;
++	gc->label = client->name;
++	gc->owner = THIS_MODULE;
++	gc->to_irq = cy8c9540a_gpio_to_irq;
++
++	mutex_init(&dev->lock);
++
++	/* Whoami */
++	dev_id = i2c_smbus_read_byte_data(client, REG_DEVID_STAT);
++	if (dev_id < 0) {
++		dev_err(&client->dev, "can't read device ID\n");
++		ret = dev_id;
++		goto err;
++	}
++	dev_info(&client->dev, "dev_id=0x%x\n", dev_id & 0xff);
++	if (DEVID_FAMILY_CY8C9540A != (dev_id & DEVID_FAMILY_MASK)) {
++		dev_err(&client->dev, "unknown/unsupported dev_id 0x%x\n",
++			dev_id & 0xff);
++		ret = -ENODEV;
++		goto err;
++	}
++
++	ret = cy8c9540a_setup(dev);
++	if (ret) {
++		goto err;
++	}
++
++	ret = cy8c9540a_irq_setup(dev);
++	if (ret) {
++		goto err;
++	}
++	ret = gpiochip_add(&dev->gpio_chip);
++	if (ret) {
++		dev_err(&client->dev, "gpiochip_add failed %d\n", ret);
++		goto err_irq;
++	}
++
++	dev->pwm_chip.dev = &client->dev;
++	dev->pwm_chip.ops = &cy8c9540a_pwm_ops;
++	dev->pwm_chip.base = pdata->pwm_base;
++	dev->pwm_chip.npwm = CY8C9540A_NPWM;
++
++	/* Populate platform-specific PWM-to-GPIO mapping table */
++	memcpy(dev->pwm2gpio_mapping, pdata->pwm2gpio_mapping, sizeof(pdata->pwm2gpio_mapping));
++
++	ret = pwmchip_add(&dev->pwm_chip);
++	if (ret) {
++		dev_err(&client->dev, "pwmchip_add failed %d\n", ret);
++		goto err_gpiochip;
++	}
++
++	i2c_set_clientdata(client, dev);
++
++	return 0;
++
++err_gpiochip:
++	if(gpiochip_remove(&dev->gpio_chip))
++		dev_warn(&client->dev, "gpiochip_remove failed\n");
++err_irq:
++	cy8c9540a_irq_teardown(dev);
++err:
++	mutex_destroy(&dev->lock);
++	kfree(dev);
++
++	return ret;
++}
++
++static int cy8c9540a_remove(struct i2c_client *client)
++{
++	struct cy8c9540a *dev = i2c_get_clientdata(client);
++	int ret = 0;
++	int err = 0;
++
++	ret = pwmchip_remove(&dev->pwm_chip);
++	if (ret < 0) {
++		dev_err(&client->dev, "pwmchip_remove failed %d\n", ret);
++		err = ret;
++	}
++
++	ret = gpiochip_remove(&dev->gpio_chip);
++	if (ret) {
++		dev_err(&client->dev, "gpiochip_remove failed %d\n", ret);
++		err = ret;
++	}
++
++	cy8c9540a_irq_teardown(dev);
++
++	mutex_destroy(&dev->lock);
++	kfree(dev);
++
++	return err;
++}
++
++static const struct i2c_device_id cy8c9540a_id[] = {
++	{DRV_NAME, 0},
++	{}
++};
++
++MODULE_DEVICE_TABLE(i2c, cy8c9540a_id);
++
++static struct i2c_driver cy8c9540a_driver = {
++	.driver = {
++		   .name = DRV_NAME,
++		   },
++	.probe = cy8c9540a_probe,
++	.remove = cy8c9540a_remove,
++	.id_table = cy8c9540a_id,
++};
++
++module_i2c_driver(cy8c9540a_driver);
++
++MODULE_AUTHOR("Josef Ahmad <josef.ahmad@linux.intel.com>");
++MODULE_DESCRIPTION("GPIO/PWM driver for CY8C9540A I/O expander");
++MODULE_LICENSE("GPL");
++
+diff --git a/drivers/mfd/intel_qrk_gip.h b/drivers/mfd/intel_qrk_gip.h
+new file mode 100644
+index 0000000..3dfc487
+--- /dev/null
++++ b/drivers/mfd/intel_qrk_gip.h
+@@ -0,0 +1,97 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark GIP (GPIO/I2C) driver
++ */
++
++#ifndef __INTEL_QRKGIP_H__
++#define __INTEL_QRKGIP_H__
++
++#include <linux/i2c.h>
++#include <linux/mfd/intel_qrk_gip_pdata.h>
++#include <linux/pci.h>
++#include "../i2c/busses/i2c-designware-core.h"
++
++/* PCI BAR for register base address */
++#define GIP_I2C_BAR		0
++#define GIP_GPIO_BAR		1
++
++/**
++ * intel_qrk_gpio_probe
++ *
++ * @param pdev: Pointer to GIP PCI device
++ * @return 0 success < 0 failure
++ *
++ * Perform GPIO-specific probing on behalf of the top-level GIP driver.
++ */
++int intel_qrk_gpio_probe(struct pci_dev *pdev);
++
++/**
++ * intel_qrk_gpio_remove
++ *
++ * @param pdev: Pointer to GIP PCI device
++ *
++ * Perform GPIO-specific resource release on behalf of the top-level GIP driver.
++ */
++void intel_qrk_gpio_remove(struct pci_dev *pdev);
++
++/**
++ * intel_qrk_gpio_isr
++ *
++ * @param irq: IRQ number to be served
++ * @param dev_id: used to distinguish the device (for shared interrupts)
++ *
++ * Perform GPIO-specific ISR of the top-level GIP driver.
++ */
++irqreturn_t intel_qrk_gpio_isr(int irq, void *dev_id);
++
++/**
++ * intel_qrk_gpio_save_state
++ *
++ * Save GPIO register state for system-wide suspend events and mask out
++ * interrupts.
++ */
++void intel_qrk_gpio_save_state(void);
++
++/**
++ * intel_qrk_gpio_restore_state
++ *
++ * Restore GPIO register state for system-wide resume events and clear out
++ * spurious interrupts.
++ */
++void intel_qrk_gpio_restore_state(void);
++
++/**
++ * intel_qrk_i2c_probe
++ * @param pdev: Pointer to GIP PCI device
++ * @param drvdata: private driver data
++ * @param drvdata: GIP platform-specific settings
++ * @return 0 success < 0 failure
++ *
++ * Perform I2C-specific probing on behalf of the top-level GIP driver.
++ */
++int intel_qrk_i2c_probe(struct pci_dev *pdev, 
++			struct dw_i2c_dev **drvdata,
++			struct intel_qrk_gip_pdata *pdata);
++
++/**
++ * intel_qrk_i2c_remove
++ * @param pdev: Pointer to GIP PCI device
++ * @param dev: Pointer to I2C private data 
++ *
++ * Perform I2C-specific resource release on behalf of the top-level GIP driver.
++ */
++void intel_qrk_i2c_remove(struct pci_dev *pdev,
++	struct dw_i2c_dev *dev);
++
++#endif /* __INTEL_QRKGIP_H__ */
+diff --git a/drivers/mfd/intel_qrk_gip_core.c b/drivers/mfd/intel_qrk_gip_core.c
+new file mode 100644
+index 0000000..44209f0
+--- /dev/null
++++ b/drivers/mfd/intel_qrk_gip_core.c
+@@ -0,0 +1,328 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark GIP (GPIO/I2C) PCI driver
++ *
++ *  PCI glue logic for Quark GIP driver.
++ *  Quark GIP is a single PCI function exporting a GPIO and an I2C device.
++ *  The PCI driver performs the bus-dependent probe/release operations, and
++ *  call into GPIO/I2C specific modules for handling the two diffrerent
++ *  functionalities.
++ */
++
++#include <asm/qrk.h>
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/mfd/intel_qrk_gip_pdata.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include "intel_qrk_gip.h"
++
++static unsigned int enable_msi = 1;
++module_param(enable_msi, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(enable_msi, "Enable PCI MSI mode");
++
++static unsigned int i2c = 1;
++module_param(i2c, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(i2c, "Register I2C adapter");
++
++static unsigned int gpio = 1;
++module_param(gpio, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(gpio, "Register GPIO chip");
++
++/* GIP private data, supporting only a single instance of the device. */
++struct intel_qrk_gip_data {
++	struct pci_dev *pci_device;
++	struct dw_i2c_dev *i2c_drvdata;
++	struct intel_qrk_gip_pdata *pdata;
++};
++
++/**
++ * intel_qrk_gip_handler
++ *
++ * @param irq: IRQ number to be served
++ * @param dev_id: device private data
++ *
++ * Top-level interrupt handler for GIP driver.
++ * It calls into the appropriate sub-routines and gathers the return values.
++ */
++static irqreturn_t intel_qrk_gip_handler(int irq, void *dev_id)
++{
++	irqreturn_t ret_i2c = IRQ_NONE;
++	irqreturn_t ret_gpio = IRQ_NONE;
++	struct intel_qrk_gip_data *data = (struct intel_qrk_gip_data *)dev_id;
++
++	mask_pvm(data->pci_device);
++
++	if (likely(i2c)) {
++		/* Only I2C gets platform data */
++		ret_i2c = i2c_dw_isr(irq, data->i2c_drvdata);
++	}
++
++	if (likely(gpio)) {
++		ret_gpio = intel_qrk_gpio_isr(irq, NULL);
++	}
++
++	unmask_pvm(data->pci_device);
++
++	if (likely(IRQ_HANDLED == ret_i2c || IRQ_HANDLED == ret_gpio))
++		return IRQ_HANDLED;
++
++	/* Each sub-ISR routine returns either IRQ_HANDLED or IRQ_NONE. */
++	return IRQ_NONE;
++}
++
++static DEFINE_PCI_DEVICE_TABLE(intel_qrk_gip_ids) = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x0934), },
++	{ 0, }
++};
++MODULE_DEVICE_TABLE(pci, intel_qrk_gip_ids);
++
++#ifdef CONFIG_PM
++
++/**
++ * qrk_gip_suspend
++ * 
++ * @param device: Pointer to device
++ * @return 0 success < 0 failure
++ *
++ * Prepare GIP for system-wide transition to sleep state.
++ * Save context, disable GPIO chip and I2C adapter, transition PCI device into
++ * low-power state.
++ */
++static int qrk_gip_suspend(struct device *dev)
++{
++	int err = 0;
++	struct intel_qrk_gip_data *data = NULL;
++	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
++	data = (struct intel_qrk_gip_data *)pci_get_drvdata(pdev);
++
++	i2c_dw_disable(data->i2c_drvdata);
++	intel_qrk_gpio_save_state();
++
++	err = pci_save_state(pdev);
++	if (err) {
++		dev_err(&pdev->dev, "pci_save_state failed\n");
++		return err;
++	}
++
++	err = pci_set_power_state(pdev, PCI_D3hot);
++	if (err) {
++		dev_err(&pdev->dev, "pci_set_power_state failed\n");
++		return err;
++	}
++
++	return 0;
++}
++
++/**
++ * qrk_gip_resume
++ * 
++ * @param device: Pointer to device
++ * @return 0 success < 0 failure
++ *
++ * Prepare GIP for system-wide transition to fully active state.
++ * Set PCI device into full-power state, restore context, enable I2C adapter
++ * and GPIO chip.
++ */
++static int qrk_gip_resume(struct device *dev)
++{
++	int err = 0;
++	struct intel_qrk_gip_data *data = NULL;
++	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
++	data = (struct intel_qrk_gip_data *)pci_get_drvdata(pdev);
++
++	err = pci_set_power_state(pdev, PCI_D0);
++	if (err) {
++		dev_err(&pdev->dev, "pci_set_power_state() failed\n");
++		return err;
++	}
++
++	pci_restore_state(pdev);
++
++	intel_qrk_gpio_restore_state();
++	i2c_dw_init(data->i2c_drvdata);
++
++	return 0;
++}
++
++#else
++#define qrk_gip_suspend		NULL
++#define qrk_gip_resume		NULL
++#endif
++
++static const struct dev_pm_ops qrk_gip_pm_ops = {
++	.resume         = qrk_gip_resume,
++	.suspend        = qrk_gip_suspend,
++};
++
++/**
++ * intel_qrk_gip_probe
++ *
++ * @param pdev: Pointer to GIP PCI device
++ * @param id: GIP PCI Device ID
++ * @return 0 success < 0 failure
++ *
++ * GIP PCI driver probing. Calls into the appropriate probe routines for GPIO
++ * and I2C too.
++ */
++static int intel_qrk_gip_probe(struct pci_dev *pdev,
++				const struct pci_device_id *id)
++{
++	int retval = 0;
++	struct intel_qrk_gip_data *gip_drvdata = NULL;
++
++	retval = pci_enable_device(pdev);
++	if (retval)
++		return retval;
++
++	retval = pci_request_regions(pdev, "qrk-gip");
++	if (retval) {
++		dev_err(&pdev->dev, "error requesting PCI region\n");
++		goto err_pcidev_disable;
++	}
++
++	gip_drvdata = kzalloc(sizeof(struct intel_qrk_gip_data), GFP_KERNEL);
++	if (NULL == gip_drvdata) {
++		retval = -ENOMEM;
++		goto err_pciregions_release;
++	}
++	pci_set_drvdata(pdev, gip_drvdata);
++
++	gip_drvdata->pci_device = pdev; 
++
++	/* Retrieve platform data if there is any */
++	if (*intel_qrk_gip_get_pdata) {
++		gip_drvdata->pdata = intel_qrk_gip_get_pdata();
++	}
++
++	if (gpio) {
++		retval = intel_qrk_gpio_probe(pdev);
++		if (retval)
++			goto err_release_drvdata;
++	}
++
++	if (i2c) {
++		retval = intel_qrk_i2c_probe(pdev,
++			(struct dw_i2c_dev **)&gip_drvdata->i2c_drvdata,
++			gip_drvdata->pdata);
++		if (retval)
++			goto err_release_drvdata;
++	}
++
++	if (enable_msi) {
++		pci_set_master(pdev);
++		retval = pci_enable_msi(pdev);
++		if (retval)
++			goto err_release_drvdata;
++	}
++
++	/*
++	 * Request a shared IRQ.
++	 * Since the dev_id cannot be NULL, it points to PCI device descriptor
++	 * if I2C is not registered.
++	 */
++	retval = request_irq(pdev->irq, intel_qrk_gip_handler, IRQF_SHARED,
++			"intel_qrk_gip", gip_drvdata);
++	if (retval) {
++		dev_err(&pdev->dev, "error requesting IRQ\n");
++		goto err;
++	}
++
++	return 0;
++
++err_release_drvdata:
++	pci_set_drvdata(pdev, NULL);
++	kfree(gip_drvdata);
++err:
++	if (enable_msi)
++		pci_disable_msi(pdev);
++err_pciregions_release:
++	pci_release_regions(pdev);
++err_pcidev_disable:
++	pci_disable_device(pdev);
++
++	return retval;
++}
++
++/**
++ * intel_qrk_gip_remove
++ *
++ * @param pdev: Pointer to GIP PCI device
++ *
++ * Release resources. Calls into GPIO/I2C dedicate routines too.
++ */
++static void intel_qrk_gip_remove(struct pci_dev *pdev)
++{
++	struct intel_qrk_gip_data *data = NULL;
++
++	data = (struct intel_qrk_gip_data *)pci_get_drvdata(pdev);
++
++	if (NULL == data) {
++		dev_err(&pdev->dev, "%s: failure getting driver data\n",
++			__func__);
++		return;
++	}
++
++	free_irq(pdev->irq, data);
++
++	if (enable_msi) {
++		pci_clear_master(pdev);
++		if (pci_dev_msi_enabled(pdev))
++			pci_disable_msi(pdev);
++	}
++
++	if (i2c)
++		intel_qrk_i2c_remove(pdev, data->i2c_drvdata);
++
++	if (gpio)
++		intel_qrk_gpio_remove(pdev);
++
++	pci_set_drvdata(pdev, NULL);
++	kfree(data);
++
++	pci_release_regions(pdev);
++	pci_disable_device(pdev);
++}
++
++static struct pci_driver intel_qrk_gip_driver = {
++	.name =		"intel_qrk_gip",
++	.id_table	= intel_qrk_gip_ids,
++	.probe		= intel_qrk_gip_probe,
++	.remove		= intel_qrk_gip_remove,
++	.driver         = {
++		.pm     = &qrk_gip_pm_ops,
++	},
++};
++
++static int intel_qrk_gip_init(void)
++{
++	return pci_register_driver(&intel_qrk_gip_driver);
++}
++
++static void intel_qrk_gip_exit(void)
++{
++	pci_unregister_driver(&intel_qrk_gip_driver);
++}
++
++module_init(intel_qrk_gip_init);
++module_exit(intel_qrk_gip_exit);
++
++MODULE_AUTHOR("Intel Corporation");
++MODULE_DESCRIPTION("Quark GIP driver");
++MODULE_LICENSE("Dual BSD/GPL");
+diff --git a/drivers/mfd/intel_qrk_gip_gpio.c b/drivers/mfd/intel_qrk_gip_gpio.c
+new file mode 100644
+index 0000000..f823957
+--- /dev/null
++++ b/drivers/mfd/intel_qrk_gip_gpio.c
+@@ -0,0 +1,652 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark GIP (GPIO/I2C) - GPIO-specific PCI and core driver
++ *
++ *  PCI glue logic and core driver for Quark GIP/GPIO.
++ *  The GIP GPIO device is the DesignWare GPIO. This file defines the PCI glue
++ *  for this driver and as well as the core logic for the device.
++ *  Please note only a single instance of the GPIO device is supported.
++ *  The default number of GPIO is 8, all interrupt-capable.
++ */
++
++#include <linux/errno.h>
++#include <linux/gpio.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/uio_driver.h>
++#include "intel_qrk_gip.h"
++
++static void qrk_gpio_restrict_release(struct device *dev) {}
++static struct platform_device qrk_gpio_restrict_pdev = 
++{
++	.name	= "qrk-gpio-restrict-sc",
++	.dev.release = qrk_gpio_restrict_release,
++};
++struct uio_info *info;
++
++/* The base GPIO number under GPIOLIB framework */
++#define INTEL_QRK_GIP_GPIO_BASE		8
++
++/* The default number of South-Cluster GPIO on Quark. */
++#define INTEL_QRK_GIP_NGPIO		8
++
++/*
++ * The default base IRQ for searching and allocating the range of GPIO IRQ
++ * descriptors.
++ */
++#define INTEL_QRK_GIP_GPIO_IRQBASE	56
++
++/* The GPIO private data. */
++static struct gpio_chip *gc;
++static struct irq_chip_generic *igc;
++static void __iomem *reg_base;
++static spinlock_t lock;
++static int irq_base;
++static unsigned int n_gpio = INTEL_QRK_GIP_NGPIO;
++static unsigned int gpio_irqbase = INTEL_QRK_GIP_GPIO_IRQBASE;
++
++/* Store GPIO context across system-wide suspend/resume transitions */
++static struct gpio_saved_regs {
++	u32 data;
++	u32 dir;
++	u32 int_en;
++	u32 int_mask; 
++	u32 int_type; 
++	u32 int_pol; 
++	u32 int_deb; 
++} saved_regs;
++
++/* PortA registers set. Note other ports are unused */
++#define PORTA_DATA			0x00	/* Data */
++#define PORTA_DIR			0x04	/* Direction */
++#define PORTA_INT_EN			0x30	/* Interrupt enable */
++#define PORTA_INT_MASK			0x34	/* Interrupt mask */
++#define PORTA_INT_TYPE_LEVEL		0x38	/* Interrupt level*/
++#define PORTA_INT_POLARITY		0x3c	/* Interrupt polarity */
++#define PORTA_INT_STATUS		0x40	/* Interrupt status */
++#define PORTA_INT_RAW_STATUS		0x44	/* Interrupt raw status */
++#define PORTA_DEBOUNCE			0x48	/* Debounce enable */
++#define PORTA_INT_EOI			0x4c	/* Clear interrupt */
++#define PORTA_EXT			0x50	/* External */
++
++module_param(n_gpio, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(n_gpio, "Number of GPIO");
++
++module_param(gpio_irqbase, uint, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(gpio_irqbase, "Base IRQ for GPIO range");
++
++/**
++ * intel_qrk_gpio_get
++ * @param chip: Pointer to GPIO chip registered by GPIOLIB
++ * @param offset: the GPIO number within the GPIOLIB chip
++ * @return 0 if GPIO is deasserted, 1 if GPIO is asserted
++ *
++ * Read back the value of a GPIO.
++ */
++static int intel_qrk_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	void __iomem *reg_ext = reg_base + PORTA_EXT;
++	u32 val_ext = ioread32(reg_ext);
++
++	val_ext &= BIT(offset % 32);
++	return (val_ext > 0);
++}
++
++/**
++ * intel_qrk_gpio_set
++ * @param chip: Pointer to GPIO chip registered by GPIOLIB
++ * @param offset: the GPIO number within the GPIOLIB chip
++ *
++ * Set value of a GPIO.
++ */
++static void intel_qrk_gpio_set(struct gpio_chip *chip, unsigned offset,
++				int value)
++{
++	void __iomem *reg_data = reg_base + PORTA_DATA;
++	u32 val_data = 0;
++	unsigned long flags = 0;
++
++	spin_lock_irqsave(&lock, flags);
++
++	val_data = ioread32(reg_data);
++	if (value)
++		iowrite32(val_data | BIT(offset % 32), reg_data);
++	else
++		iowrite32(val_data & ~BIT(offset % 32), reg_data);
++
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_direction_input
++ * @param chip: Pointer to GPIO chip registered by GPIOLIB
++ * @param offset: the GPIO number within the GPIOLIB chip
++ * @return always 0 (success)
++ *
++ * Set direction of a GPIO as input.
++ */
++static int intel_qrk_gpio_direction_input(struct gpio_chip *chip,
++						unsigned offset)
++{
++	u32 val_dir = 0;
++	void __iomem *reg_dir = reg_base + PORTA_DIR;
++	unsigned long flags = 0;
++
++	spin_lock_irqsave(&lock, flags);
++
++	val_dir = ioread32(reg_dir);
++	iowrite32(val_dir & ~BIT(offset % 32), reg_dir);
++
++	spin_unlock_irqrestore(&lock, flags);
++
++	return 0;
++}
++
++/**
++ * intel_qrk_gpio_direction_output
++ * @param chip: Pointer to GPIO chip registered by GPIOLIB
++ * @param offset: the GPIO number within the GPIOLIB chip
++ * @param value: value to be driven to the GPIO
++ * @return always 0 (success)
++ *
++ * Set the default value of a GPIO, and then set direction as output.
++ */
++static int intel_qrk_gpio_direction_output(struct gpio_chip *chip,
++			unsigned offset, int value)
++{
++	u32 val_dir = 0;
++	void __iomem *reg_dir = reg_base + PORTA_DIR;
++	unsigned long flags = 0;
++
++	/* Ensure glitch-free operation. */
++	intel_qrk_gpio_set(chip, offset, value);
++
++	spin_lock_irqsave(&lock, flags);
++
++	val_dir = ioread32(reg_dir);
++	iowrite32(val_dir | BIT(offset % 32), reg_dir);
++
++	spin_unlock_irqrestore(&lock, flags);
++
++	return 0;
++}
++
++/**
++ * intel_qrk_gpio_set_debounce
++ * @param chip: Pointer to GPIO chip registered by GPIOLIB
++ * @param offset: the GPIO number within the GPIOLIB chip
++ * @param debounce: 1 to enable, 0 to disable
++ * @return always 0 (success)
++ *
++ * Enable/disable interrupt debounce logic for a GPIO.
++ */
++static int intel_qrk_gpio_set_debounce(struct gpio_chip *chip,
++				 unsigned offset, unsigned debounce)
++{
++	u32 val_deb = 0;
++	void __iomem *reg_deb = reg_base + PORTA_DEBOUNCE;
++	unsigned long flags = 0;
++
++	spin_lock_irqsave(&lock, flags);
++
++	val_deb = ioread32(reg_deb);
++	if (debounce)
++		iowrite32(val_deb | BIT(offset % 32), reg_deb);
++	else
++		iowrite32(val_deb & ~BIT(offset % 32), reg_deb);
++
++	spin_unlock_irqrestore(&lock, flags);
++
++	return 0;
++}
++
++/**
++ * intel_qrk_gpio_irq_type
++ * @param irq_data: Pointer to information about the IRQ
++ * @param type: set the triggering type of the interrupt
++ * @return always 0 (success)
++ *
++ * Set interrupt triggering type for a GPIO.
++ */
++static int intel_qrk_gpio_irq_type(struct irq_data *d, unsigned type)
++{
++	int ret = 0;
++	unsigned long flags = 0;
++	void __iomem *reg_level = reg_base + PORTA_INT_TYPE_LEVEL;
++	void __iomem *reg_pol = reg_base + PORTA_INT_POLARITY;
++	u32 val_level = 0;
++	u32 val_pol = 0;
++	u32 gpio = 0;
++
++	if (NULL == d) {
++		pr_err("%s(): null irq_data\n",  __func__);
++		return -EFAULT;
++	}
++
++	gpio = d->irq - irq_base;
++
++	spin_lock_irqsave(&lock, flags);
++
++	val_level = ioread32(reg_level);
++	val_pol = ioread32(reg_pol);
++
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		iowrite32(val_level | BIT(gpio % 32), reg_level);
++		iowrite32(val_pol | BIT(gpio % 32), reg_pol);
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		iowrite32(val_level | BIT(gpio % 32), reg_level);
++		iowrite32(val_pol & ~BIT(gpio % 32), reg_pol);
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		iowrite32(val_level & ~BIT(gpio % 32), reg_level);
++		iowrite32(val_pol | BIT(gpio % 32), reg_pol);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		iowrite32(val_level & ~BIT(gpio % 32), reg_level);
++		iowrite32(val_pol & ~BIT(gpio % 32), reg_pol);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++	spin_unlock_irqrestore(&lock, flags);
++
++	return ret;
++}
++
++/**
++ * intel_qrk_gpio_irq_unmask
++ * @param irq_data: Pointer to information about the IRQ
++ *
++ * Unmask interrupts for a GPIO.
++ */
++static void intel_qrk_gpio_irq_unmask(struct irq_data *d)
++{
++	unsigned long flags = 0;
++	void __iomem *reg_mask = reg_base + PORTA_INT_MASK;
++	u32 val_mask = 0;
++	unsigned gpio = 0;
++
++	if (NULL == d) {
++		pr_err("%s(): null irq_data\n", __func__);
++		return;
++	}
++
++	gpio = d->irq - irq_base;
++
++	spin_lock_irqsave(&lock, flags);
++	val_mask =  ioread32(reg_mask);
++	iowrite32(val_mask | BIT(gpio % 32), reg_mask);
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_irq_mask
++ * @param irq_data: Pointer to information about the IRQ
++ *
++ * Mask interrupts for a GPIO.
++ */
++static void intel_qrk_gpio_irq_mask(struct irq_data *d)
++{
++	unsigned long flags = 0;
++	void __iomem *reg_mask = reg_base + PORTA_INT_MASK;
++	u32 val_mask = 0;
++	unsigned gpio = 0;
++
++	if (NULL == d) {
++		pr_err("%s(): null irq_data\n", __func__);
++		return;
++	}
++
++	gpio = d->irq - irq_base;
++
++	spin_lock_irqsave(&lock, flags);
++	val_mask =  ioread32(reg_mask);
++	iowrite32(val_mask & ~BIT(gpio % 32), reg_mask);
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_irq_enable
++ * @param irq_data: Pointer to information about the IRQ
++ *
++ * Enable interrupts for a GPIO.
++ */
++static void intel_qrk_gpio_irq_enable(struct irq_data *d)
++{
++	unsigned long flags = 0;
++	void __iomem *reg_inte = reg_base + PORTA_INT_EN;
++	u32 val_inte = 0;
++	unsigned gpio = 0;
++
++	if (NULL == d) {
++		pr_err("%s(): null irq_data\n", __func__);
++		return;
++	}
++
++	gpio = d->irq - irq_base;
++
++	spin_lock_irqsave(&lock, flags);
++	val_inte =  ioread32(reg_inte);
++	iowrite32(val_inte | BIT(gpio % 32), reg_inte);
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_irq_disable
++ * @param irq_data: Pointer to information about the IRQ
++ *
++ * Disable interrupts for a GPIO.
++ */
++static void intel_qrk_gpio_irq_disable(struct irq_data *d)
++{
++	unsigned long flags = 0;
++	void __iomem *reg_inte = reg_base + PORTA_INT_EN;
++	u32 val_inte = 0;
++	unsigned gpio = 0;
++
++	if (NULL == d) {
++		pr_err("%s(): null irq_data\n", __func__);
++		return;
++	}
++
++	gpio = d->irq - irq_base;
++
++	spin_lock_irqsave(&lock, flags);
++	val_inte =  ioread32(reg_inte);
++	iowrite32(val_inte & ~BIT(gpio % 32), reg_inte);
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_to_irq
++ * @param chip: Pointer to GPIO chip registered by GPIOLIB
++ * @param offset: the GPIO number within the GPIOLIB chip
++ * @return IRQ associated to GPIO
++ *
++ * Compute the IRQ number based on the GPIO.
++ */
++static int intel_qrk_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	return irq_base + offset;
++}
++
++/**
++ * intel_qrk_gpio_isr
++ * @param irq: IRQ number
++ * @param dev_id: cookie used to tell what instance of the driver the interrupt
++ *                belongs to
++ * @return IRQ_HANDLED if interrupt served, IRQ_NONE if no interrupt pending
++ *
++ * Interrupt Service Routine for GPIO. Identify which GPIOs (if any) is pending
++ * for interrupt to be served, acknowledge the interrupt and serve it.
++ */
++irqreturn_t intel_qrk_gpio_isr(int irq, void *dev_id)
++{
++	irqreturn_t ret = IRQ_NONE;
++	u32 pending = 0, gpio = 0;
++	void __iomem *reg_pending = reg_base + PORTA_INT_STATUS;
++	void __iomem *reg_eoi = reg_base + PORTA_INT_EOI;
++
++	/* Which pin (if any) triggered the interrupt */
++	while ((pending = ioread32(reg_pending))) {
++		/*
++		 * Acknowledge all the asserted GPIO interrupt lines before
++		 * serving them, so that we don't lose an edge.
++		 * This has only effect on edge-triggered interrupts.
++		 */
++		iowrite32(pending, reg_eoi);
++
++		/* Serve each asserted interrupt */
++		do {
++			gpio = __ffs(pending);
++			generic_handle_irq(
++				gpio_to_irq(INTEL_QRK_GIP_GPIO_BASE + gpio));
++			pending &= ~BIT(gpio);
++			ret = IRQ_HANDLED;
++		} while(pending);
++	}
++
++	return ret;
++}
++
++/**
++ * intel_qrk_gpio_save_state
++ *
++ * Save GPIO register state for system-wide suspend events and mask out
++ * interrupts.
++ */
++void intel_qrk_gpio_save_state(void)
++{
++	unsigned long flags = 0;
++
++	spin_lock_irqsave(&lock, flags);
++
++	saved_regs.int_mask = ioread32(reg_base + PORTA_INT_MASK);
++	saved_regs.int_en = ioread32(reg_base + PORTA_INT_EN);
++	saved_regs.int_deb = ioread32(reg_base + PORTA_DEBOUNCE);
++	saved_regs.int_pol = ioread32(reg_base + PORTA_INT_POLARITY);
++	saved_regs.int_type = ioread32(reg_base + PORTA_INT_TYPE_LEVEL);
++	saved_regs.dir = ioread32(reg_base + PORTA_DIR);
++	saved_regs.data = ioread32(reg_base + PORTA_DATA);
++
++	/* Mask out interrupts */
++	iowrite32(0xffffffff, reg_base + PORTA_INT_MASK);
++
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_restore_state
++ *
++ * Restore GPIO register state for system-wide resume events and clear out
++ * spurious interrupts.
++ */
++void intel_qrk_gpio_restore_state(void)
++{
++	unsigned long flags = 0;
++
++	spin_lock_irqsave(&lock, flags);
++
++	iowrite32(saved_regs.data, reg_base + PORTA_DATA);
++	iowrite32(saved_regs.dir, reg_base + PORTA_DIR);
++	iowrite32(saved_regs.int_type, reg_base + PORTA_INT_TYPE_LEVEL);
++	iowrite32(saved_regs.int_pol, reg_base + PORTA_INT_POLARITY);
++	iowrite32(saved_regs.int_deb, reg_base + PORTA_DEBOUNCE);
++	iowrite32(saved_regs.int_en, reg_base + PORTA_INT_EN);
++	iowrite32(saved_regs.int_mask, reg_base + PORTA_INT_MASK);
++
++	/* Clear out spurious interrupts */
++	iowrite32(0xffffffff, reg_base + PORTA_INT_EOI);
++
++	spin_unlock_irqrestore(&lock, flags);
++}
++
++/**
++ * intel_qrk_gpio_probe
++ * @param pdev: Pointer to GIP PCI device
++ * @return 0 success < 0 failure
++ *
++ * Perform GPIO-specific probing on behalf of the top-level GIP driver.
++ * Initiate the GPIO device.
++ */
++int intel_qrk_gpio_probe(struct pci_dev *pdev)
++{
++	int retval = 0;
++	resource_size_t start = 0, len = 0;
++
++	/* Get UIO memory */
++	info = kzalloc(sizeof(struct uio_info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++
++	/* Determine the address of the GPIO area */
++	start = pci_resource_start(pdev, GIP_GPIO_BAR);
++	len = pci_resource_len(pdev, GIP_GPIO_BAR);
++	if (!start || len == 0) {
++		dev_err(&pdev->dev, "bar%d not set\n", GIP_GPIO_BAR);
++		retval = -ENODEV;
++		goto exit;
++	}
++
++	reg_base = ioremap_nocache(start, len);
++	if (NULL == reg_base) {
++		dev_err(&pdev->dev, "I/O memory remapping failed\n");
++		retval = -EFAULT;
++		goto exit;
++	}
++
++	memset(&saved_regs, 0x0, sizeof(saved_regs));
++
++	gc = kzalloc(sizeof(struct gpio_chip), GFP_KERNEL);
++	if (!gc) {
++		retval = -ENOMEM;
++		goto err_iounmap;
++	}
++
++	if (n_gpio == 0 || n_gpio > INTEL_QRK_GIP_NGPIO) {
++		dev_err(&pdev->dev, "n_gpio outside range [1,%d]\n",
++			INTEL_QRK_GIP_NGPIO);
++		retval = -EINVAL;
++		goto err_free_gpiochip;
++	}
++
++	gc->label = "intel_qrk_gip_gpio";
++	gc->owner = THIS_MODULE;
++	gc->direction_input = intel_qrk_gpio_direction_input;
++	gc->direction_output = intel_qrk_gpio_direction_output;
++	gc->get = intel_qrk_gpio_get;
++	gc->set = intel_qrk_gpio_set;
++	gc->set_debounce = intel_qrk_gpio_set_debounce;
++	gc->to_irq = intel_qrk_gpio_to_irq;
++	gc->base = INTEL_QRK_GIP_GPIO_BASE;
++	gc->ngpio = n_gpio;
++	gc->can_sleep = 0;
++	retval = gpiochip_add(gc);
++	if (retval) {
++		dev_err(&pdev->dev, "failure adding GPIO chip\n");
++		goto err_free_gpiochip;
++	}
++
++	spin_lock_init(&lock);
++
++	/*
++	 * Allocate a range of IRQ descriptor for the available GPIO.
++	 * IRQs are allocated dynamically.
++	 */
++	irq_base = irq_alloc_descs(-1, gpio_irqbase, n_gpio, NUMA_NO_NODE);
++	if (irq_base < 0) {
++		dev_err(&pdev->dev, "failure adding GPIO IRQ descriptors\n");
++		goto err_remove_gpiochip;
++	}
++
++	retval = platform_device_register(&qrk_gpio_restrict_pdev);
++	if (retval < 0){
++		goto err_free_irq_descs;
++	}
++
++	igc = irq_alloc_generic_chip("intel_qrk_gip_gpio", 1, irq_base,
++			reg_base, handle_simple_irq);
++	if (NULL == igc) {
++		retval = -ENOMEM;
++		goto err_free_irq_descs;
++	}
++
++	/* UIO */
++	info->mem[0].addr = start;
++	info->mem[0].internal_addr = reg_base;
++	info->mem[0].size = len;
++	info->mem[0].memtype = UIO_MEM_PHYS;
++	info->mem[0].name = "gpio_regs";
++	info->name = "gpio uio";
++	info->version = "0.0.1";
++
++	if (uio_register_device(&pdev->dev, info))
++		goto err_free_irq_descs;
++
++	pr_info("%s UIO addr 0x%08x internal_addr 0x%08x size %lu memtype %d\n",
++		__func__, (unsigned int)info->mem[0].addr,
++		(unsigned int)info->mem[0].internal_addr, info->mem[0].size,
++		info->mem[0].memtype);
++	igc->chip_types->chip.irq_mask = intel_qrk_gpio_irq_mask;
++	igc->chip_types->chip.irq_unmask = intel_qrk_gpio_irq_unmask;
++	igc->chip_types->chip.irq_set_type = intel_qrk_gpio_irq_type;
++	igc->chip_types->chip.irq_enable = intel_qrk_gpio_irq_enable;
++	igc->chip_types->chip.irq_disable = intel_qrk_gpio_irq_disable;
++
++	irq_setup_generic_chip(igc, IRQ_MSK(n_gpio), IRQ_GC_INIT_MASK_CACHE,
++			IRQ_NOREQUEST | IRQ_NOPROBE, 0);
++
++	return 0;
++
++err_free_irq_descs:
++	irq_free_descs(irq_base, n_gpio);
++err_remove_gpiochip:
++	if (0 != gpiochip_remove(gc))
++		dev_err(&pdev->dev, "failed removing gpio_chip\n");
++err_free_gpiochip:
++	kfree(gc);
++err_iounmap:
++	iounmap(reg_base);
++exit:
++	if (info != NULL)
++		kfree(info);
++	return retval;
++}
++
++/**
++ * intel_qrk_gpio_remove
++ * @param pdev: Pointer to GIP PCI device
++ *
++ * Perform GPIO-specific resource release on behalf of the top-level GIP
++ * driver.
++ */
++void intel_qrk_gpio_remove(struct pci_dev *pdev)
++{
++	if (NULL == igc) {
++		dev_err(&pdev->dev, "null pointer to irq_generic_chip\n");
++		return;
++	}
++	if (NULL == gc) {
++		dev_err(&pdev->dev, "null pointer to gpio_chip\n");
++		return;
++	}
++
++	/* Tear down IRQ descriptors */
++	irq_remove_generic_chip(igc, IRQ_MSK(n_gpio), 0,
++		IRQ_NOREQUEST | IRQ_NOPROBE);
++	kfree(igc);
++	irq_free_descs(irq_base, n_gpio);
++
++	platform_device_unregister(&qrk_gpio_restrict_pdev);
++
++	/* Release GPIO chip */
++	if (0 != gpiochip_remove(gc))
++		dev_err(&pdev->dev, "failed removing gpio_chip\n");
++
++
++	if (info != NULL){
++		uio_unregister_device(info);
++		kfree(info);
++	}
++
++	kfree(gc);
++	iounmap(reg_base);
++}
+diff --git a/drivers/mfd/intel_qrk_gip_i2c.c b/drivers/mfd/intel_qrk_gip_i2c.c
+new file mode 100644
+index 0000000..08e8f9d
+--- /dev/null
++++ b/drivers/mfd/intel_qrk_gip_i2c.c
+@@ -0,0 +1,241 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark GIP (GPIO/I2C) - I2C-specific PCI driver
++ *
++ *  PCI glue logic for Quark GIP/I2C.
++ *  The GIP I2C device is the DesignWare I2C. This file defines the PCI glue
++ *  for this driver and is heavily based on
++ *  on drivers/i2c/busses/i2c-designware-pcidrv.c.  Also, it relies on
++ *  drivers/i2c/busses/i2c-designware-core.c for the core logic.
++ *  Please note only a single instance of the I2C device is supported.
++ */
++
++#include <linux/errno.h>
++#include <linux/i2c.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include "intel_qrk_gip.h"
++
++enum dw_pci_ctl_id_t {
++	quark_0,
++};
++
++/*
++ * By default, driver operates in fast mode (400kHz).
++ *
++ * Standard mode operation (100kHz) can be forced via, in order of priority:
++ * 1. setting the following i2c_std_mode module parameter to 1
++ * 2. setting the platform data i2c_std_mode parameter to 1
++ *
++ * Note in both cases, setting i2c_std_mode to 0 means forcing fast mode
++ * operation.
++ */
++static unsigned int i2c_std_mode = -1;
++module_param(i2c_std_mode, uint, S_IRUSR);
++MODULE_PARM_DESC(i2c_std_mode, "Set to 1 to force I2C standard mode");
++
++#define INTEL_QRK_STD_CFG  (DW_IC_CON_MASTER |			\
++				DW_IC_CON_SLAVE_DISABLE |	\
++				DW_IC_CON_RESTART_EN)
++
++static struct dw_pci_controller qrk_gip_i2c_controller = {
++	.bus_num	= 0,
++	.bus_cfg	= INTEL_QRK_STD_CFG | DW_IC_CON_SPEED_FAST,
++	.tx_fifo_depth	= 16,
++	.rx_fifo_depth	= 16,
++	.clk_khz	=
++#ifdef CONFIG_INTEL_QUARK_X1000_SOC_FPGAEMU
++			14000,
++#else
++			33000,
++#endif
++	.explicit_stop	= 1,
++};
++
++static struct i2c_algorithm i2c_dw_algo = {
++	.master_xfer	= i2c_dw_xfer,
++	.functionality	= i2c_dw_func,
++};
++
++/**
++ * i2c_dw_get_clk_rate_khz
++ * @param dev: Pointer to I2C device private data
++ * @return clock rate in kHz
++ *
++ * Ancillary function returning the frequency of the clock supplied to the
++ * interface.
++ */
++static u32 i2c_dw_get_clk_rate_khz(struct dw_i2c_dev *dev)
++{
++	return dev->controller->clk_khz;
++}
++
++/**
++ * intel_qrk_i2c_probe
++ * @param pdev: Pointer to GIP PCI device
++ * @param drvdata: private driver data
++ * @return 0 success < 0 failure
++ *
++ * Perform I2C-specific probing on behalf of the top-level GIP driver.
++ * Also call into I2C core driver routines for initiating the device.
++ */
++int intel_qrk_i2c_probe(struct pci_dev *pdev,
++			struct dw_i2c_dev **drvdata,
++			struct intel_qrk_gip_pdata *pdata)
++{
++	int retval = 0;
++	resource_size_t start = 0, len = 0;
++	struct dw_i2c_dev *dev = NULL;
++	struct i2c_adapter *adap = NULL;
++	void __iomem *reg_base = NULL;
++	struct dw_pci_controller *controller = NULL;
++	int std_mode = -1;
++
++	controller = &qrk_gip_i2c_controller;
++
++	/* Quark default configuration is fast mode, unless otherwise forced */
++	if (-1 != i2c_std_mode) {
++		switch (i2c_std_mode) {
++		case 0:
++		case 1:
++			std_mode = i2c_std_mode;
++			break;
++		default:
++			dev_err(&pdev->dev, "invalid i2c_std_mode param val %d."
++				" Using driver default\n", i2c_std_mode);
++			break;
++		}
++	} else if (pdata) {
++		switch (pdata->i2c_std_mode) {
++		case 0:
++		case 1:
++			std_mode = pdata->i2c_std_mode;
++			break;
++		default:
++			dev_err(&pdev->dev, "invalid i2c_std_mode pdata val %d."
++				" Usign driver default\n", pdata->i2c_std_mode);
++			break;
++		}
++	}
++	if (-1 != std_mode) {
++		if (0 == std_mode) {
++			controller->bus_cfg |= DW_IC_CON_SPEED_FAST;
++			controller->bus_cfg &= ~DW_IC_CON_SPEED_STD;
++		} else {
++			controller->bus_cfg &= ~DW_IC_CON_SPEED_FAST;
++			controller->bus_cfg |= DW_IC_CON_SPEED_STD;
++		}
++		dev_info(&pdev->dev, "i2c speed set to %skHz\n",
++			 std_mode ? "100" : "400");
++	}
++
++	/* Determine the address of the I2C area */
++	start = pci_resource_start(pdev, GIP_I2C_BAR);
++	len = pci_resource_len(pdev, GIP_I2C_BAR);
++	if (!start || len == 0) {
++		dev_err(&pdev->dev, "bar%d not set\n", GIP_I2C_BAR);
++		retval = -ENODEV;
++		goto err;
++	}
++
++	reg_base = ioremap_nocache(start, len);
++	if (!reg_base) {
++		dev_err(&pdev->dev, "I/O memory remapping failed\n");
++		retval = -ENOMEM;
++		goto err;
++	}
++
++	dev = kzalloc(sizeof(struct dw_i2c_dev), GFP_KERNEL);
++	if (!dev) {
++		retval = -ENOMEM;
++		goto err_iounmap;
++	}
++
++	init_completion(&dev->cmd_complete);
++	mutex_init(&dev->lock);
++	dev->clk = NULL;
++	dev->controller = controller;
++	dev->get_clk_rate_khz = i2c_dw_get_clk_rate_khz;
++	dev->base = reg_base;
++	dev->dev = get_device(&pdev->dev);
++	dev->functionality =
++		I2C_FUNC_I2C |
++		I2C_FUNC_10BIT_ADDR |
++		I2C_FUNC_SMBUS_BYTE |
++		I2C_FUNC_SMBUS_BYTE_DATA |
++		I2C_FUNC_SMBUS_WORD_DATA |
++		I2C_FUNC_SMBUS_I2C_BLOCK;
++	dev->master_cfg =  controller->bus_cfg;
++
++	*drvdata = dev;
++
++	dev->tx_fifo_depth = controller->tx_fifo_depth;
++	dev->rx_fifo_depth = controller->rx_fifo_depth;
++	dev->explicit_stop = controller->explicit_stop;
++	retval = i2c_dw_init(dev);
++	if (retval)
++		goto err_release_drvdata;
++
++	adap = &dev->adapter;
++	i2c_set_adapdata(adap, dev);
++	adap->owner = THIS_MODULE;
++	adap->class = 0;
++	adap->algo = &i2c_dw_algo;
++	adap->dev.parent = &pdev->dev;
++	adap->nr = controller->bus_num;
++	snprintf(adap->name, sizeof(adap->name), "intel_qrk_gip_i2c");
++
++	i2c_dw_disable_int(dev);
++	i2c_dw_clear_int(dev);
++	retval = i2c_add_numbered_adapter(adap);
++	if (retval) {
++		dev_err(&pdev->dev, "failure adding I2C adapter\n");
++		goto err_release_drvdata;
++	}
++
++	return 0;
++
++err_release_drvdata:
++	put_device(&pdev->dev);
++	kfree(dev);
++err_iounmap:
++	iounmap(reg_base);
++err:
++	return retval;
++}
++
++/**
++ * intel_qrk_i2c_remove
++ * @param pdev: Pointer to GIP PCI device
++ * @param dev: Pointer to I2C private data 
++ *
++ * Perform I2C-specific resource release on behalf of the top-level GIP driver.
++ */
++void intel_qrk_i2c_remove(struct pci_dev *pdev,
++	struct dw_i2c_dev *dev)
++{
++
++	if (NULL == dev) {
++		dev_err(&pdev->dev, "%s: failure getting driver data\n",
++			__func__);
++		return;
++	}
++
++	i2c_dw_disable(dev);
++	i2c_del_adapter(&dev->adapter);
++	iounmap(dev->base);
++
++	kfree(dev);
++}
+diff --git a/drivers/mfd/intel_qrk_gip_pdata.c b/drivers/mfd/intel_qrk_gip_pdata.c
+new file mode 100644
+index 0000000..cc230be
+--- /dev/null
++++ b/drivers/mfd/intel_qrk_gip_pdata.c
+@@ -0,0 +1,18 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#include <linux/module.h>
++#include <linux/mfd/intel_qrk_gip_pdata.h>
++
++struct intel_qrk_gip_pdata *(*intel_qrk_gip_get_pdata)(void) = NULL;
++EXPORT_SYMBOL_GPL(intel_qrk_gip_get_pdata);
+diff --git a/drivers/mfd/intel_qrk_gip_test.c b/drivers/mfd/intel_qrk_gip_test.c
+new file mode 100644
+index 0000000..e444c81
+--- /dev/null
++++ b/drivers/mfd/intel_qrk_gip_test.c
+@@ -0,0 +1,1124 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++/*
++ * Intel Quark GIP (GPIO/I2C) Test module
++ *
++ * Quark GIP + North-Cluster GPIO test module.
++ */
++
++#include <asm/tsc.h>
++#include <linux/cdev.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/fs.h>
++#include <linux/gpio.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/slab.h>
++#include <linux/workqueue.h>
++
++#define DRIVER_NAME			"intel_qrk_gip_test"
++
++/**************************** Exported to LISA *******************************/
++
++/*
++ * Internally-used ioctl code. At the moment it is not reserved by any mainline
++ * driver.
++ */
++#define GIP_TEST_IOCTL_CODE			0xE0
++
++/*
++ * Integers for ioctl operation.
++ */
++#define IOCTL_QRK_GPIO_11			_IO(GIP_TEST_IOCTL_CODE, 0x00)
++#define IOCTL_QRK_GPIO_11_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x01)
++#define IOCTL_QRK_GPIO_12			_IO(GIP_TEST_IOCTL_CODE, 0x02)
++#define IOCTL_QRK_GPIO_12_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x03)
++#define IOCTL_QRK_GPIO_13			_IO(GIP_TEST_IOCTL_CODE, 0x04)
++#define IOCTL_QRK_GPIO_13_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x05)
++#define IOCTL_QRK_GPIO_14			_IO(GIP_TEST_IOCTL_CODE, 0x06)
++#define IOCTL_QRK_GPIO_14_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x07)
++#define IOCTL_QRK_GPIO_15			_IO(GIP_TEST_IOCTL_CODE, 0x08)
++#define IOCTL_QRK_GPIO_15_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x09)
++#define IOCTL_QRK_GPIO_16			_IO(GIP_TEST_IOCTL_CODE, 0x0A)
++#define IOCTL_QRK_GPIO_16_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x0B)
++#define IOCTL_QRK_GPIO_17			_IO(GIP_TEST_IOCTL_CODE, 0x0C)
++#define IOCTL_QRK_GPIO_17_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x0D)
++#define IOCTL_QRK_GPIO_19			_IO(GIP_TEST_IOCTL_CODE, 0x0E)
++#define IOCTL_QRK_GPIO_19_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x0F)
++#define IOCTL_QRK_GPIO_20			_IO(GIP_TEST_IOCTL_CODE, 0x10)
++#define IOCTL_QRK_GPIO_20_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x11)
++#define IOCTL_QRK_GPIO_21			_IO(GIP_TEST_IOCTL_CODE, 0x12)
++#define IOCTL_QRK_GPIO_21_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x13)
++#define IOCTL_QRK_GPIO_24			_IO(GIP_TEST_IOCTL_CODE, 0x14)
++#define IOCTL_QRK_GPIO_26			_IO(GIP_TEST_IOCTL_CODE, 0x15)
++#define IOCTL_QRK_GPIO_26_CLEANUP		_IO(GIP_TEST_IOCTL_CODE, 0x16)
++/* Exercise callbacks for S0/S3 power-state transitions and vice-versa */
++#define IOCTL_QRK_GIP_SYSTEM_SUSPEND		_IO(GIP_TEST_IOCTL_CODE, 0x17)
++#define IOCTL_QRK_GIP_SYSTEM_RESUME		_IO(GIP_TEST_IOCTL_CODE, 0x18)
++#define IOCTL_QRK_GPIO_NMI_ENABLE		_IO(GIP_TEST_IOCTL_CODE, 0x19)
++#define IOCTL_QRK_GPIO_NMI_DISABLE		_IO(GIP_TEST_IOCTL_CODE, 0x1A)
++
++#define GPIO_INT_EDGE_POS_LABEL			"gpio-edge-pos"
++#define GPIO_INT_EDGE_NEG_LABEL			"gpio-edge-neg"
++#define GPIO_INT_LEVEL_HIGH_LABEL		"gpio-level-hi"
++#define GPIO_INT_LEVEL_LOW_LABEL		"gpio-level-lo"
++#define GPIO_INT_BASIC_LABEL			"gpio-edge-pos-basic"
++#define GPIO_PM_TEST_IRQ_LABEL			"gpio_pm_test_irq"
++
++/*
++ * Board GPIO numbers.
++ * Mapping between the North/South cluster GPIO and GPIOLIB IDs.
++ */
++#define SUT_GPIO_NC_0				0x00
++#define SUT_GPIO_NC_1				0x01
++#define SUT_GPIO_NC_2				0x02
++#define SUT_GPIO_NC_7				0x07
++#define SUT_GPIO_SC_0				0x08
++#define SUT_GPIO_SC_1				0x09
++#define SUT_GPIO_SC_6				0x0E
++#define SUT_GPIO_SC_7				0x0F
++
++/*
++ * Bitbanged SPI bus numbers.
++ */
++#define GPIO_NC_BITBANG_SPI_BUS			0x0
++#define GPIO_SC_BITBANG_SPI_BUS			0x1
++
++/*****************************************************************************/
++
++/**
++ * struct intel_qrk_gip_dev
++ *
++ * Structure to represent module state/data/etc
++ */
++struct intel_qrk_gip_test_dev {
++	unsigned int opened;
++	struct platform_device *pldev;	/* Platform device */
++	struct cdev cdev;
++	struct mutex open_lock;
++};
++
++static struct intel_qrk_gip_test_dev gip_test_dev;
++static struct class *gip_test_class;
++static DEFINE_MUTEX(gip_test_mutex);
++static int gip_test_major;
++
++/*
++ * Level-triggered interrupt variables
++ */
++/* Level-triggered GPIO workqueue */
++static struct delayed_work work;
++/* Level-triggered interrupt counter */
++static unsigned int level_int_count;
++/* By default, a level-triggered interrupt is a low-level triggered */
++static int level_high_triggered = 0;
++
++/*
++ * Interrupt performance metrics variables and parameters
++ */
++/* How many captures */
++#define INT_PERF_TEST_CAPTURES			10000
++/* Timestamp for latency test interrupt handler */
++static cycles_t perf_t1;
++/* Captures to be returned to user space */
++static cycles_t deltas[INT_PERF_TEST_CAPTURES];
++/* Couldn't find the actual define for this */
++#define UINT64_MAX		0xFFFFFFFFFFFFFFFFULL
++
++static irqreturn_t gpio_pm_test_handler(int irq, void *dev_id)
++{
++	/* Do nothing, just acknowledge the IRQ subsystem */
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t gpio_latency_handler(int irq, void *dev_id)
++{
++	/* t0 */
++	perf_t1 = get_cycles();
++
++	gpio_set_value(SUT_GPIO_SC_0, 0);
++
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t gpio_basic_handler(int irq, void *dev_id)
++{
++	/* Do nothing, just acknowledge the IRQ subsystem */
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t gpio_pos_edge_handler(int irq, void *dev_id)
++{
++	/* Do nothing, just acknowledge the IRQ subsystem */
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t gpio_neg_edge_handler(int irq, void *dev_id)
++{
++	/* Do nothing, just acknowledge the IRQ subsystem */
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t gpio_level_handler(int irq, void *dev_id)
++{
++	/* Untrigger the interrupt */
++	gpio_set_value(SUT_GPIO_SC_7, level_high_triggered ? 0 : 1);
++
++	level_int_count ++;
++	if (level_int_count < 1000) {
++		/* Next task due in a jiffy */
++		schedule_delayed_work(&work, 1);
++	} else if (level_int_count == 1000){
++		/* OK */
++	} else {
++		/*
++		 * We may get spurious interrupts. This because the TE requires
++		 * some time to drive the actual value to the GPIO.
++		 */
++		pr_info("Spurious interrupt\n");
++	}
++
++	return IRQ_HANDLED;
++}
++
++static void gpio_level_drive(struct work_struct *work)
++{
++	/* TE to trigger the interrupt */
++	gpio_set_value(SUT_GPIO_SC_7, level_high_triggered ? 1 : 0);
++}
++
++/**
++ * gpio_sc_level_int
++ *
++ * Request level triggered IRQ for SUT_GPIO_SC_6 and register
++ * SUT_GPIO_SC_7 as output GPIO.
++ * If positive equals to 0, the IRQ is high-level triggered.
++ * Otherwise, low-level triggered.
++ * Mask the IRQ if requested.
++ */
++static int gpio_sc_level_int(int positive, int masking)
++{
++	int ret = 0;
++	int irq = -1;
++
++	unsigned long out_init_val =
++		(positive ? GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH);
++
++	level_high_triggered = positive;
++
++	/* Initialise workqueue task */
++	INIT_DELAYED_WORK(&work, gpio_level_drive);
++
++	if (!gpio_is_valid(SUT_GPIO_SC_6)) {
++		pr_err("gpio%d is invalid\n", SUT_GPIO_SC_6);
++		ret = -1;
++		goto fail;
++	}
++	if (!gpio_is_valid(SUT_GPIO_SC_7)) {
++		pr_err("gpio%d is invalid\n", SUT_GPIO_SC_7);
++		ret = -1;
++		goto fail;
++	}
++
++	ret = gpio_request_one(SUT_GPIO_SC_6, GPIOF_IN, "gpio_hi_level");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", SUT_GPIO_SC_6, ret);
++		goto fail;
++	}
++	ret = gpio_request_one(SUT_GPIO_SC_7, out_init_val, "gpio_output");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", SUT_GPIO_SC_7, ret);
++		goto fail_release_first_gpio;
++	}
++
++	irq = gpio_to_irq(SUT_GPIO_SC_6);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_6);
++		goto fail_release_second_gpio;
++	}
++
++	if (0 != (ret = request_irq(irq, gpio_level_handler,
++			positive ? IRQF_TRIGGER_HIGH : IRQF_TRIGGER_LOW,
++			positive ? GPIO_INT_LEVEL_HIGH_LABEL : GPIO_INT_LEVEL_LOW_LABEL,
++			NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", SUT_GPIO_SC_6);
++		goto fail_release_second_gpio;
++	}
++
++	level_int_count = 0;
++
++	pr_info("Registered output gpio%d and IRQ for gpio%d\n", SUT_GPIO_SC_7,
++		SUT_GPIO_SC_6);
++
++	if (masking) {
++		disable_irq(gpio_to_irq(SUT_GPIO_SC_6));
++		pr_info("Masked gpio%d IRQ\n", SUT_GPIO_SC_6);
++	}
++
++	/*
++	 * Submit task to workqueue to drive the external Test Equipment.
++	 * Note the task is delayed long enough to have Aarvark already set up.
++	 * This because Aardvark has to ignore the initial glitches during the
++	 * previous GPIO setup phase. 
++	 */
++	schedule_delayed_work(&work, 20 * HZ);
++
++	return 0;
++
++fail_release_second_gpio:
++	gpio_free(SUT_GPIO_SC_7);
++fail_release_first_gpio:
++	gpio_free(SUT_GPIO_SC_6);
++fail:
++	pr_err("%s() failed\n", __func__);
++
++	return ret;
++}
++
++/**
++ * gpio_sc_level_int_teardown
++ *
++ * Release resources reserved by gpio_sc_level_int().
++ */
++static int gpio_sc_level_int_teardown(void)
++{
++	int irq = -1;
++
++	if (0 != cancel_delayed_work_sync(&work))
++		pr_warn("delayed work was still pending\n");
++
++	irq = gpio_to_irq(SUT_GPIO_SC_6);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_6);
++	} else {
++		free_irq(irq, NULL);
++	}
++
++	/* Make sure no handler is still running by this time */
++	mdelay(20);
++
++	gpio_free(SUT_GPIO_SC_7);
++	gpio_free(SUT_GPIO_SC_6);
++
++	return 0;
++}
++
++/*
++ * gpio_sc_interrupt_perf
++ *
++ * Performs a basic GPIO interrupt latency test by timestamping delta between
++ * interrupt driven and handled over a GPIO loopback.
++ *
++ * Returns to userspace the array of deltas obtained during each capture.
++ * A total amount of INT_PERF_TEST_CAPTURES captures is performed.
++ *
++ */
++static int gpio_sc_interrupt_perf(unsigned long user_memloc)
++{
++	int ret = 0;
++	int irq = -1;
++	int gpio_input = SUT_GPIO_SC_1;
++	int gpio_output = SUT_GPIO_SC_0;
++	unsigned int i = 0;
++	cycles_t perf_t0 = 0;
++	cycles_t delta = 0;
++
++	/* Casting pointer to user-space location to write */
++	cycles_t __user *user_ptr = (cycles_t __user *)user_memloc;
++
++	/* Can we copy the captures array into user-space location? */
++	if (!access_ok(VERIFY_WRITE, user_ptr, sizeof(deltas))) {
++		pr_err("can't copy 0x%x bytes to user-space address 0x%p\n",
++			sizeof(deltas),user_ptr);
++		return -EFAULT;
++	}
++
++	/* Setup the GPIO */
++	if (!gpio_is_valid(gpio_input)) {
++		pr_err("gpio%d is invalid\n", gpio_input);
++		ret = -1;
++		goto fail;
++	}
++	if (!gpio_is_valid(gpio_output)) {
++		pr_err("gpio%d is invalid\n", gpio_output);
++		ret = -1;
++		goto fail;
++	}
++	ret = gpio_request_one(gpio_input, GPIOF_IN, "gpio_intperf_in");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", gpio_input, ret);
++		goto fail;
++	}
++	ret = gpio_request_one(gpio_output, GPIOF_OUT_INIT_LOW, "gpio_intperf_out");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", gpio_output, ret);
++		goto fail_release_input_gpio;
++	}
++
++	/* Setup IRQ handler for input GPIO */
++	irq = gpio_to_irq(gpio_input);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", gpio_input);
++		goto fail_release_output_gpio;
++	}
++	if (0 != (ret = request_irq(irq, gpio_latency_handler,
++			IRQF_TRIGGER_RISING, "gpio_latency_handler", NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", gpio_input);
++		goto fail_release_output_gpio;
++	}
++
++	/* Perform test */
++	for (i = 0; i < INT_PERF_TEST_CAPTURES; i ++) {
++		/* t0 */
++		perf_t0 = get_cycles();
++
++		/* Trigger interrupt */
++		gpio_set_value(gpio_output, 1);
++		mdelay(2);
++
++		/* Check for wrap-around and store delta */
++		if(perf_t0 < perf_t1) {
++			delta = perf_t1 - perf_t0;
++		} else {
++			delta = perf_t1 + (UINT64_MAX - perf_t0);
++		}
++		deltas[i] = delta;
++	}
++
++	/* Expose results to userspace */
++	ret = copy_to_user(user_ptr, &deltas, sizeof(deltas));
++
++	/* Release resources */
++
++	free_irq(irq, NULL);
++
++fail_release_output_gpio:
++	gpio_free(gpio_output);
++fail_release_input_gpio:
++	gpio_free(gpio_input);
++fail:
++	if (0 != ret) {
++		pr_err("%s() failed\n", __func__);
++	}
++
++	return ret;
++}
++
++/**
++ * gpio_sc_pm_test_int
++ *
++ * Request rising edge-triggered IRQ for SUT_GPIO_SC_0
++ */
++static int gpio_sc_pm_test_int(void)
++{
++	int ret = 0;
++	int irq = -1;
++	int gpio_input = SUT_GPIO_SC_0;
++
++	/* Setup the GPIO */
++	if (!gpio_is_valid(gpio_input)) {
++		pr_err("gpio%d is invalid\n", gpio_input);
++		ret = -1;
++		goto fail;
++	}
++	ret = gpio_request_one(gpio_input, GPIOF_IN, "gpio_pm_test_in");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", gpio_input, ret);
++		goto fail;
++	}
++
++	/* Setup IRQ handler for input GPIO */
++	irq = gpio_to_irq(gpio_input);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", gpio_input);
++		goto fail_release_input_gpio;
++	}
++	if (0 != (ret = request_irq(irq, gpio_pm_test_handler,
++			IRQF_TRIGGER_RISING, GPIO_PM_TEST_IRQ_LABEL, NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", gpio_input);
++		goto fail_release_input_gpio;
++	}
++
++	return 0;
++
++fail_release_input_gpio:
++	gpio_free(gpio_input);
++fail:
++	return ret;
++}
++
++/**
++ * gpio_sc_pm_test_int
++ *
++ * Release resources reserved by gpio_sc_edge_int()
++ */
++static int gpio_sc_pm_test_int_teardown(void)
++{
++	int irq = -1;
++
++	irq = gpio_to_irq(SUT_GPIO_SC_0);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_0);
++	} else {
++		free_irq(irq, NULL);
++	}
++
++	gpio_free(SUT_GPIO_SC_0);
++
++	return 0;
++}
++
++/**
++ * gpio_sc_edge_int
++ *
++ * Request IRQ for SUT_GPIO_SC_6 and SUT_GPIO_SC_7, respectively positive-edge
++ * and negative edge-triggered.
++ * Mask the IRQs if requested.
++ */
++static int gpio_sc_edge_int(int masking)
++{
++	int ret = 0;
++	int irq_pos = -1, irq_neg = -1;
++
++	if (!gpio_is_valid(SUT_GPIO_SC_6)) {
++		pr_err("gpio%d is invalid\n", SUT_GPIO_SC_6);
++		ret = -1;
++		goto fail;
++	}
++	if (!gpio_is_valid(SUT_GPIO_SC_7)) {
++		pr_err("gpio%d is invalid\n", SUT_GPIO_SC_7);
++		ret = -1;
++		goto fail;
++	}
++
++	ret = gpio_request_one(SUT_GPIO_SC_6, GPIOF_IN, "gpio_pos_edge");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", SUT_GPIO_SC_6, ret);
++		goto fail;
++	}
++	ret = gpio_request_one(SUT_GPIO_SC_7, GPIOF_IN, "gpio_neg_edge");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", SUT_GPIO_SC_7, ret);
++		goto fail_release_first_gpio;
++	}
++
++	irq_pos = gpio_to_irq(SUT_GPIO_SC_6);
++	if (irq_pos < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_6);
++		goto fail_release_second_gpio;
++	}
++	irq_neg = gpio_to_irq(SUT_GPIO_SC_7);
++	if (irq_neg < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_7);
++		goto fail_release_second_gpio;
++	}
++
++	if (0 != (ret = request_irq(irq_pos, gpio_pos_edge_handler,
++			IRQF_TRIGGER_RISING, GPIO_INT_EDGE_POS_LABEL, NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", SUT_GPIO_SC_6);
++		goto fail_release_second_gpio;
++	}
++	if (0 != (ret = request_irq(irq_neg, gpio_neg_edge_handler,
++			IRQF_TRIGGER_FALLING, GPIO_INT_EDGE_NEG_LABEL, NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", SUT_GPIO_SC_7);
++		goto fail_release_first_gpio_irq;
++	}
++
++	pr_info("Registered gpio%d and gpio%d IRQs\n", SUT_GPIO_SC_6,
++		SUT_GPIO_SC_7);
++
++	if (masking) {
++		disable_irq(gpio_to_irq(SUT_GPIO_SC_6));
++		disable_irq(gpio_to_irq(SUT_GPIO_SC_7));
++		pr_info("Masked gpio%d and gpio%d IRQs\n", SUT_GPIO_SC_6,
++			SUT_GPIO_SC_7);
++	}
++
++	return 0;
++
++fail_release_first_gpio_irq:
++	free_irq(irq_pos, NULL);
++fail_release_second_gpio:
++	gpio_free(SUT_GPIO_SC_7);
++fail_release_first_gpio:
++	gpio_free(SUT_GPIO_SC_6);
++fail:
++	pr_err("%s() failed\n", __func__);
++
++	return ret;
++}
++
++/**
++ * gpio_sc_edge_int_teardown
++ *
++ * Release resources reserved by gpio_sc_edge_int()
++ */
++static int gpio_sc_edge_int_teardown(void)
++{
++	int irq_pos = -1, irq_neg = -1;
++
++	irq_neg = gpio_to_irq(SUT_GPIO_SC_7);
++	if (irq_neg < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_7);
++	} else {
++		free_irq(irq_neg, NULL);
++	}
++	irq_pos = gpio_to_irq(SUT_GPIO_SC_6);
++	if (irq_pos < 0) {
++		pr_err("can't map gpio%d to IRQ\n", SUT_GPIO_SC_6);
++	} else {
++		free_irq(irq_pos, NULL);
++	}
++
++	gpio_free(SUT_GPIO_SC_7);
++	gpio_free(SUT_GPIO_SC_6);
++
++	return 0;
++}
++
++/**
++ * gpio_sc_basic_int
++ *
++ * Register rising-edge interrupt handler on SUT_GPIO_SC_1
++ */
++static int gpio_sc_basic_int(void)
++{
++	int ret = 0;
++	int irq = -1;
++	unsigned int gpio = SUT_GPIO_SC_1;
++
++	if (!gpio_is_valid(gpio)) {
++		pr_err("gpio%d is invalid\n", gpio);
++		ret = -1;
++		goto fail;
++	}
++
++	ret = gpio_request_one(gpio, GPIOF_IN, "gpio_pos_edge_basic");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", gpio, ret);
++		goto fail;
++	}
++
++	irq = gpio_to_irq(gpio);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", gpio);
++		goto fail_release_gpio;
++	}
++
++	if (0 != (ret = request_irq(irq, gpio_basic_handler,
++			IRQF_TRIGGER_RISING, GPIO_INT_BASIC_LABEL, NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", gpio);
++		goto fail_release_gpio;
++	}
++
++	pr_info("Registered gpio%d IRQ\n", gpio);
++
++	return 0;
++
++fail_release_gpio:
++	gpio_free(gpio);
++fail:
++	pr_err("%s() failed\n", __func__);
++
++	return ret;
++}
++
++/**
++ * gpio_sc_basic_int_teardown
++ *
++ * Release resources reserved by gpio_sc_basic_int()
++ */
++static int gpio_sc_basic_int_teardown(void)
++{
++	int irq = -1;
++	unsigned int gpio = SUT_GPIO_SC_1;
++
++	irq = gpio_to_irq(gpio);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", gpio);
++	} else {
++		free_irq(irq, NULL);
++	}
++
++	gpio_free(gpio);
++
++	return 0;
++}
++
++/**
++ * gpio_spidev_register
++ *
++ * Register a bitbanged SPI platform device and export a `spidev' to userspace.
++ * For North Cluster and South Cluster.
++ */
++static int gpio_spidev_register(int north_cluster)
++{
++	/* Not needed anymore */
++	return 0;
++}
++
++/**
++ * gpio_spidev_unregister
++ *
++ * Release a bitbanged SPI platform device and its `spidev' interface.
++ * For North Cluster and South Cluster.
++ */
++static int gpio_spidev_unregister(int north_cluster)
++{
++	/* Not needed anymore */
++	return 0;
++}
++
++/**
++ * gip_system_power_transition 
++ *
++ * @param state: 0 if transition to S3, !0 if transition to S0
++ * @return 0 success < 0 failure
++ *
++ * Exercise system-wide suspend/resume power management transitions.
++ * 
++ */
++static int gip_system_power_transition(int state)
++{
++	struct pci_dev *gip = pci_get_device(PCI_VENDOR_ID_INTEL, 0x0934, NULL);
++	if (NULL == gip) {
++		pr_err("can't find GIP PCI device\n");
++		return -ENOENT;
++	}
++
++	if (0 == state) {
++		gip->driver->driver.pm->suspend(&gip->dev);
++	} else {
++		gip->driver->driver.pm->resume(&gip->dev);
++	}
++
++	/* Decrement reference count of PCI device */
++	if (NULL != pci_get_device(PCI_VENDOR_ID_INTEL, 0x0934, gip)) {
++		pr_warn("found duplicate of GIP PCI device?!\n");
++	}
++
++	return 0;
++}
++
++/**
++ * gpio_nmi_enable 
++ *
++ * @param enable: 0 to disable, !0 to enable
++ * @return 0 success < 0 failure
++ *
++ * Hack the legacy GPIO hardware to enable rising-edge triggered NMI on Core
++ * Well gpio0.
++ * 
++ */
++static int gpio_nmi_enable(int enable)
++{
++	unsigned int base_u32 = 0x0;
++	unsigned short base = 0x0;
++	struct pci_dev *ilb = pci_get_device(PCI_VENDOR_ID_INTEL,
++					     PCI_DEVICE_ID_INTEL_QUARK_ILB,
++					     NULL);
++	/* Assume interrupts are disabled by default by BIOS */
++	unsigned char gpio = enable ? 0x01 : 0x00; 
++
++	if (NULL == ilb) {
++		pr_err("can't find iLB device\n");
++		return -ENOENT;
++	}
++
++	/* The GPIO base address is @ offset 0x44.  Sussed out from driver */
++	pci_read_config_dword(ilb, 0x44, &base_u32);
++	if (0x0 == base_u32) {
++		pr_err("can't read iLB GPIO baseaddr\n");
++		return -ENOENT;
++	}
++	base = (unsigned short)base_u32;
++
++	/*
++	 * Prepare for rising edge NMI triggering.  This assumes the pin
++	 * is already set as input.
++	 */
++#define CGTPE		0x0C	/* Core Well trigger positive edge */
++#define CGTS		0x1C	/* Core Well trigges status - W1C */
++#define CGNMIEN		0x40	/* Core Well NMI enable */
++	outb(0x01, base + CGTS);
++	outb(gpio, base + CGTPE);
++	outb(gpio, base + CGNMIEN);
++#undef CGTPE
++#undef CGTS
++#undef CGNMIEN
++
++	return 0;
++}
++
++/**
++ * gpio_sc_debounce
++ *
++ * Enable GPIO debounce functionality for SC_GPIO_1 (edge and level triggered)
++ *
++ */
++static int gpio_sc_debounce(int level)
++{
++	int ret = 0;
++	int irq = -1;
++	int gpio = SUT_GPIO_SC_0;
++
++	if (!gpio_is_valid(gpio)) {
++		pr_err("gpio%d is invalid\n", gpio);
++		ret = -1;
++		goto fail;
++	}
++
++	ret = gpio_request_one(gpio, GPIOF_IN,
++		level ? "gpio_level_mask" : "gpio_edge_mask");
++	if (ret) {
++		pr_err("can't request gpio%d (error %d)\n", gpio, ret);
++		goto fail;
++	}
++
++	irq = gpio_to_irq(gpio);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", gpio);
++		goto fail_release_gpio;
++	}
++
++	/*
++	 * Register IRQ. gpio_pos_edge_handler will do for both level and edge
++	 * interrupts, as it's nooping.
++	 */
++	if (0 != (ret = request_irq(irq, gpio_pos_edge_handler,
++			level ? IRQF_TRIGGER_HIGH : IRQF_TRIGGER_RISING,
++			level ? GPIO_INT_LEVEL_HIGH_LABEL : GPIO_INT_EDGE_POS_LABEL,
++			NULL))) {
++		pr_err("can't request IRQ for gpio%d\n", gpio);
++		goto fail_release_gpio;
++	}
++
++	/* Set debounce */
++	if (0 != (ret = gpio_set_debounce(gpio, 1))) {
++		pr_err("can't set debounce for gpio%d\n", gpio);
++		goto fail_free_irq;
++	}
++
++	return 0;
++
++fail_free_irq:
++	free_irq(irq, NULL);
++fail_release_gpio:
++	gpio_free(gpio);
++fail:
++	pr_err("%s() failed\n", __func__);
++
++	return ret;
++}
++
++/**
++ * gpio_sc_debounce_teardown
++ *
++ * Undo gpio_sc_debounce
++ *
++ */
++static int gpio_sc_debounce_teardown(int level)
++{
++	int irq = -1;
++	unsigned int gpio = SUT_GPIO_SC_0;
++
++	irq = gpio_to_irq(gpio);
++	if (irq < 0) {
++		pr_err("can't map gpio%d to IRQ\n", gpio);
++	} else {
++		free_irq(irq, NULL);
++	}
++
++	gpio_free(gpio);
++
++	return 0;
++}
++
++/*
++ * File ops
++ */
++static long gip_test_ioctl(struct file *file, unsigned int cmd,
++		unsigned long arg)
++{
++	int ret = -EINVAL;
++
++	switch (cmd) {
++		case IOCTL_QRK_GPIO_11:
++			/* Edge-triggered interrupts */
++			ret = gpio_sc_edge_int(0);
++			break;
++		case IOCTL_QRK_GPIO_11_CLEANUP:
++			/* Edge-triggered interrupts cleanup */
++			ret = gpio_sc_edge_int_teardown();
++			break;
++		case IOCTL_QRK_GPIO_12:
++			/* Edge-triggered interrupts (masking) */
++			ret = gpio_sc_edge_int(1);
++			break;
++		case IOCTL_QRK_GPIO_12_CLEANUP:
++			/* Edge-triggered interrupts (masking) cleanup */
++			ret = gpio_sc_edge_int_teardown();
++			break;
++		case IOCTL_QRK_GPIO_13:
++			/* GPIO debounce (edge) */
++			ret = gpio_sc_debounce(0);
++			break;
++		case IOCTL_QRK_GPIO_13_CLEANUP:
++			/* GPIO debounce cleanup (edge) */
++			ret = gpio_sc_debounce_teardown(0);
++			break;
++		case IOCTL_QRK_GPIO_14:
++			/* High-level triggered interrupts */
++			ret = gpio_sc_level_int(1, 0);
++			break;
++		case IOCTL_QRK_GPIO_14_CLEANUP:
++			/* High-level triggered interrupts cleanup */
++			ret = gpio_sc_level_int_teardown();
++			break;
++		case IOCTL_QRK_GPIO_15:
++			/* Low-level triggered interrupts */
++			ret = gpio_sc_level_int(0, 0);
++			break;
++		case IOCTL_QRK_GPIO_15_CLEANUP:
++			/*Low-level triggered interrupts cleanup */
++			ret = gpio_sc_level_int_teardown();
++			break;
++		case IOCTL_QRK_GPIO_16:
++			/* Level triggered interrupts (masking) */
++			ret = gpio_sc_level_int(1, 1);
++			break;
++		case IOCTL_QRK_GPIO_16_CLEANUP:
++			/* Level triggered interrupts (masking) cleanup */
++			ret = gpio_sc_level_int_teardown();
++			break;
++		case IOCTL_QRK_GPIO_17:
++			/* GPIO debounce (level) */
++			ret = gpio_sc_debounce(1);
++			break;
++		case IOCTL_QRK_GPIO_17_CLEANUP:
++			/* GPIO debounce cleanup (level) */
++			ret = gpio_sc_debounce_teardown(1);
++			break;
++		case IOCTL_QRK_GPIO_19:
++			/* Register IRQ for SC_GPIO0 (PM transitions test) */
++			ret = gpio_sc_pm_test_int();
++			break;
++		case IOCTL_QRK_GPIO_19_CLEANUP:
++			/* Free IRQ for SC_GPIO0 (PM transitions test) */
++			ret = gpio_sc_pm_test_int_teardown();
++			break;
++		case IOCTL_QRK_GPIO_20:
++			/* NC bitbanged SPI */
++			ret = gpio_spidev_register(1);
++			break;
++		case IOCTL_QRK_GPIO_20_CLEANUP:
++			/* NC bitbanged SPI cleanup */
++			ret = gpio_spidev_unregister(1);
++			break;
++		case IOCTL_QRK_GPIO_21:
++			/* SC bitbanged SPI */
++			ret = gpio_spidev_register(0);
++			break;
++		case IOCTL_QRK_GPIO_21_CLEANUP:
++			/* SC bitbanged SPI cleanup */
++			ret = gpio_spidev_unregister(0);
++			break;
++		case IOCTL_QRK_GPIO_24:
++			/*
++			 * SC GPIO interrupt performance test.
++			 * Note it's shared between QRK_GPIO_24 and QRK_GPIO_25
++			 * plus it doesn't need any cleanup call.
++			 */
++			ret = gpio_sc_interrupt_perf(arg);
++			break;
++		case IOCTL_QRK_GPIO_26:
++			/* Interrupt for basic loopback test */
++			ret = gpio_sc_basic_int();
++			break;
++		case IOCTL_QRK_GPIO_26_CLEANUP:
++			/* Interrupt for basic loopback test cleanup */
++			ret = gpio_sc_basic_int_teardown();
++			break;
++		case IOCTL_QRK_GIP_SYSTEM_SUSPEND:
++			ret = gip_system_power_transition(0);
++			break;
++		case IOCTL_QRK_GIP_SYSTEM_RESUME:
++			ret = gip_system_power_transition(1);
++			break;
++		case IOCTL_QRK_GPIO_NMI_ENABLE:
++			ret = gpio_nmi_enable(1);
++			break;
++		case IOCTL_QRK_GPIO_NMI_DISABLE:
++			ret = gpio_nmi_enable(0);
++			break;
++		default:
++			break;
++	}
++
++	return ret;
++}
++
++static int gip_test_open(struct inode *inode, struct file *file)
++{
++	mutex_lock(&gip_test_mutex);
++	nonseekable_open(inode, file);
++
++	if (mutex_lock_interruptible(&gip_test_dev.open_lock)) {
++		mutex_unlock(&gip_test_mutex);
++		return -ERESTARTSYS;
++	}
++
++	if (gip_test_dev.opened) {
++		mutex_unlock(&gip_test_dev.open_lock);
++		mutex_unlock(&gip_test_mutex);
++		return -EINVAL;
++	}
++
++	gip_test_dev.opened++;
++	mutex_unlock(&gip_test_dev.open_lock);
++	mutex_unlock(&gip_test_mutex);
++	return 0;
++}
++
++static int gip_test_release(struct inode *inode, struct file *file)
++{
++	mutex_lock(&gip_test_dev.open_lock);
++	gip_test_dev.opened = 0;
++	mutex_unlock(&gip_test_dev.open_lock);
++
++	return 0;
++}
++
++static const struct file_operations gip_test_file_ops = {
++	.open = gip_test_open,
++	.release = gip_test_release,
++	.unlocked_ioctl = gip_test_ioctl,
++	.llseek = no_llseek,
++};
++
++/**
++ * intel_qrk_gip_test_probe
++ *
++ * @param pdev: Platform device
++ * @return 0 success < 0 failure
++ *
++ * Callback from platform sub-system to probe
++ */
++static int intel_qrk_gip_test_probe(struct platform_device * pdev)
++{
++	int retval = 0;
++	unsigned int minor = 0;
++
++	mutex_init(&gip_test_dev.open_lock);
++	cdev_init(&gip_test_dev.cdev, &gip_test_file_ops);
++	gip_test_dev.cdev.owner = THIS_MODULE;
++
++	retval = cdev_add(&gip_test_dev.cdev, MKDEV(gip_test_major, minor), 1);
++	if (retval) {
++		printk(KERN_ERR "chardev registration failed\n");
++		return -EINVAL;
++	}
++	if (IS_ERR(device_create(gip_test_class, NULL,
++				 MKDEV(gip_test_major, minor), NULL,
++				 "giptest%u", minor))){
++		dev_err(&pdev->dev, "can't create device\n");
++		return -EINVAL;
++	}
++
++	return 0;
++
++}
++
++static int intel_qrk_gip_test_remove(struct platform_device * pdev)
++{
++	unsigned int minor = MINOR(gip_test_dev.cdev.dev);
++
++	device_destroy(gip_test_class, MKDEV(gip_test_major, minor));
++	cdev_del(&gip_test_dev.cdev);
++
++	class_destroy(gip_test_class);
++
++	return 0;
++}
++
++/*
++ * Platform structures useful for interface to PM subsystem
++ */
++static struct platform_driver intel_qrk_gip_test_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.owner = THIS_MODULE,
++	},
++	.remove = intel_qrk_gip_test_remove,
++};
++
++/**
++ * intel_qrk_gip_test_init
++ *
++ * Load module.
++ */
++static int __init intel_qrk_gip_test_init(void)
++{
++	int retval = 0;
++	dev_t dev;
++
++	gip_test_class = class_create(THIS_MODULE,"qrk_gip_test");
++	if (IS_ERR(gip_test_class)) {
++		retval = PTR_ERR(gip_test_class);
++		printk(KERN_ERR "gip_test: can't register gip_test class\n");
++		goto err;
++	}
++
++	retval = alloc_chrdev_region(&dev, 0, 1, "gip_test");
++	if (retval) {
++		printk(KERN_ERR "earam_test: can't register character device\n");
++		goto err_class;
++	}
++	gip_test_major = MAJOR(dev);
++
++	memset(&gip_test_dev, 0x00, sizeof(gip_test_dev));
++	gip_test_dev.pldev = platform_create_bundle(
++		&intel_qrk_gip_test_driver, intel_qrk_gip_test_probe, NULL, 0, NULL, 0);
++
++	if(IS_ERR(gip_test_dev.pldev)){
++		printk(KERN_ERR "platform_create_bundle fail!\n"); 
++		retval = PTR_ERR(gip_test_dev.pldev);
++		goto err_class;
++	}
++
++	return 0;
++
++err_class:
++	class_destroy(gip_test_class);
++err:
++	return retval;
++}
++
++static void __exit intel_qrk_gip_test_exit(void)
++{
++	platform_device_unregister(gip_test_dev.pldev);
++	platform_driver_unregister(&intel_qrk_gip_test_driver);
++}
++
++module_init(intel_qrk_gip_test_init);
++module_exit(intel_qrk_gip_test_exit);
++
++MODULE_AUTHOR("Josef Ahmad <josef.ahmad@intel.com>");
++MODULE_DESCRIPTION("Quark GIP test module");
++MODULE_LICENSE("Dual BSD/GPL");
++
+diff --git a/drivers/mfd/lpc_sch.c b/drivers/mfd/lpc_sch.c
+index 5624fcb..4afc687 100644
+--- a/drivers/mfd/lpc_sch.c
++++ b/drivers/mfd/lpc_sch.c
+@@ -41,21 +41,41 @@
+ #define WDTBASE		0x84
+ #define WDT_IO_SIZE	64
+ 
++/* BIOS control reg */
++#define LPC_BIOS_CNTL	0xD8
++#define LPC_BIOS_CNTL_WE 0x01
++
++/* Root complex base address derived registers */
++#define RCBA_BASE	0xF0
++
+ static struct resource smbus_sch_resource = {
+ 		.flags = IORESOURCE_IO,
+ };
+ 
+-
+ static struct resource gpio_sch_resource = {
+ 		.flags = IORESOURCE_IO,
+ };
+ 
++static struct resource spi_res = {
++	.flags		= IORESOURCE_MEM,
++	.start		= 0,
++	.end		= 0,
++};
++
++static struct platform_device lpc_sch_spi = {
++	.name 		= "spi-lpc-sch",
++	.id 		= -1,
++	.resource	= &spi_res,
++};
++
+ static struct mfd_cell lpc_sch_cells[] = {
++#ifndef CONFIG_INTEL_QUARK_X1000_SOC
+ 	{
+ 		.name = "isch_smbus",
+ 		.num_resources = 1,
+ 		.resources = &smbus_sch_resource,
+ 	},
++#endif
+ 	{
+ 		.name = "sch_gpio",
+ 		.num_resources = 1,
+@@ -79,6 +99,7 @@ static DEFINE_PCI_DEVICE_TABLE(lpc_sch_ids) = {
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_SCH_LPC) },
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ITC_LPC) },
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_CENTERTON_ILB) },
++	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_QUARK_ILB) },
+ 	{ 0, }
+ };
+ MODULE_DEVICE_TABLE(pci, lpc_sch_ids);
+@@ -88,22 +109,26 @@ static int lpc_sch_probe(struct pci_dev *dev,
+ {
+ 	unsigned int base_addr_cfg;
+ 	unsigned short base_addr;
++	u32 rcba_base, bios_cntl;
+ 	int i;
+ 	int ret;
+ 
+-	pci_read_config_dword(dev, SMBASE, &base_addr_cfg);
+-	if (!(base_addr_cfg & (1 << 31))) {
+-		dev_err(&dev->dev, "Decode of the SMBus I/O range disabled\n");
+-		return -ENODEV;
+-	}
+-	base_addr = (unsigned short)base_addr_cfg;
+-	if (base_addr == 0) {
+-		dev_err(&dev->dev, "I/O space for SMBus uninitialized\n");
+-		return -ENODEV;
+-	}
++	/* Quark does not support iLB SMBUS */
++	if (id->device != PCI_DEVICE_ID_INTEL_QUARK_ILB) {
++		pci_read_config_dword(dev, SMBASE, &base_addr_cfg);
++		if (!(base_addr_cfg & (1 << 31))) {
++			dev_err(&dev->dev, "Decode of the SMBus I/O range disabled\n");
++			return -ENODEV;
++		}
++		base_addr = (unsigned short)base_addr_cfg;
++		if (base_addr == 0) {
++			dev_err(&dev->dev, "I/O space for SMBus uninitialized\n");
++			return -ENODEV;
++		}
+ 
+-	smbus_sch_resource.start = base_addr;
+-	smbus_sch_resource.end = base_addr + SMBUS_IO_SIZE - 1;
++		smbus_sch_resource.start = base_addr;
++		smbus_sch_resource.end = base_addr + SMBUS_IO_SIZE - 1;
++	}
+ 
+ 	pci_read_config_dword(dev, GPIOBASE, &base_addr_cfg);
+ 	if (!(base_addr_cfg & (1 << 31))) {
+@@ -132,6 +157,31 @@ static int lpc_sch_probe(struct pci_dev *dev,
+ 	if (ret)
+ 		goto out_dev;
+ 
++	/* Add RCBA SPI device */
++	if (id->device == PCI_DEVICE_ID_INTEL_QUARK_ILB) {
++		pci_read_config_dword(dev, LPC_BIOS_CNTL, &bios_cntl);
++		pr_info("%s BIOS_CNTL 0x%08x\n", __func__, bios_cntl);
++
++		/* Enable flash write */
++		bios_cntl |= LPC_BIOS_CNTL_WE;
++		pci_write_config_dword(dev, LPC_BIOS_CNTL, bios_cntl);
++
++		/* Verify */
++		pci_read_config_dword(dev, LPC_BIOS_CNTL, &bios_cntl);
++		pr_info("%s new BIOS_CNTL 0x%08x\n", __func__, bios_cntl);
++	}
++
++	pci_read_config_dword(dev, RCBA_BASE, &rcba_base);
++	rcba_base &= 0xFFFFC000;
++	spi_res.start = rcba_base + 0x3020;
++	spi_res.end = rcba_base + 0x3088;
++	pr_info("%s RCBA @ 0x%08x\n", __func__, rcba_base);
++	ret = platform_device_register(&lpc_sch_spi);
++	if (ret < 0){
++		pr_err("unable to register %s plat dev\n", lpc_sch_spi.name);
++		goto out_dev;
++	}
++
+ 	if (id->device == PCI_DEVICE_ID_INTEL_ITC_LPC
+ 	 || id->device == PCI_DEVICE_ID_INTEL_CENTERTON_ILB) {
+ 		pci_read_config_dword(dev, WDTBASE, &base_addr_cfg);
+diff --git a/drivers/mfd/pca9685-core.c b/drivers/mfd/pca9685-core.c
+new file mode 100644
+index 0000000..11cb8d9
+--- /dev/null
++++ b/drivers/mfd/pca9685-core.c
+@@ -0,0 +1,283 @@
++/*
++ * Driver for NPX PCA9685 I2C-bus PWM controller with GPIO output interface
++ * support.
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * The I2C-bus LED controller provides 16-channel, 12-bit PWM Fm+.
++ * Additionally, the driver allows the channels to be configured as GPIO
++ * interface (output only).
++ */
++
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/pwm.h>
++#include <linux/gpio.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++
++#include "pca9685.h"
++
++static unsigned int en_invrt;
++module_param(en_invrt, uint, 0);
++MODULE_PARM_DESC(en_invrt, "Enable output logic state inverted mode");
++
++static unsigned int en_open_dr;
++module_param(en_open_dr, uint, 0);
++MODULE_PARM_DESC(en_open_dr,
++	"The outputs are configured with an open-drain structure");
++
++static int gpio_base = -1; /*  requests dynamic ID allocation */
++module_param(gpio_base, int, 0);
++MODULE_PARM_DESC(gpio_base, "GPIO base number");
++
++static unsigned int pwm_period = PWM_PERIOD_DEF; /* PWM clock period */
++module_param(pwm_period, uint, 0);
++MODULE_PARM_DESC(pwm_period, "PWM clock period (nanoseconds)");
++
++static bool pca9685_register_volatile(struct device *dev, unsigned int reg)
++{
++	if (unlikely(reg == PCA9685_MODE1))
++		return true;
++	else
++		return false;
++}
++
++static struct regmap_config pca9685_regmap_i2c_config = {
++	.reg_bits     = 8,
++	.val_bits     = 8,
++	.max_register = PCA9685_NUMREGS,
++	.volatile_reg = pca9685_register_volatile,
++	.cache_type   = REGCACHE_RBTREE,
++};
++
++ssize_t pca9685_pwm_period_sysfs_show(struct device *dev,
++				      struct device_attribute *attr,
++				      char *buf)
++{
++	struct pca9685 *pca = dev_get_drvdata(dev);
++
++	return scnprintf(buf, PAGE_SIZE, "%u\n", pca->pwm_period);
++}
++
++ssize_t pca9685_pwm_period_sysfs_store(struct device *dev,
++				       struct device_attribute *attr,
++				       const char *buf, size_t count)
++{
++	struct pca9685 *pca = dev_get_drvdata(dev);
++	unsigned period_ns;
++	int ret;
++
++	sscanf(buf, "%u", &period_ns);
++
++	ret = pca9685_update_prescale(pca, period_ns, true);
++	if (ret)
++		return ret;
++
++	return count;
++}
++
++/* Sysfs attribute to allow PWM clock period adjustment at run-time
++ * NOTE: All active channels will switch off momentarily if the
++ * PWM clock period is changed
++ */
++static DEVICE_ATTR(pwm_period, S_IWUSR | S_IRUGO,
++		   pca9685_pwm_period_sysfs_show,
++		   pca9685_pwm_period_sysfs_store);
++
++static int pca9685_probe(struct i2c_client *client,
++			 const struct i2c_device_id *id)
++{
++	struct pca9685_pdata *pdata;
++	struct pca9685 *pca;
++	int ret;
++	int mode2;
++
++	pca = devm_kzalloc(&client->dev, sizeof(*pca), GFP_KERNEL);
++	if (unlikely(!pca))
++		return -ENOMEM;
++
++	pdata = client->dev.platform_data;
++	if (likely(pdata)) {
++		memcpy(pca->chan_mapping, pdata->chan_mapping,
++				ARRAY_SIZE(pca->chan_mapping));
++		pca->gpio_base = pdata->gpio_base;
++		en_invrt       = pdata->en_invrt;
++		en_open_dr     = pdata->en_open_dr;
++	} else {
++		dev_warn(&client->dev,
++			 "Platform data not provided."
++			 "Using default or mod params configuration.\n");
++		pca->gpio_base = gpio_base;
++		memset(pca->chan_mapping, PWM_CH_UNDEFINED,
++				ARRAY_SIZE(pca->chan_mapping));
++	}
++
++	if (unlikely(!i2c_check_functionality(client->adapter,
++					I2C_FUNC_I2C |
++					I2C_FUNC_SMBUS_BYTE_DATA))) {
++		dev_err(&client->dev,
++				"i2c adapter doesn't support required functionality\n");
++		return -EIO;
++	}
++
++	pca->regmap = devm_regmap_init_i2c(client, &pca9685_regmap_i2c_config);
++	if (IS_ERR(pca->regmap)) {
++		ret = PTR_ERR(pca->regmap);
++		dev_err(&client->dev, "Failed to initialize register map: %d\n",
++			ret);
++		return ret;
++	}
++
++	i2c_set_clientdata(client, pca);
++
++	/* registration of GPIO chip */
++	pca->gpio_chip.label     = "pca9685-gpio";
++	pca->gpio_chip.owner     = THIS_MODULE;
++	pca->gpio_chip.set       = pca9685_gpio_set;
++	pca->gpio_chip.get       = pca9685_gpio_get;
++	pca->gpio_chip.can_sleep = 1;
++	pca->gpio_chip.ngpio     = PCA9685_MAXCHAN;
++	pca->gpio_chip.base      = pca->gpio_base;
++	pca->gpio_chip.request   = pca9685_gpio_request;
++	pca->gpio_chip.free      = pca9685_gpio_free;
++
++	mutex_init(&pca->lock);
++
++	ret = gpiochip_add(&pca->gpio_chip);
++	if (unlikely(ret < 0)) {
++		dev_err(&client->dev, "Could not register gpiochip, %d\n", ret);
++		goto err;
++	}
++
++	/* configure initial PWM settings */
++	ret = pca9685_init_pwm_regs(pca, pwm_period);
++	if (ret) {
++		pr_err("Failed to initialize PWM registers\n");
++		goto err_gpiochip;
++	}
++
++	/* registration of PWM chip */
++
++	regmap_read(pca->regmap, PCA9685_MODE2, &mode2);
++
++	/* update mode2 register */
++	if (en_invrt)
++		mode2 |= MODE2_INVRT;
++	else
++		mode2 &= ~MODE2_INVRT;
++
++	if (en_open_dr)
++		mode2 &= ~MODE2_OUTDRV;
++	else
++		mode2 |= MODE2_OUTDRV;
++
++	regmap_write(pca->regmap, PCA9685_MODE2, mode2);
++
++	pca->pwm_chip.ops  = &pca9685_pwm_ops;
++	/* add an extra channel for ALL_LED */
++	pca->pwm_chip.npwm = PCA9685_MAXCHAN + 1;
++	pca->pwm_chip.dev  = &client->dev;
++	pca->pwm_chip.base = -1;
++
++	ret = pwmchip_add(&pca->pwm_chip);
++	if (unlikely(ret < 0)) {
++		dev_err(&client->dev, "pwmchip_add failed %d\n", ret);
++		goto err_gpiochip;
++	}
++
++	/* Also create a sysfs interface, providing a cmd line config option */
++	ret = sysfs_create_file(&client->dev.kobj, &dev_attr_pwm_period.attr);
++	if (unlikely(ret < 0)) {
++		dev_err(&client->dev, "sysfs_create_file failed %d\n", ret);
++		goto err_pwmchip;
++	}
++
++	return ret;
++
++err_pwmchip:
++	if (unlikely(pwmchip_remove(&pca->pwm_chip)))
++		dev_warn(&client->dev, "%s failed\n", "pwmchip_remove()");
++
++err_gpiochip:
++	if (unlikely(gpiochip_remove(&pca->gpio_chip)))
++		dev_warn(&client->dev, "%s failed\n", "gpiochip_remove()");
++err:
++	mutex_destroy(&pca->lock);
++
++	return ret;
++}
++
++static int pca9685_remove(struct i2c_client *client)
++{
++	struct pca9685 *pca = i2c_get_clientdata(client);
++	int ret;
++
++	regmap_update_bits(pca->regmap, PCA9685_MODE1, MODE1_SLEEP,
++			MODE1_SLEEP);
++
++	ret = gpiochip_remove(&pca->gpio_chip);
++	if (unlikely(ret))
++		dev_err(&client->dev, "%s failed, %d\n",
++				"gpiochip_remove()", ret);
++
++	sysfs_remove_file(&client->dev.kobj, &dev_attr_pwm_period.attr);
++
++	ret = pwmchip_remove(&pca->pwm_chip);
++	if (unlikely(ret))
++		dev_err(&client->dev, "%s failed, %d\n",
++				"pwmchip_remove()", ret);
++
++	mutex_destroy(&pca->lock);
++
++	return ret;
++}
++
++static const struct i2c_device_id pca9685_id[] = {
++	{ "pca9685", 0 },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(i2c, pca9685_id);
++
++static struct i2c_driver pca9685_i2c_driver = {
++	.driver = {
++		.name  = "mfd-pca9685",
++		.owner = THIS_MODULE,
++	},
++	.probe     = pca9685_probe,
++	.remove    = pca9685_remove,
++	.id_table  = pca9685_id,
++};
++
++static int __init pca9685_init(void)
++{
++	if (unlikely((pwm_period < PWM_PERIOD_MIN) ||
++		     (PWM_PERIOD_MAX < pwm_period))) {
++		pr_err("Invalid PWM period specified (valid range: %d-%d)\n",
++		       PWM_PERIOD_MIN, PWM_PERIOD_MAX);
++		return -EINVAL;
++	}
++
++	return i2c_add_driver(&pca9685_i2c_driver);
++}
++/* register after i2c postcore initcall */
++subsys_initcall(pca9685_init);
++
++static void __exit pca9685_exit(void)
++{
++	i2c_del_driver(&pca9685_i2c_driver);
++}
++module_exit(pca9685_exit);
++
++MODULE_AUTHOR("Wojciech Ziemba <wojciech.ziemba@emutex.com>");
++MODULE_DESCRIPTION("NPX Semiconductors PCA9685 (PWM/GPIO) driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/pca9685-gpio.c b/drivers/mfd/pca9685-gpio.c
+new file mode 100644
+index 0000000..7cfff86
+--- /dev/null
++++ b/drivers/mfd/pca9685-gpio.c
+@@ -0,0 +1,108 @@
++/*
++ * Driver for NPX PCA9685 I2C-bus PWM controller with GPIO output interface
++ * support.
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * The I2C-bus LED controller provides 16-channel, 12-bit PWM Fm+.
++ * Additionally, the driver allows the channels to be configured as GPIO
++ * interface (output only).
++ */
++
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/gpio.h>
++#include <linux/pwm.h>
++#include <linux/regmap.h>
++
++#include "pca9685.h"
++
++static inline struct pca9685 *gpio_to_pca(struct gpio_chip *gpio_chip)
++{
++	return container_of(gpio_chip, struct pca9685, gpio_chip);
++}
++
++static inline int is_gpio_allowed(const struct pca9685 *pca, unsigned channel)
++{
++	return pca->chan_mapping[channel] & PWM_CH_GPIO;
++}
++
++int pca9685_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	struct pca9685 *pca;
++	struct pwm_device *pwm;
++	int ret = 0;
++	pca = gpio_to_pca(chip);
++
++	/* validate channel constrains */
++	if (!is_gpio_allowed(pca, offset))
++		return -ENODEV;
++
++	/* return busy if channel is already allocated for pwm */
++	pwm = &pca->pwm_chip.pwms[offset];
++	if (test_bit(PWMF_REQUESTED, &pwm->flags))
++		return -EBUSY;
++
++	/* clear the on counter */
++	regmap_write(pca->regmap, LED_N_ON_L(offset), 0x0);
++	regmap_write(pca->regmap, LED_N_ON_H(offset), 0x0);
++
++	/* clear the off counter */
++	regmap_write(pca->regmap, LED_N_OFF_L(offset), 0x0);
++	ret = regmap_write(pca->regmap, LED_N_OFF_H(offset), 0x0);
++
++	clear_sleep_bit(pca);
++
++	return ret;
++}
++
++void pca9685_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	struct pca9685 *pca;
++
++	pca = gpio_to_pca(chip);
++
++	/* clear the on counter reg */
++	regmap_write(pca->regmap, LED_N_ON_L(offset), 0x0);
++	regmap_write(pca->regmap, LED_N_ON_H(offset), 0x0);
++
++	set_sleep_bit(pca);
++
++	return;
++}
++
++void pca9685_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct pca9685 *pca;
++
++	pca = gpio_to_pca(chip);
++
++	/* set the full-on bit */
++	regmap_write(pca->regmap,  LED_N_ON_H(offset), (value << 4) & LED_FULL);
++
++	return;
++}
++
++int pca9685_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	struct pca9685 *pca;
++	unsigned int val;
++
++	pca = gpio_to_pca(chip);
++
++	/* read the full-on bit */
++	regmap_read(pca->regmap, LED_N_ON_H(offset), &val);
++
++	return !!val;
++}
++
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/pca9685-pwm.c b/drivers/mfd/pca9685-pwm.c
+new file mode 100644
+index 0000000..13f82b8
+--- /dev/null
++++ b/drivers/mfd/pca9685-pwm.c
+@@ -0,0 +1,262 @@
++/*
++ * Driver for NPX PCA9685 I2C-bus PWM controller with GPIO output interface
++ * support.
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * The I2C-bus LED controller provides 16-channel, 12-bit PWM Fm+.
++ * Additionally, the driver allows the channels to be configured as GPIO
++ * interface (output only).
++ */
++
++#include <linux/module.h>
++#include <linux/pwm.h>
++#include <linux/gpio.h>
++#include <linux/regmap.h>
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++
++#include "pca9685.h"
++
++static inline struct pca9685 *pwm_to_pca(struct pwm_chip *pwm_chip)
++{
++	return container_of(pwm_chip, struct pca9685, pwm_chip);
++}
++
++static inline int period_ns_to_prescale(unsigned period_ns)
++{
++	return (DIV_ROUND_CLOSEST(OSC_CLK_MHZ * period_ns,
++			SAMPLE_RES * 1000)) - 1;
++}
++
++static inline int is_pwm_allowed(const struct pca9685 *pca, unsigned channel)
++{
++	return pca->chan_mapping[channel] & PWM_CH_PWM;
++}
++
++int pca9685_update_prescale(struct pca9685 *pca, unsigned period_ns,
++			    bool reconfigure_channels)
++{
++	int pre_scale, i;
++	struct pwm_device *pwm;
++	unsigned long long duty_scale;
++	unsigned long long new_duty_ns;
++
++	if (unlikely((period_ns < PWM_PERIOD_MIN) ||
++		     (PWM_PERIOD_MAX < period_ns))) {
++		pr_err("Invalid PWM period specified (valid range: %d-%d)\n",
++		       PWM_PERIOD_MIN, PWM_PERIOD_MAX);
++		return -EINVAL;
++	}
++
++	mutex_lock(&pca->lock);
++
++	/* update pre_scale to the closest period */
++	pre_scale = period_ns_to_prescale(period_ns);
++	/* ensure sleep-mode bit is set
++	 * NOTE: All active channels will switch off for at least 500 usecs
++	 */
++	regmap_update_bits(pca->regmap, PCA9685_MODE1,
++			   MODE1_SLEEP, MODE1_SLEEP);
++	regmap_write(pca->regmap, PCA9685_PRESCALE, pre_scale);
++	/* clear sleep mode flag if at least 1 channel is active */
++	if (pca->active_cnt > 0) {
++		regmap_update_bits(pca->regmap, PCA9685_MODE1,
++				   MODE1_SLEEP, 0x0);
++		usleep_range(MODE1_RESTART_DELAY, MODE1_RESTART_DELAY * 2);
++		regmap_update_bits(pca->regmap, PCA9685_MODE1,
++				   MODE1_RESTART, MODE1_RESTART);
++	}
++
++	if (reconfigure_channels) {
++		for (i = 0; i < pca->pwm_chip.npwm; i++) {
++			pwm = &pca->pwm_chip.pwms[i];
++			pwm->period = period_ns;
++			if (pwm->duty_cycle > 0) {
++				/* Scale the rise time to maintain duty cycle */
++				duty_scale = period_ns;
++				duty_scale *= 1000000;
++				do_div(duty_scale, pca->pwm_period);
++				new_duty_ns = duty_scale * pwm->duty_cycle;
++				do_div(new_duty_ns, 1000000);
++				/* Update the duty_cycle */
++				pwm_config(pwm, (int)new_duty_ns, pwm->period);
++			}
++		}
++	}
++	pca->pwm_period = period_ns;
++
++	mutex_unlock(&pca->lock);
++	return 0;
++}
++
++int pca9685_init_pwm_regs(struct pca9685 *pca, unsigned period_ns)
++{
++	int ret, chan;
++
++	/* set MODE1_SLEEP */
++	ret = regmap_update_bits(pca->regmap, PCA9685_MODE1,
++					MODE1_SLEEP, MODE1_SLEEP);
++	if (unlikely(ret < 0))
++		return ret;
++
++	/* configure the initial PWM clock period */
++	ret = pca9685_update_prescale(pca, period_ns, false);
++	if (unlikely(ret < 0))
++		return ret;
++
++	/* reset PWM channel registers to power-on default values */
++	for (chan = 0; chan < PCA9685_MAXCHAN; chan++) {
++		ret = regmap_write(pca->regmap, LED_N_ON_L(chan), 0);
++		if (unlikely(ret < 0))
++			return ret;
++		ret = regmap_write(pca->regmap, LED_N_ON_H(chan), 0);
++		if (unlikely(ret < 0))
++			return ret;
++		ret = regmap_write(pca->regmap, LED_N_OFF_L(chan), 0);
++		if (unlikely(ret < 0))
++			return ret;
++		ret = regmap_write(pca->regmap, LED_N_OFF_H(chan), LED_FULL);
++		if (unlikely(ret < 0))
++			return ret;
++	}
++	/* reset ALL_LED registers to power-on default values */
++	ret = regmap_write(pca->regmap, PCA9685_ALL_LED_ON_L, 0);
++	if (unlikely(ret < 0))
++		return ret;
++	ret = regmap_write(pca->regmap, PCA9685_ALL_LED_ON_H, 0);
++	if (unlikely(ret < 0))
++		return ret;
++	ret = regmap_write(pca->regmap, PCA9685_ALL_LED_OFF_L, 0);
++	if (unlikely(ret < 0))
++		return ret;
++	ret = regmap_write(pca->regmap, PCA9685_ALL_LED_OFF_H, LED_FULL);
++	if (unlikely(ret < 0))
++		return ret;
++
++	return ret;
++}
++
++static int pca9685_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++				int duty_ns, int period_ns)
++{
++	struct pca9685 *pca = pwm_to_pca(chip);
++	unsigned long long duty;
++	unsigned int	reg_on_h,
++			reg_off_l,
++			reg_off_h;
++	int full_off;
++
++	/* Changing PWM period for a single channel at run-time not allowed.
++	 * The PCA9685 PWM clock is shared across all PWM channels
++	 */
++	if (unlikely(period_ns != pwm->period))
++		return -EPERM;
++
++	if (unlikely(pwm->hwpwm >= PCA9685_MAXCHAN)) {
++		reg_on_h  = PCA9685_ALL_LED_ON_H;
++		reg_off_l = PCA9685_ALL_LED_OFF_L;
++		reg_off_h = PCA9685_ALL_LED_OFF_H;
++	} else {
++		reg_on_h  = LED_N_ON_H(pwm->hwpwm);
++		reg_off_l = LED_N_OFF_L(pwm->hwpwm);
++		reg_off_h = LED_N_OFF_H(pwm->hwpwm);
++	}
++
++	duty = SAMPLE_RES * (unsigned long long)duty_ns;
++	duty = DIV_ROUND_UP_ULL(duty, period_ns);
++
++	if (duty >= SAMPLE_RES) /* set the LED_FULL bit */
++		return regmap_write(pca->regmap, reg_on_h, LED_FULL);
++	else /* clear the LED_FULL bit */
++		regmap_write(pca->regmap, reg_on_h, 0x00);
++
++	full_off = !test_bit(PWMF_ENABLED, &pwm->flags) << 4;
++
++	regmap_write(pca->regmap, reg_off_l, (int)duty & 0xff);
++
++	return regmap_write(pca->regmap, reg_off_h,
++			((int)duty >> 8 | full_off) & 0x1f);
++}
++
++static int pca9685_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct pca9685 *pca = pwm_to_pca(chip);
++	int ret;
++
++	unsigned int reg_off_h;
++
++	if (unlikely(pwm->hwpwm >= PCA9685_MAXCHAN))
++		reg_off_h = PCA9685_ALL_LED_OFF_H;
++	else
++		reg_off_h = LED_N_OFF_H(pwm->hwpwm);
++
++	/* clear the full-off bit */
++	ret = regmap_update_bits(pca->regmap, reg_off_h, LED_FULL, 0x0);
++
++	clear_sleep_bit(pca);
++
++	return ret;
++}
++
++static void pca9685_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct pca9685 *pca = pwm_to_pca(chip);
++
++	unsigned int reg_off_h;
++
++	if (unlikely(pwm->hwpwm >= PCA9685_MAXCHAN))
++		reg_off_h = PCA9685_ALL_LED_OFF_H;
++	else
++		reg_off_h = LED_N_OFF_H(pwm->hwpwm);
++
++	/* set the LED_OFF counter. */
++	regmap_update_bits(pca->regmap, reg_off_h, LED_FULL, LED_FULL);
++
++	set_sleep_bit(pca);
++
++	return;
++}
++
++static int pca9685_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct pca9685 *pca;
++	struct gpio_chip *gpio_chip;
++	unsigned channel = pwm->hwpwm;
++
++	pca = pwm_to_pca(chip);
++
++	/* validate channel constrains */
++	if (!is_pwm_allowed(pca, channel))
++		return -ENODEV;
++
++	/* return busy if channel is already allocated for gpio */
++	gpio_chip = &pca->gpio_chip;
++
++	if ((channel < PCA9685_MAXCHAN) &&
++		(gpiochip_is_requested(gpio_chip, channel)))
++			return -EBUSY;
++
++	pwm->period = pca->pwm_period;
++
++	return 0;
++}
++
++const struct pwm_ops pca9685_pwm_ops = {
++	.enable  = pca9685_pwm_enable,
++	.disable = pca9685_pwm_disable,
++	.config  = pca9685_pwm_config,
++	.request = pca9685_pwm_request,
++	.owner   = THIS_MODULE,
++};
++
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/pca9685.h b/drivers/mfd/pca9685.h
+new file mode 100644
+index 0000000..3627097
+--- /dev/null
++++ b/drivers/mfd/pca9685.h
+@@ -0,0 +1,110 @@
++/*
++ * Driver for NPX PCA9685 I2C-bus PWM controller with GPIO output interface
++ * support.
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * The I2C-bus LED controller provides 16-channel, 12-bit PWM Fm+.
++ * Additionally, the driver allows the channels to be configured as GPIO
++ * interface (output only).
++ */
++
++#ifndef __LINUX_MFD_PCA9685_H
++#define __LINUX_MFD_PCA9685_H
++
++#include <linux/mutex.h>
++#include <linux/gpio.h>
++#include <linux/pwm.h>
++#include <linux/platform_data/pca9685.h>
++
++#define PCA9685_MODE1		0x00
++#define PCA9685_MODE2		0x01
++#define PCA9685_SUBADDR1	0x02
++#define PCA9685_SUBADDR2	0x03
++#define PCA9685_SUBADDR3	0x04
++#define PCA9685_LEDX_ON_L	0x06
++#define PCA9685_LEDX_ON_H	0x07
++#define PCA9685_LEDX_OFF_L	0x08
++#define PCA9685_LEDX_OFF_H	0x09
++
++#define PCA9685_ALL_LED_ON_L	0xFA
++#define PCA9685_ALL_LED_ON_H	0xFB
++#define PCA9685_ALL_LED_OFF_L	0xFC
++#define PCA9685_ALL_LED_OFF_H	0xFD
++#define PCA9685_PRESCALE	0xFE
++
++#define PCA9685_NUMREGS		0xFF
++
++#define LED_FULL		(1 << 4)
++#define MODE1_SLEEP		(1 << 4)
++#define MODE1_RESTART		(1 << 7)
++
++#define MODE1_RESTART_DELAY	500
++
++#define LED_N_ON_H(N)	(PCA9685_LEDX_ON_H +  (4 * (N)))
++#define LED_N_ON_L(N)	(PCA9685_LEDX_ON_L +  (4 * (N)))
++#define LED_N_OFF_H(N)	(PCA9685_LEDX_OFF_H + (4 * (N)))
++#define LED_N_OFF_L(N)	(PCA9685_LEDX_OFF_L + (4 * (N)))
++
++#define OSC_CLK_MHZ		      25 /* 25 MHz */
++#define SAMPLE_RES		    4096 /* 12 bits */
++#define PWM_PERIOD_MIN		  666666 /* ~1525 Hz */
++#define PWM_PERIOD_MAX		41666666 /* 24 Hz */
++#define PWM_PERIOD_DEF		 5000000 /* default 200 Hz */
++
++struct pca9685 {
++	struct gpio_chip	gpio_chip;
++	struct pwm_chip		pwm_chip;
++	struct regmap		*regmap;
++	struct mutex		lock; /* mutual exclusion semaphore */
++	/* Array of channel allocation constrains */
++	/* add an extra channel for ALL_LED */
++	u8	chan_mapping[PCA9685_MAXCHAN + 1];
++	int	gpio_base;
++	int	active_cnt;
++	int	pwm_exported_cnt;
++	int	pwm_period;
++};
++
++extern const struct pwm_ops pca9685_pwm_ops;
++
++int  pca9685_gpio_request(struct gpio_chip *chip, unsigned offset);
++void pca9685_gpio_free(struct gpio_chip *chip, unsigned offset);
++void pca9685_gpio_set(struct gpio_chip *chip, unsigned offset, int value);
++int  pca9685_gpio_get(struct gpio_chip *chip, unsigned offset);
++
++int pca9685_init_pwm_regs(struct pca9685 *pca, unsigned period_ns);
++int pca9685_update_prescale(struct pca9685 *pca, unsigned period_ns,
++			    bool reconfigure_channels);
++
++static inline void set_sleep_bit(struct pca9685 *pca)
++{
++	mutex_lock(&pca->lock);
++	/* set sleep mode flag if no more active LED channel*/
++	if (--pca->active_cnt == 0)
++		regmap_update_bits(pca->regmap, PCA9685_MODE1, MODE1_SLEEP,
++				MODE1_SLEEP);
++	mutex_unlock(&pca->lock);
++}
++
++static inline void clear_sleep_bit(struct pca9685 *pca)
++{
++	mutex_lock(&pca->lock);
++	/* clear sleep mode flag if at least 1 LED channel is active */
++	if (pca->active_cnt++ == 0)
++		regmap_update_bits(pca->regmap, PCA9685_MODE1,
++				MODE1_SLEEP, 0x0);
++
++	mutex_unlock(&pca->lock);
++}
++
++#endif	/* __LINUX_MFD_PCA9685_H */
+diff --git a/include/linux/mfd/cy8c9540a.h b/include/linux/mfd/cy8c9540a.h
+new file mode 100644
+index 0000000..4d79825
+--- /dev/null
++++ b/include/linux/mfd/cy8c9540a.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#ifndef LINUX_CY8C9540A_PDATA_H
++#define LINUX_CY8C9540A_PDATA_H
++
++#include <linux/types.h>
++
++#define CY8C9540A_POR_SETTINGS_LEN		147
++#define CY8C9540A_NPWM				8
++#define CY8C9540A_PWM_UNUSED			-1
++
++struct cy8c9540a_pdata {
++	u8 por_default[CY8C9540A_POR_SETTINGS_LEN];
++	int pwm2gpio_mapping[CY8C9540A_NPWM];
++	int gpio_base;
++	int pwm_base;
++	int irq_base;
++};
++
++#endif
+diff --git a/include/linux/mfd/intel_qrk_gip_pdata.h b/include/linux/mfd/intel_qrk_gip_pdata.h
+new file mode 100644
+index 0000000..eab17d9
+--- /dev/null
++++ b/include/linux/mfd/intel_qrk_gip_pdata.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#ifndef LINUX_INTEL_QRK_GIP_DATA_H
++#define LINUX_INTEL_QRK_GIP_DATA_H
++
++struct pci_dev;
++
++struct intel_qrk_gip_pdata {
++	int		i2c_std_mode;
++};
++
++extern struct intel_qrk_gip_pdata *(*intel_qrk_gip_get_pdata)(void);
++
++#endif
+diff --git a/include/linux/platform_data/pca9685.h b/include/linux/platform_data/pca9685.h
+new file mode 100644
+index 0000000..903d30d
+--- /dev/null
++++ b/include/linux/platform_data/pca9685.h
+@@ -0,0 +1,51 @@
++/*
++ * Platform data for pca9685 driver
++ *
++ * Copyright(c) 2013 Intel Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#ifndef _PLAT_PCA9685_H_
++#define _PLAT_PCA9685_H_
++
++#define PCA9685_MAXCHAN	16
++#define MODE2_INVRT	(1 << 4)
++#define MODE2_OUTDRV	(1 << 2)
++
++/* PWM channel allocation flags */
++enum {
++	PWM_CH_DISABLED  = 0,
++	PWM_CH_PWM       = 1 << 0,
++	PWM_CH_GPIO      = 1 << 1,
++	/* allow PWM or GPIO */
++	PWM_CH_UNDEFINED = PWM_CH_PWM | PWM_CH_GPIO,
++};
++
++/**
++ * struct pca9685_pdata - Platform data for pca9685 driver
++ * @chan_mapping: Array of channel allocation constrains
++ * @gpio_base: GPIO base
++ * mode2_flags: mode2 register modification flags: INVRT and OUTDRV
++ **/
++struct pca9685_pdata {
++	/* Array of channel allocation constrains */
++	/* add an extra channel for ALL_LED */
++	u8	chan_mapping[PCA9685_MAXCHAN + 1];
++	/* GPIO base */
++	int	gpio_base;
++	/* mode2 flags */
++	u8	en_invrt:1,   /* enable output logic state inverted mode */
++		en_open_dr:1, /* enable if outputs are configured with an
++						 open-drain structure */
++		unused:6;
++};
++
++#endif /* _PLAT_PCA9685_H_ */

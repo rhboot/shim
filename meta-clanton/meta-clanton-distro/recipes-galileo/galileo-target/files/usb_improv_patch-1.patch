@@ -1,0 +1,130 @@
+diff --git c/clloader.c w/clloader.c
+index e5fae6e..2e61e6e 100644
+--- c/clloader.c
++++ w/clloader.c
+@@ -360,7 +360,6 @@ main(int argc, char *argv[])
+ 	unsigned int startup_delay=0;
+ 
+ 	Rxtimeout = 100;
+-	setbuf(stderr, NULL);
+ 	if ((cp=getenv("SHELL")) && (strstr(cp, "rsh") || strstr(cp, "rksh")
+ 		|| strstr(cp,"rbash") || strstr(cp, "rshell")))
+ 		under_rsh=TRUE;
+@@ -593,6 +592,8 @@ main(int argc, char *argv[])
+ 	if (Restricted && allow_remote_commands) {
+ 		allow_remote_commands=FALSE;
+ 	}
++	if (Verbose == 0)
++		setbuf(stderr, NULL);
+ 	if (Fromcu && !Quiet) {
+ 		if (Verbose == 0)
+ 			Verbose = 2;
+@@ -2568,10 +2569,13 @@ int clantonLoaderFSM(int argc, char * argv[])
+ 	char rbuf_from_host[BUFFER_SIZE];
+ 	fd_set fdrset;
+ 	unsigned int err = 0;
+-	int ret = 0;
++	int ret, ioctl_rc, rd_bytes = 0;
+ 	struct timeval tv;
+ 	int rxErrorCode;
+ 	extern int errno;
++        int fgs_in ;
++        int fgs_out ;
++        int maxfd;
+ 
+ 	/* Initalise state */
+ 	mystate.fsm_state = FSM_STATE_PASSTHROUGH_INIT;
+@@ -2579,10 +2583,23 @@ int clantonLoaderFSM(int argc, char * argv[])
+ 	clantonLeavePassThroughState=0;
+ 
+ 	/* Open /dev/ttyGS0 */
+-	mystate.tty_to_host = 1; /* This program is started with stdio redirect to /dev/ttyGS0 */
+-	mystate.tty_from_host = 0; /* This program is started with stdio redirect to /dev/ttyGS0 */
+-
++        fgs_in = open("/dev/ttyGS0", O_RDONLY);
++        fgs_out = open("/dev/ttyGS0",O_WRONLY );
++	if (fgs_in  == -1 )
++		fprintf(stderr, "Unable to open /dev/ttyGS0 as input") ;
++	else
++		fprintf(stderr, "Opened /dev/ttyGS0 as input") ;
++
++	if (fgs_out == -1 )
++		fprintf(stderr, "Unable to open /dev/ttyGS0 as output") ;
++	else
++		fprintf(stderr, "Opened /dev/ttyGS0 as output") ;
++
++	if (!fgs_in || !fgs_out)
++		return ERROR ;
+ 
++	mystate.tty_to_host = fgs_out;   /* This program is started with stdio redirect to /dev/ttyGS0 */
++	mystate.tty_from_host = fgs_in;    /* This program is started with stdio redirect to /dev/ttyGS0 */
+ 
+ 	while (1){
+ 		switch(mystate.fsm_state){
+@@ -2615,10 +2632,9 @@ int clantonLoaderFSM(int argc, char * argv[])
+ 
+ 					/* Child do execvp() */
+ 					slave_args[0] = CLANTON_SKETCHPROGRAM;    /* Name of process */
+-					slave_args[1] = slavename;		  /* Serial.write => ttyS0 */	
+-					slave_args[2] = "/dev/ttyS0";		  /* Serial1.write => ttyGS0 */
+-					slave_args[3] = NULL;
+-					fprintf(stderr, "Starting %s %s %s\n",slave_args[0],slave_args[1],slave_args[2] );
++					slave_args[1] = slavename;		  /* Serial.write => ttyGS0 */
++					slave_args[2] = NULL;
++					fprintf(stderr, "Starting %s %s %s\n", slave_args[0], slave_args[1]);
+ 					if ( execvp(slave_args[0], slave_args) < 0){
+ 						fprintf(stderr, "unable to exevp - may not exist%s %s\n", slave_args[0], slave_args[1]);
+ 						return -1;
+@@ -2641,14 +2657,30 @@ int clantonLoaderFSM(int argc, char * argv[])
+ 
+ 			/* Add elements */
+ 			FD_SET(mystate.tty_slave, &fdrset);
+-			FD_SET(mystate.tty_from_host, &fdrset);
++
++			if (mystate.tty_from_host != -1 ) {
++				FD_SET(mystate.tty_from_host, &fdrset);
++			} else  {
++                        	mystate.tty_from_host = open("/dev/ttyGS0", O_RDONLY);
++				if (mystate.tty_from_host   == -1 )
++					fprintf(stderr, "Unable to Reopen /dev/ttyGS0 as input\n") ;
++
++				else  {
++					fprintf( stderr, "Reopened OK  /dev/ttyGS0 as input fd= %d \n", mystate.tty_from_host) ;
++					FD_SET(mystate.tty_from_host, &fdrset);
++				}
++			}
+
+ 			/* Set a one second timeout */
+ 			tv.tv_usec = 0;
+ 			tv.tv_sec = 1;
++                        if (mystate.tty_slave  > mystate.tty_from_host )
++				maxfd = mystate.tty_slave  + 1  ;
++			else
++				maxfd = mystate.tty_from_host   + 1  ;
+
+ 			/* Select on the FD set */
+-			ret = select(mystate.tty_slave+1, &fdrset, 0, 0, &tv);
++			ret = select(maxfd, &fdrset, 0, 0, &tv);
+
+ 			/* Receive bytes */
+ 			switch(ret){
+@@ -2681,12 +2713,14 @@ int clantonLoaderFSM(int argc, char * argv[])
+ 				if(FD_ISSET(mystate.tty_from_host, &fdrset)){
+
+ 					memset(rbuf_from_host, 0x00, sizeof(rbuf_from_host));
++				        ioctl_rc = ioctl(mystate.tty_from_host,FIONREAD, &rd_bytes);
+ 					ret = read(mystate.tty_from_host, rbuf_from_host, sizeof(rbuf_from_host));
+-					if(ret < 0){
+-						if((ret =! EAGAIN) && (ret != EWOULDBLOCK)){
+-							/* TODO: Critical - exit out */
+-							(void)err;
+-						}
++
++					if (ret < 1  &&  -1 == ioctl_rc ) {
++						// cable is probably gone here so just close the file it will reopen back at top
++						ret = close(mystate.tty_from_host);
++						fprintf(stderr, "Bad connection to host  %d bytes available, ioctl return is %d\n",rd_bytes, ioctl_rc) ;
++						mystate.tty_from_host = -1 ;
+ 					}else{
+ 						/* TODO: bring out state change of BAUD/LINE and replace magic string */
+ 						if (strncmp(CL_LOADER_CMD_HOST_START_DOWNLOAD_CMD,

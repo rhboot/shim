@@ -1,0 +1,104 @@
+/*++
+
+Copyright (c) 2013 Intel Corporation.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+* Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in
+the documentation and/or other materials provided with the
+distribution.
+* Neither the name of Intel Corporation nor the names of its
+contributors may be used to endorse or promote products derived
+from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Module Name:
+
+  Facs.aslc
+
+
+Abstract:
+
+  This file contains the FACS structure definition.
+
+--*/
+
+//
+// Statements that include other files
+//
+#include "Facs.h"
+
+EFI_ACPI_2_0_FIRMWARE_ACPI_CONTROL_STRUCTURE FACS = {
+  EFI_ACPI_2_0_FIRMWARE_ACPI_CONTROL_STRUCTURE_SIGNATURE,
+  sizeof (EFI_ACPI_2_0_FIRMWARE_ACPI_CONTROL_STRUCTURE),
+
+  //
+  // Hardware Signature will be updated at runtime
+  //
+  0x00000000,
+  EFI_ACPI_FIRMWARE_WAKING_VECTOR,
+  EFI_ACPI_GLOBAL_LOCK,
+  EFI_ACPI_FIRMWARE_CONTROL_STRUCTURE_FLAGS,
+  EFI_ACPI_X_FIRMWARE_WAKING_VECTOR,
+  EFI_ACPI_2_0_FIRMWARE_ACPI_CONTROL_STRUCTURE_VERSION,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+  EFI_ACPI_RESERVED_BYTE,
+};
+
+VOID*
+ReferenceAcpiTable (
+  VOID
+  )
+
+{
+  //
+  // Reference the table being generated to prevent the optimizer from removing the
+  // data structure from the exeutable
+  //
+  return (VOID*)&FACS;
+}

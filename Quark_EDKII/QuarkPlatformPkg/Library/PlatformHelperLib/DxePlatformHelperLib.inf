@@ -1,0 +1,111 @@
+#/*++
+#
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# 
+#  Module Name:
+#
+#    DxePlatformHelperLib.inf
+#
+#  Abstract:
+#
+#    Library producing helper routines for this platform.
+#
+#--*/
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = DxePlatformHelperLib
+  FILE_GUID                      = 02805010-2591-4ed3-827B-A218F34AE0D7
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = PlatformHelperLib|DXE_DRIVER DXE_RUNTIME_DRIVER DXE_SAL_DRIVER SMM_CORE DXE_SMM_DRIVER UEFI_APPLICATION UEFI_DRIVER
+
+#
+# The following information is for reference only and not required by the build tools.
+#
+#  VALID_ARCHITECTURES           = IA32
+#
+
+[Sources]
+  PlatformHelperLib.c
+  PlatformHelperDxe.c
+  Crc32.c
+  PlatformSecureBoot.c
+  PlatformLeds.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  QuarkSocPkg/QuarkSocPkg.dec
+  QuarkPlatformPkg/QuarkPlatformPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  PcdLib
+  BaseMemoryLib
+  SerialPortLib
+  S3BootScriptLib
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  DxeServicesLib
+  HobLib
+  PlatformDataLib
+  IntelQNCLib
+
+[Protocols]
+  gEfiPlatformTypeProtocolGuid
+  gEfiSpiProtocolGuid
+  gEfiSmmSpiProtocolGuid
+  gSecureBootHelperProtocolGuid
+  gEfiSmmBase2ProtocolGuid
+  gEfiI2CHcProtocolGuid
+
+[Guids]
+  gEfiGlobalVariableGuid
+  gEfiImageSecurityDatabaseGuid
+  gEfiQuarkCapsuleGuid
+  gQuarkVariableLockGuid
+
+[FeaturePcd]
+  gQuarkPlatformTokenSpaceGuid.PcdEnableSecureLock
+  gQuarkPlatformTokenSpaceGuid.PcdSupportSecureBoot
+
+[FixedPcd]
+  gQuarkPlatformTokenSpaceGuid.PcdFlashNvStorageBase
+  gQuarkPlatformTokenSpaceGuid.PcdFlashNvStorageSize
+  gQuarkPlatformTokenSpaceGuid.PcdPlatformDataBaseAddress
+  gQuarkPlatformTokenSpaceGuid.PcdPlatformDataMaxLen
+  gQuarkPlatformTokenSpaceGuid.PcdFlashFvFixedStage1AreaBase
+  gQuarkPlatformTokenSpaceGuid.PcdFlashFvFixedStage1AreaSize
+  gQuarkPlatformTokenSpaceGuid.PcdFlashAreaBaseAddress
+
+[Pcd]
+  gQuarkPlatformTokenSpaceGuid.PcdPkX509File
+  gQuarkPlatformTokenSpaceGuid.PcdKekX509File
+  gQuarkPlatformTokenSpaceGuid.PcdKekRsa2048File

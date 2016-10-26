@@ -1,0 +1,39 @@
+From 1b1a122b192687355cb18cd16b5e8f053a57f9b4 Mon Sep 17 00:00:00 2001
+From: Bryan O'Donoghue <bryan.odonoghue@linux.intel.com>
+Date: Thu, 4 Oct 2012 09:55:22 +0100
+Subject: [PATCH] stmmac.c updated to align with kernel registers being
+ reported in Clanton's version of this driver
+
+---
+ stmmac.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/stmmac.c b/stmmac.c
+index fb69bfe..3d79054 100644
+--- a/stmmac.c
++++ b/stmmac.c
+@@ -52,11 +52,20 @@ int st_gmac_dump_regs(struct ethtool_drvinfo *info, struct ethtool_regs *regs)
+ 	int i;
+ 	unsigned int *stmmac_reg = (unsigned int *)regs->data;
+ 
+-	fprintf(stdout, "ST GMAC Registers\n");
++	fprintf(stdout, "ST GMAC Registers - Clanton SOC extended\n");
+ 	fprintf(stdout, "GMAC Registers\n");
+ 	for (i = 0; i < 55; i++)
+ 		fprintf(stdout, "Reg%d  0x%08X\n", i, *stmmac_reg++);
+ 
++	/* VLAN extended registers 355 & 354 */
++	for(i = 353; i < 355; i++)
++		fprintf(stdout, "Reg%d 0x%08x\n", i, *stmmac_reg++);
++
++	/* 1588 extended registers 448 - 461 */
++	for(i = 448; i < 462; i++)
++		fprintf(stdout, "Reg%d 0x%08x\n", i, *stmmac_reg++);
++
++	/* DMA Regs */	
+ 	fprintf(stdout, "\n");
+ 	fprintf(stdout, "DMA Registers\n");
+ 	for (i = 0; i < 22; i++)
+-- 
+1.8.2
+

@@ -1,0 +1,55 @@
+diff --git i/gas/config/tc-i386.c w/gas/config/tc-i386.c
+index 60ff4cb..11f8384 100644
+--- i/gas/config/tc-i386.c
++++ w/gas/config/tc-i386.c
+@@ -449,6 +449,8 @@ static int allow_naked_reg = 0;
+ /* 1 if pseudo index register, eiz/riz, is allowed .  */
+ static int allow_index_reg = 0;
+ 
++static int fix_quark_lock = 0;
++
+ static enum
+   {
+     sse_check_none = 0,
+@@ -6231,6 +6233,14 @@ output_insn (void)
+       unsigned int j;
+       unsigned int prefix;
+ 
++      /* Workaround for a Quark errata.  */
++      if (fix_quark_lock)
++       {
++         if (i.tm.base_opcode == 240 /* lock */)
++             return;
++         i.prefix[LOCK_PREFIX] = 0;
++       }
++
+       /* Since the VEX prefix contains the implicit prefix, we don't
+ 	 need the explicit prefix.  */
+       if (!i.tm.opcode_modifier.vex)
+@@ -8411,6 +8421,7 @@ const char *md_shortopts = "qn";
+ #define OPTION_MSSE_CHECK (OPTION_MD_BASE + 11)
+ #define OPTION_MAVXSCALAR (OPTION_MD_BASE + 12)
+ #define OPTION_X32 (OPTION_MD_BASE + 13)
++#define OPTION_FIX_QUARK_LOCK (OPTION_MD_BASE + 14)
+ 
+ struct option md_longopts[] =
+ {
+@@ -8433,6 +8444,7 @@ struct option md_longopts[] =
+   {"msse2avx", no_argument, NULL, OPTION_MSSE2AVX},
+   {"msse-check", required_argument, NULL, OPTION_MSSE_CHECK},
+   {"mavxscalar", required_argument, NULL, OPTION_MAVXSCALAR},
++  {"mfix-quark-lock", no_argument, NULL, OPTION_FIX_QUARK_LOCK},
+   {NULL, no_argument, NULL, 0}
+ };
+ size_t md_longopts_size = sizeof (md_longopts);
+@@ -8679,6 +8691,10 @@ md_parse_option (int c, char *arg)
+ 	as_fatal (_("invalid -mavxscalar= option: `%s'"), arg);
+       break;
+ 
++    case OPTION_FIX_QUARK_LOCK:
++      fix_quark_lock = 1;
++      break;
++
+     default:
+       return 0;
+     }

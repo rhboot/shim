@@ -1,0 +1,1312 @@
+## @file
+# FDF file of Clanton Peak CRB platform with 32-bit DXE
+#
+# This package provides QuarkNcSocId platform specific modules.
+# Copyright (c) 2013 Intel Corporation.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+# notice, this list of conditions and the following disclaimer in
+# the documentation and/or other materials provided with the
+# distribution.
+# * Neither the name of Intel Corporation nor the names of its
+# contributors may be used to endorse or promote products derived
+# from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+##
+
+################################################################################
+#
+# FD Section
+# The [FD] Section is made up of the definition statements and a
+# description of what goes into  the Flash Device Image.  Each FD section
+# defines one flash "device" image.  A flash device image may be one of
+# the following: Removable media bootable image (like a boot floppy
+# image,) an Option ROM image (that would be "flashed" into an add-in
+# card,) a System "Flash"  image (that would be burned into a system's
+# flash) or an Update ("Capsule") image that will be used to update and
+# existing system flash.
+#
+################################################################################
+[FD.Quark]
+BaseAddress   = 0xFF800000                   #The base address of the the FLASH Device.
+Size          = 0x800000                     #The size in bytes of the the FLASH Device.
+ErasePolarity = 1
+BlockSize     = 0x1000
+NumBlocks     = 0x800                        #The number of blocks for the FLASH Device.
+
+#
+#Flash location override based on actual flash map
+#
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashAreaBaseAddress = 0xFF800000
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashAreaSize = 0x800000
+
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashNvStorageBase = 0xFFF30000
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashNvStorageSize = 0x20000
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashFvRecovery2Base = 0x80038400
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashFvRecovery2Size = 0x00007000
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashQNCMicrocodeSize = 0x00004000
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashFvMainBase = 0xFFD00400
+SET gQuarkPlatformTokenSpaceGuid.PcdFlashFvMainSize = 0x00120000
+
+################################################################################
+#
+# Following are lists of FD Region layout which correspond to the locations of different
+# images within the flash device.
+#
+# Regions must be defined in ascending order and may not overlap.
+#
+# A Layout Region start with a eight digit hex offset (leading "0x" required) followed by
+# the pipe "|" character, followed by the size of the region, also in hex with the leading
+# "0x" characters. Like:
+# Offset|Size
+# PcdOffsetCName|PcdSizeCName
+# RegionType <FV, DATA, or FILE>
+#
+################################################################################
+
+########################################################
+# Quark EDKII Payload Image.
+########################################################
+0x00400400|0x000F0000
+gQuarkPlatformTokenSpaceGuid.PcdFlashFvPayloadBase|gQuarkPlatformTokenSpaceGuid.PcdFlashFvPayloadSize
+FV = EDKII_PAYLOAD_IMAGE
+
+########################################################
+# Quark EDKII Stage2 Image (Compressed)
+########################################################
+0x00500400|0x00120000
+gQuarkPlatformTokenSpaceGuid.PcdFlashFvMainBase|gQuarkPlatformTokenSpaceGuid.PcdFlashFvMainSize
+FV = EDKII_BOOT_STAGE2_COMPACT
+
+#########################################################
+# Quark EDKII Stage1 Backup Image
+# Quark EDKII Stage1 contains: Stage1 FV + Remote Management Unit Binary
+#########################################################
+0x00680400|0x0003f000
+FV = EDKII_BOOT_STAGE1_IMAGE2
+
+#########################################################
+# Quark EDKII Stage1 Primary Image
+# Quark EDKII Stage1 contains: Stage1 FV + Remote Management Unit Binary
+#########################################################
+0x006C0400|0x0003f000
+FV = EDKII_BOOT_STAGE1_IMAGE1
+
+#########################################################
+# Quark Remote Management Unit Binary
+#########################################################
+0x00700000|0x00008000
+!ifdef QUARK2
+  FILE = QuarkSocPkg/QuarkNorthCluster/Binary/Quark2Microcode/RMU.bin
+!else
+  FILE = QuarkSocPkg/QuarkNorthCluster/Binary/QuarkMicrocode/RMU.bin
+!endif
+
+#########################################################
+# Master Flash Header Data.
+#########################################################
+0x00708000|0x00001000
+DATA = {
+  ## This is the MFH_HEADER struct.
+  # MFH_HEADER.QuarkMFHIdentifier.
+  0x48, 0x46, 0x4D, 0x5F,
+  # MFH_HEADER.Version, MFH_HEADER.RsvdFlags & MFH_HEADER.NextHeaderBlock.
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  # MFH_HEADER.FlashItemCount UINT32 LSB - MSB.
+  0x06, 0x00, 0x00, 0x00,
+  # MFH_HEADER.BootPriorityListCount UINT32 LSB - MSB.
+  0x03, 0x00, 0x00, 0x00,
+  ## This is the BootPriorityList.
+  # 1st                 , 2nd                   , 3rd.
+  0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is Flash Item [0] desc. 4xUINT32 LSB - MSB.
+  # Type                , FlashAddress          , LengthBytes,          ,Reserved.
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF9, 0xFF, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is Flash Item [1] desc. 4xUINT32 LSB - MSB.
+  # Type                , FlashAddress          , LengthBytes,          ,Reserved.
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xEC, 0xFF, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is Flash Item [2] desc. 4xUINT32 LSB - MSB.
+  # Type                , FlashAddress          , LengthBytes,          ,Reserved.
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE8, 0xFF, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is Flash Item [3] desc. 4xUINT32 LSB - MSB.
+  # Type                , FlashAddress          , LengthBytes,          ,Reserved.
+  0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0xFF, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is Flash Item [4] desc. 4xUINT32 LSB - MSB.
+  # Type                , FlashAddress          , LengthBytes,          ,Reserved.
+  0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xFF, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is Flash Item [5] desc. 4xUINT32 LSB - MSB.
+  # Type                , FlashAddress          , LengthBytes,          ,Reserved.
+  0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x99, 0x02, 0x00, 0x01
+}
+
+#########################################################
+# PlatformData Binary, default for standalone is none built-in so user selects.
+#########################################################
+#0x00710000|0x00001000
+#FILE = QuarkPlatformPkg/Binary/PlatformData/svp-platform-data.bin
+#FILE = QuarkPlatformPkg/Binary/PlatformData/kipsbay-platform-data.bin
+#FILE = QuarkPlatformPkg/Binary/PlatformData/crosshill-platform-data.bin
+#FILE = QuarkPlatformPkg/Binary/PlatformData/clantonhill-platform-data.bin
+#FILE = QuarkPlatformPkg/Binary/PlatformData/galileo-platform-data.bin
+#FILE = QuarkPlatformPkg/Binary/PlatformData/galileo-gen2-platform-data.bin
+
+#############################################################################
+# Quark EDKII NVRAM Area
+# Quark EDKII NVRAM Area contains: Variable + FTW Working + FTW Spare
+#############################################################################
+0x00730000|0x0000E000
+gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase|gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize
+#NV_VARIABLE_STORE
+DATA = {
+  ## This is the EFI_FIRMWARE_VOLUME_HEADER
+  # ZeroVector []
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  # FileSystemGuid: gEfiSystemNvDataFvGuid         =
+  #  { 0xFFF12B8D, 0x7696, 0x4C8B, { 0xA9, 0x85, 0x27, 0x47, 0x07, 0x5B, 0x4F, 0x50 }}
+  0x8D, 0x2B, 0xF1, 0xFF, 0x96, 0x76, 0x8B, 0x4C,
+  0xA9, 0x85, 0x27, 0x47, 0x07, 0x5B, 0x4F, 0x50,
+  # FvLength: 0x20000
+  0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+  #Signature "_FVH"       #Attributes
+  0x5f, 0x46, 0x56, 0x48, 0xff, 0xfe, 0x04, 0x00,
+  #HeaderLength #CheckSum #ExtHeaderOffset #Reserved #Revision
+  0x48, 0x00, 0x19, 0xF9, 0x00, 0x00, 0x00, 0x02,
+  #Blockmap[0]: 32 Blocks * 0x1000 Bytes / Block
+  0x20, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00,
+  #Blockmap[1]: End
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  ## This is the VARIABLE_STORE_HEADER
+  !ifdef SECURE_BOOT
+    # Signature: gEfiAuthenticatedVariableGuid = { 0xaaf32c78, 0x947b, 0x439a, { 0xa1, 0x80, 0x2e, 0x14, 0x4e, 0xc3, 0x77, 0x92 } }
+    0x78, 0x2c, 0xf3, 0xaa, 0x7b, 0x94, 0x9a, 0x43,
+    0xa1, 0x80, 0x2e, 0x14, 0x4e, 0xc3, 0x77, 0x92,
+  !else
+    #  Signature: gEfiVariableGuid = { 0xddcf3616, 0x3275, 0x4164, { 0x98, 0xb6, 0xfe, 0x85, 0x70, 0x7f, 0xfe, 0x7d }}
+    0x16, 0x36, 0xcf, 0xdd, 0x75, 0x32, 0x64, 0x41,
+    0x98, 0xb6, 0xfe, 0x85, 0x70, 0x7f, 0xfe, 0x7d,
+  !endif
+  #Size: 0x0E000 (gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize) - 0x48 (size of EFI_FIRMWARE_VOLUME_HEADER) = 0x0DFB8
+  # This can speed up the Variable Dispatch a bit.
+  0xB8, 0xDF, 0x00, 0x00,
+  #FORMATTED: 0x5A #HEALTHY: 0xFE #Reserved: UINT16 #Reserved1: UINT32
+  0x5A, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+}
+
+0x0073E000|0x00002000
+gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase|gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize
+#NV_FTW_WORKING
+DATA = {
+  # EFI_FAULT_TOLERANT_WORKING_BLOCK_HEADER->Signature = gEfiSystemNvDataFvGuid         =
+  #  { 0xFFF12B8D, 0x7696, 0x4C8B, { 0xA9, 0x85, 0x27, 0x47, 0x07, 0x5B, 0x4F, 0x50 }}
+  0x8D, 0x2B, 0xF1, 0xFF, 0x96, 0x76, 0x8B, 0x4C,
+  0xA9, 0x85, 0x27, 0x47, 0x07, 0x5B, 0x4F, 0x50,
+  # Crc:UINT32            #WorkingBlockValid:1, WorkingBlockInvalid:1, Reserved
+  0x77, 0x13, 0x9B, 0xD7, 0xFE, 0xFF, 0xFF, 0xFF,
+  # WriteQueueSize: UINT64 #Size: 0x2000 - 0x20 (FTW_WORKING_HEADER) = 0x1FE0
+  0xE0, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+}
+
+0x00740000|0x00010000
+gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase|gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize
+#NV_FTW_SPARE
+
+#########################################################################################
+# Quark EDKII Recovery Primary Image
+# Quark EDKII Recovery contains: Recovery Stage1 FV + Recovery Stage2 FV + Remote Management Unit Binary
+#########################################################################################
+0x00790400|0x00038000
+FV = EDKII_RECOVERY_STAGE1_IMAGE1
+
+0x007C8400|0x00007000
+FV = EDKII_RECOVERY_STAGE2_IMAGE1
+
+#######################
+# Quark BootRom Image
+#######################
+0x007E0000|0x00020000
+FV = EDKII_BOOTROM_OVERRIDE
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_BOOTROM_OVERRIDE]
+BlockSize          = 0x1000
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+FvNameGuid         = 18D6D9F4-2EEF-4913-AEE6-BE61C6DA6CC8
+
+################################################################################
+#
+# The INF statements point to EDK component and EDK II module INF files, which will be placed into this FV image.
+# Parsing tools will scan the INF file to determine the type of component or module.
+# The component or module type is used to reference the standard rules
+# defined elsewhere in the FDF file.
+#
+# The format for INF statements is:
+# INF $(PathAndInfFileName)
+#
+################################################################################
+
+  ##
+  #  Fixup area for function pointers to NOP ROM routines.
+  #  This File must be the first in the FV.
+  ##
+FILE FREEFORM = 5331914A-52A4-472c-B4BD-E223E48C24B0 {
+    SECTION RAW = QuarkPlatformPkg/Binary/SIZE_8KB.bin
+  }
+
+  ##
+  #  SEC Phase modules
+  ##
+INF  QuarkPlatformPkg/Cpu/Sec/ResetVector/QuarkResetVector.inf
+INF  MdeModulePkg/Core/Pei/PeiMain.inf
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_RECOVERY_STAGE1_IMAGE1]
+BlockSize          = 0x1000
+FvBaseAddress      = 0x80000400
+FvForceRebase      = TRUE
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+FvNameGuid         = 18D6D9F4-2EEF-4913-AEE6-BE61C6DA6CC8
+
+################################################################################
+#
+# The INF statements point to EDK component and EDK II module INF files, which will be placed into this FV image.
+# Parsing tools will scan the INF file to determine the type of component or module.
+# The component or module type is used to reference the standard rules
+# defined elsewhere in the FDF file.
+#
+# The format for INF statements is:
+# INF $(PathAndInfFileName)
+#
+################################################################################
+  ##
+  #  PEI Apriori file example, more PEIM module added later.
+  ##
+APRIORI PEI {
+  INF  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
+  # PlatformConfigPei should be immediately after Pcd driver.
+  INF  QuarkPlatformPkg/Platform/Pei/PlatformConfig/PlatformConfigPei.inf
+  INF  MdeModulePkg/Universal/PcatSingleSegmentPciCfg2Pei/PcatSingleSegmentPciCfg2Pei.inf
+  INF  MdeModulePkg/Universal/ReportStatusCodeRouter/Pei/ReportStatusCodeRouterPei.inf
+  INF  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+  INF  QuarkPlatformPkg/Platform/Pei/PlatformInfo/PlatformInfo.inf
+  }
+
+  ##
+  #  PEI Phase RAW Data files.
+  ##
+FILE FREEFORM = PCD(gEfiQuarkNcSocIdTokenSpaceGuid.PcdQuarkMicrocodeFile) {
+!ifdef QUARK2
+    SECTION RAW = QuarkSocPkg/QuarkNorthCluster/Binary/Quark2Microcode/RMU.bin
+!else
+    SECTION RAW = QuarkSocPkg/QuarkNorthCluster/Binary/QuarkMicrocode/RMU.bin
+!endif
+  }
+
+  ##
+  #  Platform data files see QuarkPlatformPkg/Include/Guid/PlatformDataFileNameGuids.h
+  #  for steps to add new platform.
+  ##
+FILE FREEFORM = 0A975562-DF47-4dc3-8AB0-3BA2C3522302 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/svp-platform-data.bin
+  }
+FILE FREEFORM = 956EDAD3-8440-45cb-89AC-D1930C004E34 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/kipsbay-platform-data.bin
+  }
+FILE FREEFORM = 095B3C16-6D67-4c85-B528-339D9FF6222C {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/crosshill-platform-data.bin
+  }
+FILE FREEFORM = EE84C5E7-9412-42cc-B755-A915A7B68536 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/clantonhill-platform-data.bin
+  }
+FILE FREEFORM = E4AD87C8-D20E-40ce-97F5-9756FD0E81D4 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/galileo-platform-data.bin
+  }
+FILE FREEFORM = 23B3C10D-46E3-4a78-8AAA-217B6A39EF04 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/galileo-gen2-platform-data.bin
+  }
+
+  ##
+  #  PEI Phase modules
+  ##
+INF  IA32FamilyCpuBasePkg/SecCore/SecCore.inf
+INF  MdeModulePkg/Core/Pei/PeiMain.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
+# PlatformConfigPei should be immediately after Pcd driver.
+INF  QuarkPlatformPkg/Platform/Pei/PlatformConfig/PlatformConfigPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/ReportStatusCodeRouter/Pei/ReportStatusCodeRouterPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+!ifdef SECURE_BOOT
+  INF  RuleOverride = NORELOC  SecurityPkg/VariableAuthenticated/Pei/VariablePei.inf
+!else
+  INF  RuleOverride = NORELOC  MdeModulePkg/Universal/Variable/Pei/VariablePei.inf
+!endif
+INF  RuleOverride = NORELOC  IA32FamilyCpuBasePkg/CpuPei/CpuPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/CapsulePei/CapsulePei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/MemoryInit/Pei/MemoryInitPei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/Smm/Pei/SmmAccessPei/SmmAccessPei.inf
+INF  QuarkPlatformPkg/Platform/Pei/PlatformInit/PlatformEarlyInit.inf
+INF  QuarkPlatformPkg/Platform/Pei/PlatformInfo/PlatformInfo.inf
+INF  MdeModulePkg/Universal/PcatSingleSegmentPciCfg2Pei/PcatSingleSegmentPciCfg2Pei.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_RECOVERY_STAGE2_IMAGE1]
+BlockSize          = 0x1000
+FvBaseAddress      = 0x80030000
+FvForceRebase      = TRUE
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+
+!if $(CFG_SOURCE_DEBUG) == TRUE
+ INF  QuarkPlatformPkg/Override/UefiCpuPkg/Universal/Acpi/S3Resume2Pei/S3Resume2Pei.inf
+!endif
+FILE FV_IMAGE = 1E9D7604-EF45-46a0-BD8A-71AC78C17AC1 {
+       SECTION PEI_DEPEX_EXP = {gEfiPeiMemoryDiscoveredPpiGuid AND gEfiPeiBootInRecoveryModePpiGuid}
+       SECTION GUIDED EE4E5898-3914-4259-9D6E-DC7BD79403CF {
+          SECTION FV_IMAGE = FVRECOVERY_COMPONENTS
+       }
+     }
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.FVRECOVERY_COMPONENTS]
+BlockSize          = 0x1000
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+INF  QuarkSocPkg/QuarkSouthCluster/Usb/Common/Pei/UsbPei.inf
+INF  MdeModulePkg/Bus/Pci/EhciPei/EhciPei.inf
+INF  QuarkSocPkg/QuarkSouthCluster/Usb/Ohci/Pei/OhciPei.inf
+INF  MdeModulePkg/Bus/Usb/UsbBusPei/UsbBusPei.inf
+INF  MdeModulePkg/Bus/Usb/UsbBotPei/UsbBotPei.inf
+INF  FatPkg/FatPei/FatPei.inf
+INF  MdeModulePkg/Universal/Disk/CdExpressPei/CdExpressPei.inf
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_BOOT_STAGE1_IMAGE1]
+BlockSize          = 0x1000
+FvBaseAddress      = 0x80000400
+FvForceRebase      = TRUE
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+FvNameGuid         = 18D6D9F4-2EEF-4913-AEE6-BE61C6DA6CC8
+
+################################################################################
+#
+# The INF statements point to EDK component and EDK II module INF files, which will be placed into this FV image.
+# Parsing tools will scan the INF file to determine the type of component or module.
+# The component or module type is used to reference the standard rules
+# defined elsewhere in the FDF file.
+#
+# The format for INF statements is:
+# INF $(PathAndInfFileName)
+#
+################################################################################
+  ##
+  #  PEI Apriori file example, more PEIM module added later.
+  ##
+APRIORI PEI {
+  INF  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
+  # PlatformConfigPei should be immediately after Pcd driver.
+  INF  QuarkPlatformPkg/Platform/Pei/PlatformConfig/PlatformConfigPei.inf
+  INF  MdeModulePkg/Universal/PcatSingleSegmentPciCfg2Pei/PcatSingleSegmentPciCfg2Pei.inf
+  INF  MdeModulePkg/Universal/ReportStatusCodeRouter/Pei/ReportStatusCodeRouterPei.inf
+  INF  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+  INF  QuarkPlatformPkg/Platform/Pei/PlatformInfo/PlatformInfo.inf
+  }
+
+  ##
+  #  PEI Phase RAW Data files.
+  ##
+FILE FREEFORM = PCD(gEfiQuarkNcSocIdTokenSpaceGuid.PcdQuarkMicrocodeFile) {
+!ifdef QUARK2
+    SECTION RAW = QuarkSocPkg/QuarkNorthCluster/Binary/Quark2Microcode/RMU.bin
+!else
+    SECTION RAW = QuarkSocPkg/QuarkNorthCluster/Binary/QuarkMicrocode/RMU.bin
+!endif
+  }
+
+  ##
+  #  Platform data files see QuarkPlatformPkg/Include/Guid/PlatformDataFileNameGuids.h
+  #  for steps to add new platform.
+  ##
+FILE FREEFORM = 0A975562-DF47-4dc3-8AB0-3BA2C3522302 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/svp-platform-data.bin
+  }
+FILE FREEFORM = 956EDAD3-8440-45cb-89AC-D1930C004E34 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/kipsbay-platform-data.bin
+  }
+FILE FREEFORM = 095B3C16-6D67-4c85-B528-339D9FF6222C {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/crosshill-platform-data.bin
+  }
+FILE FREEFORM = EE84C5E7-9412-42cc-B755-A915A7B68536 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/clantonhill-platform-data.bin
+  }
+FILE FREEFORM = E4AD87C8-D20E-40ce-97F5-9756FD0E81D4 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/galileo-platform-data.bin
+  }
+FILE FREEFORM = 23B3C10D-46E3-4a78-8AAA-217B6A39EF04 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/galileo-gen2-platform-data.bin
+  }
+
+
+  ##
+  #  PEI Phase modules
+  ##
+INF  IA32FamilyCpuBasePkg/SecCore/SecCore.inf
+INF  MdeModulePkg/Core/Pei/PeiMain.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
+# PlatformConfigPei should be immediately after Pcd driver.
+INF  QuarkPlatformPkg/Platform/Pei/PlatformConfig/PlatformConfigPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/ReportStatusCodeRouter/Pei/ReportStatusCodeRouterPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+!ifdef SECURE_BOOT
+  INF  RuleOverride = NORELOC  SecurityPkg/VariableAuthenticated/Pei/VariablePei.inf
+!else
+  INF  RuleOverride = NORELOC  MdeModulePkg/Universal/Variable/Pei/VariablePei.inf
+!endif
+INF  RuleOverride = NORELOC  IA32FamilyCpuBasePkg/CpuPei/CpuPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/CapsulePei/CapsulePei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/MemoryInit/Pei/MemoryInitPei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/Smm/Pei/SmmAccessPei/SmmAccessPei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/Smm/Pei/SmmControlPei/SmmControlPei.inf
+INF  QuarkPlatformPkg/Platform/Pei/PlatformInit/PlatformEarlyInit.inf
+INF  QuarkPlatformPkg/Platform/Pei/PlatformInfo/PlatformInfo.inf
+INF  MdeModulePkg/Universal/PcatSingleSegmentPciCfg2Pei/PcatSingleSegmentPciCfg2Pei.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
+INF  IA32FamilyCpuBasePkg/PiSmmCommunication/PiSmmCommunicationPei.inf
+!if $(CFG_SOURCE_DEBUG) == TRUE
+# nothing
+!else
+ INF  QuarkPlatformPkg/Override/UefiCpuPkg/Universal/Acpi/S3Resume2Pei/S3Resume2Pei.inf
+!endif
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_BOOT_STAGE1_IMAGE2]
+BlockSize          = 0x1000
+FvBaseAddress      = 0x80000400
+FvForceRebase      = TRUE
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+FvNameGuid         = 18D6D9F4-2EEF-4913-AEE6-BE61C6DA6CC8
+
+################################################################################
+#
+# The INF statements point to EDK component and EDK II module INF files, which will be placed into this FV image.
+# Parsing tools will scan the INF file to determine the type of component or module.
+# The component or module type is used to reference the standard rules
+# defined elsewhere in the FDF file.
+#
+# The format for INF statements is:
+# INF $(PathAndInfFileName)
+#
+################################################################################
+  ##
+  #  PEI Apriori file example, more PEIM module added later.
+  ##
+APRIORI PEI {
+  INF  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
+  # PlatformConfigPei should be immediately after Pcd driver.
+  INF  QuarkPlatformPkg/Platform/Pei/PlatformConfig/PlatformConfigPei.inf
+  INF  MdeModulePkg/Universal/PcatSingleSegmentPciCfg2Pei/PcatSingleSegmentPciCfg2Pei.inf
+  INF  MdeModulePkg/Universal/ReportStatusCodeRouter/Pei/ReportStatusCodeRouterPei.inf
+  INF  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+  INF  QuarkPlatformPkg/Platform/Pei/PlatformInfo/PlatformInfo.inf
+  }
+
+  ##
+  #  PEI Phase RAW Data files.
+  ##
+FILE FREEFORM = PCD(gEfiQuarkNcSocIdTokenSpaceGuid.PcdQuarkMicrocodeFile) {
+!ifdef QUARK2
+    SECTION RAW = QuarkSocPkg/QuarkNorthCluster/Binary/Quark2Microcode/RMU.bin
+!else
+    SECTION RAW = QuarkSocPkg/QuarkNorthCluster/Binary/QuarkMicrocode/RMU.bin
+!endif
+  }
+
+  ##
+  #  Platform data files see QuarkPlatformPkg/Include/Guid/PlatformDataFileNameGuids.h
+  #  for steps to add new platform.
+  ##
+FILE FREEFORM = 0A975562-DF47-4dc3-8AB0-3BA2C3522302 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/svp-platform-data.bin
+  }
+FILE FREEFORM = 956EDAD3-8440-45cb-89AC-D1930C004E34 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/kipsbay-platform-data.bin
+  }
+FILE FREEFORM = 095B3C16-6D67-4c85-B528-339D9FF6222C {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/crosshill-platform-data.bin
+  }
+FILE FREEFORM = EE84C5E7-9412-42cc-B755-A915A7B68536 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/clantonhill-platform-data.bin
+  }
+FILE FREEFORM = E4AD87C8-D20E-40ce-97F5-9756FD0E81D4 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/galileo-platform-data.bin
+  }
+FILE FREEFORM = 23B3C10D-46E3-4a78-8AAA-217B6A39EF04 {
+    SECTION RAW = QuarkPlatformPkg/Binary/PlatformData/galileo-gen2-platform-data.bin
+  }
+
+
+  ##
+  #  PEI Phase modules
+  ##
+INF  IA32FamilyCpuBasePkg/SecCore/SecCore.inf
+INF  MdeModulePkg/Core/Pei/PeiMain.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
+# PlatformConfigPei should be immediately after Pcd driver.
+INF  QuarkPlatformPkg/Platform/Pei/PlatformConfig/PlatformConfigPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/ReportStatusCodeRouter/Pei/ReportStatusCodeRouterPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/StatusCodeHandler/Pei/StatusCodeHandlerPei.inf
+!ifdef SECURE_BOOT
+  INF  RuleOverride = NORELOC  SecurityPkg/VariableAuthenticated/Pei/VariablePei.inf
+!else
+  INF  RuleOverride = NORELOC  MdeModulePkg/Universal/Variable/Pei/VariablePei.inf
+!endif
+INF  RuleOverride = NORELOC  IA32FamilyCpuBasePkg/CpuPei/CpuPei.inf
+INF  RuleOverride = NORELOC  MdeModulePkg/Universal/CapsulePei/CapsulePei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/MemoryInit/Pei/MemoryInitPei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/Smm/Pei/SmmAccessPei/SmmAccessPei.inf
+INF  RuleOverride = NORELOC  QuarkSocPkg/QuarkNorthCluster/Smm/Pei/SmmControlPei/SmmControlPei.inf
+INF  QuarkPlatformPkg/Platform/Pei/PlatformInit/PlatformEarlyInit.inf
+INF  QuarkPlatformPkg/Platform/Pei/PlatformInfo/PlatformInfo.inf
+INF  MdeModulePkg/Universal/PcatSingleSegmentPciCfg2Pei/PcatSingleSegmentPciCfg2Pei.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
+INF  IA32FamilyCpuBasePkg/PiSmmCommunication/PiSmmCommunicationPei.inf
+!if $(CFG_SOURCE_DEBUG) == TRUE
+# nothing
+!else
+ INF  QuarkPlatformPkg/Override/UefiCpuPkg/Universal/Acpi/S3Resume2Pei/S3Resume2Pei.inf
+!endif
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_BOOT_STAGE2]
+BlockSize          = 0x1000
+FvAlignment        = 16
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+FvNameGuid         = 30D9ED01-38D2-418a-90D5-C561750BF80F
+
+  ##
+  #  DXE Phase modules
+  ##
+INF  MdeModulePkg/Core/Dxe/DxeMain.inf
+INF  MdeModulePkg/Universal/PCD/Dxe/Pcd.inf
+
+#
+# Early SoC / Platform modules. I2C must be loaded before platform init.
+#
+INF  QuarkSocPkg/QuarkSouthCluster/I2C/Dxe/I2CDxe.inf
+INF  QuarkPlatformPkg/Platform/Dxe/PlatformInit/PlatformInitDxe.inf
+
+#
+# EDK Core modules.
+#
+
+INF  IntelFrameworkModulePkg/Universal/CpuIoDxe/CpuIoDxe.inf
+INF  UefiCpuPkg/CpuIo2Dxe/CpuIo2Dxe.inf
+INF  MdeModulePkg/Universal/ReportStatusCodeRouter/RuntimeDxe/ReportStatusCodeRouterRuntimeDxe.inf
+INF  MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntimeDxe.inf
+INF  MdeModulePkg/Universal/ReportStatusCodeRouter/Smm/ReportStatusCodeRouterSmm.inf
+INF  MdeModulePkg/Universal/StatusCodeHandler/Smm/StatusCodeHandlerSmm.inf
+INF  IntelFrameworkModulePkg/Universal/SectionExtractionDxe/SectionExtractionDxe.inf
+
+INF  MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf
+INF  IA32FamilyCpuBasePkg/CpuArchDxe/CpuArchDxe.inf
+INF  IA32FamilyCpuBasePkg/CpuMpDxe/CpuMpDxe.inf
+INF  MdeModulePkg/Universal/Metronome/Metronome.inf
+INF  MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
+INF  MdeModulePkg/Core/RuntimeDxe/RuntimeDxe.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteSmm.inf
+!ifdef SECURE_BOOT
+INF  SecurityPkg/VariableAuthenticated/RuntimeDxe/VariableSmmRuntimeDxe.inf
+INF  SecurityPkg/VariableAuthenticated/RuntimeDxe/VariableSmm.inf
+INF  SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf
+!else
+INF  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmmRuntimeDxe.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Universal/Variable/RuntimeDxe/VariableSmm.inf
+!endif
+INF  MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
+INF  MdeModulePkg/Universal/MonotonicCounterRuntimeDxe/MonotonicCounterRuntimeDxe.inf  
+INF  MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
+INF  QuarkPlatformPkg/Override/PcAtChipsetPkg/PcatRealTimeClockRuntimeDxe/PcatRealTimeClockRuntimeDxe.inf
+INF  MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
+INF  IntelFrameworkModulePkg/Universal/DataHubDxe/DataHubDxe.inf
+INF  IntelFrameworkModulePkg/Universal/DataHubStdErrDxe/DataHubStdErrDxe.inf
+INF  MdeModulePkg/Universal/MemoryTest/NullMemoryTestDxe/NullMemoryTestDxe.inf
+
+#
+# Platform
+#
+INF  QuarkPlatformPkg/Bds/BootManagerMenuApp/BootManagerMenuApp.inf
+INF  QuarkPlatformPkg/Bds/BdsDxe/BdsDxe.inf
+
+INF  QuarkPlatformPkg/Pci/Dxe/PciHostBridge/PciHostBridge.inf
+INF  QuarkPlatformPkg/Platform/SpiFvbServices/PlatformSpi.inf
+INF  QuarkPlatformPkg/Platform/SpiFvbServices/PlatformSmmSpi.inf
+INF  QuarkSocPkg/QuarkNorthCluster/QNCInit/Dxe/QNCInitDxe.inf 
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/Dxe/SmmAccessDxe/SmmAccess.inf
+INF  QuarkSocPkg/QuarkNorthCluster/S3Support/Dxe/QncS3Support.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Spi/RuntimeDxe/PchSpiRuntime.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Spi/Smm/PchSpiSmm.inf
+INF  QuarkPlatformPkg/Platform/Dxe/Setup/DxePlatform.inf
+
+#
+# ACPI
+#
+INF  QuarkPlatformPkg/Platform/Dxe/SaveMemoryConfig/SaveMemoryConfig.inf
+INF  MdeModulePkg/Universal/Acpi/S3SaveStateDxe/S3SaveStateDxe.inf
+INF  QuarkPlatformPkg/Acpi/Dxe/BootScriptExecutorDxe/BootScriptExecutorDxe.inf
+INF  MdeModulePkg/Universal/Acpi/AcpiTableDxe/AcpiTableDxe.inf 
+INF  IntelFrameworkModulePkg/Universal/Acpi/AcpiS3SaveDxe/AcpiS3SaveDxe.inf
+INF  QuarkPlatformPkg/Acpi/Dxe/AcpiPlatform/AcpiPlatform.inf
+INF  RuleOverride = ACPITABLE QuarkPlatformPkg/Acpi/AcpiTables/AcpiTables.inf
+
+#
+# SMM
+#
+INF  MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf
+INF  MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf
+INF  IA32FamilyCpuBasePkg/PiSmmCpuDxeSmm/PiSmmCpuDxeSmm.inf
+INF  UefiCpuPkg/CpuIo2Smm/CpuIo2Smm.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/Dxe/SmmControlDxe/SmmControlDxe.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/Dxe/SmmRuntime/SmmRuntime.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/DxeSmm/QncSmmDispatcher/QNCSmmDispatcher.inf
+INF  QuarkPlatformPkg/Acpi/DxeSmm/AcpiSmm/AcpiSmmPlatform.inf
+INF  QuarkPlatformPkg/Acpi/DxeSmm/SmmPowerManagement/SmmPowerManagement.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Universal/LockBox/SmmLockBox/SmmLockBox.inf
+INF  IA32FamilyCpuBasePkg/PiSmmCommunication/PiSmmCommunicationSmm.inf
+
+#
+# SMBIOS
+#
+INF   MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
+INF  QuarkPlatformPkg/Platform/Dxe/SmbiosMiscDxe/SmbiosMiscDxe.inf
+INF  QuarkPlatformPkg/Platform/Dxe/MemorySubClass/MemorySubClass.inf
+#
+# PCI
+#
+INF  QuarkPlatformPkg/Pci/Dxe/PciPlatform/PciPlatform.inf
+INF  MdeModulePkg/Bus/Pci/PciBusDxe/PciBusDxe.inf
+INF  QuarkSocPkg/QuarkSouthCluster/IohInit/Dxe/IohInitDxe.inf 
+INF  QuarkSocPkg/QuarkSouthCluster/Uart/Dxe/SerialDxe.inf    
+#
+# USB
+#
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Bus/Pci/EhciDxe/EhciDxe.inf
+INF  QuarkSocPkg/QuarkSouthCluster/Usb/Ohci/Dxe/OhciDxe.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
+INF  MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
+INF  MdeModulePkg/Bus/Usb/UsbMouseDxe/UsbMouseDxe.inf
+INF  MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+
+#
+# SDIO
+#
+INF  QuarkSocPkg/QuarkSouthCluster/Sdio/Dxe/SDControllerDxe/SDControllerDxe.inf
+INF  QuarkSocPkg/QuarkSouthCluster/Sdio/Dxe/SDMediaDeviceDxe/SDMediaDeviceDxe.inf
+
+#
+# IDE
+#
+INF  MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
+INF  MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
+
+#
+# Console
+#
+INF  MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
+INF  MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf 
+INF  MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
+INF  MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
+
+INF  MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
+INF  MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
+INF  MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
+
+#
+# TPM DXE Driver.
+#
+!ifdef TPM_SUPPORT
+INF  QuarkPlatformPkg/Override/SecurityPkg/Tcg/TcgDxe/TcgDxe.inf
+!endif
+
+#
+# Shell and Applications
+#
+FILE APPLICATION = c57ad6b7-0515-40a8-9d21-551652854e37 {
+  SECTION PE32 = EdkShellBinPkg/FullShell/Ia32/Shell_Full.efi
+}
+#!endif
+
+#
+# Legacy Modules
+#
+INF  PcAtChipsetPkg/8259InterruptControllerDxe/8259.inf
+
+#       
+# File System Modules
+#        
+INF FatPkg/EnhancedFatDxe/Fat.inf
+INF  QuarkPlatformPkg/Platform/DxeSmm/SMIFlashDxe/SMIFlashDxe.inf
+
+################################################################################
+#
+# FILE statements are provided so that a platform integrator can include
+# complete EFI FFS files, as well as a method for constructing FFS files
+# using curly "{}" brace scoping. The following three FILEs are
+# for binary shell, binary fat and logo module.
+#
+################################################################################
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+
+[FV.EDKII_BOOT_STAGE2_RECOVERY]
+BlockSize          = 0x1000
+FvAlignment        = 16
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+FvNameGuid         = 30D9ED01-38D2-418a-90D5-C561750BF80F
+
+  ##
+  #  DXE Phase modules
+  ##
+INF  MdeModulePkg/Core/Dxe/DxeMain.inf
+INF  MdeModulePkg/Universal/PCD/Dxe/Pcd.inf
+
+#
+# Early SoC / Platform modules. I2C must be loaded before platform init.
+#
+INF  QuarkSocPkg/QuarkSouthCluster/I2C/Dxe/I2CDxe.inf
+INF  QuarkPlatformPkg/Platform/Dxe/PlatformInit/PlatformInitDxe.inf
+
+#
+# EDK Core modules.
+#
+INF  IntelFrameworkModulePkg/Universal/CpuIoDxe/CpuIoDxe.inf
+INF  UefiCpuPkg/CpuIo2Dxe/CpuIo2Dxe.inf
+INF  MdeModulePkg/Universal/ReportStatusCodeRouter/RuntimeDxe/ReportStatusCodeRouterRuntimeDxe.inf
+INF  MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntimeDxe.inf
+INF  MdeModulePkg/Universal/ReportStatusCodeRouter/Smm/ReportStatusCodeRouterSmm.inf
+INF  MdeModulePkg/Universal/StatusCodeHandler/Smm/StatusCodeHandlerSmm.inf
+INF  IntelFrameworkModulePkg/Universal/SectionExtractionDxe/SectionExtractionDxe.inf
+
+INF  MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf
+INF  IA32FamilyCpuBasePkg/CpuArchDxe/CpuArchDxe.inf
+INF  IA32FamilyCpuBasePkg/CpuMpDxe/CpuMpDxe.inf
+INF  MdeModulePkg/Universal/Metronome/Metronome.inf
+INF  MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
+INF  MdeModulePkg/Core/RuntimeDxe/RuntimeDxe.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteSmm.inf
+
+#
+# For recovery use Emulated variable store with need of NV storage.
+#
+INF  MdeModulePkg/Universal/Variable/EmuRuntimeDxe/EmuVariableRuntimeDxe.inf
+
+INF  MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
+INF  MdeModulePkg/Universal/MonotonicCounterRuntimeDxe/MonotonicCounterRuntimeDxe.inf  
+INF  MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
+INF  QuarkPlatformPkg/Override/PcAtChipsetPkg/PcatRealTimeClockRuntimeDxe/PcatRealTimeClockRuntimeDxe.inf
+INF  MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
+INF  IntelFrameworkModulePkg/Universal/DataHubDxe/DataHubDxe.inf
+INF  IntelFrameworkModulePkg/Universal/DataHubStdErrDxe/DataHubStdErrDxe.inf
+INF  MdeModulePkg/Universal/MemoryTest/NullMemoryTestDxe/NullMemoryTestDxe.inf
+
+#
+# Platform
+#
+INF  QuarkPlatformPkg/Bds/BootManagerMenuApp/BootManagerMenuApp.inf
+INF  QuarkPlatformPkg/Bds/BdsDxe/BdsDxe.inf
+
+INF  QuarkPlatformPkg/Pci/Dxe/PciHostBridge/PciHostBridge.inf
+INF  QuarkPlatformPkg/Platform/SpiFvbServices/PlatformSpi.inf
+INF  QuarkPlatformPkg/Platform/SpiFvbServices/PlatformSmmSpi.inf
+INF  QuarkSocPkg/QuarkNorthCluster/QNCInit/Dxe/QNCInitDxe.inf 
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/Dxe/SmmAccessDxe/SmmAccess.inf
+INF  QuarkSocPkg/QuarkNorthCluster/S3Support/Dxe/QncS3Support.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Spi/RuntimeDxe/PchSpiRuntime.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Spi/Smm/PchSpiSmm.inf
+INF  QuarkPlatformPkg/Platform/Dxe/Setup/DxePlatform.inf
+
+#
+# ACPI
+#
+INF  QuarkPlatformPkg/Platform/Dxe/SaveMemoryConfig/SaveMemoryConfig.inf
+INF  MdeModulePkg/Universal/Acpi/S3SaveStateDxe/S3SaveStateDxe.inf
+INF  QuarkPlatformPkg/Acpi/Dxe/BootScriptExecutorDxe/BootScriptExecutorDxe.inf
+INF  MdeModulePkg/Universal/Acpi/AcpiTableDxe/AcpiTableDxe.inf 
+INF  IntelFrameworkModulePkg/Universal/Acpi/AcpiS3SaveDxe/AcpiS3SaveDxe.inf
+INF  QuarkPlatformPkg/Acpi/Dxe/AcpiPlatform/AcpiPlatform.inf
+INF  RuleOverride = ACPITABLE QuarkPlatformPkg/Acpi/AcpiTables/AcpiTables.inf
+
+#
+# SMM
+#
+INF  MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf
+INF  MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf
+INF  IA32FamilyCpuBasePkg/PiSmmCpuDxeSmm/PiSmmCpuDxeSmm.inf
+INF  UefiCpuPkg/CpuIo2Smm/CpuIo2Smm.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/Dxe/SmmControlDxe/SmmControlDxe.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/Dxe/SmmRuntime/SmmRuntime.inf
+INF  QuarkSocPkg/QuarkNorthCluster/Smm/DxeSmm/QncSmmDispatcher/QNCSmmDispatcher.inf
+INF  QuarkPlatformPkg/Acpi/DxeSmm/AcpiSmm/AcpiSmmPlatform.inf
+INF  QuarkPlatformPkg/Acpi/DxeSmm/SmmPowerManagement/SmmPowerManagement.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Universal/LockBox/SmmLockBox/SmmLockBox.inf
+INF  IA32FamilyCpuBasePkg/PiSmmCommunication/PiSmmCommunicationSmm.inf
+
+#
+# SMBIOS
+#
+INF   MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
+INF  QuarkPlatformPkg/Platform/Dxe/SmbiosMiscDxe/SmbiosMiscDxe.inf
+INF  QuarkPlatformPkg/Platform/Dxe/MemorySubClass/MemorySubClass.inf
+#
+# PCI
+#
+INF  QuarkPlatformPkg/Pci/Dxe/PciPlatform/PciPlatform.inf
+INF  MdeModulePkg/Bus/Pci/PciBusDxe/PciBusDxe.inf
+INF  QuarkSocPkg/QuarkSouthCluster/IohInit/Dxe/IohInitDxe.inf 
+INF  QuarkSocPkg/QuarkSouthCluster/Uart/Dxe/SerialDxe.inf    
+#
+# USB
+#
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Bus/Pci/EhciDxe/EhciDxe.inf
+INF  QuarkSocPkg/QuarkSouthCluster/Usb/Ohci/Dxe/OhciDxe.inf
+INF  QuarkPlatformPkg/Override/MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
+INF  MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
+INF  MdeModulePkg/Bus/Usb/UsbMouseDxe/UsbMouseDxe.inf
+INF  MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+
+#
+# SDIO
+#
+INF  QuarkSocPkg/QuarkSouthCluster/Sdio/Dxe/SDControllerDxe/SDControllerDxe.inf
+INF  QuarkSocPkg/QuarkSouthCluster/Sdio/Dxe/SDMediaDeviceDxe/SDMediaDeviceDxe.inf
+
+#
+# IDE
+#
+INF  MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
+INF  MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
+
+#
+# Console
+#
+INF  MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
+INF  MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf 
+INF  MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
+INF  MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
+
+INF  MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
+INF  MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
+INF  MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
+
+#
+# TPM DXE Driver.
+#
+!ifdef TPM_SUPPORT
+INF  QuarkPlatformPkg/Override/SecurityPkg/Tcg/TcgDxe/TcgDxe.inf
+!endif
+
+#
+# Shell and Applications
+#
+FILE APPLICATION = c57ad6b7-0515-40a8-9d21-551652854e37 {
+  SECTION PE32 = EdkShellBinPkg/FullShell/Ia32/Shell_Full.efi
+}
+#!endif
+
+#
+# Legacy Modules
+#
+INF  PcAtChipsetPkg/8259InterruptControllerDxe/8259.inf
+
+#       
+# File System Modules
+#        
+INF FatPkg/EnhancedFatDxe/Fat.inf
+INF  QuarkPlatformPkg/Platform/DxeSmm/SMIFlashDxe/SMIFlashDxe.inf
+
+################################################################################
+#
+# FILE statements are provided so that a platform integrator can include
+# complete EFI FFS files, as well as a method for constructing FFS files
+# using curly "{}" brace scoping. The following three FILEs are
+# for binary shell, binary fat and logo module.
+#
+################################################################################
+
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_BOOT_STAGE2_COMPACT]
+FvAlignment        = 16
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+
+FILE FV_IMAGE = 9E21FD93-9C72-4c15-8C4B-E77F1DB2D792 {
+        SECTION GUIDED A31280AD-481E-41B6-95E8-127F4C984779 PROCESSING_REQUIRED = TRUE {
+          SECTION FV_IMAGE = EDKII_BOOT_STAGE2
+       }
+     }
+
+################################################################################
+#
+# FV Section
+#
+# [FV] section is used to define what components or modules are placed within a flash
+# device file.  This section also defines order the components and modules are positioned
+# within the image.  The [FV] section consists of define statements, set statements and
+# module statements.
+#
+################################################################################
+[FV.EDKII_PAYLOAD_IMAGE]
+BlockSize          = 0x1000
+FvBaseAddress      = 0xFFC00000
+FvAlignment        = 16         #FV alignment and FV attributes setting.
+ERASE_POLARITY     = 1
+MEMORY_MAPPED      = TRUE
+STICKY_WRITE       = TRUE
+LOCK_CAP           = TRUE
+LOCK_STATUS        = TRUE
+WRITE_DISABLED_CAP = TRUE
+WRITE_ENABLED_CAP  = TRUE
+WRITE_STATUS       = TRUE
+WRITE_LOCK_CAP     = TRUE
+WRITE_LOCK_STATUS  = TRUE
+READ_DISABLED_CAP  = TRUE
+READ_ENABLED_CAP   = TRUE
+READ_STATUS        = TRUE
+READ_LOCK_CAP      = TRUE
+READ_LOCK_STATUS   = TRUE
+
+FILE APPLICATION = PCD(gQuarkPlatformTokenSpaceGuid.PcdPayloadFile) {
+     SECTION PE32 = QuarkPlatformPkg/Binary/Payload/PayloadSample.efi
+     }
+
+################################################################################
+#
+# Rules are use with the [FV] section's module INF type to define
+# how an FFS file is created for a given INF file. The following Rule are the default
+# rules for the different module type. User can add the customized rules to define the
+# content of the FFS file.
+#
+################################################################################
+[Rule.Common.SEC]
+  FILE SEC = $(NAMED_GUID) RELOCS_STRIPPED {
+    TE  TE    Align = 8       $(INF_OUTPUT)/$(MODULE_NAME).efi
+    RAW BIN   Align = 16      |.com
+  }
+
+[Rule.Common.PEI_CORE]
+  FILE PEI_CORE = $(NAMED_GUID)            {
+    TE       TE               $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI       STRING="$(MODULE_NAME)" Optional
+    VERSION  STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.PEIM.NORELOC]
+  FILE PEIM = $(NAMED_GUID) RELOCS_STRIPPED  {
+     PEI_DEPEX PEI_DEPEX Optional        $(INF_OUTPUT)/$(MODULE_NAME).depex
+     TE        TE                        $(INF_OUTPUT)/$(MODULE_NAME).efi
+     UI        STRING="$(MODULE_NAME)" Optional
+     VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.PEIM]
+  FILE PEIM = $(NAMED_GUID)               {
+     PEI_DEPEX PEI_DEPEX Optional        $(INF_OUTPUT)/$(MODULE_NAME).depex
+     TE        TE                        $(INF_OUTPUT)/$(MODULE_NAME).efi
+     UI        STRING="$(MODULE_NAME)" Optional
+     VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.DXE_CORE]
+  FILE DXE_CORE = $(NAMED_GUID) {
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.UEFI_DRIVER]
+  FILE DRIVER = $(NAMED_GUID) {
+    DXE_DEPEX DXE_DEPEX Optional       $(INF_OUTPUT)/$(MODULE_NAME).depex
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.DXE_DRIVER]
+  FILE DRIVER = $(NAMED_GUID) {
+    DXE_DEPEX DXE_DEPEX Optional       $(INF_OUTPUT)/$(MODULE_NAME).depex
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.DXE_RUNTIME_DRIVER]
+  FILE DRIVER = $(NAMED_GUID) {
+    DXE_DEPEX DXE_DEPEX Optional       $(INF_OUTPUT)/$(MODULE_NAME).depex
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.DXE_SMM_DRIVER]
+  FILE SMM = $(NAMED_GUID) {
+    SMM_DEPEX SMM_DEPEX Optional       $(INF_OUTPUT)/$(MODULE_NAME).depex
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.SMM_CORE]
+  FILE SMM_CORE = $(NAMED_GUID) {
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.UEFI_APPLICATION]
+  FILE APPLICATION = $(NAMED_GUID) {
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="$(MODULE_NAME)" Optional
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+
+[Rule.Common.UEFI_APPLICATION.UI]
+  FILE APPLICATION = $(NAMED_GUID) {
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="Enter Setup"
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
+  }
+  
+[Rule.Common.USER_DEFINED.ACPITABLE]
+  FILE FREEFORM = $(NAMED_GUID) {
+    RAW ACPI               |.acpi
+    RAW ASL                |.aml
+  }
+

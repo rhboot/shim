@@ -1,0 +1,2227 @@
+From xxxx Mon Sep 17 00:00:00 2001
+From: Krzysztof Sywula <krzysztof.m.sywula@intel.com>
+Date: Wed, 9 Apr 2014 15:29:52 +0100
+Subject: [PATCH 13/21] Quark stmmac Ethernet
+
+---
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |  25 +-
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+ drivers/net/ethernet/stmicro/stmmac/common.h       |  14 +-
+ drivers/net/ethernet/stmicro/stmmac/descs.h        |  45 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac1000.h    |  64 +-
+ .../net/ethernet/stmicro/stmmac/dwmac1000_core.c   | 139 +++-
+ .../net/ethernet/stmicro/stmmac/dwmac1000_dma.c    |   9 +-
+ .../net/ethernet/stmicro/stmmac/dwmac100_core.c    |   6 +-
+ drivers/net/ethernet/stmicro/stmmac/mmc_core.c     |   1 +
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |  76 +++
+ .../net/ethernet/stmicro/stmmac/stmmac_ethtool.c   |  21 +-
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  | 163 ++++-
+ drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   | 275 +++++++-
+ drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.c   | 723 +++++++++++++++++++++
+ 14 files changed, 1488 insertions(+), 74 deletions(-)
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.c
+
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index 1164930..c959209 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -26,8 +26,8 @@ config STMMAC_PLATFORM
+ 	  If unsure, say N.
+ 
+ config STMMAC_PCI
+-	bool "STMMAC PCI bus support (EXPERIMENTAL)"
+-	depends on STMMAC_ETH && PCI && EXPERIMENTAL
++	bool "STMMAC PCI bus support"
++	depends on STMMAC_ETH && PCI
+ 	---help---
+ 	  This is to select the Synopsys DWMAC available on PCI devices,
+ 	  if you have a controller with this interface, say Y or M here.
+@@ -54,6 +54,27 @@ config STMMAC_DA
+ 	  By default, the DMA arbitration scheme is based on Round-robin
+ 	  (rx:tx priority is 1:1).
+ 
++config STMMAC_PTP
++	bool "STMMAC PTP (1588-2005) Clock Support"
++	default n
++	depends on EXPERIMENTAL
++	select PPS
++	select PTP_1588_CLOCK
++	---help---
++	  Say Y here if you want support for 1588 Timestamping with a
++	  Quark device, using the PTP 1588 Clock support. This is
++	  required to enable timestamping support for the device.
++
++	  If unsure, say N.
++
++config STMMAC_PTP_CLK_MHZ
++	depends on STMMAC_PTP
++	int "Reference clock in Mhz"
++	default 50
++	---help---
++	  Frequency if MHz of the reference clock used to derive PTP time
++	  locally. Permissable values are 1 - 255 inclusive
++
+ choice
+ 	prompt "Select the DMA TX/RX descriptor operating modes"
+ 	depends on STMMAC_ETH
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
+index c8e8ea6..0995db5 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Makefile
++++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
+@@ -3,6 +3,7 @@ stmmac-$(CONFIG_STMMAC_RING) += ring_mode.o
+ stmmac-$(CONFIG_STMMAC_CHAINED) += chain_mode.o
+ stmmac-$(CONFIG_STMMAC_PLATFORM) += stmmac_platform.o
+ stmmac-$(CONFIG_STMMAC_PCI) += stmmac_pci.o
++stmmac-$(CONFIG_STMMAC_PTP) += stmmac_ptp.o
+ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o	\
+ 	      dwmac_lib.o dwmac1000_core.o  dwmac1000_dma.o	\
+ 	      dwmac100_core.o dwmac100_dma.o enh_desc.o  norm_desc.o \
+diff --git a/drivers/net/ethernet/stmicro/stmmac/common.h b/drivers/net/ethernet/stmicro/stmmac/common.h
+index 186d148..ad16e73 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/common.h
++++ b/drivers/net/ethernet/stmicro/stmmac/common.h
+@@ -32,9 +32,15 @@
+ #include <linux/init.h>
+ #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+ #define STMMAC_VLAN_TAG_USED
++#if defined(CONFIG_INTEL_QUARK_X1000_SOC)
++#define STMMAC_VLAN_HASH
++#endif
+ #include <linux/if_vlan.h>
+ #endif
+ 
++#if defined(STMMAC_VLAN_HASH) || defined(CONFIG_STMMAC_PTP)
++#define STMMAC_ATDS_USED
++#endif
+ #include "descs.h"
+ #include "mmc.h"
+ 
+@@ -319,15 +325,16 @@ struct stmmac_dma_ops {
+ 	void (*rx_watchdog) (void __iomem *ioaddr, u32 riwt);
+ };
+ 
++struct stmmac_priv;
+ struct stmmac_ops {
+ 	/* MAC core initialization */
+ 	void (*core_init) (void __iomem *ioaddr) ____cacheline_aligned;
+ 	/* Enable and verify that the IPC module is supported */
+-	int (*rx_ipc) (void __iomem *ioaddr);
++	int (*set_rx_ipc) (void __iomem *ioaddr, bool on);
+ 	/* Dump MAC registers */
+ 	void (*dump_regs) (void __iomem *ioaddr);
+ 	/* Handle extra events on specific interrupts hw dependent */
+-	int (*host_irq_status) (void __iomem *ioaddr);
++	int (*host_irq_status) (struct stmmac_priv * priv);
+ 	/* Multicast filter setting */
+ 	void (*set_filter) (struct net_device *dev, int id);
+ 	/* Flow control setting */
+@@ -340,6 +347,9 @@ struct stmmac_ops {
+ 			       unsigned int reg_n);
+ 	void (*get_umac_addr) (void __iomem *ioaddr, unsigned char *addr,
+ 			       unsigned int reg_n);
++	/* Enable/Disable VLAN Hash filters */
++	int (*vlan_rx_add_vid)(struct stmmac_priv *priv, unsigned short vid);
++	int (*vlan_rx_kill_vid)(struct stmmac_priv *priv, unsigned short vid);
+ 	void (*set_eee_mode) (void __iomem *ioaddr);
+ 	void (*reset_eee_mode) (void __iomem *ioaddr);
+ 	void (*set_eee_timer) (void __iomem *ioaddr, int ls, int tw);
+diff --git a/drivers/net/ethernet/stmicro/stmmac/descs.h b/drivers/net/ethernet/stmicro/stmmac/descs.h
+index 223adf9..ce08163 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/descs.h
++++ b/drivers/net/ethernet/stmicro/stmmac/descs.h
+@@ -25,8 +25,8 @@
+ #define __DESCS_H__
+ 
+ struct dma_desc {
+-	/* Receive descriptor */
+ 	union {
++		/* Receive descriptor */
+ 		struct {
+ 			/* RDES0 */
+ 			u32 payload_csum_error:1;
+@@ -160,6 +160,49 @@ struct dma_desc {
+ 	} des01;
+ 	unsigned int des2;
+ 	unsigned int des3;
++
++	/* Enhanced mode - with VLAN/1588-2005/IPC CHKSUM offload */
++	#if defined(STMMAC_ATDS_USED)
++		union {
++			/* Receive descriptor */
++			struct {
++				/* RDES4 */
++				u32 ip_payload_type:3;
++				u32 ip_header_error:1;
++				u32 ip_payload_error:1;
++				u32 ip_checksum_bypassed:1;
++				u32 ipv4_packet_received:1;
++				u32 ipv6_packet_received:1;
++				u32 message_type:4;
++				u32 ptp_frame_type:1;
++				u32 ptp_version:1;
++				u32 timestamp_dropped:1;
++				u32 reserved1:1;
++				u32 av_packet_received:1;
++				u32 av_tagged_packet_received:1;
++				u32 vlan_tag_priority_value:3;
++				u32 reserved2:3;
++				u32 layer3_filter_match:1;
++				u32 layer4_filter_match:1;
++				u32 layer3_layer4_filter_num_matched:2;
++				u32 reserved3:4;
++
++				/* RDES5 */
++				u32 reserved4;
++			}erx;
++
++			/* Transmit descriptor */
++			struct {
++				/* TDES4 */
++				u32 reserved1;
++
++				/* TDES5 */
++				u32 reserved2;
++			} etx;
++		} des05;
++		unsigned int ts_lo;		/* des6 Tx/Rx timestmp lo */
++		unsigned int ts_hi;		/* des7 Tx/Rx timestamp hi */
++	#endif
+ };
+ 
+ /* Transmit checksum insertion control */
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac1000.h b/drivers/net/ethernet/stmicro/stmmac/dwmac1000.h
+index 7ad56af..3042098 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac1000.h
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac1000.h
+@@ -50,7 +50,14 @@ enum dwmac1000_irq_status {
+ 	rgmii_irq = 0x0001,
+ };
+ #define GMAC_INT_MASK		0x0000003c	/* interrupt mask register */
+-
++#define GMAC_INT_MASK_LPIIM	0x00000200	/* LPI Interrupt Mask */
++#define GMAC_INT_MASK_TSIM	0x00000100	/* Timestamp Interrupt Mask */
++#define GMAC_INT_MASK_PMTIM	0x00000004	/* PMT Interrupt Mask */
++#define GMAC_INT_MASK_PCSANCIM	0x00000002	/* PCS AN Completion */
++#define GMAC_INT_MASK_PCSLCHGIM	0x00000001	/* PCS Link Status */
++#define GMAC_INT_MASK_DEFAULT GMAC_INT_MASK_PCSLCHGIM | GMAC_INT_MASK_PCSANCIM\
++				| GMAC_INT_MASK_PMTIM | GMAC_INT_MASK_TSIM\
++				| GMAC_INT_MASK_LPIIM
+ /* PMT Control and Status */
+ #define GMAC_PMT		0x0000002c
+ enum power_event {
+@@ -135,6 +142,7 @@ enum inter_frame_gap {
+ #define GMAC_FRAME_FILTER_SAIF	0x00000100	/* Inverse Filtering */
+ #define GMAC_FRAME_FILTER_SAF	0x00000200	/* Source Address Filter */
+ #define GMAC_FRAME_FILTER_HPF	0x00000400	/* Hash or perfect Filter */
++#define GMAC_FRAME_FILTER_VTFE	0x00010000	/* VLAN Tag Filter Enable */
+ #define GMAC_FRAME_FILTER_RA	0x80000000	/* Receive all mode */
+ /* GMII ADDR  defines */
+ #define GMAC_MII_ADDR_WRITE	0x00000002	/* MII Write */
+@@ -145,11 +153,17 @@ enum inter_frame_gap {
+ #define GMAC_FLOW_CTRL_RFE	0x00000004	/* Rx Flow Control Enable */
+ #define GMAC_FLOW_CTRL_TFE	0x00000002	/* Tx Flow Control Enable */
+ #define GMAC_FLOW_CTRL_FCB_BPA	0x00000001	/* Flow Control Busy ... */
+-
++/* GMAC VLAN TAG defines */
++#define GMAC_VLAN_TAG_VTHM	0x00080000	/* Hash Table Match Enable */
++#define GMAC_VLAN_TAG_ESVL	0x00040000	/* Enable S-VLAN */
++#define GMAC_VLAN_TAG_VTIM	0x00020000	/* VLAN Tag inverse match */
++#define GMAC_VLAN_TAG_ETV	0x00010000	/* Enable 12-bit tag comp */
++#define GMAC_VLAN_TAG_VLMASK	0x0000FFFF	/* VLAN tag ID for Rx frames */
+ /*--- DMA BLOCK defines ---*/
+ /* DMA Bus Mode register defines */
+ #define DMA_BUS_MODE_SFT_RESET	0x00000001	/* Software Reset */
+ #define DMA_BUS_MODE_DA		0x00000002	/* Arbitration scheme */
++#define DMA_BUS_MODE_ATDS	0X00000080	/* Alternate Descriptor Size */
+ #define DMA_BUS_MODE_DSL_MASK	0x0000007c	/* Descriptor Skip Length */
+ #define DMA_BUS_MODE_DSL_SHIFT	2	/*   (in DWORDS)      */
+ /* Programmable burst length (passed thorugh platform)*/
+@@ -169,6 +183,7 @@ enum rx_tx_priority_ratio {
+ #define DMA_BUS_MODE_USP	0x00800000
+ #define DMA_BUS_MODE_PBL	0x01000000
+ #define DMA_BUS_MODE_AAL	0x02000000
++#define DMA_BUS_MODE_RIX	0x80000000
+ 
+ /* DMA CRS Control and Status Register Mapping */
+ #define DMA_HOST_TX_DESC	  0x00001048	/* Current Host Tx descriptor */
+@@ -230,5 +245,50 @@ enum rtc_control {
+ #define GMAC_MMC_TX_INTR   0x108
+ #define GMAC_MMC_RX_CSUM_OFFLOAD   0x208
+ 
++/* VLAN Hash register offset */
++#define GMAC_VLAN_TAG_REP	0x584
++#define GMAC_VLAN_HASH		0x588
++#define GMAC_VLAN_HASH_MAXID	0x0F
++
++/***************** 1588 regs *****************/
++#define GMAC_TS_CTRL		0x700		/* Timestamp control reg */
++#define GMAC_TS_CTRL_TSENA	0x00000001	/* Timestamp enable */
++#define GMAC_TS_CTRL_TSCFUPDT	0x00000002	/* Timestamp fine/coarse */
++#define GMAC_TS_CTRL_TSINT	0x00000004	/* Timestamp initialise */
++#define GMAC_TS_CTRL_TSUPDT	0x00000008	/* Timestamp update */
++#define GMAC_TS_CTRL_TSTRIG	0x00000010	/* Timestamp trigger en */
++#define GMAC_TS_CTRL_TSADDREG	0x00000020	/* Timestamp addreg update */
++#define GMAC_TS_CTRL_TSENALL	0x00000100	/* Timestamp RX enable all */
++#define GMAC_TS_CTRL_TSCTRLSSR	0x00000200	/* Timestamp rollover ctr */
++#define GMAC_TS_CTRL_TSVER2ENA	0x00000400	/* Timestamp PTP v2 en */
++#define GMAC_TS_CTRL_TSIPENA	0x00000800	/* Timestamp PTP over eth */
++#define GMAC_TS_CTRL_TSIPV6ENA	0x00001000	/* Timestamp over IPV6 */
++#define GMAC_TS_CTRL_TSIPV4ENA	0x00002000	/* Timestamp over IPV4 */
++#define GMAC_TS_CTRL_TSEVNTENA	0x00004000	/* Timestamp event only */
++#define GMAC_TS_CTRL_TSMSTRENA	0x00008000	/* Timestamp master enable */
++#define GMAC_TS_CTRL_SNTYPSEL0	0x00000000	/* Timestamp type 0 snapshot */
++#define GMAC_TS_CTRL_SNTYPSEL1	0x00010000	/* Timestamp type 1 snapshot */
++#define GMAC_TS_CTRL_SNTYPSEL2	0x00020000	/* Timestamp type 2 snapshot */
++#define GMAC_TS_CTRL_SNTYPSEL3	0x00030000	/* Timestamp type 3 snapshot */
++#define GMAC_TS_CTRL_TSENMACADR	0x00040000	/* Timestamp mac filter en */
++#define GMAC_TS_CTRL_ATSFC	0x01000000	/* Timestamp aux fifo clear */
++#define GMAC_TS_CTRL_ATSEN0	0x02000000	/* Timestamp aux0 snap en */
++#define GMAC_TS_CTRL_ATSEN1	0x04000000	/* Timestamp aux1 snap en */
++#define GMAC_TS_CTRL_ATSEN2	0x08000000	/* Timestamp aux2 snap en */
++#define GMAC_TS_CTRL_ATSEN3	0x10000000	/* Timestamp aux3 enable */
++#define GMAC_SS_INC		0x704		/* Sub-second increment reg */
++#define GMAC_ST_SEC		0x708		/* System time seconds */
++#define GMAC_ST_NSEC		0x70C		/* System time nseconds */
++#define GMAC_ST_SECUP		0x710		/* System time sec-update */
++#define GMAC_ST_NSECUP		0x714		/* System time nsec-update */
++#define GMAC_TS_APPEND		0x718		/* Timestamp append */
++#define GMAC_TT_SEC		0x71C		/* Target time seconds */
++#define GMAC_TT_NSEC		0x720		/* Target time nseconds */
++#define GMAC_ST_HWSEC		0x724		/* System time high word sec */
++#define GMAC_ST_TS_STAT		0x728		/* Timestamp status */
++#define GMAC_PPS_CTRL		0x72C		/* PPS signal output control */
++#define GMAC_AUXTS_NSEC		0x730		/* Aux timestamp counter nsec */
++#define GMAC_AUXTS_SEC		0x734		/* Aux timestamp counter sec */
++
+ extern const struct stmmac_dma_ops dwmac1000_dma_ops;
+ #endif /* __DWMAC1000_H__ */
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
+index bfe0226..b6d04ca 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
+@@ -30,6 +30,7 @@
+ #include <linux/slab.h>
+ #include <asm/io.h>
+ #include "dwmac1000.h"
++#include "stmmac.h"
+ 
+ static void dwmac1000_core_init(void __iomem *ioaddr)
+ {
+@@ -38,7 +39,7 @@ static void dwmac1000_core_init(void __iomem *ioaddr)
+ 	writel(value, ioaddr + GMAC_CONTROL);
+ 
+ 	/* Mask GMAC interrupts */
+-	writel(0x207, ioaddr + GMAC_INT_MASK);
++	writel(GMAC_INT_MASK_DEFAULT, ioaddr + GMAC_INT_MASK);
+ 
+ #ifdef STMMAC_VLAN_TAG_USED
+ 	/* Tag detection without filtering */
+@@ -46,11 +47,15 @@ static void dwmac1000_core_init(void __iomem *ioaddr)
+ #endif
+ }
+ 
+-static int dwmac1000_rx_ipc_enable(void __iomem *ioaddr)
++static int dwmac1000_set_rx_ipc(void __iomem *ioaddr, bool on)
+ {
+ 	u32 value = readl(ioaddr + GMAC_CONTROL);
+ 
+-	value |= GMAC_CONTROL_IPC;
++	if(on == true){
++		value |= GMAC_CONTROL_IPC;
++	}else{
++		value &= ~GMAC_CONTROL_IPC;
++	}
+ 	writel(value, ioaddr + GMAC_CONTROL);
+ 
+ 	value = readl(ioaddr + GMAC_CONTROL);
+@@ -87,6 +92,7 @@ static void dwmac1000_get_umac_addr(void __iomem *ioaddr, unsigned char *addr,
+ static void dwmac1000_set_filter(struct net_device *dev, int id)
+ {
+ 	void __iomem *ioaddr = (void __iomem *) dev->base_addr;
++	struct stmmac_priv *priv = netdev_priv(dev);
+ 	unsigned int value = 0;
+ 	unsigned int perfect_addr_number;
+ 
+@@ -147,6 +153,10 @@ static void dwmac1000_set_filter(struct net_device *dev, int id)
+ 	/* Enable Receive all mode (to debug filtering_fail errors) */
+ 	value |= GMAC_FRAME_FILTER_RA;
+ #endif
++	if (priv->active_vlans != 0){
++		/* VLAN hash filtering is active on this interface */
++		value |= GMAC_FRAME_FILTER_VTFE;
++	}
+ 	writel(value, ioaddr + GMAC_FRAME_FILTER);
+ 
+ 	CHIP_DBG(KERN_INFO "\tFrame Filter reg: 0x%08x\n\tHash regs: "
+@@ -194,38 +204,42 @@ static void dwmac1000_pmt(void __iomem *ioaddr, unsigned long mode)
+ }
+ 
+ 
+-static int dwmac1000_irq_status(void __iomem *ioaddr)
++#ifndef CONFIG_STMMAC_PTP
++#define stmmac_ptp_check_pps_event(x){}
++#endif
++
++static int dwmac1000_irq_status(struct stmmac_priv *priv)
+ {
+-	u32 intr_status = readl(ioaddr + GMAC_INT_STATUS);
++	u32 intr_status = readl(priv->ioaddr + GMAC_INT_STATUS);
+ 	int status = 0;
+ 
+ 	/* Not used events (e.g. MMC interrupts) are not handled. */
+ 	if ((intr_status & mmc_tx_irq)) {
+ 		CHIP_DBG(KERN_INFO "GMAC: MMC tx interrupt: 0x%08x\n",
+-		    readl(ioaddr + GMAC_MMC_TX_INTR));
++		    readl(priv->ioaddr + GMAC_MMC_TX_INTR));
+ 		status |= core_mmc_tx_irq;
+ 	}
+ 	if (unlikely(intr_status & mmc_rx_irq)) {
+ 		CHIP_DBG(KERN_INFO "GMAC: MMC rx interrupt: 0x%08x\n",
+-		    readl(ioaddr + GMAC_MMC_RX_INTR));
++		    readl(priv->ioaddr + GMAC_MMC_RX_INTR));
+ 		status |= core_mmc_rx_irq;
+ 	}
+ 	if (unlikely(intr_status & mmc_rx_csum_offload_irq)) {
+ 		CHIP_DBG(KERN_INFO "GMAC: MMC rx csum offload: 0x%08x\n",
+-		    readl(ioaddr + GMAC_MMC_RX_CSUM_OFFLOAD));
++		    readl(priv->ioaddr + GMAC_MMC_RX_CSUM_OFFLOAD));
+ 		status |= core_mmc_rx_csum_offload_irq;
+ 	}
+ 	if (unlikely(intr_status & pmt_irq)) {
+ 		CHIP_DBG(KERN_INFO "GMAC: received Magic frame\n");
+ 		/* clear the PMT bits 5 and 6 by reading the PMT
+ 		 * status register. */
+-		readl(ioaddr + GMAC_PMT);
++		readl(priv->ioaddr + GMAC_PMT);
+ 		status |= core_irq_receive_pmt_irq;
+ 	}
+ 	/* MAC trx/rx EEE LPI entry/exit interrupts */
+ 	if (intr_status & lpiis_irq) {
+ 		/* Clean LPI interrupt by reading the Reg 12 */
+-		u32 lpi_status = readl(ioaddr + LPI_CTRL_STATUS);
++		u32 lpi_status = readl(priv->ioaddr + LPI_CTRL_STATUS);
+ 
+ 		if (lpi_status & LPI_CTRL_STATUS_TLPIEN) {
+ 			CHIP_DBG(KERN_INFO "GMAC TX entered in LPI\n");
+@@ -244,10 +258,110 @@ static int dwmac1000_irq_status(void __iomem *ioaddr)
+ 			status |= core_irq_rx_path_exit_lpi_mode;
+ 		}
+ 	}
++	if (unlikely(intr_status & time_stamp_irq)){
++		stmmac_ptp_check_pps_event(priv);
++	}
+ 
+ 	return status;
+ }
+ 
++static unsigned int dwmac1000_calc_vlan_4bit_crc ( const char * vlan )
++{
++	int i = 0, j = 0, len = 0, bit = 0;
++	unsigned int crc = 0xFFFFFFFF;
++	unsigned int poly = 0x04C11DB7;
++	unsigned char data;
++
++	if(unlikely(vlan == NULL)){
++		return 0;
++	}
++
++	for( i = 0; i < 2; i++ ) {
++		data = vlan[i];
++
++		if (i==0){
++			len = 8;
++		}else{
++			len = 4;
++		}
++
++		for( bit = 0; bit < len; bit++ ) {
++
++			j = ((crc >> 31) ^ data) & 0x1;
++			crc <<= 1;
++
++			if( j != 0 ){
++				crc ^= poly;
++			}
++
++			data >>= 1;
++		}
++	}
++	return crc;
++
++}
++
++static int dwmac1000_vlan_rx_add_vid(struct stmmac_priv *priv, unsigned short vid)
++{
++	u32 reg = 0;
++	u32 bit_nr = 0;
++
++	if(unlikely(priv == NULL || vid > GMAC_VLAN_HASH_MAXID)){
++		return -EINVAL;
++	}
++
++	if(priv->active_vlans == 0){
++
++		/* Flip the VTFE bit in GMAC_FRAME_FILTER */
++		reg = readl(priv->ioaddr + GMAC_FRAME_FILTER);
++		reg |= GMAC_FRAME_FILTER_VTFE;
++		writel(reg, priv->ioaddr + GMAC_FRAME_FILTER);
++
++		/* Enable hash filtering - based on 12 bit vid */
++		reg = readl(priv->ioaddr + GMAC_VLAN_TAG);
++		reg |= GMAC_VLAN_TAG_VTHM | GMAC_VLAN_TAG_ETV | 0x0000FFFF;
++		writel(reg, priv->ioaddr + GMAC_VLAN_TAG);
++	}
++
++	bit_nr = (~dwmac1000_calc_vlan_4bit_crc((const char*)&vid)) >> 28;
++	priv->active_vlans |= 1 << bit_nr;
++
++	writel(priv->active_vlans, priv->ioaddr + GMAC_VLAN_HASH);
++
++	return 0;
++}
++
++static int dwmac1000_vlan_rx_kill_vid(struct stmmac_priv *priv, unsigned short vid)
++{
++	u32 reg = 0;
++	u32 bit_nr = 0;
++
++	if(unlikely(priv == NULL || vid > GMAC_VLAN_HASH_MAXID)){
++		return -EINVAL;
++	}
++
++	bit_nr = (~dwmac1000_calc_vlan_4bit_crc((const char*)&vid)) >> 28;
++
++	priv->active_vlans &= ~(1 << bit_nr);
++	writel(priv->active_vlans, priv->ioaddr + GMAC_VLAN_HASH);
++
++	if(priv->active_vlans == 0){
++
++		/* Disable hash filtering */
++		reg = readl(priv->ioaddr + GMAC_VLAN_TAG);
++		reg &= ~(GMAC_VLAN_TAG_VTHM | GMAC_VLAN_TAG_ETV | 0x00000001);
++		writel(reg, priv->ioaddr + GMAC_VLAN_TAG);
++
++		/* Flip the VTFE bit in GMAC_FRAME_FILTER */
++		reg = readl(priv->ioaddr + GMAC_FRAME_FILTER);
++		reg &= ~GMAC_FRAME_FILTER_VTFE;
++		writel(reg, priv->ioaddr + GMAC_FRAME_FILTER);
++
++	}
++
++	return 0;
++}
++
+ static void  dwmac1000_set_eee_mode(void __iomem *ioaddr)
+ {
+ 	u32 value;
+@@ -297,9 +411,10 @@ static void  dwmac1000_set_eee_timer(void __iomem *ioaddr, int ls, int tw)
+ 	writel(value, ioaddr + LPI_TIMER_CTRL);
+ }
+ 
++
+ static const struct stmmac_ops dwmac1000_ops = {
+ 	.core_init = dwmac1000_core_init,
+-	.rx_ipc = dwmac1000_rx_ipc_enable,
++	.set_rx_ipc = dwmac1000_set_rx_ipc,
+ 	.dump_regs = dwmac1000_dump_regs,
+ 	.host_irq_status = dwmac1000_irq_status,
+ 	.set_filter = dwmac1000_set_filter,
+@@ -307,6 +422,8 @@ static const struct stmmac_ops dwmac1000_ops = {
+ 	.pmt = dwmac1000_pmt,
+ 	.set_umac_addr = dwmac1000_set_umac_addr,
+ 	.get_umac_addr = dwmac1000_get_umac_addr,
++	.vlan_rx_add_vid = dwmac1000_vlan_rx_add_vid,
++	.vlan_rx_kill_vid = dwmac1000_vlan_rx_kill_vid,
+ 	.set_eee_mode =  dwmac1000_set_eee_mode,
+ 	.reset_eee_mode =  dwmac1000_reset_eee_mode,
+ 	.set_eee_timer =  dwmac1000_set_eee_timer,
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_dma.c b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_dma.c
+index bf83c03..a0c08e1 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_dma.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_dma.c
+@@ -59,9 +59,12 @@ static int dwmac1000_dma_init(void __iomem *ioaddr, int pbl, int fb,
+ 	 * DMA transfers the data in 8, 16, 32, 64, 128 & 256 beats
+ 	 * depending on pbl value.
+ 	 */
++#ifdef CONFIG_INTEL_QUARK_X1000_SOC
++	value = DMA_BUS_MODE_RIX | (pbl << DMA_BUS_MODE_PBL_SHIFT);
++#else
+ 	value = DMA_BUS_MODE_PBL | ((pbl << DMA_BUS_MODE_PBL_SHIFT) |
+ 		(pbl << DMA_BUS_MODE_RPBL_SHIFT));
+-
++#endif
+ 	/* Set the Fixed burst mode */
+ 	if (fb)
+ 		value |= DMA_BUS_MODE_FB;
+@@ -70,6 +73,10 @@ static int dwmac1000_dma_init(void __iomem *ioaddr, int pbl, int fb,
+ 	if (mb)
+ 		value |= DMA_BUS_MODE_MB;
+ 
++#if defined(STMMAC_ATDS_USED)
++	value |= DMA_BUS_MODE_ATDS;
++#endif
++
+ #ifdef CONFIG_STMMAC_DA
+ 	value |= DMA_BUS_MODE_DA;	/* Rx has priority over tx */
+ #endif
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c b/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
+index f83210e..43472c0 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
+@@ -67,12 +67,12 @@ static void dwmac100_dump_mac_regs(void __iomem *ioaddr)
+ 		readl(ioaddr + MAC_VLAN2));
+ }
+ 
+-static int dwmac100_rx_ipc_enable(void __iomem *ioaddr)
++static int dwmac100_set_rx_ipc(void __iomem *ioaddr, bool on)
+ {
+ 	return 0;
+ }
+ 
+-static int dwmac100_irq_status(void __iomem *ioaddr)
++static int dwmac100_irq_status(struct stmmac_priv *priv)
+ {
+ 	return 0;
+ }
+@@ -160,7 +160,7 @@ static void dwmac100_pmt(void __iomem *ioaddr, unsigned long mode)
+ 
+ static const struct stmmac_ops dwmac100_ops = {
+ 	.core_init = dwmac100_core_init,
+-	.rx_ipc = dwmac100_rx_ipc_enable,
++	.set_rx_ipc = dwmac100_set_rx_ipc,
+ 	.dump_regs = dwmac100_dump_mac_regs,
+ 	.host_irq_status = dwmac100_irq_status,
+ 	.set_filter = dwmac100_set_filter,
+diff --git a/drivers/net/ethernet/stmicro/stmmac/mmc_core.c b/drivers/net/ethernet/stmicro/stmmac/mmc_core.c
+index 0c74a70..50617c5 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/mmc_core.c
++++ b/drivers/net/ethernet/stmicro/stmmac/mmc_core.c
+@@ -149,6 +149,7 @@ void dwmac_mmc_intr_all_mask(void __iomem *ioaddr)
+ {
+ 	writel(MMC_DEFAULT_MASK, ioaddr + MMC_RX_INTR_MASK);
+ 	writel(MMC_DEFAULT_MASK, ioaddr + MMC_TX_INTR_MASK);
++	writel(MMC_DEFAULT_MASK, ioaddr + MMC_RX_IPC_INTR_MASK);
+ }
+ 
+ /* This reads the MAC core counters (if actaully supported).
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac.h b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+index b05df89..611f70e 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac.h
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+@@ -27,9 +27,11 @@
+ #define DRV_MODULE_VERSION	"Nov_2012"
+ 
+ #include <linux/clk.h>
++#include <linux/clocksource.h>
+ #include <linux/stmmac.h>
+ #include <linux/phy.h>
+ #include <linux/pci.h>
++#include <linux/ptp_clock_kernel.h>
+ #include "common.h"
+ 
+ struct stmmac_priv {
+@@ -72,8 +74,22 @@ struct stmmac_priv {
+ 	u32 msg_enable;
+ 	spinlock_t lock;
+ 	spinlock_t tx_lock;
++
++	/* PTP */
++	struct ptp_clock *ptp_clock;
++	struct ptp_clock_info ptp_caps;
++	struct delayed_work overflow_work;
++	spinlock_t tmreg_lock;
++	struct cyclecounter ccnt;
++	struct timecounter tcnt;
++//	struct timecompare tcmp;
++	int hwts;
++	struct stmmac_timer *tm;
++
+ 	int wolopts;
+ 	int wol_irq;
++
++	int active_vlans;
+ 	struct plat_stmmacenet_data *plat;
+ 	struct stmmac_counters mmc;
+ 	struct dma_features dma_cap;
+@@ -81,6 +97,8 @@ struct stmmac_priv {
+ 	struct clk *stmmac_clk;
+ 	int clk_csr;
+ 	int synopsys_id;
++	int irqmode_msi;
++	struct pci_dev * pdev;
+ 	struct timer_list eee_ctrl_timer;
+ 	bool tx_path_in_lpi_mode;
+ 	int lpi_irq;
+@@ -110,6 +128,63 @@ int stmmac_dvr_remove(struct net_device *ndev);
+ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 				     struct plat_stmmacenet_data *plat_dat,
+ 				     void __iomem *addr);
++#ifdef CONFIG_STMMAC_PTP
++
++#define STMMAC_PTP_OVERFLOW_CHECK_ENABLED	(u32)(1)
++#define STMMAC_PTP_PPS_ENABLED			(u32)(1 << 1)
++#define STMMAC_PTP_HWTS_TX_EN			(u32)(1 << 2)
++#define STMMAC_PTP_HWTS_RX_EN			(u32)(1 << 3)
++
++extern void stmmac_ptp_init(struct net_device *ndev, struct device * pdev);
++extern void stmmac_ptp_remove(struct stmmac_priv *priv);
++extern int stmmac_ptp_hwtstamp_ioctl(struct stmmac_priv *priv,
++			     struct ifreq *ifr, int cmd);
++extern void stmmac_ptp_rx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *pdma,
++			   struct sk_buff *skb);
++extern void stmmac_ptp_tx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *pdma,
++			   struct sk_buff *skb);
++extern void stmmac_ptp_check_pps_event(struct stmmac_priv *priv);
++#endif
++
++#ifdef CONFIG_HAVE_CLK
++static inline int stmmac_clk_enable(struct stmmac_priv *priv)
++{
++	if (!IS_ERR(priv->stmmac_clk))
++		return clk_prepare_enable(priv->stmmac_clk);
++
++	return 0;
++}
++
++static inline void stmmac_clk_disable(struct stmmac_priv *priv)
++{
++	if (IS_ERR(priv->stmmac_clk))
++		return;
++
++	clk_disable_unprepare(priv->stmmac_clk);
++}
++static inline int stmmac_clk_get(struct stmmac_priv *priv)
++{
++	priv->stmmac_clk = clk_get(priv->device, NULL);
++
++	if (IS_ERR(priv->stmmac_clk))
++		return PTR_ERR(priv->stmmac_clk);
++
++	return 0;
++}
++#else
++static inline int stmmac_clk_enable(struct stmmac_priv *priv)
++{
++	return 0;
++}
++static inline void stmmac_clk_disable(struct stmmac_priv *priv)
++{
++}
++static inline int stmmac_clk_get(struct stmmac_priv *priv)
++{
++	return 0;
++}
++#endif /* CONFIG_HAVE_CLK */
++
+ void stmmac_disable_eee_mode(struct stmmac_priv *priv);
+ bool stmmac_eee_init(struct stmmac_priv *priv);
+ 
+@@ -167,6 +242,7 @@ static inline int stmmac_register_pci(void)
+ static inline void stmmac_unregister_pci(void)
+ {
+ }
++
+ #endif /* CONFIG_STMMAC_PCI */
+ 
+ #endif /* __STMMAC_H__ */
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c
+index 1372ce2..0644dcd 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c
+@@ -31,6 +31,7 @@
+ 
+ #include "stmmac.h"
+ #include "dwmac_dma.h"
++#include "dwmac1000.h"
+ 
+ #define REG_SPACE_SIZE	0x1054
+ #define MAC100_ETHTOOL_NAME	"st_mac100"
+@@ -231,9 +232,7 @@ static int stmmac_ethtool_getsettings(struct net_device *dev,
+ 		return -EBUSY;
+ 	}
+ 	cmd->transceiver = XCVR_INTERNAL;
+-	spin_lock_irq(&priv->lock);
+ 	rc = phy_ethtool_gset(phy, cmd);
+-	spin_unlock_irq(&priv->lock);
+ 	return rc;
+ }
+ 
+@@ -244,10 +243,7 @@ static int stmmac_ethtool_setsettings(struct net_device *dev,
+ 	struct phy_device *phy = priv->phydev;
+ 	int rc;
+ 
+-	spin_lock(&priv->lock);
+ 	rc = phy_ethtool_sset(phy, cmd);
+-	spin_unlock(&priv->lock);
+-
+ 	return rc;
+ }
+ 
+@@ -279,7 +275,7 @@ static int stmmac_ethtool_get_regs_len(struct net_device *dev)
+ static void stmmac_ethtool_gregs(struct net_device *dev,
+ 			  struct ethtool_regs *regs, void *space)
+ {
+-	int i;
++	int i, offset = 0;
+ 	u32 *reg_space = (u32 *) space;
+ 
+ 	struct stmmac_priv *priv = netdev_priv(dev);
+@@ -300,9 +296,20 @@ static void stmmac_ethtool_gregs(struct net_device *dev,
+ 		/* MAC registers */
+ 		for (i = 0; i < 55; i++)
+ 			reg_space[i] = readl(priv->ioaddr + (i * 4));
++
++		/* VLAN registers */
++		offset = i;
++		reg_space[offset++] = readl(priv->ioaddr + GMAC_VLAN_TAG_REP);
++		reg_space[offset++] = readl(priv->ioaddr + GMAC_VLAN_HASH);
++
++		/* 1588 registers */
++		for(i = 0; i < 13; i++);
++			reg_space[i + offset] = readl(priv->ioaddr + (GMAC_TS_CTRL + (i * 4)));
++
+ 		/* DMA registers */
++		offset += i;
+ 		for (i = 0; i < 22; i++)
+-			reg_space[i + 55] =
++			reg_space[i + offset] =
+ 			    readl(priv->ioaddr + (DMA_BUS_MODE + (i * 4)));
+ 	}
+ }
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index b75f4b2..aaccd3a 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -28,6 +28,9 @@
+ 	https://bugzilla.stlinux.com/
+ *******************************************************************************/
+ 
++#if defined(CONFIG_INTEL_QUARK_X1000_SOC)
++#include <asm/qrk.h>
++#endif
+ #include <linux/clk.h>
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
+@@ -135,6 +138,8 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id);
+ #ifdef CONFIG_STMMAC_DEBUG_FS
+ static int stmmac_init_fs(struct net_device *dev);
+ static void stmmac_exit_fs(void);
++static int debugfs_registered = 0;
++
+ #endif
+ 
+ #define STMMAC_COAL_TIMER(x) (jiffies + usecs_to_jiffies(x))
+@@ -502,13 +507,29 @@ static int stmmac_set_bfsize(int mtu, int bufsize)
+ }
+ 
+ /**
++ * init_dma_err_cleanup
++ *
++ * @dev: net device to clean
++ * Description: Does a cleanup if kmalloc fails during init
++ */
++static void init_dma_err_cleanup(struct stmmac_priv * priv)
++{
++	if (priv->tx_skbuff != NULL)
++		kfree(priv->tx_skbuff);
++	if (priv->rx_skbuff_dma != NULL)
++		kfree (priv->rx_skbuff_dma);
++	if (priv->rx_skbuff != NULL)
++		kfree (priv->rx_skbuff);
++}
++
++/**
+  * init_dma_desc_rings - init the RX/TX descriptor rings
+  * @dev: net device structure
+  * Description:  this function initializes the DMA RX/TX descriptors
+  * and allocates the socket buffers. It suppors the chained and ring
+  * modes.
+  */
+-static void init_dma_desc_rings(struct net_device *dev)
++static int init_dma_desc_rings(struct net_device *dev)
+ {
+ 	int i;
+ 	struct stmmac_priv *priv = netdev_priv(dev);
+@@ -532,8 +553,16 @@ static void init_dma_desc_rings(struct net_device *dev)
+ 	    txsize, rxsize, bfsize);
+ 
+ 	priv->rx_skbuff_dma = kmalloc(rxsize * sizeof(dma_addr_t), GFP_KERNEL);
++	if (priv->rx_skbuff_dma == NULL)
++		return -ENOMEM;
++
+ 	priv->rx_skbuff =
+ 	    kmalloc(sizeof(struct sk_buff *) * rxsize, GFP_KERNEL);
++	if (priv->rx_skbuff == NULL){
++		init_dma_err_cleanup(priv);
++		return -ENOMEM;
++	}
++
+ 	priv->dma_rx =
+ 	    (struct dma_desc *)dma_alloc_coherent(priv->device,
+ 						  rxsize *
+@@ -542,6 +571,11 @@ static void init_dma_desc_rings(struct net_device *dev)
+ 						  GFP_KERNEL);
+ 	priv->tx_skbuff = kmalloc(sizeof(struct sk_buff *) * txsize,
+ 				       GFP_KERNEL);
++	if (priv->tx_skbuff == NULL){
++		init_dma_err_cleanup(priv);
++		return -ENOMEM;
++	}
++
+ 	priv->dma_tx =
+ 	    (struct dma_desc *)dma_alloc_coherent(priv->device,
+ 						  txsize *
+@@ -550,8 +584,9 @@ static void init_dma_desc_rings(struct net_device *dev)
+ 						  GFP_KERNEL);
+ 
+ 	if ((priv->dma_rx == NULL) || (priv->dma_tx == NULL)) {
++		init_dma_err_cleanup(priv);
+ 		pr_err("%s:ERROR allocating the DMA Tx/Rx desc\n", __func__);
+-		return;
++		return -ENOMEM;
+ 	}
+ 
+ 	DBG(probe, INFO, "stmmac (%s) DMA desc: virt addr (Rx %p, "
+@@ -569,8 +604,9 @@ static void init_dma_desc_rings(struct net_device *dev)
+ 		skb = __netdev_alloc_skb(dev, bfsize + NET_IP_ALIGN,
+ 					 GFP_KERNEL);
+ 		if (unlikely(skb == NULL)) {
++			init_dma_err_cleanup(priv);
+ 			pr_err("%s: Rx init fails; skb is NULL\n", __func__);
+-			break;
++			return -ENOMEM;
+ 		}
+ 		skb_reserve(skb, NET_IP_ALIGN);
+ 		priv->rx_skbuff[i] = skb;
+@@ -615,6 +651,8 @@ static void init_dma_desc_rings(struct net_device *dev)
+ 		pr_info("TX descriptor ring:\n");
+ 		display_ring(priv->dma_tx, txsize);
+ 	}
++
++	return 0;
+ }
+ 
+ static void dma_free_rx_skbufs(struct stmmac_priv *priv)
+@@ -736,6 +774,10 @@ static void stmmac_tx_clean(struct stmmac_priv *priv)
+ 					 DMA_TO_DEVICE);
+ 		priv->hw->ring->clean_desc3(p);
+ 
++#ifdef CONFIG_STMMAC_PTP
++		stmmac_ptp_tx_hwtstamp(priv, p, skb);
++#endif
++
+ 		if (likely(skb != NULL)) {
+ 			dev_kfree_skb(skb);
+ 			priv->tx_skbuff[entry] = NULL;
+@@ -963,6 +1005,25 @@ static int stmmac_init_dma_engine(struct stmmac_priv *priv)
+ }
+ 
+ /**
++ *  stmmac_hw_set_rx_ipc
++ *  @priv : pointer to the private device structure.
++ *  Enables RX IPC offload if the feature is supported in hardware
++ */
++static int stmmac_hw_set_rx_ipc(struct stmmac_priv *priv, bool on)
++{
++	int ret = 0;
++
++	/* Enable the IPC (Checksum Offload) and check if the feature has been
++	 * enabled during the core configuration. */
++	ret = priv->hw->mac->set_rx_ipc(priv->ioaddr, on);
++	if (on == true && !ret) {
++		pr_warning(" RX IPC Checksum Offload not configured.\n");
++		priv->plat->rx_coe = STMMAC_RX_COE_NONE;
++	}
++	return ret;
++}
++
++/**
+  * stmmac_tx_timer:
+  * @data: data pointer
+  * Description:
+@@ -1022,7 +1083,12 @@ static int stmmac_open(struct net_device *dev)
+ 	priv->dma_tx_size = STMMAC_ALIGN(dma_txsize);
+ 	priv->dma_rx_size = STMMAC_ALIGN(dma_rxsize);
+ 	priv->dma_buf_sz = STMMAC_ALIGN(buf_sz);
+-	init_dma_desc_rings(dev);
++	ret = init_dma_desc_rings(dev);
++	if (ret < 0){
++		pr_err("%s: DMA initialization failed\n", __func__);
++		goto open_error;
++	}
++	
+ 
+ 	/* DMA initialization and SW reset */
+ 	ret = stmmac_init_dma_engine(priv);
+@@ -1078,6 +1144,9 @@ static int stmmac_open(struct net_device *dev)
+ 	/* Set the HW DMA mode and the COE */
+ 	stmmac_dma_operation_mode(priv);
+ 
++	/* Enable RX IPC if supported by silicon */
++	ret = stmmac_hw_set_rx_ipc(priv, true);
++
+ 	/* Extra statistics */
+ 	memset(&priv->xstats, 0, sizeof(struct stmmac_extra_stats));
+ 	priv->xstats.threshold = tc;
+@@ -1085,9 +1154,12 @@ static int stmmac_open(struct net_device *dev)
+ 	stmmac_mmc_setup(priv);
+ 
+ #ifdef CONFIG_STMMAC_DEBUG_FS
+-	ret = stmmac_init_fs(dev);
+-	if (ret < 0)
+-		pr_warning("%s: failed debugFS registration\n", __func__);
++	if (debugfs_registered == 0){
++		debugfs_registered = 1;
++		ret = stmmac_init_fs(dev);
++		if (ret < 0)
++			pr_warning("%s: failed debugFS registration\n", __func__);
++	}
+ #endif
+ 	/* Start the ball rolling... */
+ 	DBG(probe, DEBUG, "%s: DMA RX/TX processes started...\n", dev->name);
+@@ -1430,6 +1502,9 @@ static int stmmac_rx(struct stmmac_priv *priv, int limit)
+ #endif
+ 			skb->protocol = eth_type_trans(skb, priv->dev);
+ 
++#ifdef CONFIG_STMMAC_PTP
++			stmmac_ptp_tx_hwtstamp(priv, priv->dma_rx + entry, skb);
++#endif
+ 			if (unlikely(!priv->plat->rx_coe))
+ 				skb_checksum_none_assert(skb);
+ 			else
+@@ -1588,9 +1663,19 @@ static netdev_features_t stmmac_fix_features(struct net_device *dev,
+ 	if (priv->plat->bugged_jumbo && (dev->mtu > ETH_DATA_LEN))
+ 		features &= ~NETIF_F_ALL_CSUM;
+ 
++	stmmac_hw_set_rx_ipc(priv, features & NETIF_F_RXCSUM);
++
+ 	return features;
+ }
+ 
++#if defined(CONFIG_INTEL_QUARK_X1000_SOC)
++	#define mask_pvm(x) qrk_pci_pvm_mask(x)
++	#define unmask_pvm(x) qrk_pci_pvm_unmask(x)
++#else
++	#define mask_pvm(x)
++	#define unmask_pvm(x)
++#endif
++
+ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
+ {
+ 	struct net_device *dev = (struct net_device *)dev_id;
+@@ -1601,10 +1686,12 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
+ 		return IRQ_NONE;
+ 	}
+ 
++	mask_pvm(priv->pdev);
++
+ 	/* To handle GMAC own interrupts */
+ 	if (priv->plat->has_gmac) {
+-		int status = priv->hw->mac->host_irq_status((void __iomem *)
+-							    dev->base_addr);
++		int status = priv->hw->mac->host_irq_status(priv);
++
+ 		if (unlikely(status)) {
+ 			if (status & core_mmc_tx_irq)
+ 				priv->xstats.mmc_tx_irq_n++;
+@@ -1634,6 +1721,8 @@ static irqreturn_t stmmac_interrupt(int irq, void *dev_id)
+ 	/* To handle DMA interrupts */
+ 	stmmac_dma_interrupt(priv);
+ 
++	unmask_pvm(priv->pdev);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1669,7 +1758,15 @@ static int stmmac_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+ 	if (!priv->phydev)
+ 		return -EINVAL;
+ 
+-	ret = phy_mii_ioctl(priv->phydev, rq, cmd);
++	switch (cmd) {
++#ifdef CONFIG_STMMAC_PTP
++	case SIOCSHWTSTAMP:
++		ret = stmmac_ptp_hwtstamp_ioctl(priv, rq, cmd);
++		break;
++#endif
++	default:
++		ret = phy_mii_ioctl(priv->phydev, rq, cmd);
++	}
+ 
+ 	return ret;
+ }
+@@ -1850,6 +1947,21 @@ static void stmmac_exit_fs(void)
+ }
+ #endif /* CONFIG_STMMAC_DEBUG_FS */
+ 
++#ifdef STMMAC_VLAN_HASH
++static int stmmac_vlan_rx_add_vid(struct net_device *dev, unsigned short vid)
++{
++	struct stmmac_priv *priv = netdev_priv(dev);
++	return priv->hw->mac->vlan_rx_add_vid(priv, vid);
++}
++
++static int stmmac_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
++{
++	struct stmmac_priv *priv = netdev_priv(dev);
++	return priv->hw->mac->vlan_rx_kill_vid(priv, vid);
++}
++
++#endif
++
+ static const struct net_device_ops stmmac_netdev_ops = {
+ 	.ndo_open = stmmac_open,
+ 	.ndo_start_xmit = stmmac_xmit,
+@@ -1860,6 +1972,10 @@ static const struct net_device_ops stmmac_netdev_ops = {
+ 	.ndo_tx_timeout = stmmac_tx_timeout,
+ 	.ndo_do_ioctl = stmmac_ioctl,
+ 	.ndo_set_config = stmmac_config,
++#ifdef STMMAC_VLAN_HASH
++	.ndo_vlan_rx_add_vid = stmmac_vlan_rx_add_vid,
++	.ndo_vlan_rx_kill_vid = stmmac_vlan_rx_kill_vid,
++#endif
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller = stmmac_poll_controller,
+ #endif
+@@ -1924,13 +2040,7 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
+ 	/* Select the enhnaced/normal descriptor structures */
+ 	stmmac_selec_desc_mode(priv);
+ 
+-	/* Enable the IPC (Checksum Offload) and check if the feature has been
+-	 * enabled during the core configuration. */
+-	ret = priv->hw->mac->rx_ipc(priv->ioaddr);
+-	if (!ret) {
+-		pr_warning(" RX IPC Checksum Offload not configured.\n");
+-		priv->plat->rx_coe = STMMAC_RX_COE_NONE;
+-	}
++	ret = stmmac_hw_set_rx_ipc(priv, true);
+ 
+ 	if (priv->plat->rx_coe)
+ 		pr_info(" RX Checksum Offload Engine supported (type %d)\n",
+@@ -2001,6 +2111,12 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	/* Both mac100 and gmac support receive VLAN tag detection */
+ 	ndev->features |= NETIF_F_HW_VLAN_RX;
+ #endif
++#ifdef STMMAC_VLAN_HASH
++	ndev->features |= NETIF_F_HW_VLAN_FILTER;
++	ndev->vlan_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
++			    NETIF_F_RXCSUM;
++#endif
++
+ 	priv->msg_enable = netif_msg_init(debug, default_msg_level);
+ 
+ 	if (flow_ctrl)
+@@ -2044,6 +2160,10 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
+ 	else
+ 		priv->clk_csr = priv->plat->clk_csr;
+ 
++#ifdef CONFIG_STMMAC_PTP
++	stmmac_ptp_init(ndev, device);
++#endif
++
+ 	/* MDIO bus Registration */
+ 	ret = stmmac_mdio_register(ndev);
+ 	if (ret < 0) {
+@@ -2060,6 +2180,9 @@ error_clk_get:
+ 	unregister_netdev(ndev);
+ error_netdev_register:
+ 	netif_napi_del(&priv->napi);
++#ifdef CONFIG_STMMAC_PTP
++	stmmac_ptp_remove(priv);
++#endif
+ 	free_netdev(ndev);
+ 
+ 	return NULL;
+@@ -2075,7 +2198,7 @@ int stmmac_dvr_remove(struct net_device *ndev)
+ {
+ 	struct stmmac_priv *priv = netdev_priv(ndev);
+ 
+-	pr_info("%s:\n\tremoving driver", __func__);
++	pr_info("%s:\n\tremoving driver\n", __func__);
+ 
+ 	priv->hw->dma->stop_rx(priv->ioaddr);
+ 	priv->hw->dma->stop_tx(priv->ioaddr);
+@@ -2083,6 +2206,10 @@ int stmmac_dvr_remove(struct net_device *ndev)
+ 	stmmac_set_mac(priv->ioaddr, false);
+ 	stmmac_mdio_unregister(ndev);
+ 	netif_carrier_off(ndev);
++
++#ifdef CONFIG_STMMAC_PTP
++	stmmac_ptp_remove(priv);
++#endif
+ 	unregister_netdev(ndev);
+ 	free_netdev(ndev);
+ 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
+index 064eaac..ac32842 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
+@@ -23,31 +23,205 @@
+   Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+ *******************************************************************************/
+ 
++#include <linux/dmi.h>
+ #include <linux/pci.h>
++#include <linux/platform_data/quark.h>
+ #include "stmmac.h"
+ 
+-struct plat_stmmacenet_data plat_dat;
+-struct stmmac_mdio_bus_data mdio_data;
+-struct stmmac_dma_cfg dma_cfg;
++/* List of supported PCI device IDs */
++#define STMMAC_VENDOR_ID 0x700
++#define STMMAC_DEVICE_ID 0x1108
++#define STMMAC_QUARK_ID 0x0937
++#define MAX_INTERFACES	 0x02
++
++#if defined (CONFIG_INTEL_QUARK_X1000_SOC)
++static int enable_msi = 1;
++#else
++static int enable_msi = 0;
++#endif
++module_param(enable_msi, int, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(enable_msi, "Enable PCI MSI mode");
++
++static int bus_id = 1;
++#if 0
++static char stmmac_mac_data[MAX_INTERFACES][ETH_ALEN];
++#endif
++
++struct stmmac_qrk_mac_data {
++	int phy_addr;
++	int bus_id;
++	const char * name;	
++};
++
++static struct stmmac_qrk_mac_data phy_data [] = {
++	{
++		.phy_addr	= -1,			/* not connected */
++		.bus_id		= 1,
++		.name		= "QuarkEmulation",
++	},
++	{
++		.phy_addr 	= 1,
++		.bus_id		= 2,
++		.name		= "QuarkEmulation",
++	},
++	{
++		.phy_addr	= 3,
++		.bus_id		= 1,
++		.name 		= "ClantonPeakSVP",
++	},
++	{
++		.phy_addr 	= 1,
++		.bus_id		= 2,
++		.name 		= "ClantonPeakSVP",
++	},
++	{
++		.phy_addr	= 1,
++		.bus_id		= 1,
++		.name 		= "KipsBay",
++	},
++	{
++		.phy_addr 	= -1,			/* not connected */
++		.bus_id		= 2,
++		.name 		= "KipsBay",
++	},
++	{
++		.phy_addr	= 1,
++		.bus_id		= 1,
++		.name 		= "CrossHill",
++	},
++	{
++		.phy_addr 	= 1,
++		.bus_id		= 2,
++		.name 		= "CrossHill",
++	},
++	{
++		.phy_addr	= 1,
++		.bus_id		= 1,
++		.name 		= "ClantonHill",
++	},
++	{
++		.phy_addr 	= 1,
++		.bus_id		= 2,
++		.name 		= "ClantonHill",
++	},
++	{
++		.phy_addr	= 1,
++		.bus_id		= 1,
++		.name 		= "Galileo",
++	},
++	{
++		.phy_addr 	= -1,			/* not connected */
++		.bus_id		= 2,
++		.name 		= "Galileo",
++	},
++	{
++		.phy_addr	= 1,
++		.bus_id		= 1,
++		.name		= "GalileoGen2",
++	},
++	{
++		.phy_addr	= -1,			/* not connected */
++		.bus_id		= 2,
++		.name		= "GalileoGen2",
++	},
++};
++
++
++static int stmmac_find_phy_addr(int mdio_bus_id)
++{
++	int i = 0;
++	const char * board_name = dmi_get_system_info(DMI_BOARD_NAME);
++	if (board_name == NULL)
++		return -1;
++
++	for (; i < sizeof(phy_data)/sizeof(struct stmmac_qrk_mac_data); i++){
++		if ((!strcmp(phy_data[i].name, board_name)) &&
++			phy_data[i].bus_id == mdio_bus_id)
++			return phy_data[i].phy_addr;
++	}
++
++	return -1;
++}
++
++static int stmmac_default_data(struct plat_stmmacenet_data *plat_dat,
++			       int mdio_bus_id, const struct pci_device_id *id)
++{
++	int phy_addr = 0;
++	memset(plat_dat, 0, sizeof(struct plat_stmmacenet_data));
++
++	plat_dat->mdio_bus_data = kzalloc(sizeof(struct stmmac_mdio_bus_data),
++					GFP_KERNEL);
++	if (plat_dat->mdio_bus_data == NULL)
++		return -ENOMEM;
++
++	plat_dat->dma_cfg = kzalloc(sizeof(struct stmmac_dma_cfg),GFP_KERNEL);
++	if (plat_dat->dma_cfg == NULL)
++		return -ENOMEM;
++
++	if (id->device ==  STMMAC_QUARK_ID) {
++
++		phy_addr = stmmac_find_phy_addr(mdio_bus_id);
++		if (phy_addr == -1)
++			return -ENODEV;
++
++		plat_dat->bus_id = mdio_bus_id;
++		plat_dat->phy_addr = phy_addr;
++		plat_dat->interface = PHY_INTERFACE_MODE_RMII;
++		/* clk_csr_i = 20-35MHz & MDC = clk_csr_i/16 */
++		plat_dat->clk_csr = 2;
++		plat_dat->has_gmac = 1;
++		plat_dat->force_sf_dma_mode = 1;
++
++		plat_dat->mdio_bus_data->phy_reset = NULL;
++		plat_dat->mdio_bus_data->phy_mask = 0;
++
++		plat_dat->dma_cfg->pbl = 16;
++		plat_dat->dma_cfg->fixed_burst = 1;
++		plat_dat->dma_cfg->burst_len = DMA_AXI_BLEN_256;
++
++	} else {
++
++		plat_dat->bus_id = mdio_bus_id;
++		plat_dat->phy_addr = phy_addr;
++		plat_dat->interface = PHY_INTERFACE_MODE_GMII;
++		/* clk_csr_i = 20-35MHz & MDC = clk_csr_i/16 */
++		plat_dat->clk_csr = 2;
++		plat_dat->has_gmac = 1;
++		plat_dat->force_sf_dma_mode = 1;
++
++		plat_dat->mdio_bus_data->phy_reset = NULL;
++		plat_dat->mdio_bus_data->phy_mask = 0;
++
++		plat_dat->dma_cfg->pbl = 32;
++		plat_dat->dma_cfg->burst_len = DMA_AXI_BLEN_256;
++
++	}
++
++	return 0;
++}
+ 
+-static void stmmac_default_data(void)
++#if 0
++/**
++ * stmmac_pci_find_mac
++ *
++ * @prive: pointer to private stmmac structure
++ * @mdio_bus_id : MDIO bus identifier used to find the platform MAC id
++ *
++ * Attempt to find MAC in platform data. If not found then driver will generate
++ * a random one for itself in any case
++ */
++void stmmac_pci_find_mac (struct stmmac_priv * priv, unsigned int mdio_bus_id)
+ {
+-	memset(&plat_dat, 0, sizeof(struct plat_stmmacenet_data));
+-	plat_dat.bus_id = 1;
+-	plat_dat.phy_addr = 0;
+-	plat_dat.interface = PHY_INTERFACE_MODE_GMII;
+-	plat_dat.clk_csr = 2;	/* clk_csr_i = 20-35MHz & MDC = clk_csr_i/16 */
+-	plat_dat.has_gmac = 1;
+-	plat_dat.force_sf_dma_mode = 1;
+-
+-	mdio_data.phy_reset = NULL;
+-	mdio_data.phy_mask = 0;
+-	plat_dat.mdio_bus_data = &mdio_data;
+-
+-	dma_cfg.pbl = 32;
+-	dma_cfg.burst_len = DMA_AXI_BLEN_256;
+-	plat_dat.dma_cfg = &dma_cfg;
++	unsigned int id = mdio_bus_id - 1;
++	if (priv == NULL || id >= MAX_INTERFACES)
++		return;
++
++	if (intel_qrk_plat_get_mac(PLAT_DATA_MAC0+id,
++		(char*)&stmmac_mac_data[id]) == 0){
++		memcpy(priv->dev->dev_addr, &stmmac_mac_data[id], ETH_ALEN);
++	}
+ }
++#endif
+ 
+ /**
+  * stmmac_pci_probe
+@@ -67,8 +241,21 @@ static int stmmac_pci_probe(struct pci_dev *pdev,
+ 	int ret = 0;
+ 	void __iomem *addr = NULL;
+ 	struct stmmac_priv *priv = NULL;
++	struct plat_stmmacenet_data *plat_dat = NULL;
+ 	int i;
+ 
++        plat_dat = kmalloc(sizeof(struct plat_stmmacenet_data), GFP_KERNEL);
++        if (plat_dat == NULL){
++                ret = -ENOMEM;
++                goto err_out_map_failed;
++        }
++
++	/* return -ENODEV for non existing PHY, stop probing here  */
++        ret = stmmac_default_data(plat_dat, bus_id, id);
++        if (ret != 0)
++                goto err_platdata;
++
++
+ 	/* Enable pci device */
+ 	ret = pci_enable_device(pdev);
+ 	if (ret) {
+@@ -96,30 +283,51 @@ static int stmmac_pci_probe(struct pci_dev *pdev,
+ 		break;
+ 	}
+ 	pci_set_master(pdev);
++	if(enable_msi == 1){
++		pci_enable_msi(pdev);
++		pr_info("stmmac MSI mode enabled");
++	}
+ 
+-	stmmac_default_data();
++	pr_info("Vendor 0x%04x Device 0x%04x\n",
++		id->vendor, id->device);
+ 
+-	priv = stmmac_dvr_probe(&(pdev->dev), &plat_dat, addr);
++	priv = stmmac_dvr_probe(&(pdev->dev), plat_dat, addr);
+ 	if (!priv) {
+ 		pr_err("%s: main driver probe failed", __func__);
+ 		goto err_out;
+ 	}
++#if 0
++	stmmac_pci_find_mac(priv, bus_id);
++#endif
+ 	priv->dev->irq = pdev->irq;
+ 	priv->wol_irq = pdev->irq;
+-
++	priv->irqmode_msi = enable_msi;
++	priv->pdev = pdev;
++	#ifdef CONFIG_INTEL_QUARK_X1000_SOC
++	priv->lpi_irq = -ENXIO;
++	#endif
+ 	pci_set_drvdata(pdev, priv->dev);
+ 
+ 	pr_debug("STMMAC platform driver registration completed");
++	bus_id++;
+ 
+ 	return 0;
+ 
+ err_out:
+ 	pci_clear_master(pdev);
+-err_out_map_failed:
+ 	pci_release_regions(pdev);
+ err_out_req_reg_failed:
+ 	pci_disable_device(pdev);
+-
++err_platdata:
++	if (plat_dat != NULL){
++		if (plat_dat->dma_cfg != NULL)
++			kfree (plat_dat->dma_cfg);
++		if (plat_dat->mdio_bus_data != NULL)
++			kfree (plat_dat->mdio_bus_data);
++		kfree(plat_dat);
++	}
++err_out_map_failed:
++	bus_id++;
+ 	return ret;
+ }
+ 
+@@ -138,6 +346,21 @@ static void stmmac_pci_remove(struct pci_dev *pdev)
+ 	stmmac_dvr_remove(ndev);
+ 
+ 	pci_set_drvdata(pdev, NULL);
++
++	if(enable_msi == 1) {
++		if(pci_dev_msi_enabled(pdev)) {
++			pci_disable_msi(pdev);
++		}
++	}
++
++	if (priv->plat != NULL) {
++		if (priv->plat->dma_cfg != NULL)
++			kfree (priv->plat->dma_cfg);
++		if (priv->plat->mdio_bus_data != NULL)
++			kfree (priv->plat->mdio_bus_data);
++		kfree(priv->plat);
++	}
++
+ 	pci_iounmap(pdev, priv->ioaddr);
+ 	pci_release_regions(pdev);
+ 	pci_disable_device(pdev);
+@@ -167,12 +390,10 @@ static int stmmac_pci_resume(struct pci_dev *pdev)
+ }
+ #endif
+ 
+-#define STMMAC_VENDOR_ID 0x700
+-#define STMMAC_DEVICE_ID 0x1108
+-
+ static DEFINE_PCI_DEVICE_TABLE(stmmac_id_table) = {
+ 	{PCI_DEVICE(STMMAC_VENDOR_ID, STMMAC_DEVICE_ID)},
+ 	{PCI_DEVICE(PCI_VENDOR_ID_STMICRO, PCI_DEVICE_ID_STMICRO_MAC)},
++	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, STMMAC_QUARK_ID)},
+ 	{}
+ };
+ 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.c
+new file mode 100644
+index 0000000..8552d0c
+--- /dev/null
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_ptp.c
+@@ -0,0 +1,723 @@
++/*******************************************************************************
++
++  STMMAC 1588-2005 hardware accel
++  Copyright(c) 2012 Intel Corporation. This code is based on IXGBE_PTP
++
++  This program is free software; you can redistribute it and/or modify it
++  under the terms and conditions of the GNU General Public License,
++  version 2, as published by the Free Software Foundation.
++
++  This program is distributed in the hope it will be useful, but WITHOUT
++  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++  more details.
++
++  You should have received a copy of the GNU General Public License along with
++  this program; if not, write to the Free Software Foundation, Inc.,
++  51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
++
++  The full GNU General Public License is included in this distribution in
++  the file called "COPYING".
++
++  Contact Information::w
++  Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
++
++*******************************************************************************/
++#include "stmmac.h"
++#include "dwmac1000.h"
++#include <linux/export.h>
++#include <linux/net_tstamp.h>
++
++/* PPSCMD0 */
++#define STMMAC_PPSCMD_NONE		0x00	/* No command */
++#define STMMAC_PPSCMD_START_SINGLE	0x01	/* Start single pulse */
++#define STMMAC_PPSCMD_START_PULSE	0x02	/* Start pulse train */
++#define STMMAC_PPSCMD_START_CANCEL	0x03	/* Cancel start */
++#define STMMAC_PPSCMD_STOP_PULSE_ATTIME	0x04	/* Stop pulse train at time */
++#define STMMAC_PPSCMD_STOP_PULSE_IMMED	0x05	/* Stop pulse train immediate */
++#define STMMAC_PPSCMD_STOP_CANCEL	0x06	/* Stop cancel pulse train */
++
++#define STMMAC_PTP_OVERFLOW_CHECK_ENABLED	(u32)(1)
++#define STMMAC_PTP_PPS_ENABLED			(u32)(1 << 1)
++#define STMMAC_PTP_HWTS_TX_EN			(u32)(1 << 2)
++#define STMMAC_PTP_HWTS_RX_EN			(u32)(1 << 3)
++
++#ifndef NSECS_PER_SEC
++#define NSECS_PER_SEC 1000000000ULL
++#endif
++
++/*
++ *  Structure of STMMAC timer registers
++ *
++ *           GMAC_TS_HWSEC    GMAC_ST_SEC     GMAC_ST_NSEC 
++ *         +--------------+ +--------------+ +---+---+------+
++ *  STMMAC |      16      | |      32      | |      32      |
++ *         +--------------+ +--------------+ +---+---+------+
++ *
++ *  The counter for the STMMAC is 80 bits
++ *   - HWSEC == overflow value for ST_SEC => 130 years to overflow (optional)
++ *   - ST_SEC == seconds
++ *   - ST_NSEC == nanoseconds
++ */
++
++/**
++ * stmmac_ptp_read - read raw cycle counter (to be used by time counter)
++ * @cc - the cyclecounter structure
++ *
++ * this function reads the cyclecounter registers and is called by the
++ * cyclecounter structure used to construct a ns counter from the
++ * arbitrary fixed point registers
++ */
++static cycle_t stmmac_ptp_read(const struct cyclecounter *ccnt)
++{
++	struct stmmac_priv *priv =
++		container_of(ccnt, struct stmmac_priv, ccnt);
++	cycle_t stamp = 0;
++
++	stamp = (u64)readl(priv->ioaddr + GMAC_ST_NSEC);
++	stamp |= (u64)readl(priv->ioaddr + GMAC_ST_SEC) << 32;
++
++	return stamp;
++}
++
++/**
++ * stmmac_ptp_adjfreq
++ * @ptp - the ptp clock structure
++ * @ppb - parts per billion adjustment from base
++ *
++ * adjust the frequency of the ptp cycle counter by the
++ * indicated ppb from the base frequency.
++ */
++static int stmmac_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
++{
++	return 0;
++}
++
++/**
++ * stmmac_ptp_adjtime
++ * @ptp - the ptp clock structure
++ * @delta - offset to adjust the cycle counter by
++ *
++ * adjust the timer by resetting the timecounter structure.
++ */
++static int stmmac_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
++{
++	struct stmmac_priv *priv =
++		container_of(ptp, struct stmmac_priv, ptp_caps);
++	unsigned long flags;
++	u64 now;
++
++	spin_lock_irqsave(&priv->tmreg_lock, flags);
++
++	now = timecounter_read(&priv->tcnt);
++	now += delta;
++
++	/* reset the timecounter */
++	timecounter_init(&priv->tcnt,
++			 &priv->ccnt,
++			 now);
++
++	spin_unlock_irqrestore(&priv->tmreg_lock, flags);
++	return 0;
++}
++
++/**
++ * stmmac_ptp_gettime
++ * @ptp - the ptp clock structure
++ * @ts - timespec structure to hold the current time value
++ *
++ * read the timecounter and return the correct value on ns,
++ * after converting it into a struct timespec.
++ */
++static int stmmac_ptp_gettime(struct ptp_clock_info *ptp, struct timespec *ts)
++{
++	struct stmmac_priv *priv =
++		container_of(ptp, struct stmmac_priv, ptp_caps);
++	u64 ns;
++        u32 remainder;
++        unsigned long flags;
++
++        spin_lock_irqsave(&priv->tmreg_lock, flags);
++        ns = timecounter_read(&priv->tcnt);
++        spin_unlock_irqrestore(&priv->tmreg_lock, flags);
++
++        ts->tv_sec = div_u64_rem(ns, 1000000000ULL, &remainder);
++        ts->tv_nsec = remainder;
++
++	return 0;
++}
++
++/**
++ * stmmac_ptp_settime
++ * @ptp - the ptp clock structure
++ * @ts - the timespec containing the new time for the cycle counter
++ *
++ * reset the timecounter to use a new base value instead of the kernel
++ * wall timer value.
++ */
++static int stmmac_ptp_settime(struct ptp_clock_info *ptp,
++			     const struct timespec *ts)
++{
++	struct stmmac_priv *priv =
++		container_of(ptp, struct stmmac_priv, ptp_caps);
++	u64 ns;
++	unsigned long flags;
++
++	ns = ts->tv_sec * 1000000000ULL;
++	ns += ts->tv_nsec;
++
++	/* reset the timecounter */
++	spin_lock_irqsave(&priv->tmreg_lock, flags);
++	timecounter_init(&priv->tcnt, &priv->ccnt, ns);
++	spin_unlock_irqrestore(&priv->tmreg_lock, flags);
++
++	return 0;
++}
++
++/**
++ * stmmac_ptp_enable
++ * @ptp - the ptp clock structure
++ * @rq - the requested feature to change
++ * @on - whether to enable or disable the feature
++ *
++ * enable (or disable) ancillary features of the phc subsystem.
++ * our driver only supports the PPS feature on the X540
++ */
++static int stmmac_ptp_enable(struct ptp_clock_info *ptp,
++			    struct ptp_clock_request *rq, int on)
++{
++	struct stmmac_priv *priv =
++		container_of(ptp, struct stmmac_priv, ptp_caps);
++	uint32_t reg = 0;
++
++	/**
++	 * When enabling PPS functionality in STMMAC we need to unmask the
++	 * interrupt mask reg and enable the TSTRIG bit in the timestamp control
++	 * reg
++	 */
++	if (rq->type == PTP_CLK_REQ_PPS) {
++		if (on){
++			priv->hwts |= STMMAC_PTP_PPS_ENABLED;
++
++			/* Enable TSTRIG */
++			reg = readl(priv->ioaddr + GMAC_TS_CTRL);
++			reg |= GMAC_TS_CTRL_TSTRIG;
++			writel(reg, priv->ioaddr + GMAC_TS_CTRL);
++			wmb();
++
++			/* Unmask interrupt */
++			reg = readl(priv->ioaddr + GMAC_INT_MASK);
++			printk(KERN_INFO "%s[on] read interrupt mask 0x%08x\n", __func__, reg);
++			reg &= ~GMAC_INT_MASK_TSIM;
++			printk(KERN_INFO "%s[on] write interrupt mask 0x%08x\n", __func__, reg);
++			writel(reg, priv->ioaddr + GMAC_INT_MASK);
++			wmb();
++
++		} else {
++			/* Mask interrupt */
++			reg = readl(priv->ioaddr + GMAC_INT_MASK);
++			printk(KERN_INFO "%s[off] read interrupt mask 0x%08x\n", __func__, reg);
++			reg |= GMAC_INT_MASK_TSIM;
++			printk(KERN_INFO "%s[off] write interrupt mask 0x%08x\n", __func__, reg);
++			writel(reg, priv->ioaddr + GMAC_INT_MASK);
++			wmb();
++
++			/* Disable TSTRIG */
++			reg = readl(priv->ioaddr + GMAC_TS_CTRL);
++			reg &= ~GMAC_TS_CTRL_TSTRIG;
++			writel(reg, priv->ioaddr + GMAC_TS_CTRL);
++			wmb();
++
++			priv->hwts &=
++				~STMMAC_PTP_PPS_ENABLED;
++		}
++		return 0;
++	}
++
++	return -ENOTSUPP;
++}
++
++/**
++ * stmmac_ptp_check_pps_event
++ * @priv - the private priv structure
++ *
++ * This function is called by the interrupt routine when checking for
++ * interrupts. It will check and handle a pps event.
++ */
++void stmmac_ptp_check_pps_event(struct stmmac_priv *priv)
++{
++	struct ptp_clock_event event;
++	event.type = PTP_CLOCK_PPS;
++
++	/* Make sure ptp clock is valid, and PPS event enabled */
++	if (!priv->ptp_clock ||
++	    !(priv->hwts & STMMAC_PTP_PPS_ENABLED)){
++		return;
++	}
++
++	ptp_clock_event(priv->ptp_clock, &event);
++}
++
++#if 0
++/**
++ * stmmac_ptp_overflow_check - delayed work to detect SYSTIME overflow
++ * @work: structure containing information about this work task
++ *
++ * this work function is scheduled to continue reading the timecounter
++ * in order to prevent missing when the system time registers wrap
++ * around. This needs to be run approximately twice a minute when no
++ * PTP activity is occurring.
++ */
++void stmmac_ptp_overflow_check(struct stmmac_priv *priv)
++{
++	unsigned long elapsed_jiffies = priv->last_overflow_check - jiffies;
++	struct timespec ts;
++
++	if ((priv->hwts & STMMAC_PTP_OVERFLOW_CHECK_ENABLED) &&
++	    (elapsed_jiffies >= STMMAC_OVERFLOW_PERIOD)) {
++		stmmac_ptp_gettime(&priv->ptp_caps, &ts);
++		priv->last_overflow_check = jiffies;
++	}
++}
++#endif
++
++/**
++ * stmmac_ptp_tx_hwtstamp - utility function which checks for TX time stamp
++ * @q_vector: structure containing interrupt and ring information
++ * @skb: particular skb to send timestamp with
++ *
++ * if the timestamp is valid, we convert it into the timecounter ns
++ * value, then store that result into the shhwtstamps structure which
++ * is passed up the network stack
++ */
++void stmmac_ptp_tx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *pdma,
++			   struct sk_buff *skb)
++{
++	/* Sanity check input */
++	if (unlikely(priv == NULL || pdma == NULL || skb == NULL)){
++		return;
++	}
++
++	if(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP){
++		struct skb_shared_hwtstamps shhwtstamps;
++		u64 ns;
++		u64 regval;
++		unsigned long flags;
++
++		regval = (u64)pdma->ts_lo;
++		regval |= (u64)pdma->ts_hi << 32;
++
++		spin_lock_irqsave(&priv->tmreg_lock, flags);
++		ns = timecounter_cyc2time(&priv->tcnt, regval);
++		spin_unlock_irqrestore(&priv->tmreg_lock, flags);
++
++		memset(&shhwtstamps, 0, sizeof(shhwtstamps));
++		shhwtstamps.hwtstamp = ns_to_ktime(ns);
++		skb_tstamp_tx(skb, &shhwtstamps);
++	}
++}
++
++/**
++ * stmmac_ptp_rx_hwtstamp - utility function which checks for RX time stamp
++ * @q_vector: structure containing interrupt and ring information
++ * @skb: particular skb to send timestamp with
++ *
++ * if the timestamp is valid, we convert it into the timecounter ns
++ * value, then store that result into the shhwtstamps structure which
++ * is passed up the network stack
++ */
++void stmmac_ptp_rx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *pdma,
++			   struct sk_buff *skb)
++{
++	/* Sanity check input */
++	if (unlikely(priv == NULL || pdma == NULL || skb == NULL)){
++		return;
++	}
++
++	if(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP){
++		struct skb_shared_hwtstamps shhwtstamps;
++		u64 ns;
++		u64 regval;
++		unsigned long flags;
++
++		regval = (u64)pdma->ts_lo;
++		regval |= (u64)pdma->ts_hi << 32;
++
++		spin_lock_irqsave(&priv->tmreg_lock, flags);
++		ns = timecounter_cyc2time(&priv->tcnt, regval);
++		spin_unlock_irqrestore(&priv->tmreg_lock, flags);
++
++		memset(&shhwtstamps, 0, sizeof(shhwtstamps));
++		shhwtstamps.hwtstamp = ns_to_ktime(ns);
++	}
++}
++
++/**
++ * ixgbe_ptp_hwtstamp_ioctl - control hardware time stamping
++ * @priv: pointer to priv struct
++ * @ifreq: ioctl data
++ * @cmd: particular ioctl requested
++ *
++ * Outgoing time stamping can be enabled and disabled. Play nice and
++ * disable it when requested, although it shouldn't case any overhead
++ * when no packet needs it. At most one packet in the queue may be
++ * marked for time stamping, otherwise it would be impossible to tell
++ * for sure to which packet the hardware time stamp belongs.
++ *
++ * Incoming time stamping has to be configured via the hardware
++ * filters. Not all combinations are supported, in particular event
++ * type has to be specified. Matching the kind of event packet is
++ * not supported, with the exception of "all V2 events regardless of
++ * level 2 or 4".
++ */
++int stmmac_ptp_hwtstamp_ioctl(struct stmmac_priv *priv,
++			     struct ifreq *ifr, int cmd)
++{
++	struct hwtstamp_config config;
++//	struct stmmac_priv *priv = netdev_priv(netdev);
++	u32 tsctl = 0;
++
++	if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))
++		return -EFAULT;
++
++	/* reserved for future extensions */
++	if (config.flags)
++		return -EINVAL;
++
++	/* Snapshot the reg - preserve Timestamp Interrupt Trigger Enable */
++	tsctl = readl(priv->ioaddr + GMAC_TS_CTRL) & GMAC_TS_CTRL_TSTRIG;
++
++	/* TX */
++	switch (config.tx_type) {
++	case HWTSTAMP_TX_OFF:
++		priv->hwts &= ~STMMAC_PTP_HWTS_TX_EN;
++		printk(KERN_INFO "%s set TX PTP en false\n", __func__);
++		break;
++	case HWTSTAMP_TX_ON:
++		priv->hwts |= STMMAC_PTP_HWTS_TX_EN;
++		printk(KERN_INFO "%s set TX PTP en true\n", __func__);
++		break;
++	default:
++		return -ERANGE;
++	}
++
++	/* RX */
++	priv->hwts |= STMMAC_PTP_HWTS_RX_EN;
++
++	switch (config.rx_filter) {
++
++	
++	case HWTSTAMP_FILTER_PTP_V1_L4_EVENT:
++		/* 
++		 * V1_L4 UDP any event 
++		 * SYNC, Follow_Up, Delay_Req, Delay_Resp,
++		 * Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up
++		 *
++		 * SNAPTYPSEL=1, TSMSTRENA=x, TSEVNTENA=0, TSVER2ENA=0, IPV4=1 
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL1 | GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V1_L4_EVENT \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ:
++		/*
++		 * V1_L4 Master
++		 * Delay_Req
++		 *
++		 * SNAPTYPSEL=0, TSMSTRENA=1, TSEVNTENA=1, TSVER2ENA=0, IPV4=1
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSMSTRENA;
++		tsctl |= GMAC_TS_CTRL_TSEVNTENA | GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V1_L4_SYNC:
++		/*
++		 * V1_L4 Slave
++		 * Sync
++		 *
++ 		 * SNAPTYPSEL=0, TSMSTRENA=0, TSEVNTENA=1, TSVER2ENA=0, IPV4=1
++		 */ 
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSEVNTENA;
++		tsctl |= GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V1_L4_SYNC \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_L4_EVENT:
++		/*
++		 * V2_L4 UDP any event 
++		 * SYNC, Follow_Up, Delay_Req, Delay_Resp,
++		 * Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up
++		 *
++		 * SNAPTYPSEL=1, TSMSTRENA=x, TSEVNTENA=0, TSVER2ENA=1, IPV4=1 
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL1 | GMAC_TS_CTRL_TSVER2ENA | GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_L4_EVENT \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ:
++		/*
++		 * V2_L4 Master
++		 * Delay_Req
++		 *
++		 * SNAPTYPSEL=0, TSMSTRENA=1, TSEVNTENA=1, TSVER2ENA=1, IPV4=1
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSMSTRENA;
++		tsctl |= GMAC_TS_CTRL_TSEVNTENA | GMAC_TS_CTRL_TSVER2ENA;
++		tsctl |= GMAC_TS_CTRL_TSIPV4ENA;
++
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_L4_SYNC:
++		/*
++		 * V2_L4 Slave
++		 * Sync
++		 *
++ 		 * SNAPTYPSEL=0, TSMSTRENA=0, TSEVNTENA=1, TSVER2ENA=1, IPV4=1
++		 */ 
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSVER2ENA | GMAC_TS_CTRL_TSEVNTENA;
++		tsctl |= GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_L4_SYNC \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:
++		/*
++		 * V2_L2 Ethernet any event
++		 * SYNC, Follow_Up, Delay_Req, Delay_Resp,
++		 * Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up
++		 *
++		 * SNAPTYPSEL=1, TSMSTRENA=x, TSEVNTENA=0, TSVER2ENA=1,TSIPENA=1
++		 * TSIPENA=1
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL1 | GMAC_TS_CTRL_TSVER2ENA | GMAC_TS_CTRL_TSIPENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_L2_EVENT \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:
++		/*
++		 * V2_L2 Master
++		 * Delay_Req
++		 *
++		 * SNAPTYPSEL=0, TSMSTRENA=1, TSEVNTENA=1, TSVER2ENA=1,TSIPENA=1
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSMSTRENA;
++		tsctl |= GMAC_TS_CTRL_TSEVNTENA | GMAC_TS_CTRL_TSVER2ENA;
++		tsctl |= GMAC_TS_CTRL_TSIPENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ \n", __func__);
++		break;
++	
++	case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:
++		/*
++		 * V2_L2 Slave
++		 * Sync
++		 *
++ 		 * SNAPTYPSEL=0, TSMSTRENA=0, TSEVNTENA=1, TSVER2ENA=1,
++ 		 * TSIPENA=1 
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSVER2ENA;
++		tsctl |= GMAC_TS_CTRL_TSEVNTENA | GMAC_TS_CTRL_TSIPENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_L2_SYNC \n", __func__);
++		break;
++	
++	case HWTSTAMP_FILTER_PTP_V2_EVENT:
++		/*
++		 * V2_L2 Ethernet any event
++		 * SYNC, Follow_Up, Delay_Req, Delay_Resp,
++		 * Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up
++		 *
++		 * SNAPTYPSEL=1, TSMSTRENA=x, TSEVNTENA=0, TSVER2ENA=1
++		 * TSIPENA=1, TSIPV4ENA=1
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL1 | GMAC_TS_CTRL_TSVER2ENA;
++		tsctl |= GMAC_TS_CTRL_TSIPENA | GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_EVENT \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:
++		/*
++		 * V2_L2_L4 Master 
++		 * Delay_Req
++		 *
++		 * SNAPTYPSEL=0, TSMSTRENA=1, TSEVNTENA=1,
++		 * TSVER2ENA=1,TSIPENA=1, TSIPV4ENA=1
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSMSTRENA;
++		tsctl |= GMAC_TS_CTRL_TSEVNTENA | GMAC_TS_CTRL_TSVER2ENA;
++		tsctl |= GMAC_TS_CTRL_TSIPENA | GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_DELAY_REQ \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_PTP_V2_SYNC:
++		/* 
++		 * V2_L2_L4 Slave
++		 * Sync
++		 *
++ 		 * SNAPTYPSEL=0, TSMSTRENA=0, TSEVNTENA=1, TSVER2ENA=1,
++ 		 * TSIPENA=1, TSIPV4ENA=1 
++		 */
++		tsctl |= GMAC_TS_CTRL_SNTYPSEL0 | GMAC_TS_CTRL_TSVER2ENA;
++		tsctl |= GMAC_TS_CTRL_TSEVNTENA | GMAC_TS_CTRL_TSIPENA;
++		tsctl |= GMAC_TS_CTRL_TSIPV4ENA;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_PTP_V2_SYNC \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_ALL:
++		/*
++		 * V2_L2_L4 Ethernet any event
++		 *
++		 * SYNC, Follow_Up, Delay_Req, Delay_Resp,
++		 * Pdelay_Req, Pdelay_Resp, Pdelay_Resp_Follow_Up
++		 *
++		 * GMAC_TS_CTRL_TSENALL
++		 */
++		tsctl |= GMAC_TS_CTRL_TSENALL;
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_ALL \n", __func__);
++		break;
++
++	case HWTSTAMP_FILTER_NONE:
++		printk(KERN_INFO "%s HWTSTAMP_FILTER_NONE  \n", __func__);
++		priv->hwts &= ~STMMAC_PTP_HWTS_RX_EN;
++		break;
++
++	default:
++		printk(KERN_INFO "%s error ioctl rx type %d \n", __func__, config.rx_filter);
++		/* bad/unknown parameter */
++		return -ERANGE;
++	}
++
++	/* Set the TS CTRL reg */
++	tsctl |= GMAC_TS_CTRL_TSENA;
++	writel(tsctl, priv->ioaddr + GMAC_TS_CTRL);
++	wmb();
++
++	printk(KERN_INFO "%s sync ts_ctl @ value 0x%08x\n", __func__, tsctl);
++
++	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
++		-EFAULT : 0;
++}
++
++
++#define DEFAULT_PTP_CLK 50
++
++/**
++ * stmmac_ptp_init_timestamp - initialise the PTP clock
++ * @priv - pointer to the priv structure
++ *
++ * This function initialises the PTP clock consistent with the method spelled
++ * out in the Snopsys documentation
++ */
++static void stmmac_ptp_init_timestamp(struct stmmac_priv *priv)
++{
++	unsigned long tsctl = GMAC_TS_CTRL_TSENA, flags = 0;
++	uint8_t ssinc = CONFIG_STMMAC_PTP_CLK_MHZ;
++
++	/* Enable TS */	
++	writel(tsctl, priv->ioaddr + GMAC_TS_CTRL);
++	wmb();
++
++	/* Write SSINC - number of nano seconds to increment on each clock */
++	if(ssinc == 0){
++		ssinc = DEFAULT_PTP_CLK;
++	}
++	ssinc = 1000/ssinc;
++	writel(ssinc, priv->ioaddr + GMAC_SS_INC);
++	wmb();
++
++	printk(KERN_INFO "%s setting PTP_CLK to 0x%02x\n", __func__, ssinc);
++
++	/* Reset system time registers to zero */
++	writel(0x00000000, priv->ioaddr + GMAC_ST_SEC);
++	writel(0x00000000, priv->ioaddr + GMAC_ST_NSEC);
++	wmb();
++
++	/* Set TSINT to latch values in ST_SEC and ST_NSEC */
++	tsctl |= GMAC_TS_CTRL_TSINT;
++	writel(tsctl, priv->ioaddr + GMAC_TS_CTRL);
++	wmb();
++	printk(KERN_INFO "%s tsctl == 0x%08lx (TSINIT | TSENA)\n", __func__, tsctl);
++
++	spin_lock_irqsave(&priv->tmreg_lock, flags);
++
++	/* Init timecounter */
++	memset(&priv->ccnt, 0, sizeof(priv->ccnt));
++	priv->ccnt.read = stmmac_ptp_read;
++	priv->ccnt.mask = CLOCKSOURCE_MASK(64);
++	priv->ccnt.mult = 1;
++	priv->ccnt.shift = 0;
++
++	/* reset the ns time counter */
++	timecounter_init(&priv->tcnt, &priv->ccnt,
++			 ktime_to_ns(ktime_get_real()));
++
++	spin_unlock_irqrestore(&priv->tmreg_lock, flags);
++}
++
++/**
++ * stmmac_ptp_init
++ * @priv - the stmmac private priv structure
++ *
++ * This function performs the required steps for enabling ptp
++ * support. If ptp support has already been loaded it simply calls the
++ * cyclecounter init routine and exits.
++ */
++void stmmac_ptp_init(struct net_device *ndev, struct device * pdev)
++{
++	struct stmmac_priv *priv = netdev_priv(ndev);
++
++	/* Ensure the timestamp interrupt is masked */
++	writel(GMAC_INT_MASK_TSIM, priv->ioaddr + GMAC_INT_MASK);
++
++	/* Fill out PTP callback contents */
++	snprintf(priv->ptp_caps.name, 16, "%pm", ndev->dev_addr);
++	priv->ptp_caps.owner = THIS_MODULE;
++	priv->ptp_caps.max_adj = 0;	/* Cannot be adjusted */
++	priv->ptp_caps.n_alarm = 0;
++	priv->ptp_caps.n_ext_ts = 0;
++	priv->ptp_caps.n_per_out = 0;
++	priv->ptp_caps.pps = 0;
++	priv->ptp_caps.adjfreq = stmmac_ptp_adjfreq;
++	priv->ptp_caps.adjtime = stmmac_ptp_adjtime;
++	priv->ptp_caps.gettime = stmmac_ptp_gettime;
++	priv->ptp_caps.settime = stmmac_ptp_settime;
++	priv->ptp_caps.enable = stmmac_ptp_enable;
++
++	spin_lock_init(&priv->tmreg_lock);
++
++	stmmac_ptp_init_timestamp(priv);
++
++	/* Init to default state */
++//	priv->hwts = STMMAC_PTP_OVERFLOW_CHECK_ENABLED;
++
++	priv->ptp_clock = ptp_clock_register(&priv->ptp_caps, pdev);
++	if (IS_ERR(priv->ptp_clock)) {
++		priv->ptp_clock = NULL;
++		printk(KERN_ERR "%s ptp_clock_reg failed!\n", __func__);
++	} else {
++		printk(KERN_INFO "%s ptp_clock_reg success!\n", __func__);
++	}
++
++	return;
++}
++
++/**
++ * stmmac_ptp_remove - disable ptp device and stop the overflow check
++ * @priv: pointer to priv struct
++ *
++ * this function stops the ptp support, and cancels the delayed work.
++ */
++void stmmac_ptp_remove(struct stmmac_priv *priv)
++{
++	/* Ensure the timestamp interrupt is masked */
++	writel(GMAC_INT_MASK_TSIM, priv->ioaddr + GMAC_INT_MASK);
++
++	/* stop the overflow check task */
++//	priv->hwts &= ~STMMAC_PTP_OVERFLOW_CHECK_ENABLED;
++
++	if (priv->ptp_clock != NULL) {
++		ptp_clock_unregister(priv->ptp_clock);
++		priv->ptp_clock = NULL;
++		printk(KERN_INFO "%s removed ptp_clock\n", __func__);
++	}
++}
++
