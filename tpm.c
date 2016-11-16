@@ -71,9 +71,13 @@ static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm)
  */
 static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2)
 {
+	EFI_PHYSICAL_ADDRESS start;
+	EFI_PHYSICAL_ADDRESS end;
+	BOOLEAN truncated;
+
 	return uefi_call_wrapper(tpm2->get_event_log, 5, tpm2,
-				 EFI_TCG2_EVENT_LOG_FORMAT_TCG_2, NULL,
-				 NULL, NULL);
+				 EFI_TCG2_EVENT_LOG_FORMAT_TCG_2, &start,
+				 &end, &truncated);
 }
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
