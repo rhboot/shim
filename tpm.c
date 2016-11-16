@@ -93,7 +93,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 
 		status = trigger_tcg2_final_events_table(tpm2);
 		if (EFI_ERROR(status)) {
-			perror(L"Unable to trigger tcg2 final events table\n");
+			perror(L"Unable to trigger tcg2 final events table: %r\n", status);
 			return status;
 		}
 
