@@ -2013,18 +2013,32 @@ EFI_STATUS mirror_mok_sb_state()
 	UINTN DataSize = 0;
 
 	efi_status = get_variable(L"MokSBState", &Data, &DataSize, shim_lock_guid);
-	if (efi_status != EFI_SUCCESS)
-		return efi_status;
+	if (efi_status == EFI_SUCCESS) {
+		UINT8 *Data_RT = NULL;
+		UINTN DataSize_RT = 0;
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokSBStateRT",
-				       &shim_lock_guid,
-				       EFI_VARIABLE_BOOTSERVICE_ACCESS
-				       | EFI_VARIABLE_RUNTIME_ACCESS,
-				       DataSize, Data);
-	if (efi_status != EFI_SUCCESS) {
-		console_error(L"Failed to set MokSBStateRT", efi_status);
+		efi_status = get_variable(L"MokSBStateRT", &Data_RT,
+					  &DataSize_RT, shim_lock_guid);
+		if (efi_status == EFI_SUCCESS) {
+			efi_status = uefi_call_wrapper(RT->SetVariable, 5,
+						L"MokSBStateRT",
+						&shim_lock_guid,
+						EFI_VARIABLE_BOOTSERVICE_ACCESS
+						| EFI_VARIABLE_RUNTIME_ACCESS
+						| EFI_VARIABLE_NON_VOLATILE,
+						0, NULL);
+		}
+
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5,
+					       L"MokSBStateRT",
+					       &shim_lock_guid,
+					       EFI_VARIABLE_BOOTSERVICE_ACCESS
+					       | EFI_VARIABLE_RUNTIME_ACCESS,
+					       DataSize, Data);
+		if (efi_status != EFI_SUCCESS) {
+			console_error(L"Failed to set MokSBStateRT", efi_status);
+		}
 	}
-
 	return efi_status;
 }
 
