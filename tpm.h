@@ -65,24 +65,26 @@ typedef uint32_t EFI_TCG2_EVENT_LOG_BITMAP;
 typedef uint32_t EFI_TCG2_EVENT_LOG_FORMAT;
 typedef uint32_t EFI_TCG2_EVENT_ALGORITHM_BITMAP;
 
+typedef struct tdEFI_TCG_VERSION {
+  uint8_t Major;
+  uint8_t Minor;
+  uint8_t RevMajor;
+  uint8_t RevMinor;
+} __attribute__ ((packed)) EFI_TCG_VERSION;
+
 typedef struct tdEFI_TCG2_VERSION {
   uint8_t Major;
   uint8_t Minor;
 } __attribute__ ((packed)) EFI_TCG2_VERSION;
 
-typedef struct tdEFI_TCG2_BOOT_SERVICE_CAPABILITY_1_0 {
+typedef struct tdEFI_TCG_BOOT_SERVICE_CAPABILITY {
   uint8_t Size;
-  EFI_TCG2_VERSION StructureVersion;
-  EFI_TCG2_VERSION ProtocolVersion;
-  EFI_TCG2_EVENT_ALGORITHM_BITMAP HashAlgorithmBitmap;
-  EFI_TCG2_EVENT_LOG_BITMAP SupportedEventLogs;
+  EFI_TCG_VERSION StructureVersion;
+  EFI_TCG_VERSION ProtocolVersion;
+  uint8_t HashAlgorithmBitmap;
   BOOLEAN TPMPresentFlag;
-  uint16_t MaxCommandSize;
-  uint16_t MaxResponseSize;
-  uint32_t ManufacturerID;
-  uint32_t NumberOfPcrBanks;
-  EFI_TCG2_EVENT_ALGORITHM_BITMAP ActivePcrBanks;
-} EFI_TCG2_BOOT_SERVICE_CAPABILITY_1_0;
+  BOOLEAN TPMDeactivatedFlag;
+} EFI_TCG_BOOT_SERVICE_CAPABILITY;
 
 typedef struct tdEFI_TCG2_BOOT_SERVICE_CAPABILITY {
   uint8_t Size;
