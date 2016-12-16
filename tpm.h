@@ -61,28 +61,33 @@ struct efi_tpm_protocol
 
 typedef struct efi_tpm_protocol efi_tpm_protocol_t;
 
+typedef uint32_t TREE_EVENT_LOG_BITMAP;
+
 typedef uint32_t EFI_TCG2_EVENT_LOG_BITMAP;
 typedef uint32_t EFI_TCG2_EVENT_LOG_FORMAT;
 typedef uint32_t EFI_TCG2_EVENT_ALGORITHM_BITMAP;
+
+typedef struct tdTREE_VERSION {
+  uint8_t Major;
+  uint8_t Minor;
+} TREE_VERSION;
 
 typedef struct tdEFI_TCG2_VERSION {
   uint8_t Major;
   uint8_t Minor;
 } __attribute__ ((packed)) EFI_TCG2_VERSION;
 
-typedef struct tdEFI_TCG2_BOOT_SERVICE_CAPABILITY_1_0 {
+typedef struct tdTREE_BOOT_SERVICE_CAPABILITY {
   uint8_t Size;
-  EFI_TCG2_VERSION StructureVersion;
-  EFI_TCG2_VERSION ProtocolVersion;
-  EFI_TCG2_EVENT_ALGORITHM_BITMAP HashAlgorithmBitmap;
-  EFI_TCG2_EVENT_LOG_BITMAP SupportedEventLogs;
-  BOOLEAN TPMPresentFlag;
+  TREE_VERSION StructureVersion;
+  TREE_VERSION ProtocolVersion;
+  uint32_t HashAlgorithmBitmap;
+  TREE_EVENT_LOG_BITMAP SupportedEventLogs;
+  BOOLEAN TrEEPresentFlag;
   uint16_t MaxCommandSize;
   uint16_t MaxResponseSize;
   uint32_t ManufacturerID;
-  uint32_t NumberOfPcrBanks;
-  EFI_TCG2_EVENT_ALGORITHM_BITMAP ActivePcrBanks;
-} EFI_TCG2_BOOT_SERVICE_CAPABILITY_1_0;
+} TREE_BOOT_SERVICE_CAPABILITY;
 
 typedef struct tdEFI_TCG2_BOOT_SERVICE_CAPABILITY {
   uint8_t Size;
