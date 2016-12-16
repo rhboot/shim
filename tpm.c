@@ -39,7 +39,7 @@ static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm)
 {
 	EFI_STATUS status;
 	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
-	EFI_TCG2_BOOT_SERVICE_CAPABILITY_1_0 *caps_1_0;
+	TREE_BOOT_SERVICE_CAPABILITY *caps_1_0;
 
 	caps.Size = (UINT8)sizeof(caps);
 
@@ -50,8 +50,8 @@ static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm)
 
 	if (caps.StructureVersion.Major == 1 &&
 	    caps.StructureVersion.Minor == 0) {
-		caps_1_0 = (EFI_TCG2_BOOT_SERVICE_CAPABILITY_1_0 *)&caps;
-		if (caps_1_0->TPMPresentFlag)
+		caps_1_0 = (TREE_BOOT_SERVICE_CAPABILITY *)&caps;
+		if (caps_1_0->TrEEPresentFlag)
 			return TRUE;
 	} else {
 		if (caps.TPMPresentFlag)
