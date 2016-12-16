@@ -75,7 +75,7 @@ typedef struct tdTREE_VERSION {
 typedef struct tdEFI_TCG2_VERSION {
   uint8_t Major;
   uint8_t Minor;
-} __attribute__ ((packed)) EFI_TCG2_VERSION;
+} EFI_TCG2_VERSION;
 
 typedef struct tdTREE_BOOT_SERVICE_CAPABILITY {
   uint8_t Size;
@@ -101,7 +101,7 @@ typedef struct tdEFI_TCG2_BOOT_SERVICE_CAPABILITY {
   uint32_t ManufacturerID;
   uint32_t NumberOfPcrBanks;
   EFI_TCG2_EVENT_ALGORITHM_BITMAP ActivePcrBanks;
-} __attribute__ ((packed))  EFI_TCG2_BOOT_SERVICE_CAPABILITY;
+} EFI_TCG2_BOOT_SERVICE_CAPABILITY;
 
 typedef uint32_t TCG_PCRINDEX;
 typedef uint32_t TCG_EVENTTYPE;
