@@ -1855,8 +1855,8 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	int use_fb = should_use_fallback(image_handle);
 
 	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
-
-	if (efi_status == EFI_SECURITY_VIOLATION) {
+	if (efi_status == EFI_SECURITY_VIOLATION ||
+	    efi_status == EFI_ACCESS_DENIED) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"start_image() returned %r\n", efi_status);
