@@ -567,31 +567,31 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
 				 SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) ==
 				DATA_FOUND)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
 				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) ==
 				DATA_FOUND)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	if (cert && check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
 					 sha256hash) == DATA_FOUND)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EFI_CERT_SHA256_GUID) == DATA_FOUND)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
 			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash) ==
 				DATA_FOUND)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	if (check_db_hash(L"MokListX", shim_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash) ==
 				DATA_FOUND) {
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 	}
 
 	return EFI_SUCCESS;
@@ -646,7 +646,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
-	return EFI_ACCESS_DENIED;
+	return EFI_SECURITY_VIOLATION;
 }
 
 /*
@@ -941,7 +941,7 @@ static EFI_STATUS verify_mok (void) {
 		perror(L"MokList is compromised!\nErase all keys in MokList!\n");
 		if (LibDeleteVariable(L"MokList", &shim_lock_guid) != EFI_SUCCESS) {
 			perror(L"Failed to erase MokList\n");
-                        return EFI_ACCESS_DENIED;
+                        return EFI_SECURITY_VIOLATION;
 		}
 	}
 
@@ -959,7 +959,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 {
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
-	EFI_STATUS status = EFI_ACCESS_DENIED;
+	EFI_STATUS status = EFI_SECURITY_VIOLATION;
 	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
 	unsigned int size = datasize;
 
@@ -1005,7 +1005,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	 * Ensure that the binary isn't blacklisted
 	 */
 	status = check_blacklist(cert, sha256hash, sha1hash);
-
 	if (status != EFI_SUCCESS) {
 		perror(L"Binary is blacklisted\n");
 		return status;
@@ -1045,8 +1044,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		}
 	}
 
-	status = EFI_ACCESS_DENIED;
-
+	status = EFI_SECURITY_VIOLATION;
 	return status;
 }
 
@@ -2113,7 +2111,7 @@ static EFI_STATUS check_mok_sb (void)
 	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSBState", &shim_lock_guid,
 				   &attributes, &MokSBStateSize, &MokSBState);
 	if (status != EFI_SUCCESS)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 
 	/*
 	 * Delete and ignore the variable if it's been set from or could be
@@ -2124,7 +2122,7 @@ static EFI_STATUS check_mok_sb (void)
 		if (LibDeleteVariable(L"MokSBState", &shim_lock_guid) != EFI_SUCCESS) {
 			perror(L"Failed to erase MokSBState\n");
 		}
-		status = EFI_ACCESS_DENIED;
+		status = EFI_SECURITY_VIOLATION;
 	} else {
 		if (MokSBState == 1) {
 			user_insecure_mode = 1;
@@ -2149,7 +2147,7 @@ static EFI_STATUS check_mok_db (void)
 	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDBState", &shim_lock_guid,
 				   &attributes, &MokDBStateSize, &MokDBState);
 	if (status != EFI_SUCCESS)
-		return EFI_ACCESS_DENIED;
+		return EFI_SECURITY_VIOLATION;
 
 	ignore_db = 0;
 
@@ -2162,7 +2160,7 @@ static EFI_STATUS check_mok_db (void)
 		if (LibDeleteVariable(L"MokDBState", &shim_lock_guid) != EFI_SUCCESS) {
 			perror(L"Failed to erase MokDBState\n");
 		}
-		status = EFI_ACCESS_DENIED;
+		status = EFI_SECURITY_VIOLATION;
 	} else {
 		if (MokDBState == 1) {
 			ignore_db = 1;
