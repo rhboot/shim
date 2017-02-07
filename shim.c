@@ -62,7 +62,7 @@
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
 static EFI_SYSTEM_TABLE *systab;
-static EFI_HANDLE image_handle;
+static EFI_HANDLE global_image_handle;
 static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
 
 static CHAR16 *second_stage;
@@ -2323,7 +2323,7 @@ get_load_option_optional_data(UINT8 *data, UINTN data_size,
 EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS status;
-	EFI_LOADED_IMAGE *li;
+	EFI_LOADED_IMAGE *li = NULL;
 	CHAR16 *start = NULL;
 	int remaining_size = 0;
 	CHAR16 *loader_str = NULL;
@@ -2573,7 +2573,7 @@ shim_init(void)
 	dprinta(shim_version);
 
 	/* Set the second stage loader */
-	set_second_stage (image_handle);
+	set_second_stage (global_image_handle);
 
 	if (secure_mode()) {
 		if (vendor_cert_size || vendor_dbx_size) {
@@ -2671,6 +2671,7 @@ EFI_STATUS
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
+	EFI_HANDLE image_handle;
 
 	verification_method = VERIFIED_BY_NOTHING;
 
@@ -2688,7 +2689,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Context = shim_read_header;
 
 	systab = passed_systab;
-	image_handle = passed_image_handle;
+	image_handle = global_image_handle = passed_image_handle;
 
 	/*
 	 * Ensure that gnu-efi functions are available
