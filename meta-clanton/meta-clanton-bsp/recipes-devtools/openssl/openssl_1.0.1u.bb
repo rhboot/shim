@@ -6,7 +6,7 @@ DEPENDS += "ocf-linux"
 
 CFLAG += "-DHAVE_CRYPTODEV -DUSE_CRYPTODEV_DIGESTS"
 
-PR = "${INC_PR}.2"
+PR = "${INC_PR}.3"
 
 LIC_FILES_CHKSUM = "file://LICENSE;md5=27ffa5d74bb5a337056c14b2ef93fbf6"
 
@@ -17,6 +17,7 @@ SRC_URI += " \
             file://debian/debian-targets.patch \
             file://debian/no-rpath.patch \
             file://engines-install-in-libdir-ssl.patch \
+            file://find.pl \
            "
 
 SRC_URI[md5sum] = "130bb19745db2a5a09f22ccbbf7e69d0"
@@ -32,3 +33,7 @@ FILES_${PN}-engines-dbg = "${libdir}/ssl/engines/.debug"
 
 PARALLEL_MAKE = ""
 PARALLEL_MAKEINST = ""
+
+do_configure_prepend() {
+  cp ${WORKDIR}/find.pl ${S}/util/find.pl
+}
