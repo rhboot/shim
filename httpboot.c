@@ -506,7 +506,7 @@ no_event:
 }
 
 static EFI_STATUS
-receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINTN *buf_size)
+receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 {
 	EFI_HTTP_TOKEN rx_token;
 	EFI_HTTP_MESSAGE rx_message;
@@ -645,7 +645,7 @@ no_event:
 static EFI_STATUS
 http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	    CHAR8 *hostname, CHAR8 *uri, BOOLEAN is_ip6,
-	    VOID **buffer, UINTN *buf_size)
+	    VOID **buffer, UINT64 *buf_size)
 {
 	EFI_GUID http_binding_guid = EFI_HTTP_SERVICE_BINDING_PROTOCOL_GUID;
 	EFI_GUID http_protocol_guid = EFI_HTTP_PROTOCOL_GUID;

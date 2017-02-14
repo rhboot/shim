@@ -1815,8 +1815,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	}
 
 	/* Measure the binary into the TPM */
-	tpm_log_event((EFI_PHYSICAL_ADDRESS)data, datasize, 9,
-		      (CHAR8 *)"Second stage bootloader");
+	tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)data, datasize,
+		      9, (CHAR8 *)"Second stage bootloader");
 
 	/*
 	 * We need to modify the loaded image protocol entry before running
@@ -1901,8 +1901,8 @@ EFI_STATUS measure_mok()
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
-	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)Data, DataSize, 14,
-				   (CHAR8 *)"MokList");
+	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
+				   DataSize, 14, (CHAR8 *)"MokList");
 
 	FreePool(Data);
 
@@ -1915,8 +1915,8 @@ EFI_STATUS measure_mok()
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
-	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)Data, DataSize, 14,
-				   (CHAR8 *)"MokSBState");
+	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
+				   DataSize, 14, (CHAR8 *)"MokSBState");
 
 	FreePool(Data);
 
