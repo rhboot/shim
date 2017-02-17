@@ -16,12 +16,12 @@ export OE_LDFLAGS="${LDFLAGS}"
 SRC_URI += " \
             file://debian/debian-targets.patch \
             file://debian/no-rpath.patch \
-            file://engines-install-in-libdir-ssl.patch \
+            file://0001-OpenSSL-1.0.2-Change-LIBDIR-engines-to-LIBDIR-ssl-en.patch \
             file://find.pl \
            "
 
-SRC_URI[md5sum] = "130bb19745db2a5a09f22ccbbf7e69d0"
-SRC_URI[sha256sum] = "4312b4ca1215b6f2c97007503d80db80d5157f76f8f7d3febbe6b4c56ff26739"
+SRC_URI[md5sum] = "f965fc0bf01bf882b31314b61391ae65"
+SRC_URI[sha256sum] = "6b3977c61f2aedf0f96367dcfb5c6e578cf37e7b8d913b4ecb6643c3cb88d8c0"
 
 PACKAGES =+ " \
 	${PN}-engines \

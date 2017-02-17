@@ -1,11 +1,19 @@
-Upstream-Status: Inappropriate [configuration]
+From d3cae41cc50ddc8c36a63b4463aeb2d1606d90b4 Mon Sep 17 00:00:00 2001
+From: Calvin Park <calvin.s.park@intel.com>
+Date: Tue, 28 Feb 2017 15:21:02 -0800
+Subject: [PATCH] OpenSSL 1.0.2 Change $(LIBDIR)/engines to
+ $(LIBDIR)/ssl/engines
 
+---
+ openssl-1.0.0/engines/Makefile        | 10 +++++-----
+ openssl-1.0.0/engines/ccgost/Makefile |  8 ++++----
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-Index: openssl-1.0.0/engines/Makefile
-===================================================================
---- openssl-1.0.0.orig/engines/Makefile
+diff --git openssl-1.0.0/engines/Makefile openssl-1.0.0/engines/Makefile
+index 2058ff4..fe8e9ca 100644
+--- openssl-1.0.0/engines/Makefile
 +++ openssl-1.0.0/engines/Makefile
-@@ -107,7 +107,7 @@
+@@ -107,13 +107,13 @@ install:
  	@[ -n "$(INSTALLTOP)" ] # should be set by top Makefile...
  	@if [ -n "$(SHARED_LIBS)" ]; then \
  		set -e; \
@@ -14,16 +22,19 @@ Index: openssl-1.0.0/engines/Makefile
  		for l in $(LIBNAMES); do \
  			( echo installing $$l; \
  			  pfx=lib; \
-@@ -119,13 +119,13 @@
+ 			  if expr "$(PLATFORM)" : "Cygwin" >/dev/null; then \
+ 				sfx=".so"; \
+-				cp cyg$$l.dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new; \
++				cp cyg$$l.dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/ssl/engines/$$pfx$$l$$sfx.new; \
+ 			  else \
+ 				case "$(CFLAGS)" in \
+ 				*DSO_BEOS*)	sfx=".so";;	\
+@@ -122,10 +122,10 @@ install:
  				*DSO_WIN32*)	sfx="eay32.dll"; pfx=;;	\
  				*)		sfx=".bad";;	\
  				esac; \
 -				cp $$pfx$$l$$sfx $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new; \
 +				cp $$pfx$$l$$sfx $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/ssl/engines/$$pfx$$l$$sfx.new; \
- 			  else \
- 				sfx=".so"; \
--				cp cyg$$l.dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new; \
-+				cp cyg$$l.dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/ssl/engines/$$pfx$$l$$sfx.new; \
  			  fi; \
 -			  chmod 555 $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new; \
 -			  mv -f $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx ); \
@@ -32,20 +43,25 @@ Index: openssl-1.0.0/engines/Makefile
  		done; \
  	fi
  	@target=install; $(RECURSIVE_MAKE)
-Index: openssl-1.0.0/engines/ccgost/Makefile
-===================================================================
---- openssl-1.0.0.orig/engines/ccgost/Makefile
+diff --git openssl-1.0.0/engines/ccgost/Makefile openssl-1.0.0/engines/ccgost/Makefile
+index f378530..5286e23 100644
+--- openssl-1.0.0/engines/ccgost/Makefile
 +++ openssl-1.0.0/engines/ccgost/Makefile
-@@ -53,13 +53,13 @@
+@@ -47,7 +47,7 @@ install:
+ 		pfx=lib; \
+ 		if expr "$(PLATFORM)" : "Cygwin" >/dev/null; then \
+ 			sfx=".so"; \
+-			cp cyg$(LIBNAME).dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$${pfx}$(LIBNAME)$$sfx.new; \
++			cp cyg$(LIBNAME).dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/ssl/engines/$${pfx}$(LIBNAME)$$sfx.new; \
+ 		else \
+ 			case "$(CFLAGS)" in \
+ 			*DSO_BEOS*) sfx=".so";; \
+@@ -56,10 +56,10 @@ install:
  			*DSO_WIN32*) sfx="eay32.dll"; pfx=;; \
  			*) sfx=".bad";; \
  			esac; \
 -			cp $${pfx}$(LIBNAME)$$sfx $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$${pfx}$(LIBNAME)$$sfx.new; \
 +			cp $${pfx}$(LIBNAME)$$sfx $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/ssl/engines/$${pfx}$(LIBNAME)$$sfx.new; \
- 		else \
- 			sfx=".so"; \
--			cp cyg$(LIBNAME).dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$${pfx}$(LIBNAME)$$sfx.new; \
-+			cp cyg$(LIBNAME).dll $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/ssl/engines/$${pfx}$(LIBNAME)$$sfx.new; \
  		fi; \
 -		chmod 555 $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$${pfx}$(LIBNAME)$$sfx.new; \
 -		mv -f $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$${pfx}$(LIBNAME)$$sfx.new $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$${pfx}$(LIBNAME)$$sfx; \
@@ -54,3 +70,6 @@ Index: openssl-1.0.0/engines/ccgost/Makefile
  	fi
  
  links:
+-- 
+2.10.1 (Apple Git-78)
+
