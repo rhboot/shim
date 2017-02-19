@@ -428,7 +428,8 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
-					 UINT8 *hash)
+					 UINT8 *hash,
+					 UINTN hashsize)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
@@ -445,7 +446,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 								      data->Hdr.dwLength - sizeof(data->Hdr),
 								      Cert->SignatureData,
 								      CertSize,
-								      hash, SHA256_DIGEST_SIZE);
+								      hash, hashsize);
 					if (IsFound)
 						return DATA_FOUND;
 				}
@@ -462,7 +463,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 }
 
 static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
-				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash, UINTN hashsize)
 {
 	CHECK_STATUS rc;
 	EFI_STATUS efi_status;
@@ -477,7 +478,7 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
-	rc = check_db_cert_in_ram(CertList, dbsize, data, hash);
+	rc = check_db_cert_in_ram(CertList, dbsize, data, hash, hashsize);
 
 	FreePool(db);
 
@@ -571,7 +572,8 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
 	if (cert && check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
-					 sha256hash) == DATA_FOUND)
+					 sha256hash, SHA256_DIGEST_SIZE) ==
+					DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
@@ -580,14 +582,14 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
 			  EFI_CERT_SHA1_GUID) == DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
-	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash) ==
+	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash, SHA256_DIGEST_SIZE) ==
 				DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
 	if (check_db_hash(L"MokListX", shim_var, sha256hash, SHA256_DIGEST_SIZE,
 			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash) ==
+	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash, SHA256_DIGEST_SIZE) ==
 				DATA_FOUND) {
 		return EFI_SECURITY_VIOLATION;
 	}
@@ -622,7 +624,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		}
-		if (cert && check_db_cert(L"db", secure_var, cert, sha256hash)
+		if (cert && check_db_cert(L"db", secure_var, cert, sha256hash, SHA256_DIGEST_SIZE)
 					== DATA_FOUND) {
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
@@ -636,7 +638,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
 	}
-	if (cert && check_db_cert(L"MokList", shim_var, cert, sha256hash) ==
+	if (cert && check_db_cert(L"MokList", shim_var, cert, sha256hash, SHA256_DIGEST_SIZE) ==
 				DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
@@ -1020,25 +1022,43 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		/*
 		 * Check against the shim build key
 		 */
-		if (sizeof(shim_cert) &&
-		    AuthenticodeVerify(cert->CertData,
+		if (sizeof(shim_cert)) {
+		    if (AuthenticodeVerify(cert->CertData,
 			       cert->Hdr.dwLength - sizeof(cert->Hdr),
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
 			return status;
+		    }
+
+		    if (AuthenticodeVerify(cert->CertData,
+			    cert->Hdr.dwLength - sizeof(cert->Hdr),
+			    shim_cert, sizeof(shim_cert), sha1hash,
+			    SHA1_DIGEST_SIZE)) {
+			status = EFI_SUCCESS;
+			return status;
+		    }
 		}
 
 		/*
 		 * And finally, check against shim's built-in key
 		 */
-		if (vendor_cert_size &&
-		    AuthenticodeVerify(cert->CertData,
+		if (vendor_cert_size) {
+		    if (AuthenticodeVerify(cert->CertData,
 				       cert->Hdr.dwLength - sizeof(cert->Hdr),
 				       vendor_cert, vendor_cert_size,
 				       sha256hash, SHA256_DIGEST_SIZE)) {
 			status = EFI_SUCCESS;
 			return status;
+		    }
+
+		    if (AuthenticodeVerify(cert->CertData,
+					   cert->Hdr.dwLength - sizeof(cert->Hdr),
+					   vendor_cert, vendor_cert_size,
+					   sha1hash, SHA1_DIGEST_SIZE)) {
+			status = EFI_SUCCESS;
+			return status;
+		    }
 		}
 	}
 
