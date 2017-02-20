@@ -184,6 +184,9 @@ generate_next_uri (CONST CHAR8 *current_uri, CONST CHAR8 *next_loader,
 	if (strncmpa(current_uri, (CHAR8 *)"http://", 7) == 0) {
 		ptr = current_uri + 7;
 		count += 7;
+	} else if (strncmpa(current_uri, (CHAR8 *)"https://", 8) == 0) {
+		ptr = current_uri + 8;
+		count += 8;
 	} else {
 		return EFI_INVALID_PARAMETER;
 	}
@@ -216,6 +219,8 @@ extract_hostname (CONST CHAR8 *url, CHAR8 **hostname)
 
 	if (strncmpa(url, (CHAR8 *)"http://", 7) == 0)
 		start = url + 7;
+	else if (strncmpa(url, (CHAR8 *)"https://", 8) == 0)
+		start = url + 8;
 	else
 		return EFI_INVALID_PARAMETER;
 
