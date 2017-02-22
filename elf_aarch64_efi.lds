@@ -15,6 +15,16 @@ SECTIONS
     _etext = .;
   }
   .dynamic  : { *(.dynamic) }
+
+  . = ALIGN(4096);
+  .note.gnu.build-id : {
+    *(.note.gnu.build-id)
+  }
+  .data.ident : {
+    *(.data.ident)
+  }
+
+  . = ALIGN(4096);
   .data :
   {
    _data = .;
@@ -37,7 +47,6 @@ SECTIONS
    . = ALIGN(16);
    _bss_end = .;
   }
-  .note.gnu.build-id : { *(.note.gnu.build-id) }
 
   . = ALIGN(4096);
   .vendor_cert :

@@ -170,7 +170,7 @@ FORMAT		?= --target efi-app-$(ARCH)
 ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
-	$(OBJCOPY) -j .text -j .sdata -j .data \
+	$(OBJCOPY) -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .dynsym  -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .vendor_cert \

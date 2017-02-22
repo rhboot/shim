@@ -28,6 +28,14 @@ SECTIONS
    *(.scommon)
   }
   . = ALIGN(4096);
+  .note.gnu.build-id : {
+    *(.note.gnu.build-id)
+  }
+  .data.ident : {
+    *(.data.ident)
+  }
+
+  . = ALIGN(4096);
   .data :
   {
    *(.rodata*)
@@ -41,7 +49,7 @@ SECTIONS
    *(.bss)
    *(COMMON)
   }
-  .note.gnu.build-id : { *(.note.gnu.build-id) }
+
   . = ALIGN(4096);
   .vendor_cert :
   {
