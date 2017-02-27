@@ -708,7 +708,7 @@ error:
 }
 
 EFI_STATUS
-httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINTN *buf_size)
+httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 {
 	EFI_STATUS status;
 	EFI_HANDLE nic;

@@ -36,6 +36,6 @@
 
 BOOLEAN find_httpboot (EFI_DEVICE_PATH *devpath);
 
-EFI_STATUS httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINTN *buf_size);
+EFI_STATUS httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size);
 
 #endif
