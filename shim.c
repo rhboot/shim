@@ -1191,7 +1191,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
-	unsigned int alignment;
+	unsigned int alignment, alloc_size;
+	EFI_PHYSICAL_ADDRESS alloc_address;
 	int found_entry_point = 0;
 
 	/*
@@ -1236,20 +1237,29 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	if (!alignment)
 		alignment = 4096;
 
-	buffer = AllocatePool(context.ImageSize + context.SectionAlignment);
-	buffer = ALIGN_POINTER(buffer, alignment);
+	alloc_size = ALIGN_VALUE(context.ImageSize + context.SectionAlignment,
+				 PAGE_SIZE);
 
-	if (!buffer) {
+	efi_status = uefi_call_wrapper (BS->AllocatePages, 4,
+					AllocateAnyPages,
+					EfiLoaderCode,
+					alloc_size / PAGE_SIZE,
+					&alloc_address);
+
+	if (efi_status != EFI_SUCCESS) {
 		perror(L"Failed to allocate image buffer\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
+
+	buffer = (void *)ALIGN_VALUE((unsigned long)alloc_address, alignment);
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
 	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!entry_point) {
 		perror(L"Entry point is invalid\n");
-		FreePool(buffer);
+		uefi_call_wrapper(BS->FreePages, 2, alloc_address,
+				  alloc_size / PAGE_SIZE);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -1283,7 +1293,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		if (end < base) {
 			perror(L"Section %d has negative size\n", i);
-			FreePool(buffer);
+			uefi_call_wrapper(BS->FreePages, 2,  alloc_address,
+					  alloc_size / PAGE_SIZE);
 			return EFI_UNSUPPORTED;
 		}
 
