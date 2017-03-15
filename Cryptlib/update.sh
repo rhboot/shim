@@ -1,18 +1,20 @@
 #!/bin/bash
 
 DIR=$1
-OPENSSL_VERSION="1.0.2j"
+OPENSSL_VERSION="1.0.2k"
 
 cp $DIR/CryptoPkg/Library/BaseCryptLib/InternalCryptLib.h InternalCryptLib.h
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptMd4.c Hash/CryptMd4.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptMd4Null.c Hash/CryptMd4Null.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptMd5.c Hash/CryptMd5.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptSha1.c Hash/CryptSha1.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptSha256.c Hash/CryptSha256.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Hmac/CryptHmacMd5.c Hmac/CryptHmacMd5.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Hmac/CryptHmacSha1.c Hmac/CryptHmacSha1.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Cipher/CryptAes.c Cipher/CryptAes.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Cipher/CryptTdes.c Cipher/CryptTdes.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Cipher/CryptArc4.c Cipher/CryptArc4.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptSha512.c Hash/CryptSha512.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Hmac/CryptHmacMd5Null.c Hmac/CryptHmacMd5Null.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Hmac/CryptHmacSha1Null.c Hmac/CryptHmacSha1Null.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Hmac/CryptHmacSha256Null.c Hmac/CryptHmacSha256Null.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Cipher/CryptAesNull.c Cipher/CryptAesNull.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Cipher/CryptTdesNull.c Cipher/CryptTdesNull.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Cipher/CryptArc4Null.c Cipher/CryptArc4Null.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Rand/CryptRand.c Rand/CryptRand.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptRsaBasic.c Pk/CryptRsaBasic.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptRsaExtNull.c Pk/CryptRsaExtNull.c

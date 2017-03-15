@@ -20,16 +20,17 @@ endif
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libcryptlib.a
-OBJS		=   Hash/CryptMd4.o \
+OBJS		=   Hash/CryptMd4Null.o \
 		    Hash/CryptMd5.o \
 		    Hash/CryptSha1.o \
 		    Hash/CryptSha256.o \
 		    Hash/CryptSha512.o \
-		    Hmac/CryptHmacMd5.o \
-		    Hmac/CryptHmacSha1.o \
-		    Cipher/CryptAes.o \
-		    Cipher/CryptTdes.o \
-		    Cipher/CryptArc4.o \
+		    Hmac/CryptHmacMd5Null.o \
+		    Hmac/CryptHmacSha1Null.o \
+		    Hmac/CryptHmacSha256Null.o \
+		    Cipher/CryptAesNull.o \
+		    Cipher/CryptTdesNull.o \
+		    Cipher/CryptArc4Null.o \
 		    Rand/CryptRand.o \
 		    Pk/CryptRsaBasic.o \
 		    Pk/CryptRsaExtNull.o \
