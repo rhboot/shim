@@ -374,6 +374,11 @@ size_t fread (void *b, size_t c, size_t i, FILE *f)
   return 0;
 }
 
+int fputs (const char *s, FILE *f)
+{
+  return 0;
+}
+
 int fprintf (FILE *f, const char *s, ...)
 {
   return 0;
@@ -435,6 +440,11 @@ void syslog (int a, const char *c, ...)
 }
 
 ssize_t write (int f, const void *b, size_t l)
+{
+  return 0;
+}
+
+int printf (char const *fmt, ...)
 {
   return 0;
 }

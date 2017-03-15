@@ -1,7 +1,7 @@
 /** @file
   SHA-384 and SHA-512 Digest Wrapper Implementations over OpenSSL.
 
-Copyright (c) 2014, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2014 - 2016, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -103,7 +103,7 @@ Sha384Duplicate (
 
   This function performs SHA-384 digest on a data buffer of the specified size.
   It can be called multiple times to compute the digest of long or discontinuous data streams.
-  SHA-384 context should be already correctly intialized by Sha384Init(), and should not be finalized
+  SHA-384 context should be already correctly initialized by Sha384Init(), and should not be finalized
   by Sha384Final(). Behavior with invalid context is undefined.
 
   If Sha384Context is NULL, then return FALSE.
@@ -150,7 +150,7 @@ Sha384Update (
   This function completes SHA-384 hash computation and retrieves the digest value into
   the specified memory. After this function has been called, the SHA-384 context cannot
   be used again.
-  SHA-384 context should be already correctly intialized by Sha384Init(), and should not be
+  SHA-384 context should be already correctly initialized by Sha384Init(), and should not be
   finalized by Sha384Final(). Behavior with invalid SHA-384 context is undefined.
 
   If Sha384Context is NULL, then return FALSE.
@@ -182,6 +182,52 @@ Sha384Final (
   // OpenSSL SHA-384 Hash Finalization
   //
   return (BOOLEAN) (SHA384_Final (HashValue, (SHA512_CTX *) Sha384Context));
+}
+
+/**
+  Computes the SHA-384 message digest of a input data buffer.
+
+  This function performs the SHA-384 message digest of a given data buffer, and places
+  the digest value into the specified memory.
+
+  If this interface is not supported, then return FALSE.
+
+  @param[in]   Data        Pointer to the buffer containing the data to be hashed.
+  @param[in]   DataSize    Size of Data buffer in bytes.
+  @param[out]  HashValue   Pointer to a buffer that receives the SHA-384 digest
+                           value (48 bytes).
+
+  @retval TRUE   SHA-384 digest computation succeeded.
+  @retval FALSE  SHA-384 digest computation failed.
+  @retval FALSE  This interface is not supported.
+
+**/
+BOOLEAN
+EFIAPI
+Sha384HashAll (
+  IN   CONST VOID  *Data,
+  IN   UINTN       DataSize,
+  OUT  UINT8       *HashValue
+  )
+{
+  //
+  // Check input parameters.
+  //
+  if (HashValue == NULL) {
+    return FALSE;
+  }
+  if (Data == NULL && DataSize != 0) {
+    return FALSE;
+  }
+
+  //
+  // OpenSSL SHA-384 Hash Computation.
+  //
+  if (SHA384 (Data, DataSize, HashValue) == NULL) {
+    return FALSE;
+  } else {
+    return TRUE;
+  }
 }
 
 /**
@@ -272,7 +318,7 @@ Sha512Duplicate (
 
   This function performs SHA-512 digest on a data buffer of the specified size.
   It can be called multiple times to compute the digest of long or discontinuous data streams.
-  SHA-512 context should be already correctly intialized by Sha512Init(), and should not be finalized
+  SHA-512 context should be already correctly initialized by Sha512Init(), and should not be finalized
   by Sha512Final(). Behavior with invalid context is undefined.
 
   If Sha512Context is NULL, then return FALSE.
@@ -319,7 +365,7 @@ Sha512Update (
   This function completes SHA-512 hash computation and retrieves the digest value into
   the specified memory. After this function has been called, the SHA-512 context cannot
   be used again.
-  SHA-512 context should be already correctly intialized by Sha512Init(), and should not be
+  SHA-512 context should be already correctly initialized by Sha512Init(), and should not be
   finalized by Sha512Final(). Behavior with invalid SHA-512 context is undefined.
 
   If Sha512Context is NULL, then return FALSE.
@@ -351,4 +397,50 @@ Sha512Final (
   // OpenSSL SHA-512 Hash Finalization
   //
   return (BOOLEAN) (SHA384_Final (HashValue, (SHA512_CTX *) Sha512Context));
+}
+
+/**
+  Computes the SHA-512 message digest of a input data buffer.
+
+  This function performs the SHA-512 message digest of a given data buffer, and places
+  the digest value into the specified memory.
+
+  If this interface is not supported, then return FALSE.
+
+  @param[in]   Data        Pointer to the buffer containing the data to be hashed.
+  @param[in]   DataSize    Size of Data buffer in bytes.
+  @param[out]  HashValue   Pointer to a buffer that receives the SHA-512 digest
+                           value (64 bytes).
+
+  @retval TRUE   SHA-512 digest computation succeeded.
+  @retval FALSE  SHA-512 digest computation failed.
+  @retval FALSE  This interface is not supported.
+
+**/
+BOOLEAN
+EFIAPI
+Sha512HashAll (
+  IN   CONST VOID  *Data,
+  IN   UINTN       DataSize,
+  OUT  UINT8       *HashValue
+  )
+{
+  //
+  // Check input parameters.
+  //
+  if (HashValue == NULL) {
+    return FALSE;
+  }
+  if (Data == NULL && DataSize != 0) {
+    return FALSE;
+  }
+
+  //
+  // OpenSSL SHA-512 Hash Computation.
+  //
+  if (SHA512 (Data, DataSize, HashValue) == NULL) {
+    return FALSE;
+  } else {
+    return TRUE;
+  }
 }

@@ -1,7 +1,7 @@
 /** @file
   MD5 Digest Wrapper Implementation over OpenSSL.
 
-Copyright (c) 2009 - 2012, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2009 - 2016, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -103,7 +103,7 @@ Md5Duplicate (
 
   This function performs MD5 digest on a data buffer of the specified size.
   It can be called multiple times to compute the digest of long or discontinuous data streams.
-  MD5 context should be already correctly intialized by Md5Init(), and should not be finalized
+  MD5 context should be already correctly initialized by Md5Init(), and should not be finalized
   by Md5Final(). Behavior with invalid context is undefined.
 
   If Md5Context is NULL, then return FALSE.
@@ -150,7 +150,7 @@ Md5Update (
   This function completes MD5 hash computation and retrieves the digest value into
   the specified memory. After this function has been called, the MD5 context cannot
   be used again.
-  MD5 context should be already correctly intialized by Md5Init(), and should not be
+  MD5 context should be already correctly initialized by Md5Init(), and should not be
   finalized by Md5Final(). Behavior with invalid MD5 context is undefined.
 
   If Md5Context is NULL, then return FALSE.
@@ -182,4 +182,50 @@ Md5Final (
   // OpenSSL MD5 Hash Finalization
   //
   return (BOOLEAN) (MD5_Final (HashValue, (MD5_CTX *) Md5Context));
+}
+
+/**
+  Computes the MD5 message digest of a input data buffer.
+
+  This function performs the MD5 message digest of a given data buffer, and places
+  the digest value into the specified memory.
+
+  If this interface is not supported, then return FALSE.
+
+  @param[in]   Data        Pointer to the buffer containing the data to be hashed.
+  @param[in]   DataSize    Size of Data buffer in bytes.
+  @param[out]  HashValue   Pointer to a buffer that receives the MD5 digest
+                           value (16 bytes).
+
+  @retval TRUE   MD5 digest computation succeeded.
+  @retval FALSE  MD5 digest computation failed.
+  @retval FALSE  This interface is not supported.
+
+**/
+BOOLEAN
+EFIAPI
+Md5HashAll (
+  IN   CONST VOID  *Data,
+  IN   UINTN       DataSize,
+  OUT  UINT8       *HashValue
+  )
+{
+  //
+  // Check input parameters.
+  //
+  if (HashValue == NULL) {
+    return FALSE;
+  }
+  if (Data == NULL && (DataSize != 0)) {
+    return FALSE;
+  }
+
+  //
+  // OpenSSL MD5 Hash Computation.
+  //
+  if (MD5 (Data, DataSize, HashValue) == NULL) {
+    return FALSE;
+  } else {
+    return TRUE;
+  }
 }
