@@ -1,4 +1,4 @@
-VERSION		= 0.9
+VERSION		= 10
 RELEASE		:=
 ifneq ($(RELEASE),"")
 	RELEASE:="-$(RELEASE)"
