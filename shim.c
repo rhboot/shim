@@ -2317,6 +2317,24 @@ get_load_option_optional_data(UINT8 *data, UINTN data_size,
 	return EFI_SUCCESS;
 }
 
+static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path, UINTN len)
+{
+	CHAR16 *dppath = NULL;
+	int ret = 1;
+
+	dppath = DevicePathToStr(li->FilePath);
+	if (!dppath)
+		return 0;
+
+	Print(L"dppath: %s\n", dppath);
+	Print(L"path:   %s\n", path);
+	if (StrnCaseCmp(dppath, path, len))
+		ret = 0;
+
+	FreePool(dppath);
+	return ret;
+}
+
 /*
  * Check the load options to specify the second stage loader
  */
@@ -2483,6 +2501,20 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 
 	strings = count_ucs2_strings((UINT8 *)start, loader_len);
 	if (strings < 1)
+		return EFI_SUCCESS;
+
+	/*
+	 * And then I found a version of BDS that gives us our own path in
+	 * LoadOptions:
+
+77162C58                           5c 00 45 00 46 00 49 00          |\.E.F.I.|
+77162C60  5c 00 42 00 4f 00 4f 00  54 00 5c 00 42 00 4f 00  |\.B.O.O.T.\.B.O.|
+77162C70  4f 00 54 00 58 00 36 00  34 00 2e 00 45 00 46 00  |O.T.X.6.4...E.F.|
+77162C80  49 00 00 00                                       |I...|
+
+	 * which is just cruel... So yeah, just don't use it.
+	 */
+	if (strings == 1 && is_our_path(li, start, loader_len))
 		return EFI_SUCCESS;
 
 	/*
