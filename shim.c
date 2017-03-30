@@ -891,7 +891,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
 
 		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
-		    (SumOfBytesHashed - hashsize != context->SecDir->VirtualAddress)) {
+		    (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress)) {
 			perror(L"Malformed binary after Attribute Certificate Table\n");
 			status = EFI_INVALID_PARAMETER;
 			goto done;
