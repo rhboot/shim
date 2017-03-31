@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
-#include <OpenSslSupport.h>
+#include <CrtLibSupport.h>
 
 //
 // -- Memory-Allocation Routines --

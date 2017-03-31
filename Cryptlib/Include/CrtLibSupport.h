@@ -1,7 +1,8 @@
 /** @file
-  Root include file to support building OpenSSL Crypto Library.
+  Root include file of C runtime library to support building the third-party
+  cryptographic library.
 
-Copyright (c) 2010 - 2011, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2010 - 2017, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -12,8 +13,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
-#ifndef __OPEN_SSL_SUPPORT_H__
-#define __OPEN_SSL_SUPPORT_H__
+#ifndef __CRT_LIB_SUPPORT_H__
+#define __CRT_LIB_SUPPORT_H__
 
 #include <efi.h>
 #include <efilib.h>
@@ -22,6 +23,9 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Library/BaseMemoryLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/DebugLib.h>
+
+#define OPENSSLDIR ""
+#define ENGINESDIR ""
 
 #define CONST const
 
@@ -164,27 +168,14 @@ typedef CHAR8 *VA_LIST;
 #endif
 
 //
-// #defines from EFI Application Toolkit required to buiild Open SSL
+// Definitions for global constants used by CRT library routines
 //
-#define ENOMEM       12               /* Cannot allocate memory */
 #define EINVAL       22               /* Invalid argument */
-#define BUFSIZ       1024             /* size of buffer used by setbuf */
-#define INT_MAX      2147483647       /* max value for an int */
-#define INT_MIN      (-2147483647-1)  /* min value for an int */
-#define LONG_MAX     2147483647L      /* max value for a long */
-#define LONG_MIN     (-2147483647-1)  /* min value for a long */
-#define ULONG_MAX    0xffffffff       /* max value for an unsigned long */
-#define LOG_DAEMON   (3<<3)           /* system daemons */
-#define LOG_EMERG    0                /* system is unusable */
-#define LOG_ALERT    1                /* action must be taken immediately */
-#define LOG_CRIT     2                /* critical conditions */
-#define LOG_ERR      3                /* error conditions */
-#define LOG_WARNING  4                /* warning conditions */
-#define LOG_NOTICE   5                /* normal but significant condition */
-#define LOG_INFO     6                /* informational */
-#define LOG_DEBUG    7                /* debug-level messages */
-#define LOG_PID      0x01             /* log the pid with each message */
-#define LOG_CONS     0x02             /* log on the console if errors in sending */
+#define INT_MAX      0x7FFFFFFF       /* Maximum (signed) int value */
+#define LONG_MAX     0X7FFFFFFFL      /* max value for a long */
+#define LONG_MIN     (-LONG_MAX-1)    /* min value for a long */
+#define ULONG_MAX    0xFFFFFFFF       /* Maximum unsigned long value */
+#define CHAR_BIT     8                /* Number of bits in a char */
 
 //
 // Macros from EFI Application Toolkit required to buiild Open SSL
@@ -199,25 +190,26 @@ typedef CHAR8 *VA_LIST;
 #endif
 
 //
-// Basic types from EFI Application Toolkit required to buiild Open SSL
+// Basic types mapping
 //
 typedef UINTN          size_t;
 typedef INTN           ssize_t;
-typedef INT64          off_t;
-typedef UINT16         mode_t;
-typedef long           time_t;
-typedef unsigned long  clock_t;
+typedef INT32          time_t;
+typedef UINT8          __uint8_t;
+typedef UINT8          sa_family_t;
 typedef UINT32         uid_t;
 typedef UINT32         gid_t;
+typedef INT64          off_t;
+typedef UINT16         mode_t;
+typedef unsigned long  clock_t;
 typedef UINT32         ino_t;
 typedef UINT32         dev_t;
 typedef UINT16         nlink_t;
 typedef int            pid_t;
 typedef void           *DIR;
-typedef void           __sighandler_t (int);
 
 //
-// Structures from EFI Application Toolkit required to buiild Open SSL
+// Structures Definitions
 //
 struct tm {
   int   tm_sec;     /* seconds after the minute [0-60] */
@@ -236,6 +228,12 @@ struct tm {
 struct timeval {
   long tv_sec;      /* time value, in seconds */
   long tv_usec;     /* time value, in microseconds */
+};
+
+struct sockaddr {
+  __uint8_t    sa_len;       /* total length */
+  sa_family_t  sa_family;    /* address family */
+  char         sa_data[14];  /* actually longer; address value */
 };
 
 struct dirent {
@@ -270,38 +268,37 @@ struct stat {
 };
 
 //
-// Externs from EFI Application Toolkit required to buiild Open SSL
+// Global variables
 //
 extern int errno;
 
 //
-// Function prototypes from EFI Application Toolkit required to buiild Open SSL
+// Function prototypes of CRT Library routines
 //
 void           *malloc     (size_t);
 void           *realloc    (void *, size_t);
 void           free        (void *);
-int            isdigit     (int);
-int            isspace     (int);
-int            tolower     (int);
-int            isupper     (int);
-int            isxdigit    (int);
-int            isalnum     (int);
 void           *memcpy     (void *, const void *, size_t);
-void           *memset     (void *, int, size_t);
 void           *memchr     (const void *, int, size_t);
 int            memcmp      (const void *, const void *, size_t);
 void           *memmove    (void *, const void *, size_t);
+void           *memset     (void *, int, size_t);
+int            isdigit     (int);
+int            isspace     (int);
+int            isxdigit    (int);
+int            isalnum     (int);
+int            isupper     (int);
+int            tolower     (int);
 int            strcmp      (const char *, const char *);
 int            strncmp     (const char *, const char *, size_t);
+int            strncasecmp (const char *, const char *, size_t);
+int            strcasecmp  (const char *, const char *);
 char           *strcpy     (char *, const char *);
 char           *strncpy    (char *, const char *, size_t);
 size_t         strlen      (const char *);
 char           *strcat     (char *, const char *);
 char           *strchr     (const char *, int);
-int            strcasecmp  (const char *, const char *);
-int            strncasecmp (const char *, const char *, size_t);
 char           *strncpy    (char *, const char *, size_t);
-int            strncmp     (const char *, const char *, size_t);
 char           *strrchr    (const char *, int);
 unsigned long  strtoul     (const char *, char **, int);
 long           strtol      (const char *, char **, int);
@@ -340,8 +337,11 @@ gid_t          getegid     (void);
 void           qsort       (void *, size_t, size_t, int (*)(const void *, const void *));
 char           *getenv     (const char *);
 void           exit        (int);
+#if defined(__GNUC__) && (__GNUC__ >= 2)
+void           abort       (void) __attribute__((__noreturn__));
+#else
 void           abort       (void);
-__sighandler_t *signal     (int, __sighandler_t *);
+#endif
 
 //
 // Global variables from EFI Application Toolkit required to buiild Open SSL
@@ -361,17 +361,17 @@ extern FILE  *stdout;
 #define memchr(buf,ch,count)              ScanMem8(buf,(UINTN)(count),(UINT8)ch)
 #define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
 #define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
-#define strcmp                            strcmpa
-#define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
+#define strlen(str)                       (size_t)(AsciiStrLen(str))
 #define strcpy(strDest,strSource)         AsciiStrCpy(strDest,strSource)
 #define strncpy(strDest,strSource,count)  AsciiStrnCpy(strDest,strSource,(UINTN)count)
-#define strlen(str)                       (size_t)(AsciiStrLen(str))
 #define strcat(strDest,strSource)         AsciiStrCat(strDest,strSource)
 #define strchr(str,ch)                    ScanMem8((VOID *)(str),AsciiStrSize(str),(UINT8)ch)
-#define abort()                           ASSERT (FALSE)
-#define assert(expression)
+#define strcmp                            strcmpa
+#define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
 #define localtime(timer)                  NULL
-#define gmtime_r(timer,result)            (result = NULL)
+#define assert(expression)
 #define atoi(nptr)                        Atoi(nptr)
+#define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
+#define gmtime_r(timer,result)            (result = NULL)
 
 #endif

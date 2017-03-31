@@ -21,7 +21,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Library/DebugLib.h>
 #include <Library/BaseCryptLib.h>
 
-#include "OpenSslSupport.h"
+#include "CrtLibSupport.h"
 
 #include <openssl/opensslv.h>
 
