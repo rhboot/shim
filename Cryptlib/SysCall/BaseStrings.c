@@ -1,4 +1,4 @@
-#include <OpenSslSupport.h>
+#include <CrtLibSupport.h>
 
 char *
 AsciiStrCat(char *Destination, char *Source)
