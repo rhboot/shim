@@ -2,7 +2,7 @@
   C Run-Time Libraries (CRT) Time Management Routines Wrapper Implementation
   for OpenSSL-based Cryptographic Library (used in DXE & RUNTIME).
 
-Copyright (c) 2010 - 2016, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2010 - 2017, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
