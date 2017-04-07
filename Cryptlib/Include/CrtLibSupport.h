@@ -374,7 +374,6 @@ extern FILE  *stdout;
 #define strncpy(strDest,strSource,count)  AsciiStrnCpy(strDest,strSource,(UINTN)count)
 #define strcat(strDest,strSource)         AsciiStrCat(strDest,strSource)
 #define strchr(str,ch)                    (char *)(ScanMem8((CHAR8 *)str,AsciiStrSize((CHAR8 *)str),ch))
-#define strcmp(string1,string2)           strcmpa((CHAR8 *)string1,(CHAR8 *)string2)
 #define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
 #define localtime(timer)                  NULL
 #define assert(expression)
