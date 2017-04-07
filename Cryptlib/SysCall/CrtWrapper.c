@@ -424,11 +424,6 @@ int stat (const char *c, struct stat *s)
   return -1;
 }
 
-int strcasecmp (const char *c, const char *s)
-{
-  return 0;
-}
-
 int strncasecmp (const char *c, const char *s, size_t l)
 {
   return 0;

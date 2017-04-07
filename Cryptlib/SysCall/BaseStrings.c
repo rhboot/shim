@@ -64,4 +64,32 @@ AsciiStrSize(CHAR8 *string)
 	return strlena(string) + 1;
 }
 
+int
+strcmp (const char *str1, const char *str2)
+{
+	return strcmpa((CHAR8 *)str1,(CHAR8 *)str2);
+}
 
+inline static char
+toupper (char c)
+{
+	return ((c >= 'a' && c <= 'z') ? c - ('a' - 'A') : c);
+}
+
+/* Based on AsciiStriCmp() in edk2 MdePkg/Library/BaseLib/String.c */
+int
+strcasecmp (const char *str1, const char *str2)
+{
+	char c1, c2;
+
+	c1 = toupper (*str1);
+	c2 = toupper (*str2);
+	while ((*str1 != '\0') && (c1 == c2)) {
+		str1++;
+		str2++;
+		c1 = toupper (*str1);
+		c2 = toupper (*str2);
+	}
+
+	return c1 - c2;
+}
