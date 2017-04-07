@@ -200,7 +200,7 @@ typedef CHAR8 *VA_LIST;
    For pre-Standard C compilers, here is a version that usually works
    (but watch out!): */
 #ifndef offsetof
-#define offsetof(type, member) ( (int) & ((type*)0) -> member )
+#define offsetof(type, member) ( (UINTN) & ((type*)0) -> member )
 #endif
 
 //
@@ -310,6 +310,9 @@ int            strncmp     (const char *, const char *, size_t);
 char           *strrchr    (const char *, int);
 unsigned long  strtoul     (const char *, char **, int);
 long           strtol      (const char *, char **, int);
+char           *strerror   (int);
+size_t         strspn      (const char *, const char *);
+size_t         strcspn     (const char *, const char *);
 int            printf      (const char *, ...);
 int            sscanf      (const char *, const char *, ...);
 int            open        (const char *, int, ...);
@@ -356,26 +359,26 @@ extern FILE  *stdin;
 extern FILE  *stdout;
 
 #define AsciiStrLen(x) strlena(x)
-#define AsciiStrnCmp(s1, s2, len) strncmpa(s1, s2, len)
+#define AsciiStrnCmp(s1, s2, len) strncmpa((CHAR8 *)s1, (CHAR8 *)s2, len)
 
 //
 // Macros that directly map functions to BaseLib, BaseMemoryLib, and DebugLib functions
 //
 #define memcpy(dest,source,count)         ( {CopyMem(dest,source,(UINTN)(count)); dest; })
 #define memset(dest,ch,count)             SetMem(dest,(UINTN)(count),(UINT8)(ch))
-#define memchr(buf,ch,count)              ScanMem8(buf,(UINTN)(count),(UINT8)ch)
+#define memchr(buf,ch,count)              ScanMem8((CHAR8 *)buf,(UINTN)(count),ch)
 #define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
 #define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
-#define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
+#define strlen(str)                       (size_t)(AsciiStrLen((CHAR8 *)str))
 #define strcpy(strDest,strSource)         AsciiStrCpy(strDest,strSource)
 #define strncpy(strDest,strSource,count)  AsciiStrnCpy(strDest,strSource,(UINTN)count)
-#define strlen(str)                       (size_t)(AsciiStrLen(str))
 #define strcat(strDest,strSource)         AsciiStrCat(strDest,strSource)
-#define strchr(str,ch)                    ScanMem8((VOID *)(str),AsciiStrSize(str),(UINT8)ch)
-#define abort()                           ASSERT (FALSE)
-#define assert(expression)
+#define strchr(str,ch)                    (char *)(ScanMem8((CHAR8 *)str,AsciiStrSize((CHAR8 *)str),ch))
+#define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
 #define localtime(timer)                  NULL
+#define assert(expression)
+#define atoi(nptr)                        AsciiStrDecimalToUintn(nptr)
+#define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
 #define gmtime_r(timer,result)            (result = NULL)
-#define atoi(nptr)                        Atoi(nptr)
 
 #endif

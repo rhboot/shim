@@ -1,9 +1,9 @@
 #include <OpenSslSupport.h>
 
-CHAR8 *
-AsciiStrCat(CHAR8 *Destination, CHAR8 *Source)
+char *
+AsciiStrCat(char *Destination, char *Source)
 {
-	UINTN dest_len = strlena(Destination);
+	UINTN dest_len = strlena((CHAR8 *)Destination);
 	UINTN i;
 
 	for (i = 0; Source[i] != '\0'; i++)
@@ -25,8 +25,8 @@ AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
 	return Destination;
 }
 
-CHAR8 *
-AsciiStrnCpy(CHAR8 *Destination, CHAR8 *Source, UINTN count)
+char *
+AsciiStrnCpy(char *Destination, char *Source, UINTN count)
 {
 	UINTN i;
 
@@ -92,4 +92,34 @@ strcasecmp (const char *str1, const char *str2)
 	}
 
 	return c1 - c2;
+}
+
+/* Based on AsciiStrDecimalToUintnS() in edk2
+ * MdePkg/Library/BaseLib/SafeString.c */
+UINTN
+AsciiStrDecimalToUintn(const char *String)
+{
+	UINTN     Result;
+
+	if (String == NULL)
+		return 0;
+
+	/* Ignore the pad spaces (space or tab) */
+	while ((*String == ' ') || (*String == '\t')) {
+		String++;
+	}
+
+	/* Ignore leading Zeros after the spaces */
+	while (*String == '0') {
+		String++;
+	}
+
+	Result = 0;
+
+	while (*String >= '0' && *String <= '9') {
+		Result = Result * 10 + (*String - '0');
+		String++;
+	}
+
+	return Result;
 }
