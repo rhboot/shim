@@ -352,14 +352,14 @@ static void show_x509_info(X509 * X509Cert, UINT8 * hash)
 			fields++;
 	}
 
-	time = X509_get_notBefore(X509Cert);
+	time = X509_getm_notBefore(X509Cert);
 	if (time) {
 		from = get_x509_time(time);
 		if (from)
 			fields++;
 	}
 
-	time = X509_get_notAfter(X509Cert);
+	time = X509_getm_notAfter(X509Cert);
 	if (time) {
 		until = get_x509_time(time);
 		if (until)
