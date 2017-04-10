@@ -1,0 +1,61 @@
+#!/bin/bash
+set -u -e
+
+usage() {
+	ret=$1 && shift
+
+	if [[ $ret -ne 0 ]]; then
+		exec 1>&2
+	fi
+	echo 'usage: make-my-branch [--remote <remote-repo>] [--remote-branch <remote-branch>] [--remote-treeish <treeish>] --local-branch <branch name>'
+	eval exit $ret
+}
+
+declare -a args
+args=()
+declare localbranch=""
+declare remote="https://github.com/rhinstaller/shim.git"
+declare branch="master"
+declare treeish="latest-release"
+
+while [[ $# -ne 0 ]]; do
+	case "${1}" in
+	--help|-h|--usage|-\?|-u)
+		usage 0
+		;;
+	--localbranch|--local-branch|-l)
+		localbranch="${2}" && shift
+		;;
+	--remote|-r)
+		remote="${2}" && shift
+		;;
+	--remotebranch|--remote-branch|-b)
+		branch="${2}" && shift
+		;;
+	--remotetreeish|--remote-treeish|-t)
+		treeish="${2}" && shift
+		;;
+	*)
+		args+=($1)
+		;;
+	esac
+	shift
+done
+
+if [[ ${#args[@]} -gt 1 ]]; then
+	usage 1
+fi
+
+if [[ -z "${localbranch}" ]]; then
+	if [[ ${#args[@]} -ne 1 ]]; then
+		usage 1
+	fi
+	localbranch="${args[0]}"
+fi
+
+git remote add remote "${remote}"
+git fetch remote
+git branch "${localbranch}" remote/"${branch}"
+git checkout "${localbranch}"
+git rebase "${treeish}"
+git log --reverse --pretty=format:%H origin/reviews | xargs -n 1 git cp --strategy recursive -Xtheirs
