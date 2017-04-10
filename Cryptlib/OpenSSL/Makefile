@@ -52,32 +52,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/hmac/hmac.o \
   crypto/hmac/hm_ameth.o \
   crypto/hmac/hm_pmeth.o \
-  crypto/des/set_key.o \
-  crypto/des/ecb_enc.o \
-  crypto/des/cbc_enc.o \
-  crypto/des/ecb3_enc.o \
-  crypto/des/cfb64enc.o \
-  crypto/des/cfb64ede.o \
-  crypto/des/cfb_enc.o \
-  crypto/des/ofb64ede.o \
-  crypto/des/enc_read.o \
-  crypto/des/enc_writ.o \
-  crypto/des/ofb64enc.o \
-  crypto/des/ofb_enc.o \
-  crypto/des/str2key.o \
-  crypto/des/pcbc_enc.o \
-  crypto/des/qud_cksm.o \
-  crypto/des/rand_key.o \
-  crypto/des/des_enc.o \
-  crypto/des/fcrypt_b.o \
-  crypto/des/fcrypt.o \
-  crypto/des/xcbc_enc.o \
-  crypto/des/rpc_enc.o \
-  crypto/des/cbc_cksm.o \
-  crypto/des/ede_cbcm_enc.o \
-  crypto/des/des_old.o \
-  crypto/des/des_old2.o \
-  crypto/des/read2pwd.o \
   crypto/rc4/rc4_enc.o \
   crypto/rc4/rc4_skey.o \
   crypto/rc4/rc4_utl.o \

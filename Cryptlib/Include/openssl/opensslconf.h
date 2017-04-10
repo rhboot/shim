@@ -32,6 +32,9 @@ extern "C" {
 #ifndef OPENSSL_NO_DGRAM
 # define OPENSSL_NO_DGRAM
 #endif
+#ifndef OPENSSL_NO_DES
+# define OPENSSL_NO_DES
+#endif
 #ifndef OPENSSL_NO_DSA
 # define OPENSSL_NO_DSA
 #endif
