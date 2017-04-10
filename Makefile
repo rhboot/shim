@@ -34,6 +34,8 @@ SHIMNAME	= shim
 MMNAME		= MokManager
 FBNAME		= fallback
 
+COMMITID ?= $(shell if [ -d .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo commit id not available; fi)
+
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
 endif
@@ -116,7 +118,7 @@ shim_cert.h: shim.cer
 version.c : version.c.in
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
 		-e "s,@@UNAME@@,$(shell uname -a)," \
-		-e "s,@@COMMIT@@,$(shell if [ -d .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo commit id not available; fi)," \
+		-e "s,@@COMMIT@@,$(COMMITID)," \
 		< version.c.in > version.c
 
 certdb/secmod.db: shim.crt
@@ -208,6 +210,7 @@ test-archive:
 
 tag:
 	git tag --sign $(GITTAG) refs/heads/master
+	git tag -f latest-release $(GITTAG)
 
 archive: tag
 	@rm -rf /tmp/shim-$(VERSION) /tmp/shim-$(VERSION)-tmp
