@@ -283,8 +283,6 @@ OBJS		= crypto/bio/b_print.o \
 		  crypto/kdf/tls1_prf.o \
 		  crypto/lhash/lh_stats.o \
 		  crypto/lhash/lhash.o \
-		  crypto/md4/md4_dgst.o \
-		  crypto/md4/md4_one.o \
 		  crypto/md5/md5_dgst.o \
 		  crypto/md5/md5_one.o \
 		  crypto/mem.o \

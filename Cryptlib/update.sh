@@ -35,3 +35,4 @@ cp $DIR/CryptoPkg/Library/Include/internal/dso_conf.h Include/internal/
 cp $DIR/CryptoPkg/Library/Include/openssl/opensslconf.h Include/openssl/
 
 patch -p2 <Cryptlib.diff
+patch -p2 <opensslconf-diff.patch
