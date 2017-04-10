@@ -46,7 +46,6 @@ SUBDIRS="
 	cmac
 	comp
 	conf
-	des
 	dh
 	dso
 	err

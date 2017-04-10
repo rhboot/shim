@@ -3,7 +3,6 @@
 #include <Library/BaseCryptLib.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
-#include <openssl/des.h>
 #include "PasswordCrypt.h"
 #include "crypt_blowfish.h"
 
@@ -29,20 +28,6 @@ UINT16 get_hash_size (const UINT16 method)
 	}
 
 	return 0;
-}
-
-static EFI_STATUS trad_des_crypt (const char *key, const char *salt, UINT8 *hash)
-{
-	char result[TRAD_DES_HASH_SIZE + 1];
-	char *ret;
-
-	ret = DES_fcrypt(key, salt, result);
-	if (ret) {
-		CopyMem(hash, result, TRAD_DES_HASH_SIZE);
-		return EFI_SUCCESS;
-	}
-
-	return EFI_UNSUPPORTED;
 }
 
 static const char md5_salt_prefix[] = "$1$";
@@ -308,8 +293,6 @@ EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 
 	switch (pw_crypt->method) {
 	case TRADITIONAL_DES:
-		status = trad_des_crypt (password, (char *)pw_crypt->salt, hash);
-		break;
 	case EXTEND_BSDI_DES:
 		status = EFI_UNSUPPORTED;
 		break;
