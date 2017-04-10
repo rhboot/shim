@@ -25,9 +25,6 @@ install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_fips.c cr
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_init.c crypto/o_init.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/fips_ers.c crypto/fips_ers.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/LPdir_nyi.c crypto/LPdir_nyi.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md4/md4_locl.h crypto/md4/md4_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md4/md4_dgst.c crypto/md4/md4_dgst.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md4/md4_one.c crypto/md4/md4_one.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md5/md5_locl.h crypto/md5/md5_locl.h
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md5/md5_dgst.c crypto/md5/md5_dgst.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md5/md5_one.c crypto/md5/md5_one.c

@@ -32,3 +32,4 @@ cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/BaseMemAllocation.c SysCall/BaseM
 cp $DIR/CryptoPkg/Library/OpensslLib/openssl-${OPENSSL_VERSION}/include/openssl/* Include/openssl/
 
 patch -p2 <Cryptlib.diff
+patch -p2 <opensslconf-diff.patch

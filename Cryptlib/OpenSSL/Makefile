@@ -41,8 +41,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/o_fips.o \
   crypto/o_init.o \
   crypto/fips_ers.o \
-  crypto/md4/md4_dgst.o \
-  crypto/md4/md4_one.o \
   crypto/md5/md5_dgst.o \
   crypto/md5/md5_one.o \
   crypto/sha/sha_dgst.o \
