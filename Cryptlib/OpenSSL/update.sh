@@ -54,7 +54,6 @@ SUBDIRS="
 	hmac
 	kdf
 	lhash
-	md4
 	md5
 	modes
 	objects
