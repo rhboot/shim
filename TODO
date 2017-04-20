@@ -1,23 +1,14 @@
-Versioned protocol:
-- Make shim and the bootloaders using it express how enlightened they
-  are to one another, so we can stop earlier without tricks like
-  the one above
-MokListRT signing:
-- For kexec and hybernate to work right, MokListRT probably needs to
-  be an authenticated variable.  It's probable this needs to be done
-  in the kernel boot stub instead, just because it'll need an
-  ephemeral key to be generated, and that means we need some entropy
-  to build up.
-New security protocol:
-- TBD
-kexec MoK Management:
-Modsign enforcement mgmt MoK:
-- This is part of the plan for SecureBoot patches.  Basically these
-  features need to be disableable/enableable in MokManager.
-Variable for debug:
-- basically we need to be able to set a UEFI variable and get debug
-  output.  Right now some code uses SHIM_VERBOSE but that needs a fair
-  amount of work to actually be useful.
-Hashing of option roms:
-- hash option roms and add them to MokListRT
-- probably belongs in MokManager
+- Versioned protocol:
+  - Make shim and the bootloaders using it express how enlightened they
+    are to one another, so we can stop earlier without tricks like the one
+    above
+  - Make a LoadImage/CheckImage/StartImage based protocol
+- Hashing of option roms:
+  - hash option roms and add them to MokListRT
+  - probably belongs in MokManager
+- Ability to specify second stage as a device path
+  - including vendor path that means "parent of this image's path"
+  - including vendor path that means "this image"
+  - including path that's like Fv() to embed images.
+
+# vim:filetype=mail:tw=74
