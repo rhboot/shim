@@ -2531,7 +2531,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		loader_str[loader_len/2-1] = L'\0';
 
 		second_stage = loader_str;
-		load_options = remaining_size ? start + loader_len : NULL;
+		load_options = remaining_size ? start + (loader_len/2) : NULL;
 		load_options_size = remaining_size;
 	}
 
