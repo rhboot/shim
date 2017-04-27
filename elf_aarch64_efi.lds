@@ -14,12 +14,16 @@ SECTIONS
     . = ALIGN(16);
     _etext = .;
   }
+
+  . = ALIGN(4096);
   .dynamic  : { *(.dynamic) }
 
   . = ALIGN(4096);
   .note.gnu.build-id : {
     *(.note.gnu.build-id)
   }
+
+  . = ALIGN(4096);
   .data.ident : {
     *(.data.ident)
   }
@@ -55,10 +59,15 @@ SECTIONS
   }
   . = ALIGN(4096);
 
-  .rela.dyn : { *(.rela.dyn) }
-  .rela.plt : { *(.rela.plt) }
-  .rela.got : { *(.rela.got) }
-  .rela.data : { *(.rela.data) *(.rela.data*) }
+  . = ALIGN(4096);
+  .rela :
+  {
+    *(.rela.dyn)
+    *(.rela.plt)
+    *(.rela.got)
+    *(.rela.data)
+    *(.rela.data*)
+  }
   _edata = .;
   _data_size = . - _data;
 

@@ -20,6 +20,8 @@ SECTIONS
   .note.gnu.build-id : {
     *(.note.gnu.build-id)
   }
+
+  . = ALIGN(4096);
   .data.ident : {
     *(.data.ident)
   }
@@ -55,10 +57,15 @@ SECTIONS
   }
   . = ALIGN(4096);
 
-  .rel.dyn : { *(.rel.dyn) }
-  .rel.plt : { *(.rel.plt) }
-  .rel.got : { *(.rel.got) }
-  .rel.data : { *(.rel.data) *(.rel.data*) }
+  . = ALIGN(4096);
+  .rel :
+  {
+    *(.rel.dyn)
+    *(.rel.plt)
+    *(.rel.got)
+    *(.rel.data)
+    *(.rel.data*)
+  }
   _edata = .;
   _data_size = . - _data;
 

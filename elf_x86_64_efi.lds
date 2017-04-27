@@ -28,6 +28,8 @@ SECTIONS
   .note.gnu.build-id : {
     *(.note.gnu.build-id)
   }
+
+  . = ALIGN(4096);
   .data.ident : {
     *(.data.ident)
   }
@@ -62,12 +64,8 @@ SECTIONS
   .rela :
   {
     *(.rela.data*)
-  }
-  .rela.got : {
-    *(.rela.got)
-  }
-  .rela.stab : {
-    *(.rela.stab)
+    *(.rela.got*)
+    *(.rela.stab*)
   }
   _edata = .;
   _data_size = . - _data;
