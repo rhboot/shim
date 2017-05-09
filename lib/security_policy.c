@@ -55,14 +55,14 @@ static SecurityHook extra_check = NULL;
 static EFI_SECURITY_FILE_AUTHENTICATION_STATE esfas = NULL;
 static EFI_SECURITY2_FILE_AUTHENTICATION es2fa = NULL;
 
-static EFI_STATUS thunk_security_policy_authentication(
+extern EFI_STATUS thunk_security_policy_authentication(
 	const EFI_SECURITY_PROTOCOL *This,
 	UINT32 AuthenticationStatus,
 	const EFI_DEVICE_PATH_PROTOCOL *DevicePath
 						       ) 
 __attribute__((unused));
 
-static EFI_STATUS thunk_security2_policy_authentication(
+extern EFI_STATUS thunk_security2_policy_authentication(
 	const EFI_SECURITY2_PROTOCOL *This,
 	const EFI_DEVICE_PATH_PROTOCOL *DevicePath,
 	VOID *FileBuffer,
@@ -276,11 +276,11 @@ security_policy_install(SecurityHook hook)
 	 * If it fails, use security2_protocol == NULL as indicator */
 	uefi_call_wrapper(BS->LocateProtocol, 3,
 			  &SECURITY2_PROTOCOL_GUID, NULL,
-			  &security2_protocol);
+			  (VOID **) &security2_protocol);
 
 	status = uefi_call_wrapper(BS->LocateProtocol, 3,
 				   &SECURITY_PROTOCOL_GUID, NULL,
-				   &security_protocol);
+				   (VOID **) &security_protocol);
 	if (status != EFI_SUCCESS)
 		/* This one is mandatory, so there's a serious problem */
 		return status;
@@ -288,12 +288,12 @@ security_policy_install(SecurityHook hook)
 	if (security2_protocol) {
 		es2fa = security2_protocol->FileAuthentication;
 		security2_protocol->FileAuthentication = 
-			thunk_security2_policy_authentication;
+			(EFI_SECURITY2_FILE_AUTHENTICATION) thunk_security2_policy_authentication;
 	}
 
 	esfas = security_protocol->FileAuthenticationState;
 	security_protocol->FileAuthenticationState =
-		thunk_security_policy_authentication;
+		(EFI_SECURITY_FILE_AUTHENTICATION_STATE) thunk_security_policy_authentication;
 
 	if (hook)
 		extra_check = hook;
@@ -311,7 +311,7 @@ security_policy_uninstall(void)
 
 		status = uefi_call_wrapper(BS->LocateProtocol, 3,
 					   &SECURITY_PROTOCOL_GUID, NULL,
-					   &security_protocol);
+					   (VOID **) &security_protocol);
 
 		if (status != EFI_SUCCESS)
 			return status;
@@ -328,7 +328,7 @@ security_policy_uninstall(void)
 
 		status = uefi_call_wrapper(BS->LocateProtocol, 3,
 					   &SECURITY2_PROTOCOL_GUID, NULL,
-					   &security2_protocol);
+					   (VOID **) &security2_protocol);
 
 		if (status != EFI_SUCCESS)
 			return status;
