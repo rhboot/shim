@@ -291,6 +291,20 @@ int isupper (int c)
 // -- Data Conversion Routines --
 //
 
+static int to_digit(char c, int base)
+{
+  int value = -1;
+
+  if (c >= '0' && c <= '9')
+    value = c - '0';
+  else if (c >= 'a' && c <= 'z')
+    value = 0xA + c - 'a';
+  else if (c >= 'A' && c <= 'Z')
+    value = 0xA + c - 'A';
+
+  return value < base ? value : -1;
+}
+
 /* Convert strings to a long-integer value */
 long strtol (const char *nptr, char **endptr, int base)
 {
@@ -304,11 +318,31 @@ long strtol (const char *nptr, char **endptr, int base)
 /* Convert strings to an unsigned long-integer value */
 unsigned long strtoul (const char *nptr, char **endptr, int base)
 {
-  //
-  // Null strtoul() function implementation to satisfy the linker, since there is
-  // no direct functionality logic dependency in present UEFI cases.
-  //
-  return 0;
+  int value = 0;
+
+  if (!nptr)
+    goto out;
+
+  if ((base == 0 || base == 16) &&
+      (strlena((CHAR8 *)nptr) > 2 && nptr[0] == '0' && nptr[1] == 'x')) {
+    nptr += 2;
+    base = 16;
+  }
+
+  if (base == 0)
+    base = 10;
+
+  for (; *nptr != '\0' ; nptr++) {
+    int t = to_digit(*nptr, base);
+    if (t == -1)
+      goto out;
+    value = (value * base) + t;
+  }
+
+ out:
+  if (endptr)
+    *endptr = (char *)nptr;
+  return value;
 }
 
 /* Convert character to lowercase */
