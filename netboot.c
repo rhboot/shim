@@ -330,8 +330,6 @@ try_again:
 				bufsiz, &blksz, &tftp_addr, full_path, NULL, nobuffer);
 
 	if (rc == EFI_BUFFER_TOO_SMALL) {
-		/* try again, doubling buf size */
-		*bufsiz *= 2;
 		FreePool(*buffer);
 		*buffer = AllocatePool(*bufsiz);
 		if (!*buffer)
