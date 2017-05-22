@@ -14,6 +14,16 @@ extern UINT8 in_protocol;
 		})
 
 
+typedef struct {
+	CHAR16 *VariableName;
+	EFI_GUID *VendorGuid;
+	VOID *Data;
+	UINTN Size;
+} VARIABLE_RECORD;
+
+UINTN measuredcount = 0;
+VARIABLE_RECORD *measureddata = NULL;
+
 EFI_GUID tpm_guid = EFI_TPM_GUID;
 EFI_GUID tpm2_guid = EFI_TPM2_GUID;
 
@@ -109,8 +119,9 @@ static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2,
 				 &start, &end, &truncated);
 }
 
-EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
-			 const CHAR8 *description)
+static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
+				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
+				    UINT32 type)
 {
 	EFI_STATUS status;
 	efi_tpm_protocol_t *tpm;
@@ -139,7 +150,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			return status;
 		}
 
-		event = AllocatePool(sizeof(*event) + strlen(description) + 1);
+		event = AllocatePool(sizeof(*event) + logsize);
 		if (!event) {
 			perror(L"Unable to allocate event structure\n");
 			return EFI_OUT_OF_RESOURCES;
@@ -148,9 +159,9 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		event->Header.HeaderSize = sizeof(EFI_TCG2_EVENT_HEADER);
 		event->Header.HeaderVersion = 1;
 		event->Header.PCRIndex = pcr;
-		event->Header.EventType = EV_IPL;
-		event->Size = sizeof(*event) - sizeof(event->Event) + strlen(description) + 1;
-		memcpy(event->Event, description, strlen(description) + 1);
+		event->Header.EventType = type;
+		event->Size = sizeof(*event) - sizeof(event->Event) + logsize + 1;
+		CopyMem(event->Event, (VOID *)log, logsize);
 		status = uefi_call_wrapper(tpm2->hash_log_extend_event, 5, tpm2,
 					   0, buf, (UINT64) size, event);
 		FreePool(event);
@@ -168,7 +179,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		if (!tpm_present(tpm))
 			return EFI_SUCCESS;
 
-		event = AllocatePool(sizeof(*event) + strlen(description) + 1);
+		event = AllocatePool(sizeof(*event) + logsize);
 
 		if (!event) {
 			perror(L"Unable to allocate event structure\n");
@@ -176,8 +187,9 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		}
 
 		event->PCRIndex = pcr;
-		event->EventType = EV_IPL;
-		event->EventSize = strlen(description) + 1;
+		event->EventType = type;
+		event->EventSize = logsize;
+		CopyMem(event->Event, (VOID *)log, logsize);
 		status = uefi_call_wrapper(tpm->log_extend_event, 7, tpm, buf,
 					   (UINT64)size, TPM_ALG_SHA, event,
 					   &eventnum, &lastevent);
@@ -186,4 +198,110 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 	}
 
 	return EFI_SUCCESS;
+}
+EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
+			 const CHAR8 *description)
+{
+	return tpm_log_event_raw(buf, size, pcr, description,
+				 strlen(description) + 1, 0xd);
+}
+
+typedef struct {
+	EFI_GUID VariableName;
+	UINT64 UnicodeNameLength;
+	UINT64 VariableDataLength;
+	CHAR16 UnicodeName[1];
+	INT8 VariableData[1];
+} EFI_VARIABLE_DATA_TREE;
+
+static BOOLEAN tpm_data_measured(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
+{
+	UINTN i;
+
+	for (i=0; i<measuredcount; i++) {
+		if ((StrCmp (VarName, measureddata[i].VariableName) == 0) &&
+		    (CompareGuid (&VendorGuid, measureddata[i].VendorGuid)) &&
+		    (VarSize == measureddata[i].Size) &&
+		    (CompareMem (VarData, measureddata[i].Data, VarSize) == 0)) {
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
+{
+	if (measureddata == NULL) {
+		measureddata = AllocatePool(sizeof(*measureddata));
+	} else {
+		measureddata = ReallocatePool(measureddata, measuredcount * sizeof(*measureddata),
+					      (measuredcount + 1) * sizeof(*measureddata));
+	}
+
+	if (measureddata == NULL)
+		return EFI_OUT_OF_RESOURCES;
+
+	measureddata[measuredcount].VariableName = AllocatePool(StrSize(VarName));
+	measureddata[measuredcount].VendorGuid = AllocatePool(sizeof(EFI_GUID));
+	measureddata[measuredcount].Data = AllocatePool(VarSize);
+
+	if (measureddata[measuredcount].VariableName == NULL ||
+	    measureddata[measuredcount].VendorGuid == NULL ||
+	    measureddata[measuredcount].Data == NULL) {
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	StrCpy(measureddata[measuredcount].VariableName, VarName);
+	CopyMem(measureddata[measuredcount].VendorGuid, &VendorGuid, sizeof(EFI_GUID));
+	CopyMem(measureddata[measuredcount].Data, VarData, VarSize);
+	measureddata[measuredcount].Size = VarSize;
+	measuredcount++;
+
+	return EFI_SUCCESS;
+}
+
+EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
+{
+	EFI_STATUS Status;
+	UINTN VarNameLength;
+	EFI_VARIABLE_DATA_TREE *VarLog;
+	UINT32 VarLogSize;
+
+	/* Don't measure something that we've already measured */
+	if (tpm_data_measured(VarName, VendorGuid, VarSize, VarData))
+		return EFI_SUCCESS;
+
+	VarNameLength = StrLen (VarName);
+	VarLogSize = (UINT32)(sizeof (*VarLog) +
+			      VarNameLength * sizeof (*VarName) +
+			      VarSize -
+			      sizeof (VarLog->UnicodeName) -
+			      sizeof (VarLog->VariableData));
+
+	VarLog = (EFI_VARIABLE_DATA_TREE *) AllocateZeroPool (VarLogSize);
+	if (VarLog == NULL) {
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	CopyMem (&VarLog->VariableName, &VendorGuid,
+		 sizeof(VarLog->VariableName));
+	VarLog->UnicodeNameLength  = VarNameLength;
+	VarLog->VariableDataLength = VarSize;
+	CopyMem (VarLog->UnicodeName, VarName,
+		 VarNameLength * sizeof (*VarName));
+	CopyMem ((CHAR16 *)VarLog->UnicodeName + VarNameLength, VarData,
+		 VarSize);
+
+	Status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)VarLog, VarLogSize, 7,
+				   (CHAR8 *)VarLog, VarLogSize,
+				   EV_EFI_VARIABLE_AUTHORITY);
+
+	FreePool(VarLog);
+
+	if (Status != EFI_SUCCESS)
+		return Status;
+
+	return tpm_record_data_measurement(VarName, VendorGuid, VarSize,
+					   VarData);
 }
