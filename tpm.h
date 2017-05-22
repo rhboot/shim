@@ -7,6 +7,8 @@
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description);
 
+EFI_STATUS tpm_measure_variable(CHAR16 *dbname, EFI_GUID guid, UINTN size, void *data);
+
 typedef struct {
   uint8_t Major;
   uint8_t Minor;
@@ -154,3 +156,17 @@ struct efi_tpm2_protocol
 };
 
 typedef struct efi_tpm2_protocol efi_tpm2_protocol_t;
+
+typedef UINT32                     TCG_EVENTTYPE;
+
+#define EV_EFI_EVENT_BASE                   ((TCG_EVENTTYPE) 0x80000000)
+#define EV_EFI_VARIABLE_DRIVER_CONFIG       (EV_EFI_EVENT_BASE + 1)
+#define EV_EFI_VARIABLE_BOOT                (EV_EFI_EVENT_BASE + 2)
+#define EV_EFI_BOOT_SERVICES_APPLICATION    (EV_EFI_EVENT_BASE + 3)
+#define EV_EFI_BOOT_SERVICES_DRIVER         (EV_EFI_EVENT_BASE + 4)
+#define EV_EFI_RUNTIME_SERVICES_DRIVER      (EV_EFI_EVENT_BASE + 5)
+#define EV_EFI_GPT_EVENT                    (EV_EFI_EVENT_BASE + 6)
+#define EV_EFI_ACTION                       (EV_EFI_EVENT_BASE + 7)
+#define EV_EFI_PLATFORM_FIRMWARE_BLOB       (EV_EFI_EVENT_BASE + 8)
+#define EV_EFI_HANDOFF_TABLES               (EV_EFI_EVENT_BASE + 9)
+#define EV_EFI_VARIABLE_AUTHORITY           (EV_EFI_EVENT_BASE + 0xE0)
