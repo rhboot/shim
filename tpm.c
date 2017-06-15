@@ -73,6 +73,17 @@ static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm,
 	return FALSE;
 }
 
+static inline EFI_TCG2_EVENT_LOG_BITMAP
+tpm2_get_supported_logs(efi_tpm2_protocol_t *tpm,
+			EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
+			BOOLEAN old_caps)
+{
+	if (old_caps)
+		return ((TREE_BOOT_SERVICE_CAPABILITY *)caps)->SupportedEventLogs;
+
+	return caps->SupportedEventLogs;
+}
+
 /*
  * According to TCG EFI Protocol Specification for TPM 2.0 family,
  * all events generated after the invocation of EFI_TCG2_GET_EVENT_LOG
@@ -81,15 +92,21 @@ static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm,
  * internal switch through calling get_event_log() in order to allow
  * to retrieve the logs from OS runtime.
  */
-static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2)
+static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2,
+						  EFI_TCG2_EVENT_LOG_BITMAP supported_logs)
 {
+	EFI_TCG2_EVENT_LOG_FORMAT log_fmt;
 	EFI_PHYSICAL_ADDRESS start;
 	EFI_PHYSICAL_ADDRESS end;
 	BOOLEAN truncated;
 
-	return uefi_call_wrapper(tpm2->get_event_log, 5, tpm2,
-				 EFI_TCG2_EVENT_LOG_FORMAT_TCG_2, &start,
-				 &end, &truncated);
+	if (supported_logs & EFI_TCG2_EVENT_LOG_FORMAT_TCG_2)
+		log_fmt = EFI_TCG2_EVENT_LOG_FORMAT_TCG_2;
+	else
+		log_fmt = EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2;
+
+	return uefi_call_wrapper(tpm2->get_event_log, 5, tpm2, log_fmt,
+				 &start, &end, &truncated);
 }
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
@@ -105,6 +122,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		BOOLEAN old_caps;
 		EFI_TCG2_EVENT *event;
 		EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
+		EFI_TCG2_EVENT_LOG_BITMAP supported_logs;
 
 		status = tpm2_get_caps(tpm2, &caps, &old_caps);
 		if (status != EFI_SUCCESS)
@@ -113,7 +131,9 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		if (!tpm2_present(tpm2, &caps, old_caps))
 			return EFI_SUCCESS;
 
-		status = trigger_tcg2_final_events_table(tpm2);
+		supported_logs = tpm2_get_supported_logs(tpm2, &caps, old_caps);
+
+		status = trigger_tcg2_final_events_table(tpm2, supported_logs);
 		if (EFI_ERROR(status)) {
 			perror(L"Unable to trigger tcg2 final events table: %r\n", status);
 			return status;
