@@ -35,28 +35,40 @@ static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
 	return TRUE;
 }
 
-static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm)
+static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
+				EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
+				BOOLEAN *old_caps)
 {
 	EFI_STATUS status;
-	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
-	TREE_BOOT_SERVICE_CAPABILITY *caps_1_0;
 
-	caps.Size = (UINT8)sizeof(caps);
+	caps->Size = (UINT8)sizeof(*caps);
 
-	status = uefi_call_wrapper(tpm->get_capability, 2, tpm, &caps);
+	status = uefi_call_wrapper(tpm->get_capability, 2, tpm, caps);
 
 	if (status != EFI_SUCCESS)
-		return FALSE;
+		return status;
 
-	if (caps.StructureVersion.Major == 1 &&
-	    caps.StructureVersion.Minor == 0) {
-		caps_1_0 = (TREE_BOOT_SERVICE_CAPABILITY *)&caps;
+	if (caps->StructureVersion.Major == 1 &&
+	    caps->StructureVersion.Minor == 0)
+		*old_caps = TRUE;
+
+	return EFI_SUCCESS;
+}
+
+static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm,
+			    EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
+			    BOOLEAN old_caps)
+{
+	TREE_BOOT_SERVICE_CAPABILITY *caps_1_0;
+
+	if (old_caps) {
+		caps_1_0 = (TREE_BOOT_SERVICE_CAPABILITY *)caps;
 		if (caps_1_0->TrEEPresentFlag)
 			return TRUE;
-	} else {
-		if (caps.TPMPresentFlag)
-			return TRUE;
 	}
+
+	if (caps->TPMPresentFlag)
+		return TRUE;
 
 	return FALSE;
 }
@@ -90,9 +102,15 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 	status = LibLocateProtocol(&tpm2_guid, (VOID **)&tpm2);
 	/* TPM 2.0 */
 	if (status == EFI_SUCCESS) {
+		BOOLEAN old_caps;
 		EFI_TCG2_EVENT *event;
+		EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
 
-		if (!tpm2_present(tpm2))
+		status = tpm2_get_caps(tpm2, &caps, &old_caps);
+		if (status != EFI_SUCCESS)
+			return EFI_SUCCESS;
+
+		if (!tpm2_present(tpm2, &caps, old_caps))
 			return EFI_SUCCESS;
 
 		status = trigger_tcg2_final_events_table(tpm2);
