@@ -110,7 +110,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		event->Header.HeaderSize = sizeof(EFI_TCG2_EVENT_HEADER);
 		event->Header.HeaderVersion = 1;
 		event->Header.PCRIndex = pcr;
-		event->Header.EventType = 0x0d;
+		event->Header.EventType = EV_IPL;
 		event->Size = sizeof(*event) - sizeof(event->Event) + strlen(description) + 1;
 		memcpy(event->Event, description, strlen(description) + 1);
 		status = uefi_call_wrapper(tpm2->hash_log_extend_event, 5, tpm2,
@@ -119,7 +119,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		return status;
 	} else {
 		TCG_PCR_EVENT *event;
-		UINT32 algorithm, eventnum = 0;
+		UINT32 eventnum = 0;
 		EFI_PHYSICAL_ADDRESS lastevent;
 
 		status = LibLocateProtocol(&tpm_guid, (VOID **)&tpm);
@@ -138,11 +138,10 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		}
 
 		event->PCRIndex = pcr;
-		event->EventType = 0x0d;
+		event->EventType = EV_IPL;
 		event->EventSize = strlen(description) + 1;
-		algorithm = 0x00000004;
 		status = uefi_call_wrapper(tpm->log_extend_event, 7, tpm, buf,
-					   (UINT64)size, algorithm, event,
+					   (UINT64)size, TPM_ALG_SHA, event,
 					   &eventnum, &lastevent);
 		FreePool(event);
 		return status;
