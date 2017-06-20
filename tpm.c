@@ -55,8 +55,7 @@ static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
 	return EFI_SUCCESS;
 }
 
-static BOOLEAN tpm2_present(efi_tpm2_protocol_t *tpm,
-			    EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
+static BOOLEAN tpm2_present(EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
 			    BOOLEAN old_caps)
 {
 	TREE_BOOT_SERVICE_CAPABILITY *caps_1_0;
@@ -128,7 +127,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 		if (status != EFI_SUCCESS)
 			return EFI_SUCCESS;
 
-		if (!tpm2_present(tpm2, &caps, old_caps))
+		if (!tpm2_present(&caps, old_caps))
 			return EFI_SUCCESS;
 
 		supported_logs = tpm2_get_supported_logs(tpm2, &caps, old_caps);
