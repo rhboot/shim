@@ -110,8 +110,10 @@ find_httpboot (EFI_HANDLE device)
 	URI_DEVICE_PATH *UriNode;
 	UINTN uri_size;
 
-	if (!uri)
+	if (uri) {
 		FreePool(uri);
+		uri = NULL;
+	}
 
 	devpath = DevicePathFromHandle(device);
 	if (!devpath) {
