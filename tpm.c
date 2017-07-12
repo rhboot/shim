@@ -120,7 +120,7 @@ static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2,
 
 static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
-				    UINT32 type)
+				    UINT32 type, CHAR8 *hash)
 {
 	EFI_STATUS status;
 	efi_tpm_protocol_t *tpm;
@@ -161,8 +161,18 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 		event->Header.EventType = type;
 		event->Size = sizeof(*event) - sizeof(event->Event) + logsize + 1;
 		CopyMem(event->Event, (VOID *)log, logsize);
-		status = uefi_call_wrapper(tpm2->hash_log_extend_event, 5, tpm2,
-					   0, buf, (UINT64) size, event);
+		if (hash) {
+			/* TPM 2 systems will generate the appropriate hash
+			   themselves if we pass PE_COFF_IMAGE
+			*/
+			status = uefi_call_wrapper(tpm2->hash_log_extend_event,
+						   5, tpm2, PE_COFF_IMAGE, buf,
+						   (UINT64) size, event);
+		} else {
+			status = uefi_call_wrapper(tpm2->hash_log_extend_event,
+						   5, tpm2, 0, buf,
+						   (UINT64) size, event);
+		}
 		FreePool(event);
 		return status;
 	} else {
@@ -189,9 +199,21 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 		event->EventType = type;
 		event->EventSize = logsize;
 		CopyMem(event->Event, (VOID *)log, logsize);
-		status = uefi_call_wrapper(tpm->log_extend_event, 7, tpm, buf,
-					   (UINT64)size, TPM_ALG_SHA, event,
-					   &eventnum, &lastevent);
+		if (hash) {
+			/* TPM 1.2 devices require us to pass the Authenticode
+			   hash rather than allowing the firmware to attempt
+			   to calculate it */
+			CopyMem(event->digest, hash, sizeof(event->digest));
+			status = uefi_call_wrapper(tpm->log_extend_event, 7,
+						   tpm, 0, 0, TPM_ALG_SHA,
+						   event, &eventnum,
+						   &lastevent);
+		} else {
+			status = uefi_call_wrapper(tpm->log_extend_event, 7,
+						   tpm, buf, (UINT64)size,
+						   TPM_ALG_SHA, event,
+						   &eventnum, &lastevent);
+		}
 		FreePool(event);
 		return status;
 	}
@@ -202,7 +224,24 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description)
 {
 	return tpm_log_event_raw(buf, size, pcr, description,
-				 strlen(description) + 1, 0xd);
+				 strlen(description) + 1, 0xd, NULL);
+}
+
+EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 *sha1hash,
+		      UINT8 pcr)
+{
+	EFI_IMAGE_LOAD_EVENT ImageLoad;
+
+	// All of this is informational and forces us to do more parsing before
+	// we can generate it, so let's just leave it out for now
+	ImageLoad.ImageLocationInMemory = 0;
+	ImageLoad.ImageLengthInMemory = 0;
+	ImageLoad.ImageLinkTimeAddress = 0;
+	ImageLoad.LengthOfDevicePath = 0;
+
+	return tpm_log_event_raw(buf, size, pcr, (CHAR8 *)&ImageLoad,
+				 sizeof(ImageLoad),
+				 EV_EFI_BOOT_SERVICES_APPLICATION, sha1hash);
 }
 
 typedef struct {
@@ -294,7 +333,7 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 
 	Status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)VarLog, VarLogSize, 7,
 				   (CHAR8 *)VarLog, VarLogSize,
-				   EV_EFI_VARIABLE_AUTHORITY);
+				   EV_EFI_VARIABLE_AUTHORITY, NULL);
 
 	FreePool(VarLog);
 
