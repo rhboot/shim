@@ -13,7 +13,7 @@ PK12UTIL	?= pk12util
 CERTUTIL	?= certutil
 PESIGN		?= pesign
 
-ARCH		= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
+ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
 SUBDIRS		= Cryptlib lib
