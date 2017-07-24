@@ -188,7 +188,13 @@ image_is_loadable(EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr)
 	if (PEHdr->Pe32.FileHeader.Machine != machine_type) {
 		if (!(machine_type == IMAGE_FILE_MACHINE_I386 &&
 		      PEHdr->Pe32.FileHeader.Machine == IMAGE_FILE_MACHINE_X64 &&
-		      allow_64_bit())) {
+		      allow_64_bit())
+#if defined(ALLOW_32BIT_KERNEL_ON_X64)
+		  && !(machine_type == IMAGE_FILE_MACHINE_X64 &&
+		      PEHdr->Pe32.FileHeader.Machine == IMAGE_FILE_MACHINE_I386 &&
+		      allow_32_bit())
+#endif
+		  ) {
 			return 0;
 		}
 	}
