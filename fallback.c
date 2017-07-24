@@ -591,6 +591,10 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 				FreePool(buffer);
 			return rc;
 		}
+		/* If there's no data to read, don't try to allocate 0 bytes
+		 * and read the data... */
+		if (bs == 0)
+			break;
 
 		buffer = AllocateZeroPool(bs);
 		if (!buffer) {
