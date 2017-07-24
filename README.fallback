@@ -24,7 +24,7 @@ for an installed system:
 \EFI\BOOT\BOOTX64.EFI    <-- shim
 \EFI\BOOT\MokManager.efi
 \EFI\BOOT\fallback.efi
-\EFI\BOOT\BOOT.CSV
+\EFI\fedora\BOOT.CSV
 \EFI\fedora\shim.efi
 \EFI\fedora\MokManager.efi
 \EFI\fedora\grubx64.efi
