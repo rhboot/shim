@@ -15,6 +15,57 @@
 
 EFI_LOADED_IMAGE *this_image = NULL;
 
+EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
+
+int
+get_fallback_verbose(void)
+{
+	EFI_GUID guid = SHIM_LOCK_GUID;
+	UINT8 *data = NULL;
+	UINTN dataSize = 0;
+	EFI_STATUS efi_status;
+	unsigned int i;
+	static int state = -1;
+
+	if (state != -1)
+		return state;
+
+	efi_status = get_variable(L"FALLBACK_VERBOSE",
+				  &data, &dataSize, guid);
+	if (EFI_ERROR(efi_status)) {
+		state = 0;
+		return state;
+	}
+
+	for (i = 0; i < dataSize; i++) {
+		if (data[i]) {
+			state = 1;
+			return state;
+		}
+	}
+
+	state = 0;
+	return state;
+}
+
+#define VerbosePrintUnprefixed(fmt, ...)				\
+	({								\
+		UINTN ret_ = 0;						\
+		if (get_fallback_verbose())				\
+			ret_ = Print((fmt), ##__VA_ARGS__);		\
+		ret_;							\
+	})
+
+#define VerbosePrint(fmt, ...)						\
+	({	UINTN line_ = __LINE__;					\
+		UINTN ret_ = 0;						\
+		if (get_fallback_verbose()) {				\
+			Print(L"%a:%d: ", __func__, line_);		\
+			ret_ = Print((fmt), ##__VA_ARGS__);		\
+		}							\
+		ret_;							\
+	})
+
 static EFI_STATUS
 FindSubDevicePath(EFI_DEVICE_PATH *In, UINT8 Type, UINT8 SubType,
 		  EFI_DEVICE_PATH **Out)
@@ -23,9 +74,18 @@ FindSubDevicePath(EFI_DEVICE_PATH *In, UINT8 Type, UINT8 SubType,
 	if (!In || !Out)
 		return EFI_INVALID_PARAMETER;
 
+	CHAR16 *dps = DevicePathToStr(In);
+	VerbosePrint(L"input device path: \"%s\"\n", dps);
+	FreePool(dps);
+
 	for (dp = In; !IsDevicePathEnd(dp); dp = NextDevicePathNode(dp)) {
 		if (DevicePathType(dp) == Type &&
 				DevicePathSubType(dp) == SubType) {
+			dps = DevicePathToStr(dp);
+			VerbosePrint(L"sub-path (%hhd,%hhd): \"%s\"\n",
+				     Type, SubType, dps);
+			FreePool(dps);
+
 			*Out = DuplicateDevicePath(dp);
 			if (!*Out)
 				return EFI_OUT_OF_RESOURCES;
@@ -327,13 +387,11 @@ update_boot_order(void)
 		return EFI_OUT_OF_RESOURCES;
 	CopyMem(newbootorder, bootorder, size);
 
-#ifdef DEBUG_FALLBACK
-	Print(L"nbootorder: %d\nBootOrder: ", size / sizeof (CHAR16));
+	VerbosePrint(L"nbootorder: %d\nBootOrder: ", size / sizeof (CHAR16));
 	UINTN j;
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
-		Print(L"%04x ", newbootorder[j]);
+		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
 	Print(L"\n");
-#endif
 	rc = uefi_call_wrapper(RT->GetVariable, 5, L"BootOrder", &global,
 			       NULL, &len, NULL);
 	if (rc == EFI_BUFFER_TOO_SMALL)
@@ -363,6 +421,7 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	EFI_DEVICE_PATH *file = NULL;
 	EFI_DEVICE_PATH *full_device_path = NULL;
 	EFI_DEVICE_PATH *dp = NULL;
+	CHAR16 *dps;
 
 	dph = DevicePathFromHandle(this_image->DeviceHandle);
 	if (!dph) {
@@ -381,6 +440,9 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 		rc = EFI_OUT_OF_RESOURCES;
 		goto err;
 	}
+	dps = DevicePathToStr(full_device_path);
+	VerbosePrint(L"file DP: %s\n", dps);
+	FreePool(dps);
 
 	rc = FindSubDevicePath(full_device_path,
 				MEDIA_DEVICE_PATH, MEDIA_HARDDRIVE_DP, &dp);
@@ -393,22 +455,24 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 		}
 	}
 
-#ifdef DEBUG_FALLBACK
 	{
-	UINTN s = DevicePathSize(dp);
-	UINTN i;
-	UINT8 *dpv = (void *)dp;
-	for (i = 0; i < s; i++) {
-		if (i > 0 && i % 16 == 0)
-			Print(L"\n");
-		Print(L"%02x ", dpv[i]);
-	}
-	Print(L"\n");
+		UINTN s = DevicePathSize(dp);
+		UINTN i;
+		UINT8 *dpv = (void *)dp;
+		for (i = 0; i < s; i++) {
+			if (i % 16 == 0) {
+				if (i > 0)
+					VerbosePrintUnprefixed(L"\n");
+				VerbosePrint(L"");
+			}
+			VerbosePrintUnprefixed(L"%02x ", dpv[i]);
+		}
+		VerbosePrintUnprefixed(L"\n");
 
-	CHAR16 *dps = DevicePathToStr(dp);
-	Print(L"device path: \"%s\"\n", dps);
+		CHAR16 *dps = DevicePathToStr(dp);
+		VerbosePrint(L"device path: \"%s\"\n", dps);
+		FreePool(dps);
 	}
-#endif
 
 	UINT16 option;
 	rc = find_boot_option(dp, full_device_path, fullpath, label, arguments, &option);
@@ -443,35 +507,27 @@ err:
 EFI_STATUS
 populate_stanza(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *csv)
 {
-#ifdef DEBUG_FALLBACK
-	Print(L"CSV data: \"%s\"\n", csv);
-#endif
 	CHAR16 *file = csv;
+	VerbosePrint(L"CSV data: \"%s\"\n", csv);
 
 	UINTN comma0 = StrCSpn(csv, L",");
 	if (comma0 == 0)
 		return EFI_INVALID_PARAMETER;
 	file[comma0] = L'\0';
-#ifdef DEBUG_FALLBACK
-	Print(L"filename: \"%s\"\n", file);
-#endif
+	VerbosePrint(L"filename: \"%s\"\n", file);
 
 	CHAR16 *label = csv + comma0 + 1;
 	UINTN comma1 = StrCSpn(label, L",");
 	if (comma1 == 0)
 		return EFI_INVALID_PARAMETER;
 	label[comma1] = L'\0';
-#ifdef DEBUG_FALLBACK
-	Print(L"label: \"%s\"\n", label);
-#endif
+	VerbosePrint(L"label: \"%s\"\n", label);
 
 	CHAR16 *arguments = csv + comma0 +1 + comma1 +1;
 	UINTN comma2 = StrCSpn(arguments, L",");
 	arguments[comma2] = L'\0';
 	/* This one is optional, so don't check if comma2 is 0 */
-#ifdef DEBUG_FALLBACK
-	Print(L"arguments: \"%s\"\n", arguments);
-#endif
+	VerbosePrint(L"arguments: \"%s\"\n", arguments);
 
 	add_to_boot_list(fh, dirname, file, label, arguments);
 
@@ -489,9 +545,7 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 	if (EFI_ERROR(rc))
 		return rc;
 
-#ifdef DEBUG_FALLBACK
-	Print(L"Found file \"%s\"\n", fullpath);
-#endif
+	VerbosePrint(L"Found file \"%s\"\n", fullpath);
 
 	CHAR16 *buffer;
 	UINT64 bs;
@@ -503,9 +557,7 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 	}
 	FreePool(fullpath);
 
-#ifdef DEBUG_FALLBACK
-	Print(L"File looks like:\n%s\n", buffer);
-#endif
+	VerbosePrint(L"File looks like:\n%s\n", buffer);
 
 	CHAR16 *start = buffer;
 	/* The file may or may not start with the Unicode byte order marker.
@@ -739,9 +791,7 @@ find_boot_options(EFI_HANDLE device)
 			buffer = NULL;
 			continue;
 		}
-#ifdef DEBUG_FALLBACK
-		Print(L"Found directory named \"%s\"\n", fi->FileName);
-#endif
+		VerbosePrint(L"Found directory named \"%s\"\n", fi->FileName);
 
 		EFI_FILE_HANDLE fh3;
 		rc = uefi_call_wrapper(fh->Open, 5, fh2, &fh3, fi->FileName,
@@ -814,7 +864,6 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	return rc;
 }
 
-EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
 extern EFI_STATUS
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab);
 
@@ -874,6 +923,12 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	try_start_first_option(image);
 
 	Print(L"Reset System\n");
+
+	if (get_fallback_verbose()) {
+		Print(L"Verbose enabled, sleeping for half a second\n");
+		uefi_call_wrapper(BS->Stall, 1, 500000);
+	}
+
 	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetCold,
 			  EFI_SUCCESS, 0, NULL);
 
