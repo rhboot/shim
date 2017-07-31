@@ -8,6 +8,7 @@
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description);
+EFI_STATUS fallback_should_prefer_reset(void);
 
 EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 *sha1hash,
 		      UINT8 pcr);

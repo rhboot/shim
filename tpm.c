@@ -119,6 +119,44 @@ static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2,
 				 &start, &end, &truncated);
 }
 
+static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
+				      efi_tpm2_protocol_t **tpm2,
+				      BOOLEAN *old_caps_p,
+				      EFI_TCG2_BOOT_SERVICE_CAPABILITY *capsp)
+{
+	EFI_STATUS status;
+
+	*tpm = NULL;
+	*tpm2 = NULL;
+	status = LibLocateProtocol(&tpm2_guid, (VOID **)tpm2);
+	/* TPM 2.0 */
+	if (status == EFI_SUCCESS) {
+		BOOLEAN old_caps;
+		EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
+
+		status = tpm2_get_caps(*tpm2, &caps, &old_caps);
+		if (EFI_ERROR(status))
+			return status;
+
+		if (tpm2_present(&caps, old_caps)) {
+			if (old_caps_p)
+				*old_caps_p = old_caps;
+			if (capsp)
+				memcpy(capsp, &caps, sizeof(caps));
+			return EFI_SUCCESS;
+		}
+	} else {
+		status = LibLocateProtocol(&tpm_guid, (VOID **)tpm);
+		if (EFI_ERROR(status))
+			return status;
+
+		if (tpm_present(*tpm))
+			return EFI_SUCCESS;
+	}
+
+	return EFI_NOT_FOUND;
+}
+
 static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
 				    UINT32 type, CHAR8 *hash)
@@ -126,21 +164,15 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	EFI_STATUS status;
 	efi_tpm_protocol_t *tpm;
 	efi_tpm2_protocol_t *tpm2;
+	BOOLEAN old_caps;
+	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
 
-	status = LibLocateProtocol(&tpm2_guid, (VOID **)&tpm2);
-	/* TPM 2.0 */
-	if (status == EFI_SUCCESS) {
-		BOOLEAN old_caps;
+	status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
+	if (EFI_ERROR(status)) {
+		return status;
+	} else if (tpm2) {
 		EFI_TCG2_EVENT *event;
-		EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
 		EFI_TCG2_EVENT_LOG_BITMAP supported_logs;
-
-		status = tpm2_get_caps(tpm2, &caps, &old_caps);
-		if (status != EFI_SUCCESS)
-			return EFI_SUCCESS;
-
-		if (!tpm2_present(&caps, old_caps))
-			return EFI_SUCCESS;
 
 		supported_logs = tpm2_get_supported_logs(tpm2, &caps, old_caps);
 
@@ -176,7 +208,7 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 		}
 		FreePool(event);
 		return status;
-	} else {
+	} else if (tpm) {
 		TCG_PCR_EVENT *event;
 		UINT32 eventnum = 0;
 		EFI_PHYSICAL_ADDRESS lastevent;
@@ -221,6 +253,7 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 
 	return EFI_SUCCESS;
 }
+
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description)
 {
@@ -343,4 +376,17 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 
 	return tpm_record_data_measurement(VarName, VendorGuid, VarSize,
 					   VarData);
+}
+
+EFI_STATUS
+fallback_should_prefer_reset(void)
+{
+	EFI_STATUS status;
+	efi_tpm_protocol_t *tpm;
+	efi_tpm2_protocol_t *tpm2;
+
+	status = tpm_locate_protocol(&tpm, &tpm2, NULL, NULL);
+	if (EFI_ERROR(status))
+		return EFI_NOT_FOUND;
+	return EFI_SUCCESS;
 }

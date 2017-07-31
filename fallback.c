@@ -12,6 +12,7 @@
 
 #include "ucs2.h"
 #include "variables.h"
+#include "tpm.h"
 
 EFI_LOADED_IMAGE *this_image = NULL;
 
@@ -904,7 +905,13 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		return rc;
 	}
 
-	try_start_first_option(image);
+	rc = fallback_should_prefer_reset();
+	if (EFI_ERROR(rc)) {
+		VerbosePrint(L"tpm not present, starting the first image\n");
+		try_start_first_option(image);
+	} else {
+		VerbosePrint(L"tpm present, resetting system\n");
+	}
 
 	Print(L"Reset System\n");
 
