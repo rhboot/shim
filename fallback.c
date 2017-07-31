@@ -114,7 +114,7 @@ EFI_STATUS
 make_full_path(CHAR16 *dirname, CHAR16 *filename, CHAR16 **out, UINT64 *outlen)
 {
 	UINT64 len;
-	
+
 	len = StrLen(L"\\EFI\\") + StrLen(dirname)
 	    + StrLen(L"\\") + StrLen(filename)
 	    + 2;
@@ -358,12 +358,12 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	rc = make_full_path(dirname, filename, &fullpath, &pathlen);
 	if (EFI_ERROR(rc))
 		return rc;
-	
+
 	EFI_DEVICE_PATH *dph = NULL;
 	EFI_DEVICE_PATH *file = NULL;
 	EFI_DEVICE_PATH *full_device_path = NULL;
 	EFI_DEVICE_PATH *dp = NULL;
-	
+
 	dph = DevicePathFromHandle(this_image->DeviceHandle);
 	if (!dph) {
 		rc = EFI_OUT_OF_RESOURCES;
