@@ -407,7 +407,7 @@ update_boot_order(void)
 }
 
 EFI_STATUS
-add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
+add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
 {
 	CHAR16 *fullpath = NULL;
 	UINT64 pathlen = 0;
@@ -417,25 +417,11 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	if (EFI_ERROR(rc))
 		return rc;
 
-	EFI_DEVICE_PATH *dph = NULL;
-	EFI_DEVICE_PATH *file = NULL;
 	EFI_DEVICE_PATH *full_device_path = NULL;
 	EFI_DEVICE_PATH *dp = NULL;
 	CHAR16 *dps;
 
-	dph = DevicePathFromHandle(this_image->DeviceHandle);
-	if (!dph) {
-		rc = EFI_OUT_OF_RESOURCES;
-		goto err;
-	}
-
-	file = FileDevicePath(fh, fullpath);
-	if (!file) {
-		rc = EFI_OUT_OF_RESOURCES;
-		goto err;
-	}
-
-	full_device_path = AppendDevicePath(dph, file);
+	full_device_path = FileDevicePath(this_image->DeviceHandle, fullpath);
 	if (!full_device_path) {
 		rc = EFI_OUT_OF_RESOURCES;
 		goto err;
@@ -493,8 +479,6 @@ add_to_boot_list(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *
 	}
 
 err:
-	if (file)
-		FreePool(file);
 	if (full_device_path)
 		FreePool(full_device_path);
 	if (dp)
@@ -505,7 +489,7 @@ err:
 }
 
 EFI_STATUS
-populate_stanza(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *csv)
+populate_stanza(CHAR16 *dirname, CHAR16 *filename, CHAR16 *csv)
 {
 	CHAR16 *file = csv;
 	VerbosePrint(L"CSV data: \"%s\"\n", csv);
@@ -529,7 +513,7 @@ populate_stanza(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename, CHAR16 *c
 	/* This one is optional, so don't check if comma2 is 0 */
 	VerbosePrint(L"arguments: \"%s\"\n", arguments);
 
-	add_to_boot_list(fh, dirname, file, label, arguments);
+	add_to_boot_list(dirname, file, label, arguments);
 
 	return EFI_SUCCESS;
 }
@@ -583,7 +567,7 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 		CHAR16 c = start[l];
 		start[l] = L'\0';
 
-		populate_stanza(fh, dirname, filename, start);
+		populate_stanza(dirname, filename, start);
 
 		start[l] = c;
 		start += l;
