@@ -428,7 +428,8 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
-					 UINT8 *hash)
+					 UINT8 *hash, CHAR16 *dbname,
+					 EFI_GUID guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
@@ -446,8 +447,10 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 								      Cert->SignatureData,
 								      CertSize,
 								      hash, SHA256_DIGEST_SIZE);
-					if (IsFound)
+					if (IsFound) {
+						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
 						return DATA_FOUND;
+					}
 				}
 			} else if (verbose) {
 				console_notify(L"Not a DER encoding x.509 Certificate");
@@ -477,7 +480,7 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
-	rc = check_db_cert_in_ram(CertList, dbsize, data, hash);
+	rc = check_db_cert_in_ram(CertList, dbsize, data, hash, dbname, guid);
 
 	FreePool(db);
 
@@ -489,7 +492,8 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
  */
 static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize, UINT8 *data,
-					 int SignatureSize, EFI_GUID CertType)
+					 int SignatureSize, EFI_GUID CertType,
+					 CHAR16 *dbname, EFI_GUID guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertCount, Index;
@@ -505,6 +509,7 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 					// Find the signature in database.
 					//
 					IsFound = TRUE;
+					tpm_measure_variable(dbname, guid, SignatureSize, data);
 					break;
 				}
 
@@ -545,7 +550,8 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
 	CHECK_STATUS rc = check_db_hash_in_ram(CertList, dbsize, data,
-						SignatureSize, CertType);
+					       SignatureSize, CertType,
+					       dbname, guid);
 	FreePool(db);
 	return rc;
 
@@ -563,15 +569,18 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
-				 SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) ==
+				 SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID,
+				 L"dbx", secure_var) ==
 				DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
-				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) ==
+				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID,
+				 L"dbx", secure_var) ==
 				DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
 	if (cert && check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
-					 sha256hash) == DATA_FOUND)
+					 sha256hash, L"dbx",
+					 secure_var) == DATA_FOUND)
 		return EFI_SECURITY_VIOLATION;
 
 	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
@@ -953,13 +962,13 @@ static EFI_STATUS verify_mok (void) {
  * Check that the signature is valid and matches the binary
  */
 static EFI_STATUS verify_buffer (char *data, int datasize,
-			 PE_COFF_LOADER_IMAGE_CONTEXT *context)
+				 PE_COFF_LOADER_IMAGE_CONTEXT *context,
+				 UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	UINT8 sha256hash[SHA256_DIGEST_SIZE];
-	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	EFI_STATUS status = EFI_SECURITY_VIOLATION;
 	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
 	unsigned int size = datasize;
+	EFI_GUID shim_var = SHIM_LOCK_GUID;
 
 	if (context->SecDir->Size != 0) {
 		if (context->SecDir->Size >= size) {
@@ -1026,6 +1035,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 			update_verification_method(VERIFIED_BY_CERT);
+			tpm_measure_variable(L"Shim", shim_var, sizeof(shim_cert), shim_cert);
 			status = EFI_SUCCESS;
 			return status;
 		}
@@ -1039,6 +1049,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				       vendor_cert, vendor_cert_size,
 				       sha256hash, SHA256_DIGEST_SIZE)) {
 			update_verification_method(VERIFIED_BY_CERT);
+			tpm_measure_variable(L"Shim", shim_var, vendor_cert_size, vendor_cert);
 			status = EFI_SUCCESS;
 			return status;
 		}
@@ -1194,6 +1205,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	unsigned int alignment, alloc_size;
 	EFI_PHYSICAL_ADDRESS alloc_address;
 	int found_entry_point = 0;
+	UINT8 sha1hash[SHA1_DIGEST_SIZE];
+	UINT8 sha256hash[SHA256_DIGEST_SIZE];
 
 	/*
 	 * The binary header contains relevant context and section pointers
@@ -1207,8 +1220,17 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	/*
 	 * We only need to verify the binary if we're in secure mode
 	 */
+	efi_status = generate_hash(data, datasize, &context, sha256hash,
+				   sha1hash);
+	if (efi_status != EFI_SUCCESS)
+		return efi_status;
+
+	/* Measure the binary into the TPM */
+	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)data, datasize, sha1hash, 9);
+
 	if (secure_mode ()) {
-		efi_status = verify_buffer(data, datasize, &context);
+		efi_status = verify_buffer(data, datasize, &context,
+					   sha256hash, sha1hash);
 
 		if (EFI_ERROR(efi_status)) {
 			console_error(L"Verification failed", efi_status);
@@ -1699,6 +1721,8 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 {
 	EFI_STATUS status = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	UINT8 sha1hash[SHA1_DIGEST_SIZE];
+	UINT8 sha256hash[SHA256_DIGEST_SIZE];
 
 	loader_is_participating = 1;
 	in_protocol = 1;
@@ -1710,7 +1734,11 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (status != EFI_SUCCESS)
 		goto done;
 
-	status = verify_buffer(buffer, size, &context);
+	status = generate_hash(buffer, size, &context, sha256hash, sha1hash);
+	if (status != EFI_SUCCESS)
+		goto done;
+
+	status = verify_buffer(buffer, size, &context, sha256hash, sha1hash);
 done:
 	in_protocol = 0;
 	return status;
@@ -1814,10 +1842,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 	}
 
-	/* Measure the binary into the TPM */
-	tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)data, datasize,
-		      9, (CHAR8 *)"Second stage bootloader");
-
 	/*
 	 * We need to modify the loaded image protocol entry before running
 	 * the new binary, so back it up
@@ -1888,7 +1912,11 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 }
 
 /*
- * Measure some of the MOK variables into the TPM
+ * Measure some of the MOK variables into the TPM. We measure the entirety
+ * of MokList into PCR 14, and also measure the raw MokSBState there. PCR 7
+ * will be extended with MokSBState in the Microsoft format, and we'll
+ * measure any matching hashes or certificates later on in order to behave
+ * consistently with the PCR 7 spec.
  */
 EFI_STATUS measure_mok()
 {
@@ -1915,9 +1943,14 @@ EFI_STATUS measure_mok()
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
+	efi_status = tpm_measure_variable(L"MokSBState", shim_lock_guid,
+					  DataSize, Data);
+	if (efi_status != EFI_SUCCESS)
+		goto out;
+
 	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
 				   DataSize, 14, (CHAR8 *)"MokSBState");
-
+out:
 	FreePool(Data);
 
 	return efi_status;
