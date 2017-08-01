@@ -1921,37 +1921,55 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 EFI_STATUS measure_mok()
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	EFI_STATUS efi_status;
+	EFI_STATUS efi_status, ret = EFI_SUCCESS;
 	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
 
 	efi_status = get_variable(L"MokList", &Data, &DataSize, shim_lock_guid);
-	if (efi_status != EFI_SUCCESS)
-		return efi_status;
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
+					   DataSize, 14, (CHAR8 *)"MokList");
+		FreePool(Data);
 
-	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
-				   DataSize, 14, (CHAR8 *)"MokList");
+		if (EFI_ERROR(efi_status))
+			ret = efi_status;
 
-	FreePool(Data);
+	} else {
+		ret = efi_status;
+	}
 
-	if (efi_status != EFI_SUCCESS)
-		return efi_status;
+	efi_status = get_variable(L"MokListX", &Data, &DataSize, shim_lock_guid);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
+					   DataSize, 14, (CHAR8 *)"MokListX");
+		FreePool(Data);
+
+		if (EFI_ERROR(efi_status) && !EFI_ERROR(ret))
+			ret = efi_status;
+
+	} else if (!EFI_ERROR(ret)) {
+		ret = efi_status;
+	}
 
 	efi_status = get_variable(L"MokSBState", &Data, &DataSize,
 				  shim_lock_guid);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = tpm_measure_variable(L"MokSBState",
+						  shim_lock_guid,
+						  DataSize, Data);
+		if (!EFI_ERROR(efi_status)) {
+			efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)
+						    (UINTN)Data, DataSize, 14,
+						   (CHAR8 *)"MokSBState");
+		}
 
-	if (efi_status != EFI_SUCCESS)
-		return efi_status;
+		FreePool(Data);
 
-	efi_status = tpm_measure_variable(L"MokSBState", shim_lock_guid,
-					  DataSize, Data);
-	if (efi_status != EFI_SUCCESS)
-		goto out;
-
-	efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
-				   DataSize, 14, (CHAR8 *)"MokSBState");
-out:
-	FreePool(Data);
+		if (EFI_ERROR(efi_status) && !EFI_ERROR(ret))
+			ret = efi_status;
+	} else if (!EFI_ERROR(ret)) {
+		ret = efi_status;
+	}
 
 	return efi_status;
 }
