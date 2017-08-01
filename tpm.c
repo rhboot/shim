@@ -1,6 +1,7 @@
 #include <efi.h>
 #include <efilib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "tpm.h"
 
@@ -331,8 +332,8 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 	CopyMem ((CHAR16 *)VarLog->UnicodeName + VarNameLength, VarData,
 		 VarSize);
 
-	Status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)VarLog, VarLogSize, 7,
-				   (CHAR8 *)VarLog, VarLogSize,
+	Status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)VarLog,
+				   VarLogSize, 7, (CHAR8 *)VarLog, VarLogSize,
 				   EV_EFI_VARIABLE_AUTHORITY, NULL);
 
 	FreePool(VarLog);
