@@ -12,5 +12,9 @@ in the shim.h header file and provides a single entry point. On 64-bit systems
 this entry point expects to be called with SysV ABI rather than MSABI, and
 so calls to it should not be wrapped.
 
+On systems with a TPM chip enabled and supported by the system firmware,
+shim will extend various PCRs with the digests of the targets it is
+loading.  A full list is in the file README.tpm .
+
 To use shim, simply place a DER-encoded public certificate in a file such as
 pub.cer and build with "make VENDOR_CERT_FILE=pub.cer".
