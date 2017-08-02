@@ -24,10 +24,13 @@ SBSIGN		?= sbsign
 prefix		?= /usr
 prefix		:= $(abspath $(prefix))
 datadir		?= $(prefix)/share/
+PKGNAME		?= shim
 ESPROOTDIR	?= boot/efi/
 EFIBOOTDIR	?= $(ESPROOTDIR)EFI/BOOT/
 TARGETDIR	?= $(ESPROOTDIR)EFI/$(EFIDIR)/
 DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(ARCH_SUFFIX)/
+DEBUGINFO	?= $(prefix)/lib/debug/
+DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
 DEFAULT_LOADER	?= \\\\grub$(ARCH_SUFFIX).efi
 
@@ -128,6 +131,7 @@ endif
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
 
 TARGETS	= $(SHIMNAME)
+TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 TARGETS	+= $(MMNAME).signed $(FBNAME).signed
 CFLAGS += -DENABLE_SHIM_CERT
@@ -213,6 +217,9 @@ lib/lib.a:
 	if [ ! -d lib ]; then mkdir lib ; fi
 	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile
 
+buildid : $(TOPDIR)/buildid.c
+	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
+
 $(BOOTCSVNAME) :
 	@echo Making $@
 	@( printf "\xff\xfe" ; echo "$(SHIMNAME),$(OSLABEL),,This is the boot entry for $(OSLABEL)" | sed -z 's/./&\x00/g' ) > $@
@@ -226,10 +233,31 @@ ifeq ($(origin EFIDIR),undefined)
 endif
 
 install-deps : $(TARGETS)
+install-deps : $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug buildid
 install-deps : $(BOOTCSVNAME)
 
+install-debugsource : install-deps
+	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DEBUGSOURCE)/$(PKGNAME)-$(VERSION)$(DASHRELEASE)
+	find $(TOPDIR) -type f -a '(' -iname '*.c' -o -iname '*.h' -o -iname '*.S' ')' | while read file ; do \
+		outfile=$$(echo $${file} | sed -e "s,^$(TOPDIR),,") ; \
+		$(INSTALL) -d -m 0755 $(DESTDIR)/$(DEBUGSOURCE)/$(PKGNAME)-$(VERSION)$(DASHRELEASE)/$$(dirname $${outfile}) ; \
+		$(INSTALL) -m 0644 $${file} $(DESTDIR)/$(DEBUGSOURCE)/$(PKGNAME)-$(VERSION)$(DASHRELEASE)/$${outfile} ; \
+	done
+
+install-debuginfo : install-deps
+	$(INSTALL) -d -m 0755 $(DESTDIR)/
+	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DEBUGINFO)$(TARGETDIR)/
+	@./buildid $(wildcard *.efi.debug) | while read file buildid ; do \
+		first=$$(echo $${buildid} | cut -b -2) ; \
+		rest=$$(echo $${buildid} | cut -b 3-) ; \
+		$(INSTALL) -d -m 0755 $(DESTDIR)/$(DEBUGINFO).build-id/$${first}/ ;\
+		$(INSTALL) -m 0644 $${file} $(DESTDIR)/$(DEBUGINFO)$(TARGETDIR) ; \
+		ln -s ../../../../..$(DEBUGINFO)$(TARGETDIR)$${file} $(DESTDIR)/$(DEBUGINFO).build-id/$${first}/$${rest}.debug ;\
+		ln -s ../../../.build-id/$${first}/$${rest} $(DESTDIR)/$(DEBUGINFO).build-id/$${first}/$${rest} ;\
+	done
+
 install : | install-check
-install : install-deps
+install : install-deps install-debuginfo install-debugsource
 	$(INSTALL) -d -m 0755 $(DESTDIR)/
 	$(INSTALL) -d -m 0700 $(DESTDIR)/$(ESPROOTDIR)
 	$(INSTALL) -d -m 0755 $(DESTDIR)/$(EFIBOOTDIR)
@@ -263,17 +291,22 @@ ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
 	$(OBJCOPY) -j .text -j .sdata -j .data -j .data.ident \
-		-j .dynamic -j .dynsym  -j .rel* \
+		-j .dynamic -j .dynsym -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .vendor_cert \
-		$(FORMAT)  $^ $@
+		$(FORMAT) $^ $@
+
+%.efi.debug : %.so
+ifneq ($(OBJCOPY_GTE224),1)
+	$(error objcopy >= 2.24 is required)
+endif
 	$(OBJCOPY) -j .text -j .sdata -j .data \
-		-j .dynamic -j .dynsym  -j .rel* \
+		-j .dynamic -j .dynsym -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		-j .note.gnu.build-id \
-		$(FORMAT) $^ $@.debug
+		$^ $@
 
 ifneq ($(origin ENABLE_SBSIGN),undefined)
 %.efi.signed: %.efi shim.key shim.crt
