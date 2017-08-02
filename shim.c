@@ -40,7 +40,6 @@
 #include "shim.h"
 #include "netboot.h"
 #include "httpboot.h"
-#include "shim_cert.h"
 #include "replacements.h"
 #include "tpm.h"
 #include "ucs2.h"
@@ -51,6 +50,10 @@
 #include "security_policy.h"
 #include "console.h"
 #include "version.h"
+
+#ifdef ENABLE_SHIM_CERT
+#include "shim_cert.h"
+#endif
 
 #include <stdarg.h>
 #include <openssl/x509.h>
@@ -1026,6 +1029,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		return status;
 
 	if (cert) {
+#if defined(ENABLE_SHIM_CERT)
 		/*
 		 * Check against the shim build key
 		 */
@@ -1039,6 +1043,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			status = EFI_SUCCESS;
 			return status;
 		}
+#endif /* defined(ENABLE_SHIM_CERT) */
 
 		/*
 		 * And finally, check against shim's built-in key

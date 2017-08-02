@@ -127,8 +127,12 @@ endif
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
 
 TARGETS	= $(SHIMNAME)
+ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 TARGETS	+= $(MMNAME).signed $(FBNAME).signed
+CFLAGS += -DENABLE_SHIM_CERT
+else
 TARGETS += $(MMNAME) $(FBNAME)
+endif
 OBJS	= shim.o netboot.o cert.o replacements.o tpm.o version.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h include/console.h replacements.c replacements.h tpm.c tpm.h version.h
@@ -171,7 +175,9 @@ certdb/secmod.db: shim.crt
 	$(CERTUTIL) -d certdb/ -A -i shim.crt -n shim -t u
 
 shim.o: $(SOURCES)
+ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
+endif
 shim.o: $(wildcard $(TOPDIR)/*.h)
 
 cert.o : $(TOPDIR)/cert.S
@@ -230,20 +236,26 @@ install : install-deps
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(EFIBOOTDIR)/$(BOOTEFINAME)
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(TARGETDIR)/
 	$(INSTALL) -m 0644 $(BOOTCSVNAME) $(DESTDIR)/$(TARGETDIR)/
+ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 	$(INSTALL) -m 0644 $(FBNAME).signed $(DESTDIR)/$(EFIBOOTDIR)/$(FBNAME)
 	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(EFIBOOTDIR)/$(MMNAME)
 	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(TARGETDIR)/$(MMNAME)
+else
 	$(INSTALL) -m 0644 $(FBNAME) $(DESTDIR)/$(EFIBOOTDIR)/
 	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(EFIBOOTDIR)/
 	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(TARGETDIR)/
+endif
 
 install-as-data : install-deps
 	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DATATARGETDIR)
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(DATATARGETDIR)/
+ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(DATATARGETDIR)/$(MMNAME)
 	$(INSTALL) -m 0644 $(FBNAME).signed $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
+else
 	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(DATATARGETDIR)/$(MMNAME)
 	$(INSTALL) -m 0644 $(FBNAME) $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
+endif
 
 %.efi: %.so
 ifneq ($(OBJCOPY_GTE224),1)
