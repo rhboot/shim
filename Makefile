@@ -20,6 +20,7 @@ INSTALL		?= install
 PK12UTIL	?= pk12util
 CERTUTIL	?= certutil
 PESIGN		?= pesign
+SBSIGN		?= sbsign
 prefix		?= /usr
 prefix		:= $(abspath $(prefix))
 datadir		?= $(prefix)/share/
@@ -274,8 +275,13 @@ endif
 		-j .note.gnu.build-id \
 		$(FORMAT) $^ $@.debug
 
+ifneq ($(origin ENABLE_SBSIGN),undefined)
+%.efi.signed: %.efi shim.key shim.crt
+	$(SBSIGN) --key shim.key --cert shim.crt --output $@ $<
+else
 %.efi.signed: %.efi certdb/secmod.db
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
+endif
 
 clean:
 	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
