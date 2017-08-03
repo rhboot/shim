@@ -60,6 +60,11 @@ as described in the UEFI specification. BS,NV
 
 MokListRT: A copy of MokList made available to the kernel at runtime. RT
 
+MokListX: A list of blacklisted keys and hashes.  An EFI_SIGNATURE_LIST
+as described in the UEFI specification. BS,NV
+
+MokListXRT: A copy of MokListX made available to the kernel at runtime. RT
+
 MokSBState: An 8-bit unsigned integer. If 1, shim will switch to 
 insecure mode. BS,NV
 

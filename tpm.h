@@ -1,3 +1,5 @@
+#include <efilib.h>
+
 #define EFI_TPM_GUID {0xf541796d, 0xa62e, 0x4954, {0xa7, 0x75, 0x95, 0x84, 0xf6, 0x1b, 0x9c, 0xdd }};
 #define EFI_TPM2_GUID {0x607f766c, 0x7455, 0x42be, {0x93, 0x0b, 0xe4, 0xd7, 0x6d, 0xb2, 0x72, 0x0f }};
 
@@ -6,6 +8,12 @@
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description);
+EFI_STATUS fallback_should_prefer_reset(void);
+
+EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 *sha1hash,
+		      UINT8 pcr);
+
+EFI_STATUS tpm_measure_variable(CHAR16 *dbname, EFI_GUID guid, UINTN size, void *data);
 
 typedef struct {
   uint8_t Major;
@@ -30,6 +38,14 @@ typedef struct _TCG_PCR_EVENT {
   uint32_t EventSize;
   uint8_t  Event[1];
 } TCG_PCR_EVENT;
+
+typedef struct _EFI_IMAGE_LOAD_EVENT {
+  EFI_PHYSICAL_ADDRESS ImageLocationInMemory;
+  UINTN ImageLengthInMemory;
+  UINTN ImageLinkTimeAddress;
+  UINTN LengthOfDevicePath;
+  EFI_DEVICE_PATH DevicePath[1];
+} EFI_IMAGE_LOAD_EVENT;
 
 struct efi_tpm_protocol
 {
@@ -154,3 +170,19 @@ struct efi_tpm2_protocol
 };
 
 typedef struct efi_tpm2_protocol efi_tpm2_protocol_t;
+
+typedef UINT32                     TCG_EVENTTYPE;
+
+#define EV_EFI_EVENT_BASE                   ((TCG_EVENTTYPE) 0x80000000)
+#define EV_EFI_VARIABLE_DRIVER_CONFIG       (EV_EFI_EVENT_BASE + 1)
+#define EV_EFI_VARIABLE_BOOT                (EV_EFI_EVENT_BASE + 2)
+#define EV_EFI_BOOT_SERVICES_APPLICATION    (EV_EFI_EVENT_BASE + 3)
+#define EV_EFI_BOOT_SERVICES_DRIVER         (EV_EFI_EVENT_BASE + 4)
+#define EV_EFI_RUNTIME_SERVICES_DRIVER      (EV_EFI_EVENT_BASE + 5)
+#define EV_EFI_GPT_EVENT                    (EV_EFI_EVENT_BASE + 6)
+#define EV_EFI_ACTION                       (EV_EFI_EVENT_BASE + 7)
+#define EV_EFI_PLATFORM_FIRMWARE_BLOB       (EV_EFI_EVENT_BASE + 8)
+#define EV_EFI_HANDOFF_TABLES               (EV_EFI_EVENT_BASE + 9)
+#define EV_EFI_VARIABLE_AUTHORITY           (EV_EFI_EVENT_BASE + 0xE0)
+
+#define PE_COFF_IMAGE 0x0000000000000010

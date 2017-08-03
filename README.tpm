@@ -1,0 +1,22 @@
+The following PCRs are extended by shim:
+
+PCR4:
+- the Authenticode hash of the binary being loaded will be extended into
+  PCR4 before SB verification.
+
+PCR7:
+- Any certificate in one of our certificate databases that matches a binary
+  we try to load will be extended into PCR7.  That includes:
+  - DBX - the system blacklist, logged as "dbx"
+  - MokListX - the Mok blacklist, logged as "MokListX"
+  - vendor_dbx - shim's built-in vendor blacklist, logged as "dbx"
+  - DB - the system whitelist, logged as "db"
+  - MokList the Mok whitelist, logged as "MokList"
+  - vendor_cert - shim's built-in vendor whitelist, logged as "Shim"
+  - shim_cert - shim's build-time generated whitelist, logged as "Shim"
+- MokSBState will be extended into PCR7 if it is set, logged as
+  "MokSBState".
+
+PCR14:
+- MokList, MokListX, and MokSBState will be extended into PCR14 if they are
+  set.
