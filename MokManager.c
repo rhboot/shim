@@ -786,6 +786,15 @@ static void console_restore_mode (SIMPLE_TEXT_OUTPUT_MODE *SavedMode)
 			  SavedMode->Attribute);
 }
 
+static INTN reset_system ()
+{
+	console_notify(L"The system must now be rebooted");
+	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
+			  EFI_SUCCESS, 0, NULL);
+	console_notify(L"Failed to reboot\n");
+	return -1;
+}
+
 static UINT32 get_password (CHAR16 *prompt, CHAR16 *password, UINT32 max)
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
@@ -1050,11 +1059,7 @@ static INTN mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth,
 			LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 		}
 
-		console_notify(L"The system must now be rebooted");
-		uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
-				  EFI_SUCCESS, 0, NULL);
-		console_notify(L"Failed to reboot");
-		return -1;
+		return reset_system();
 	}
 
 	return 0;
@@ -1090,11 +1095,7 @@ static INTN mok_reset_prompt (BOOLEAN MokX)
 		LibDeleteVariable(L"MokAuth", &shim_lock_guid);
 	}
 
-	console_notify(L"The system must now be rebooted");
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
-			  EFI_SUCCESS, 0, NULL);
-	console_notify(L"Failed to reboot\n");
-	return -1;
+	return reset_system();
 }
 
 static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
@@ -1460,11 +1461,7 @@ static INTN mok_deletion_prompt (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
 	}
 
-	console_notify(L"The system must now be rebooted");
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
-			  EFI_SUCCESS, 0, NULL);
-	console_notify(L"Failed to reboot");
-	return -1;
+	return reset_system();
 }
 
 static CHAR16 get_password_charater (CHAR16 *prompt)
@@ -1608,11 +1605,7 @@ static INTN mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 		}
 	}
 
-	console_notify(L"The system must now be rebooted");
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
-			  EFI_SUCCESS, 0, NULL);
-	console_notify(L"Failed to reboot");
-	return -1;
+	return reset_system();
 }
 
 static INTN mok_db_prompt (void *MokDB, UINTN MokDBSize) {
@@ -1729,11 +1722,7 @@ static INTN mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 		}
 	}
 
-	console_notify(L"The system must now be rebooted");
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm,
-			  EFI_SUCCESS, 0, NULL);
-	console_notify(L"Failed to reboot");
-	return -1;
+	return reset_system();
 }
 
 static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
@@ -1769,11 +1758,7 @@ static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 				  | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				  0, NULL);
 		LibDeleteVariable(L"MokPW", &shim_lock_guid);
-		console_notify(L"The system must now be rebooted");
-		uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm, EFI_SUCCESS, 0,
-				  NULL);
-		console_notify(L"Failed to reboot");
-		return -1;
+		return reset_system();
 	}
 
 	if (MokPWSize == PASSWORD_CRYPT_SIZE) {
@@ -1805,11 +1790,7 @@ static INTN mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 
 	LibDeleteVariable(L"MokPW", &shim_lock_guid);
 
-	console_notify(L"The system must now be rebooted");
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm, EFI_SUCCESS, 0,
-			  NULL);
-	console_notify(L"Failed to reboot");
-	return -1;
+	return reset_system();
 }
 
 static BOOLEAN verify_certificate(UINT8 *cert, UINTN size)
