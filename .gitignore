@@ -2,6 +2,7 @@
 certdb
 shim_cert.h
 *.a
+*.CSV
 *.cer
 *.crl
 *.crt

@@ -1,7 +1,8 @@
 VERSION		= 12
-RELEASE		:=
-ifneq ($(RELEASE),"")
-	RELEASE:="-$(RELEASE)"
+ifneq ($(origin RELEASE),undefined)
+DASHRELEASE	?= -$(RELEASE)
+else
+DASHRELEASE	?=
 endif
 
 ifeq ($(MAKELEVEL),0)
@@ -10,18 +11,27 @@ endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
 
-
 CC		= $(CROSS_COMPILE)gcc
 LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OPENSSL		?= openssl
 HEXDUMP		?= hexdump
+INSTALL		?= install
 PK12UTIL	?= pk12util
 CERTUTIL	?= certutil
 PESIGN		?= pesign
+prefix		?= /usr
+prefix		:= $(abspath $(prefix))
+datadir		?= $(prefix)/share/
+ESPROOTDIR	?= boot/efi/
+EFIBOOTDIR	?= $(ESPROOTDIR)EFI/BOOT/
+TARGETDIR	?= $(ESPROOTDIR)EFI/$(EFIDIR)/
+DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(ARCH_SUFFIX)/
+OSLABEL		?= $(EFIDIR)
+DEFAULT_LOADER	:= \\\\grub.efi
 
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
-OBJCOPY_GTE224  = $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
+OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
@@ -36,7 +46,6 @@ EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
 
-DEFAULT_LOADER	:= \\\\grub.efi
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
 		  -Werror=sign-compare -ffreestanding -std=gnu89 \
@@ -44,9 +53,6 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 		  $(EFI_INCLUDES)
-SHIMNAME	= shim
-MMNAME		= MokManager
-FBNAME		= fallback
 
 COMMITID ?= $(shell if [ -d .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo commit id not available; fi)
 
@@ -60,38 +66,56 @@ endif
 
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		-maccumulate-outgoing-args \
-		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		-DNO_BUILTIN_VA_FUNCS \
-		-DMDE_CPU_X64 "-DEFI_ARCH=L\"x64\"" -DPAGE_SIZE=4096 \
-		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/x64-$(VERSION)$(RELEASE)/\""
-	MMNAME	= mmx64
-	FBNAME	= fbx64
-	SHIMNAME= shimx64
-	EFI_PATH:=/usr/lib64/gnuefi
-	LIB_PATH:=/usr/lib64
-
+		   -maccumulate-outgoing-args \
+		   -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
+		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64 -DPAGE_SIZE=4096
+	LIBDIR			?= $(prefix)/lib64
+	ARCH_SUFFIX		?= x64
+	ARCH_SUFFIX_UPPER	?= X64
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		-maccumulate-outgoing-args -m32 \
-		-DMDE_CPU_IA32 "-DEFI_ARCH=L\"ia32\"" -DPAGE_SIZE=4096 \
-		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/ia32-$(VERSION)$(RELEASE)/\""
-	MMNAME	= mmia32
-	FBNAME	= fbia32
-	SHIMNAME= shimia32
-	EFI_PATH:=/usr/lib/gnuefi
-	LIB_PATH:=/usr/lib
+		   -maccumulate-outgoing-args -m32 \
+		   -DMDE_CPU_IA32 -DPAGE_SIZE=4096
+	LIBDIR			?= $(prefix)/lib
+	ARCH_SUFFIX		?= ia32
+	ARCH_SUFFIX_UPPER	?= IA32
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS += -DMDE_CPU_AARCH64 "-DEFI_ARCH=L\"aa64\"" -DPAGE_SIZE=4096 \
-		"-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/aa64-$(VERSION)$(RELEASE)/\""
-	MMNAME	= mmaa64
-	FBNAME	= fbaa64
-	SHIMNAME= shimaa64
-	EFI_PATH:=/usr/lib64/gnuefi
-	LIB_PATH:=/usr/lib64
+	CFLAGS += -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096
+	LIBDIR			?= $(prefix)/lib64
+	ARCH_SUFFIX		?= aa64
+	ARCH_SUFFIX_UPPER	?= AA64
+	FORMAT			:= -O binary
+	SUBSYSTEM		:= 0xa
+	LDFLAGS			+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 endif
+ifeq ($(ARCH),arm)
+	CFLAGS += -DMDE_CPU_ARM -DPAGE_SIZE=4096
+	LIBDIR			?= $(prefix)/lib
+	ARCH_SUFFIX		?= arm
+	ARCH_SUFFIX_UPPER	?= ARM
+	FORMAT			:= -O binary
+	SUBSYSTEM		:= 0xa
+	LDFLAGS			+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+endif
+
+FORMAT		?= --target efi-app-$(ARCH)
+EFI_PATH	?= $(LIBDIR)/gnuefi
+
+MMSTEM		?= mm$(ARCH_SUFFIX)
+MMNAME		= $(MMSTEM).efi
+MMSONAME	= $(MMSTEM).so
+FBSTEM		?= fb$(ARCH_SUFFIX)
+FBNAME		= $(FBSTEM).efi
+FBSONAME	= $(FBSTEM).so
+SHIMSTEM	?= shim$(ARCH_SUFFIX)
+SHIMNAME	= $(SHIMSTEM).efi
+SHIMSONAME	= $(SHIMSTEM).so
+BOOTEFINAME	?= BOOT$(ARCH_SUFFIX_UPPER).EFI
+BOOTCSVNAME	?= BOOT$(ARCH_SUFFIX_UPPER).CSV
+
+CFLAGS += "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
 
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
@@ -100,9 +124,11 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIB_PATH) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
+LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
 
-TARGET	= $(SHIMNAME).efi $(MMNAME).efi.signed $(FBNAME).efi.signed
+TARGETS	= $(SHIMNAME)
+TARGETS	+= $(MMNAME).signed $(FBNAME).signed
+TARGETS += $(MMNAME) $(FBNAME)
 OBJS	= shim.o netboot.o cert.o replacements.o tpm.o version.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h include/console.h replacements.c replacements.h tpm.c tpm.h version.h
@@ -120,7 +146,7 @@ SOURCES = $(foreach source,$(ORIG_SOURCES),$(TOPDIR)/$(source)) version.c
 MOK_SOURCES = $(foreach source,$(ORIG_MOK_SOURCES),$(TOPDIR)/$(source))
 FALLBACK_SRCS = $(foreach source,$(ORIG_FALLBACK_SRCS),$(TOPDIR)/$(source))
 
-all: $(TARGET)
+all: $(TARGETS)
 
 shim.crt:
 	$(TOPDIR)/make-certs shim shim@xn--u4h.net all codesign 1.3.6.1.4.1.311.10.3.1 </dev/null
@@ -144,23 +170,28 @@ certdb/secmod.db: shim.crt
 	$(PK12UTIL) -d certdb/ -i shim.p12 -W "" -K ""
 	$(CERTUTIL) -d certdb/ -A -i shim.crt -n shim -t u
 
-shim.o: $(SOURCES) shim_cert.h
-shim.o: $(wildcard $(TOPDIR)/*.h *.h)
+shim.o: $(SOURCES)
+shim.o: shim_cert.h
+shim.o: $(wildcard $(TOPDIR)/*.h)
 
 cert.o : $(TOPDIR)/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(SHIMNAME).so: $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(SHIMNAME) : $(SHIMSONAME)
+$(MMNAME) : $(MMSONAME)
+$(FBNAME) : $(FBSONAME)
+
+$(SHIMSONAME): $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 fallback.o: $(FALLBACK_SRCS)
 
-$(FBNAME).so: $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(FBSONAME): $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(MOK_SOURCES)
 
-$(MMNAME).so: $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 Cryptlib/libcryptlib.a:
@@ -175,19 +206,44 @@ lib/lib.a:
 	if [ ! -d lib ]; then mkdir lib ; fi
 	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile
 
-ifeq ($(ARCH),aarch64)
-FORMAT		:= -O binary
-SUBSYSTEM	:= 0xa
-LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+$(BOOTCSVNAME) :
+	@echo Making $@
+	@( printf "\xff\xfe" ; echo "$(SHIMNAME),$(OSLABEL),,This is the boot entry for $(OSLABEL)" | sed -z 's/./&\x00/g' ) > $@
+
+install-check :
+ifeq ($(origin LIBDIR),undefined)
+	$(error Architecture $(ARCH) is not a supported build target.)
+endif
+ifeq ($(origin EFIDIR),undefined)
+	$(error EFIDIR must be set to your reserved EFI System Partition subdirectory name)
 endif
 
-ifeq ($(ARCH),arm)
-FORMAT		:= -O binary
-SUBSYSTEM	:= 0xa
-LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-endif
+install-deps : $(TARGETS)
+install-deps : $(BOOTCSVNAME)
 
-FORMAT		?= --target efi-app-$(ARCH)
+install : | install-check
+install : install-deps
+	$(INSTALL) -d -m 0755 $(DESTDIR)/
+	$(INSTALL) -d -m 0700 $(DESTDIR)/$(ESPROOTDIR)
+	$(INSTALL) -d -m 0755 $(DESTDIR)/$(EFIBOOTDIR)
+	$(INSTALL) -d -m 0755 $(DESTDIR)/$(TARGETDIR)
+	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(EFIBOOTDIR)/$(BOOTEFINAME)
+	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(TARGETDIR)/
+	$(INSTALL) -m 0644 $(BOOTCSVNAME) $(DESTDIR)/$(TARGETDIR)/
+	$(INSTALL) -m 0644 $(FBNAME).signed $(DESTDIR)/$(EFIBOOTDIR)/$(FBNAME)
+	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(EFIBOOTDIR)/$(MMNAME)
+	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(TARGETDIR)/$(MMNAME)
+	$(INSTALL) -m 0644 $(FBNAME) $(DESTDIR)/$(EFIBOOTDIR)/
+	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(EFIBOOTDIR)/
+	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(TARGETDIR)/
+
+install-as-data : install-deps
+	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DATATARGETDIR)
+	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(DATATARGETDIR)/
+	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(DATATARGETDIR)/$(MMNAME)
+	$(INSTALL) -m 0644 $(FBNAME).signed $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
+	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(DATATARGETDIR)/$(MMNAME)
+	$(INSTALL) -m 0644 $(FBNAME) $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
 
 %.efi: %.so
 ifneq ($(OBJCOPY_GTE224),1)
@@ -242,5 +298,7 @@ archive: tag
 	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
 	@rm -rf /tmp/shim-$(VERSION)
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
+
+.PHONY : install-deps
 
 export ARCH CC LD OBJCOPY EFI_INCLUDE
