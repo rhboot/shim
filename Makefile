@@ -82,7 +82,7 @@ ifeq ($(ARCH),ia32)
 	ARCH_SUFFIX_UPPER	?= IA32
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS += -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096
+	CFLAGS += -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096 -mstrict-align
 	LIBDIR			?= $(prefix)/lib64
 	ARCH_SUFFIX		?= aa64
 	ARCH_SUFFIX_UPPER	?= AA64
@@ -91,7 +91,7 @@ ifeq ($(ARCH),aarch64)
 	LDFLAGS			+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 endif
 ifeq ($(ARCH),arm)
-	CFLAGS += -DMDE_CPU_ARM -DPAGE_SIZE=4096
+	CFLAGS += -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mstrict-align
 	LIBDIR			?= $(prefix)/lib
 	ARCH_SUFFIX		?= arm
 	ARCH_SUFFIX_UPPER	?= ARM
