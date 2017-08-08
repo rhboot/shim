@@ -11,7 +11,7 @@ CFLAGS		= -ggdb -O0 -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDI
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
 		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		-UNO_BUILTIN_VA_FUNCS -DMDE_CPU_IA64
+		-UNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \

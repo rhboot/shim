@@ -8,7 +8,7 @@ CFLAGS		= -ggdb -O0 -I$(TOPDIR) -iquote $(TOPDIR) -fno-stack-protector -fno-stri
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args \
 		-DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -DNO_BUILTIN_VA_FUNCS \
-		-DMDE_CPU_IA64
+		-DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc -maccumulate-outgoing-args -m32 \
