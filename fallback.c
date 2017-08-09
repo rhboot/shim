@@ -482,7 +482,7 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 err:
 	if (full_device_path)
 		FreePool(full_device_path);
-	if (dp)
+	if (dp && dp != full_device_path)
 		FreePool(dp);
 	if (fullpath)
 		FreePool(fullpath);
