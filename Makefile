@@ -116,6 +116,7 @@ FBSONAME	= $(FBSTEM).so
 SHIMSTEM	?= shim$(ARCH_SUFFIX)
 SHIMNAME	= $(SHIMSTEM).efi
 SHIMSONAME	= $(SHIMSTEM).so
+SHIMHASHNAME	= $(SHIMSTEM).hash
 BOOTEFINAME	?= BOOT$(ARCH_SUFFIX_UPPER).EFI
 BOOTCSVNAME	?= BOOT$(ARCH_SUFFIX_UPPER).CSV
 
@@ -132,6 +133,9 @@ LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsym
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
+ifneq ($(origin ENABLE_SHIM_HASH),undefined)
+TARGETS += $(SHIMHASHNAME)
+endif
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 TARGETS	+= $(MMNAME).signed $(FBNAME).signed
 CFLAGS += -DENABLE_SHIM_CERT
@@ -278,6 +282,9 @@ endif
 install-as-data : install-deps
 	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DATATARGETDIR)
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(DATATARGETDIR)/
+ifneq ($(origin ENABLE_SHIM_HASH),undefined)
+	$(INSTALL) -m 0644 $(SHIMHASHNAME) $(DESTDIR)/$(DATATARGETDIR)/
+endif
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 	$(INSTALL) -m 0644 $(MMNAME).signed $(DESTDIR)/$(DATATARGETDIR)/$(MMNAME)
 	$(INSTALL) -m 0644 $(FBNAME).signed $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
@@ -295,6 +302,11 @@ endif
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .vendor_cert \
 		$(FORMAT) $^ $@
+
+ifneq ($(origin ENABLE_SHIM_HASH),undefined)
+%.hash : %.efi
+	$(PESIGN) -i $< -P -h > $@
+endif
 
 %.efi.debug : %.so
 ifneq ($(OBJCOPY_GTE224),1)
