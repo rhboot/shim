@@ -362,6 +362,6 @@ archive: tag
 	@rm -rf /tmp/shim-$(VERSION)
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
 
-.PHONY : install-deps
+.PHONY : install-deps shim.key
 
 export ARCH CC LD OBJCOPY EFI_INCLUDE
