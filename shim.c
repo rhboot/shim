@@ -56,8 +56,20 @@
 #endif
 
 #include <stdarg.h>
+
+#include <Library/BaseCryptLib.h>
+#include <openssl/err.h>
+#include <openssl/bn.h>
+#include <openssl/dh.h>
+#include <openssl/ocsp.h>
+#include <openssl/pkcs12.h>
+#include <openssl/rand.h>
+#include <openssl/crypto.h>
+#include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <openssl/rsa.h>
+#include <openssl/dso.h>
 
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
@@ -477,7 +489,6 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 	UINT8 *db;
 
 	efi_status = get_variable(dbname, &db, &dbsize, guid);
-
 	if (efi_status != EFI_SUCCESS)
 		return VAR_NOT_FOUND;
 
@@ -2598,6 +2609,46 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+static void *
+ossl_malloc(size_t num)
+{
+	return AllocatePool(num);
+}
+
+static void
+ossl_free(void *addr)
+{
+	FreePool(addr);
+}
+
+static void
+init_openssl(void)
+{
+	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
+	OPENSSL_init();
+	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
+	ERR_load_ERR_strings();
+	ERR_load_BN_strings();
+	ERR_load_RSA_strings();
+	ERR_load_DH_strings();
+	ERR_load_EVP_strings();
+	ERR_load_BUF_strings();
+	ERR_load_OBJ_strings();
+	ERR_load_PEM_strings();
+	ERR_load_X509_strings();
+	ERR_load_ASN1_strings();
+	ERR_load_CONF_strings();
+	ERR_load_CRYPTO_strings();
+	ERR_load_COMP_strings();
+	ERR_load_BIO_strings();
+	ERR_load_PKCS7_strings();
+	ERR_load_X509V3_strings();
+	ERR_load_PKCS12_strings();
+	ERR_load_RAND_strings();
+	ERR_load_DSO_strings();
+	ERR_load_OCSP_strings();
+}
+
 static SHIM_LOCK shim_lock_interface;
 static EFI_HANDLE shim_lock_handle;
 
@@ -2785,6 +2836,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
+
+	init_openssl();
 
 	/*
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
