@@ -88,6 +88,9 @@ extern UINT8 verbose;
 		__dprinta_ret;									\
 	})
 
+extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
+#define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)
+
 extern VOID msleep(unsigned long msecs);
 
 #endif /* _SHIM_LIB_CONSOLE_H */
