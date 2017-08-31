@@ -1,9 +1,9 @@
-#include <CrtLibSupport.h>
+#include <OpenSslSupport.h>
 
-char *
-AsciiStrCat(char *Destination, char *Source)
+CHAR8 *
+AsciiStrCat(CHAR8 *Destination, CHAR8 *Source)
 {
-	UINTN dest_len = strlena((CHAR8 *)Destination);
+	UINTN dest_len = strlena(Destination);
 	UINTN i;
 
 	for (i = 0; Source[i] != '\0'; i++)
@@ -25,8 +25,8 @@ AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
 	return Destination;
 }
 
-char *
-AsciiStrnCpy(char *Destination, char *Source, UINTN count)
+CHAR8 *
+AsciiStrnCpy(CHAR8 *Destination, CHAR8 *Source, UINTN count)
 {
 	UINTN i;
 
@@ -64,62 +64,4 @@ AsciiStrSize(CHAR8 *string)
 	return strlena(string) + 1;
 }
 
-/* Based on AsciiStrDecimalToUintnS() in edk2
- * MdePkg/Library/BaseLib/SafeString.c */
-UINTN
-AsciiStrDecimalToUintn(const char *String)
-{
-	UINTN     Result;
 
-	if (String == NULL)
-		return 0;
-
-	/* Ignore the pad spaces (space or tab) */
-	while ((*String == ' ') || (*String == '\t')) {
-		String++;
-	}
-
-	/* Ignore leading Zeros after the spaces */
-	while (*String == '0') {
-		String++;
-	}
-
-	Result = 0;
-
-	while (*String >= '0' && *String <= '9') {
-		Result = Result * 10 + (*String - '0');
-		String++;
-	}
-
-	return Result;
-}
-
-int
-strcmp (const char *str1, const char *str2)
-{
-	return strcmpa((CHAR8 *)str1,(CHAR8 *)str2);
-}
-
-inline static char
-toupper (char c)
-{
-	return ((c >= 'a' && c <= 'z') ? c - ('a' - 'A') : c);
-}
-
-/* Based on AsciiStriCmp() in edk2 MdePkg/Library/BaseLib/String.c */
-int
-strcasecmp (const char *str1, const char *str2)
-{
-	char c1, c2;
-
-	c1 = toupper (*str1);
-	c2 = toupper (*str2);
-	while ((*str1 != '\0') && (c1 == c2)) {
-		str1++;
-		str2++;
-		c1 = toupper (*str1);
-		c2 = toupper (*str2);
-	}
-
-	return c1 - c2;
-}

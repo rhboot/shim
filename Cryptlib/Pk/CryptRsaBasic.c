@@ -7,7 +7,7 @@
   3) RsaSetKey
   4) RsaPkcs1Verify
 
-Copyright (c) 2009 - 2017, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2009 - 2015, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -92,15 +92,7 @@ RsaSetKey (
   IN      UINTN        BnSize
   )
 {
-  RSA     *RsaKey;
-  BIGNUM  *BnN;
-  BIGNUM  *BnE;
-  BIGNUM  *BnD;
-  BIGNUM  *BnP;
-  BIGNUM  *BnQ;
-  BIGNUM  *BnDp;
-  BIGNUM  *BnDq;
-  BIGNUM  *BnQInv;
+  RSA  *RsaKey;
 
   //
   // Check input parameters.
@@ -109,23 +101,7 @@ RsaSetKey (
     return FALSE;
   }
 
-  BnN    = NULL;
-  BnE    = NULL;
-  BnD    = NULL;
-  BnP    = NULL;
-  BnQ    = NULL;
-  BnDp   = NULL;
-  BnDq   = NULL;
-  BnQInv = NULL;
-
-  //
-  // Retrieve the components from RSA object.
-  //
   RsaKey = (RSA *) RsaContext;
-  RSA_get0_key (RsaKey, (const BIGNUM **)&BnN, (const BIGNUM **)&BnE, (const BIGNUM **)&BnD);
-  RSA_get0_factors (RsaKey, (const BIGNUM **)&BnP, (const BIGNUM **)&BnQ);
-  RSA_get0_crt_params (RsaKey, (const BIGNUM **)&BnDp, (const BIGNUM **)&BnDq, (const BIGNUM **)&BnQInv);
-
   //
   // Set RSA Key Components by converting octet string to OpenSSL BN representation.
   // NOTE: For RSA public key (used in signature verification), only public components
@@ -134,109 +110,144 @@ RsaSetKey (
   switch (KeyTag) {
 
   //
-  // RSA Public Modulus (N), Public Exponent (e) and Private Exponent (d)
+  // RSA Public Modulus (N)
   //
   case RsaKeyN:
-  case RsaKeyE:
-  case RsaKeyD:
-    if (BnN == NULL) {
-      BnN = BN_new ();
+    if (RsaKey->n != NULL) {
+      BN_free (RsaKey->n);
     }
-    if (BnE == NULL) {
-      BnE = BN_new ();
-    }
-    if (BnD == NULL) {
-      BnD = BN_new ();
-    }
-
-    if ((BnN == NULL) || (BnE == NULL) || (BnD == NULL)) {
-      return FALSE;
-    }
-
-    switch (KeyTag) {
-    case RsaKeyN:
-      BnN = BN_bin2bn (BigNumber, (UINT32)BnSize, BnN);
+    RsaKey->n = NULL;
+    if (BigNumber == NULL) {
       break;
-    case RsaKeyE:
-      BnE = BN_bin2bn (BigNumber, (UINT32)BnSize, BnE);
-      break;
-    case RsaKeyD:
-      BnD = BN_bin2bn (BigNumber, (UINT32)BnSize, BnD);
-      break;
-    default:
-      return FALSE;
     }
-    if (RSA_set0_key (RsaKey, BN_dup(BnN), BN_dup(BnE), BN_dup(BnD)) == 0) {
+    RsaKey->n = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->n);
+    if (RsaKey->n == NULL) {
       return FALSE;
     }
 
     break;
 
   //
-  // RSA Secret Prime Factor of Modulus (p and q)
+  // RSA Public Exponent (e)
+  //
+  case RsaKeyE:
+    if (RsaKey->e != NULL) {
+      BN_free (RsaKey->e);
+    }
+    RsaKey->e = NULL;
+    if (BigNumber == NULL) {
+      break;
+    }
+    RsaKey->e = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->e);
+    if (RsaKey->e == NULL) {
+      return FALSE;
+    }
+
+    break;
+
+  //
+  // RSA Private Exponent (d)
+  //
+  case RsaKeyD:
+    if (RsaKey->d != NULL) {
+      BN_free (RsaKey->d);
+    }
+    RsaKey->d = NULL;
+    if (BigNumber == NULL) {
+      break;
+    }
+    RsaKey->d = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->d);
+    if (RsaKey->d == NULL) {
+      return FALSE;
+    }
+
+    break;
+
+  //
+  // RSA Secret Prime Factor of Modulus (p)
   //
   case RsaKeyP:
-  case RsaKeyQ:
-    if (BnP == NULL) {
-      BnP = BN_new ();
+    if (RsaKey->p != NULL) {
+      BN_free (RsaKey->p);
     }
-    if (BnQ == NULL) {
-      BnQ = BN_new ();
-    }
-    if ((BnP == NULL) || (BnQ == NULL)) {
-      return FALSE;
-    }
-
-    switch (KeyTag) {
-    case RsaKeyP:
-      BnP = BN_bin2bn (BigNumber, (UINT32)BnSize, BnP);
+    RsaKey->p = NULL;
+    if (BigNumber == NULL) {
       break;
-    case RsaKeyQ:
-      BnQ = BN_bin2bn (BigNumber, (UINT32)BnSize, BnQ);
-      break;
-    default:
-      return FALSE;
     }
-    if (RSA_set0_factors (RsaKey, BN_dup(BnP), BN_dup(BnQ)) == 0) {
+    RsaKey->p = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->p);
+    if (RsaKey->p == NULL) {
       return FALSE;
     }
 
     break;
 
   //
-  // p's CRT Exponent (== d mod (p - 1)),  q's CRT Exponent (== d mod (q - 1)),
-  // and CRT Coefficient (== 1/q mod p)
+  // RSA Secret Prime Factor of Modules (q)
   //
-  case RsaKeyDp:
-  case RsaKeyDq:
-  case RsaKeyQInv:
-    if (BnDp == NULL) {
-      BnDp = BN_new ();
+  case RsaKeyQ:
+    if (RsaKey->q != NULL) {
+      BN_free (RsaKey->q);
     }
-    if (BnDq == NULL) {
-      BnDq = BN_new ();
+    RsaKey->q = NULL;
+    if (BigNumber == NULL) {
+      break;
     }
-    if (BnQInv == NULL) {
-      BnQInv = BN_new ();
-    }
-    if ((BnDp == NULL) || (BnDq == NULL) || (BnQInv == NULL)) {
+    RsaKey->q = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->q);
+    if (RsaKey->q == NULL) {
       return FALSE;
     }
 
-    switch (KeyTag) {
-    case RsaKeyDp:
-      BnDp = BN_bin2bn (BigNumber, (UINT32)BnSize, BnDp);
+    break;
+
+  //
+  // p's CRT Exponent (== d mod (p - 1))
+  //
+  case RsaKeyDp:
+    if (RsaKey->dmp1 != NULL) {
+      BN_free (RsaKey->dmp1);
+    }
+    RsaKey->dmp1 = NULL;
+    if (BigNumber == NULL) {
       break;
-    case RsaKeyDq:
-      BnDq = BN_bin2bn (BigNumber, (UINT32)BnSize, BnDq);
-      break;
-    case RsaKeyQInv:
-      BnQInv = BN_bin2bn (BigNumber, (UINT32)BnSize, BnQInv);
-      break;
-    default:
+    }
+    RsaKey->dmp1 = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->dmp1);
+    if (RsaKey->dmp1 == NULL) {
       return FALSE;
     }
-    if (RSA_set0_crt_params (RsaKey, BN_dup(BnDp), BN_dup(BnDq), BN_dup(BnQInv)) == 0) {
+
+    break;
+
+  //
+  // q's CRT Exponent (== d mod (q - 1))
+  //
+  case RsaKeyDq:
+    if (RsaKey->dmq1 != NULL) {
+      BN_free (RsaKey->dmq1);
+    }
+    RsaKey->dmq1 = NULL;
+    if (BigNumber == NULL) {
+      break;
+    }
+    RsaKey->dmq1 = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->dmq1);
+    if (RsaKey->dmq1 == NULL) {
+      return FALSE;
+    }
+
+    break;
+
+  //
+  // The CRT Coefficient (== 1/q mod p)
+  //
+  case RsaKeyQInv:
+    if (RsaKey->iqmp != NULL) {
+      BN_free (RsaKey->iqmp);
+    }
+    RsaKey->iqmp = NULL;
+    if (BigNumber == NULL) {
+      break;
+    }
+    RsaKey->iqmp = BN_bin2bn (BigNumber, (UINT32) BnSize, RsaKey->iqmp);
+    if (RsaKey->iqmp == NULL) {
       return FALSE;
     }
 
@@ -300,11 +311,11 @@ RsaPkcs1Verify (
   case MD5_DIGEST_SIZE:
     DigestType = NID_md5;
     break;
-
+    
   case SHA1_DIGEST_SIZE:
     DigestType = NID_sha1;
     break;
-
+    
   case SHA256_DIGEST_SIZE:
     DigestType = NID_sha256;
     break;

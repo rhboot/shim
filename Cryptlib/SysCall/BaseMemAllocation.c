@@ -2,7 +2,7 @@
   Base Memory Allocation Routines Wrapper for Crypto library over OpenSSL
   during PEI & DXE phases.
 
-Copyright (c) 2009 - 2017, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2009 - 2012, Intel Corporation. All rights reserved.<BR>
 This program and the accompanying materials
 are licensed and made available under the terms and conditions of the BSD License
 which accompanies this distribution.  The full text of the license may be found at
@@ -13,8 +13,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
-#include <CrtLibSupport.h>
-#include <Library/MemoryAllocationLib.h>
+#include <OpenSslSupport.h>
 
 //
 // -- Memory-Allocation Routines --
