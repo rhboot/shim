@@ -459,3 +459,9 @@ VOID setup_console (int text)
 
 	uefi_call_wrapper(concon->SetMode, 2, concon, new_mode);
 }
+
+VOID
+msleep(unsigned long msecs)
+{
+	uefi_call_wrapper(BS->Stall, 1, msecs);
+}

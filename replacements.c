@@ -52,11 +52,8 @@
 #include <efilib.h>
 #include "shim.h"
 #include "replacements.h"
-
-/* oh for fuck's sakes.*/
-#ifndef EFI_SECURITY_VIOLATION
-#define EFI_SECURITY_VIOLATION 26
-#endif
+#include "console.h"
+#include "errors.h"
 
 static EFI_SYSTEM_TABLE *systab;
 
@@ -129,7 +126,7 @@ start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 				Print(L"Something has gone seriously wrong: %d\n",
 					status2);
 				Print(L"shim cannot continue, sorry.\n");
-				systab->BootServices->Stall(5000000);
+				msleep(5000000);
 				systab->RuntimeServices->ResetSystem(
 					EfiResetShutdown,
 					EFI_SECURITY_VIOLATION, 0, NULL);
@@ -155,7 +152,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 
 	Print(L"Bootloader has not verified loaded image.\n");
 	Print(L"System is compromised.  halting.\n");
-	systab->BootServices->Stall(5000000);
+	msleep(5000000);
 	systab->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
 	return EFI_SECURITY_VIOLATION;
 }
@@ -177,7 +174,7 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 			Print(L"Something has gone seriously wrong: %r\n",
 				status2);
 			Print(L"shim cannot continue, sorry.\n");
-			systab->BootServices->Stall(5000000);
+			msleep(5000000);
 			systab->RuntimeServices->ResetSystem(
 				EfiResetShutdown,
 				EFI_SECURITY_VIOLATION, 0, NULL);

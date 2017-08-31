@@ -1900,7 +1900,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 		if (efi_status != EFI_SUCCESS) {
 			Print(L"start_image() returned %r\n", efi_status);
-			uefi_call_wrapper(BS->Stall, 1, 2000000);
+			msleep(2000000);
 			return efi_status;
 		}
 
@@ -1910,7 +1910,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"start_image() returned %r\n", efi_status);
-		uefi_call_wrapper(BS->Stall, 1, 2000000);
+		msleep(2000000);
 	}
 
 	return efi_status;
@@ -2751,7 +2751,7 @@ debug_hook(void)
 #else
 		if (x > 12000)
 			break;
-		uefi_call_wrapper(BS->Stall, 1, 5000);
+		msleep(5000);
 #endif
 	}
 	x = 1;
@@ -2798,10 +2798,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	if (efi_status != EFI_SUCCESS && efi_status != EFI_NOT_FOUND) {
 		Print(L"Something has gone seriously wrong: %r\n", efi_status);
 		Print(L"Shim was unable to measure state into the TPM\n");
-		systab->BootServices->Stall(5000000);
-		systab->RuntimeServices->ResetSystem(EfiResetShutdown,
-						     EFI_SECURITY_VIOLATION,
-						     0, NULL);
+		msleep(5000000);
+		uefi_call_wrapper(systab->RuntimeServices->ResetSystem, 4,
+				  EfiResetShutdown, EFI_SECURITY_VIOLATION,
+				  0, NULL);
 	}
 
 	/*
@@ -2814,7 +2814,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Something has gone seriously wrong: %r\n", efi_status);
 		Print(L"shim cannot continue, sorry.\n");
-		uefi_call_wrapper(BS->Stall, 1, 5000000);
+		msleep(5000000);
 		uefi_call_wrapper(systab->RuntimeServices->ResetSystem, 4,
 				  EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				  0, NULL);
@@ -2825,7 +2825,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	if (user_insecure_mode) {
 		Print(L"Booting in insecure mode\n");
-		uefi_call_wrapper(BS->Stall, 1, 2000000);
+		msleep(2000000);
 	}
 
 	/*

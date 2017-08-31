@@ -88,4 +88,6 @@ extern UINT8 verbose;
 		__dprinta_ret;									\
 	})
 
+extern VOID msleep(unsigned long msecs);
+
 #endif /* _SHIM_LIB_CONSOLE_H */
