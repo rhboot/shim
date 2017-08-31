@@ -386,6 +386,14 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
+static void
+drain_openssl_errors(void)
+{
+	unsigned long err = -1;
+	while (err != 0)
+		err = ERR_get_error();
+}
+
 static BOOLEAN verify_x509(UINT8 *Cert, UINTN CertSize)
 {
 	UINTN length;
@@ -456,7 +464,9 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
+				drain_openssl_errors();
 				if (verify_eku(Cert->SignatureData, CertSize)) {
+					drain_openssl_errors();
 					IsFound = AuthenticodeVerify (data->CertData,
 								      data->Hdr.dwLength - sizeof(data->Hdr),
 								      Cert->SignatureData,
@@ -470,6 +480,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			} else if (verbose) {
 				console_notify(L"Not a DER encoding x.509 Certificate");
 			}
+			drain_openssl_errors();
 		}
 
 		dbsize -= CertList->SignatureListSize;
@@ -667,6 +678,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
+	crypterr(EFI_SECURITY_VIOLATION);
 	return EFI_SECURITY_VIOLATION;
 }
 
@@ -1010,6 +1022,13 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			return EFI_UNSUPPORTED;
 		}
 	}
+
+	/*
+	 * Clear OpenSSL's error log, because we get some DSO unimplemented
+	 * errors during its intialization, and we don't want those to look
+	 * like they're the reason for validation failures.
+	 */
+	drain_openssl_errors();
 
 	status = generate_hash(data, datasize, context, sha256hash, sha1hash);
 	if (status != EFI_SUCCESS)
