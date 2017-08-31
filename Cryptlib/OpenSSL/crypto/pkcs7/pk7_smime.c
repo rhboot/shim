@@ -425,6 +425,7 @@ STACK_OF(X509) *PKCS7_get0_signers(PKCS7 *p7, STACK_OF(X509) *certs,
 
         if (!sk_X509_push(signers, signer)) {
             sk_X509_free(signers);
+            PKCS7err(PKCS7_F_PKCS7_GET0_SIGNERS, ERR_R_MALLOC_FAILURE);
             return NULL;
         }
     }
