@@ -33,10 +33,8 @@
  * Corporation.
  */
 
-#include <efi.h>
-#include <efilib.h>
-#include <string.h>
 #include "shim.h"
+#include <string.h>
 #include "netboot.h"
 #include "str.h"
 
