@@ -920,14 +920,18 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		SumOfBytesHashed += Section->SizeOfRawData;
 	}
 
-	/* Hash all remaining data */
-	if (datasize > SumOfBytesHashed) {
+	/* Hash all remaining data up to SecDir if SecDir->Size is not 0 */
+	if (datasize > SumOfBytesHashed && context->SecDir->Size) {
 		hashbase = data + SumOfBytesHashed;
 		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
 
 		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
 		    (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress)) {
 			perror(L"Malformed binary after Attribute Certificate Table\n");
+			Print(L"datasize: %u SumOfBytesHashed: %u SecDir->Size: %lu\n",
+			      datasize, SumOfBytesHashed, context->SecDir->Size);
+			Print(L"hashsize: %u SecDir->VirtualAddress: 0x%08lx\n",
+			      hashsize, context->SecDir->VirtualAddress);
 			status = EFI_INVALID_PARAMETER;
 			goto done;
 		}
@@ -939,7 +943,28 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 			status = EFI_OUT_OF_RESOURCES;
 			goto done;
 		}
+
+		SumOfBytesHashed += hashsize;
 	}
+
+#if 0 // we have to migrate to doing this later :/
+	/* Hash all remaining data */
+	if (datasize > SumOfBytesHashed) {
+		hashbase = data + SumOfBytesHashed;
+		hashsize = datasize - SumOfBytesHashed;
+
+		check_size(data, datasize_in, hashbase, hashsize);
+
+		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+			perror(L"Unable to generate hash\n");
+			status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+
+		SumOfBytesHashed += hashsize;
+	}
+#endif
 
 	if (!(Sha256Final(sha256ctx, sha256hash)) ||
 	    !(Sha1Final(sha1ctx, sha1hash))) {
