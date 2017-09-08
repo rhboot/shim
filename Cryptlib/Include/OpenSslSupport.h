@@ -200,7 +200,7 @@ typedef CHAR8 *VA_LIST;
    For pre-Standard C compilers, here is a version that usually works
    (but watch out!): */
 #ifndef offsetof
-#define offsetof(type, member) ( (UINTN) & ((type*)0) -> member )
+#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
 #endif
 
 //
