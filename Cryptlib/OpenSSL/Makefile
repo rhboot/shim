@@ -430,10 +430,6 @@ OBJS		=   crypto/cryptlib.o \
   crypto/ocsp/ocsp_prn.o \
   crypto/ocsp/ocsp_vfy.o \
   crypto/ocsp/ocsp_err.o \
-  crypto/ui/ui_lib.o \
-  crypto/ui/ui_util.o \
-  crypto/ui/ui_compat.o \
-  crypto/krb5/krb5_asn.o \
   crypto/cmac/cmac.o \
   crypto/cmac/cm_ameth.o \
   crypto/cmac/cm_pmeth.o \

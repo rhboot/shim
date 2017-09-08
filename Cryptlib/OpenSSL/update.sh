@@ -435,11 +435,6 @@ install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_s
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_prn.c crypto/ocsp/ocsp_prn.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_vfy.c crypto/ocsp/ocsp_vfy.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_err.c crypto/ocsp/ocsp_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_locl.h crypto/ui/ui_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_lib.c crypto/ui/ui_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_util.c crypto/ui/ui_util.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ui/ui_compat.c crypto/ui/ui_compat.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/krb5/krb5_asn.c crypto/krb5/krb5_asn.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cmac.c crypto/cmac/cmac.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cm_ameth.c crypto/cmac/cm_ameth.c
 install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cm_pmeth.c crypto/cmac/cm_pmeth.c
