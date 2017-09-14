@@ -167,6 +167,7 @@ shim.crt:
 shim.cer: shim.crt
 	$(OPENSSL) x509 -outform der -in $< -out $@
 
+.NOTPARALLEL: shim_cert.h
 shim_cert.h: shim.cer
 	echo "static UINT8 shim_cert[] = {" > $@
 	$(HEXDUMP) -v -e '1/1 "0x%02x, "' $< >> $@
