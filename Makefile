@@ -332,7 +332,7 @@ clean:
 	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
 	$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile clean
 	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
-	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb
+	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
 	rm -f *.debug *.so *.efi *.tar.* version.c
 
 GITTAG = $(VERSION)
