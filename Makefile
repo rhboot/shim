@@ -76,6 +76,7 @@ ifeq ($(ARCH),x86_64)
 	LIBDIR			?= $(prefix)/lib64
 	ARCH_SUFFIX		?= x64
 	ARCH_SUFFIX_UPPER	?= X64
+	ARCH_LDFLAGS		?=
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
@@ -84,6 +85,7 @@ ifeq ($(ARCH),ia32)
 	LIBDIR			?= $(prefix)/lib
 	ARCH_SUFFIX		?= ia32
 	ARCH_SUFFIX_UPPER	?= IA32
+	ARCH_LDFLAGS		?=
 endif
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096 -mstrict-align
@@ -92,7 +94,7 @@ ifeq ($(ARCH),aarch64)
 	ARCH_SUFFIX_UPPER	?= AA64
 	FORMAT			:= -O binary
 	SUBSYSTEM		:= 0xa
-	LDFLAGS			+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 endif
 ifeq ($(ARCH),arm)
 	CFLAGS += -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mstrict-align
@@ -101,7 +103,7 @@ ifeq ($(ARCH),arm)
 	ARCH_SUFFIX_UPPER	?= ARM
 	FORMAT			:= -O binary
 	SUBSYSTEM		:= 0xa
-	LDFLAGS			+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 endif
 
 FORMAT		?= --target efi-app-$(ARCH)
@@ -129,7 +131,7 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1
+LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS)
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
