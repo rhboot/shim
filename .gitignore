@@ -25,3 +25,4 @@ shim_cert.h
 *.srl.old
 *.tar.*
 version.c
+cov-int/
