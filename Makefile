@@ -229,7 +229,7 @@ buildid : $(TOPDIR)/buildid.c
 
 $(BOOTCSVNAME) :
 	@echo Making $@
-	@( printf "\xff\xfe" ; echo "$(SHIMNAME),$(OSLABEL),,This is the boot entry for $(OSLABEL)" | sed -z 's/./&\x00/g' ) > $@
+	@echo "$(SHIMNAME),$(OSLABEL),,This is the boot entry for $(OSLABEL)" | iconv -t UCS-2LE > $@
 
 install-check :
 ifeq ($(origin LIBDIR),undefined)
