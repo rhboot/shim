@@ -1,3 +1,6 @@
+default : all
+
+NAME		= shim
 VERSION		= 14
 ifneq ($(origin RELEASE),undefined)
 DASHRELEASE	?= -$(RELEASE)
@@ -8,10 +11,15 @@ endif
 ifeq ($(MAKELEVEL),0)
 TOPDIR		?= $(shell pwd)
 endif
+ifeq ($(TOPDIR),)
+override TOPDIR := $(shell pwd)
+endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
 
 include $(TOPDIR)/Make.defaults
+include $(TOPDIR)/Make.rules
+include $(TOPDIR)/Make.coverity
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
@@ -211,13 +219,16 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-clean: OBJS=$(wildcard *.o)
-clean:
+clean-shim-objs:
+	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
+	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
+	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
+	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
+	@git clean -f -d -e 'Cryptlib/OpenSSL/*'
+
+clean: clean-shim-objs
 	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
 	$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile clean
-	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
-	rm -rf $(TARGET) $(OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
-	rm -f *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
 
 GITTAG = $(VERSION)
 
