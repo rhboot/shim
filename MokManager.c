@@ -508,6 +508,7 @@ static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 	UINTN hash_num;
 	UINT8 *hash;
 	CHAR16 **menu_strings;
+	CHAR16 *selection[] = { L"[Hash List]", NULL };
 	UINTN key_num = 0;
 	UINTN i;
 
@@ -537,9 +538,8 @@ static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 
 	while (key_num < hash_num) {
 		int rc;
-		key_num = rc = console_select((CHAR16 *[]){ L"[Hash List]", NULL },
-					 menu_strings, key_num);
 
+		key_num = rc = console_select(selection, menu_strings, key_num);
 		if (rc < 0 || key_num >= hash_num)
 			break;
 
@@ -589,6 +589,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 	MokListNode *keys = NULL;
 	UINT32 key_num = 0;
 	CHAR16 **menu_strings;
+	CHAR16 *selection[] = { title, NULL };
 	unsigned int i;
 
 	if (KeyListSize < (sizeof(EFI_SIGNATURE_LIST) +
@@ -622,8 +623,7 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 
 	while (key_num < MokNum) {
 		int rc;
-		rc = key_num = console_select((CHAR16 *[]){ title, NULL },
-					 menu_strings, key_num);
+		rc = key_num = console_select(selection, menu_strings, key_num);
 
 		if (rc < 0 || key_num >= MokNum)
 			break;
@@ -997,6 +997,7 @@ static EFI_STATUS mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int aut
 				    BOOLEAN MokX)
 {
 	EFI_STATUS efi_status;
+	CHAR16 *enroll_p[] = { L"Enroll the key(s)?", NULL };
 	CHAR16 *title;
 
 	if (MokX)
@@ -1008,7 +1009,7 @@ static EFI_STATUS mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int aut
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
-	if (console_yes_no((CHAR16 *[]){L"Enroll the key(s)?", NULL}) == 0)
+	if (console_yes_no(enroll_p) == 0)
 		return EFI_ABORTED;
 
 	efi_status = store_keys(MokNew, MokNewSize, auth, MokX);
@@ -1037,15 +1038,16 @@ static EFI_STATUS mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int aut
 static EFI_STATUS mok_reset_prompt (BOOLEAN MokX)
 {
 	EFI_STATUS efi_status;
-	CHAR16 *prompt;
+	CHAR16 *prompt[] = { NULL, NULL };
 
 	uefi_call_wrapper(ST->ConOut->ClearScreen, 1, ST->ConOut);
 
 	if (MokX)
-		prompt = L"Erase all stored keys in MokListX?";
+		prompt[0] = L"Erase all stored keys in MokListX?";
 	else
-		prompt = L"Erase all stored keys in MokList?";
-	if (console_yes_no((CHAR16 *[]){prompt, NULL }) == 0)
+		prompt[0] = L"Erase all stored keys in MokList?";
+
+	if (console_yes_no(prompt) == 0)
 		return EFI_ABORTED;
 
 	efi_status = store_keys(NULL, 0, TRUE, MokX);
@@ -1259,8 +1261,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	EFI_STATUS efi_status;
 	CHAR16 *db_name;
 	CHAR16 *auth_name;
-	CHAR16 *err_str1;
-	CHAR16 *err_str2;
+	CHAR16 *err_strs[] = { NULL, NULL, NULL };
 	UINT8 auth[PASSWORD_CRYPT_SIZE];
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
@@ -1310,13 +1311,13 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		return EFI_ABORTED;
 	} else if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		if (MokX) {
-			err_str1 = L"MokListX is compromised!";
-			err_str2 = L"Erase all keys in MokListX!";
+			err_strs[0] = L"MokListX is compromised!";
+			err_strs[1] = L"Erase all keys in MokListX!";
 		} else {
-			err_str1 = L"MokList is compromised!";
-			err_str2 = L"Erase all keys in MokList!";
+			err_strs[0] = L"MokList is compromised!";
+			err_strs[1] = L"Erase all keys in MokList!";
 		}
-		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
+		console_alertbox(err_strs);
 		uefi_call_wrapper(RT->SetVariable, 5, db_name,
 				  &SHIM_LOCK_GUID,
 				  EFI_VARIABLE_NON_VOLATILE |
@@ -1333,13 +1334,13 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	mok_num = count_keys(MokListData, MokListDataSize);
 	if (mok_num == 0) {
 		if (MokX) {
-			err_str1 = L"Failed to construct the key list of MokListX";
-			err_str2 = L"Reset MokListX!";
+			err_strs[0] = L"Failed to construct the key list of MokListX";
+			err_strs[1] = L"Reset MokListX!";
 		} else {
-			err_str1 = L"Failed to construct the key list of MokList";
-			err_str2 = L"Reset MokList!";
+			err_strs[0] = L"Failed to construct the key list of MokList";
+			err_strs[1] = L"Reset MokList!";
 		}
-		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
+		console_alertbox(err_strs);
 		uefi_call_wrapper(RT->SetVariable, 5, db_name,
 				  &SHIM_LOCK_GUID,
 				  EFI_VARIABLE_NON_VOLATILE |
@@ -1394,6 +1395,7 @@ error:
 static EFI_STATUS mok_deletion_prompt (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
 	EFI_STATUS efi_status;
+	CHAR16 *delete_p[] = { L"Delete the key(s)?", NULL };
 	CHAR16 *title;
 
 	if (MokX)
@@ -1405,7 +1407,7 @@ static EFI_STATUS mok_deletion_prompt (void *MokDel, UINTN MokDelSize, BOOLEAN M
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
-	if (console_yes_no((CHAR16 *[]){L"Delete the key(s)?", NULL}) == 0)
+	if (console_yes_no(delete_p) == 0)
 		return EFI_ABORTED;
 
 	efi_status = delete_keys(MokDel, MokDelSize, MokX);
@@ -1467,6 +1469,8 @@ static EFI_STATUS mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 	UINT8 sbval = 1;
 	UINT8 pos1, pos2, pos3;
 	int ret;
+	CHAR16 *disable_sb[] = { L"Disable Secure Boot", NULL };
+	CHAR16 *enable_sb[] = { L"Enable Secure Boot", NULL };
 
 	if (MokSBSize != sizeof(MokSBvar)) {
 		console_notify(L"Invalid MokSB variable contents");
@@ -1536,9 +1540,9 @@ static EFI_STATUS mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 	}
 
 	if (var->MokSBState == 0)
-		ret = console_yes_no((CHAR16 *[]){L"Disable Secure Boot", NULL});
+		ret = console_yes_no(disable_sb);
 	else
-		ret = console_yes_no((CHAR16 *[]){L"Enable Secure Boot", NULL});
+		ret = console_yes_no(enable_sb);
 
 	if (ret == 0) {
 		LibDeleteVariable(L"MokSB", &SHIM_LOCK_GUID);
@@ -1586,6 +1590,8 @@ static EFI_STATUS mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 	UINT8 dbval = 1;
 	UINT8 pos1, pos2, pos3;
 	int ret;
+	CHAR16 *ignore_db[] = { L"Ignore DB certs/hashes", NULL };
+	CHAR16 *use_db[] = { L"Use DB certs/hashes", NULL };
 
 	if (MokDBSize != sizeof(MokDBvar)) {
 		console_notify(L"Invalid MokDB variable contents");
@@ -1655,9 +1661,9 @@ static EFI_STATUS mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 	}
 
 	if (var->MokDBState == 0)
-		ret = console_yes_no((CHAR16 *[]){L"Ignore DB certs/hashes", NULL});
+		ret = console_yes_no(ignore_db);
 	else
-		ret = console_yes_no((CHAR16 *[]){L"Use DB certs/hashes", NULL});
+		ret = console_yes_no(use_db);
 
 	if (ret == 0) {
 		LibDeleteVariable(L"MokDB", &SHIM_LOCK_GUID);
@@ -1698,6 +1704,8 @@ static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 	EFI_STATUS efi_status;
 	UINT8 hash[PASSWORD_CRYPT_SIZE];
 	UINT8 clear = 0;
+	CHAR16 *clear_p[] = { L"Clear MOK password?", NULL };
+	CHAR16 *set_p[] = { L"Set MOK password?", NULL };
 
 	if (MokPWSize != SHA256_DIGEST_SIZE && MokPWSize != PASSWORD_CRYPT_SIZE) {
 		console_notify(L"Invalid MokPW variable contents");
@@ -1717,7 +1725,7 @@ static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 	}
 
 	if (clear) {
-		if (console_yes_no((CHAR16 *[]){L"Clear MOK password?", NULL}) == 0)
+		if (console_yes_no(clear_p) == 0)
 			return EFI_ABORTED;
 
 		uefi_call_wrapper(RT->SetVariable, 5, L"MokPWStore",
@@ -1741,7 +1749,7 @@ static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 		return efi_status;
 	}
 
-	if (console_yes_no((CHAR16 *[]){L"Set MOK password?", NULL}) == 0)
+	if (console_yes_no(set_p) == 0)
 		return EFI_ABORTED;
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5,
@@ -1887,15 +1895,16 @@ static EFI_STATUS mok_hash_enroll(void)
 	EFI_FILE *file = NULL;
 	UINTN filesize;
 	void *data;
+	CHAR16 *selections[] = {
+		L"Select Binary",
+		L"",
+		L"The Selected Binary will have its hash Enrolled",
+		L"This means it will subsequently Boot with no prompting",
+		L"Remember to make sure it is a genuine binary before enrolling its hash",
+		NULL
+	};
 
-	simple_file_selector(&im, (CHAR16 *[]){
-      L"Select Binary",
-      L"",
-      L"The Selected Binary will have its hash Enrolled",
-      L"This means it will Subsequently Boot with no prompting",
-      L"Remember to make sure it is a genuine binary before Enroling its hash",
-      NULL
-	      }, L"\\", L"", &file_name);
+	simple_file_selector(&im, selections, L"\\", L"", &file_name);
 
 	if (!file_name)
 		return EFI_INVALID_PARAMETER;
@@ -1961,25 +1970,28 @@ static EFI_STATUS mok_key_enroll(void)
 	EFI_FILE *file = NULL;
 	UINTN filesize;
 	void *data;
+	CHAR16 *selections[] = {
+		L"Select Key",
+		L"",
+		L"The selected key will be enrolled into the MOK database",
+		L"This means any binaries signed with it will be run without prompting",
+		L"Remember to make sure it is a genuine key before Enrolling it",
+		NULL
+	};
+	CHAR16 *alert[] = {
+		L"Unsupported Format",
+		L"",
+		L"Only DER encoded certificate (*.cer/der/crt) is supported",
+		NULL
+	};
 
-	simple_file_selector(&im, (CHAR16 *[]){
-      L"Select Key",
-      L"",
-      L"The selected key will be enrolled into the MOK database",
-      L"This means any binaries signed with it will be run without prompting",
-      L"Remember to make sure it is a genuine key before Enroling it",
-      NULL
-	      }, L"\\", L"", &file_name);
+	simple_file_selector(&im, selections, L"\\", L"", &file_name);
 
 	if (!file_name)
 		return EFI_INVALID_PARAMETER;
 
 	if (!check_der_suffix(file_name)) {
-		console_alertbox((CHAR16 *[]){
-			L"Unsupported Format",
-			L"",
-			L"Only DER encoded certificate (*.cer/der/crt) is supported",
-			NULL});
+		console_alertbox(alert);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -2148,11 +2160,12 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
 	BOOLEAN protected;
+	CHAR16 *mok_mgmt_p[] = { L"Perform MOK management", NULL };
 	EFI_STATUS ret = EFI_SUCCESS;
 
 	if (verify_pw(&protected) == FALSE)
 		return EFI_ACCESS_DENIED;
-	
+
 	if (protected == FALSE && draw_countdown() == 0)
 		goto out;
 
@@ -2298,9 +2311,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 
 		menu_strings[i] = NULL;
 
-		choice = console_select((CHAR16 *[]){ L"Perform MOK management", NULL },
-					menu_strings, 0);
-
+		choice = console_select(mok_mgmt_p, menu_strings, 0);
 		if (choice < 0)
 			goto out;
 

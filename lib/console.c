@@ -280,13 +280,15 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 int
 console_yes_no(CHAR16 *str_arr[])
 {
-	return console_select(str_arr, (CHAR16 *[]){ L"No", L"Yes", NULL }, 0);
+	CHAR16 *yes_no[] = { L"No", L"Yes", NULL };
+	return console_select(str_arr, yes_no, 0);
 }
 
 void
 console_alertbox(CHAR16 **title)
 {
-	console_select(title, (CHAR16 *[]){ L"OK", 0 }, 0);
+	CHAR16 *okay[] = { L"OK", NULL };
+	console_select(title, okay, 0);
 }
 
 void
