@@ -11,131 +11,7 @@ endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
 
-CC		= $(CROSS_COMPILE)gcc
-LD		= $(CROSS_COMPILE)ld
-OBJCOPY		= $(CROSS_COMPILE)objcopy
-OPENSSL		?= openssl
-HEXDUMP		?= hexdump
-INSTALL		?= install
-PK12UTIL	?= pk12util
-CERTUTIL	?= certutil
-PESIGN		?= pesign
-SBSIGN		?= sbsign
-prefix		?= /usr
-prefix		:= $(abspath $(prefix))
-datadir		?= $(prefix)/share/
-PKGNAME		?= shim
-ESPROOTDIR	?= boot/efi/
-EFIBOOTDIR	?= $(ESPROOTDIR)EFI/BOOT/
-TARGETDIR	?= $(ESPROOTDIR)EFI/$(EFIDIR)/
-DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(ARCH_SUFFIX)/
-DEBUGINFO	?= $(prefix)/lib/debug/
-DEBUGSOURCE	?= $(prefix)/src/debug/
-OSLABEL		?= $(EFIDIR)
-DEFAULT_LOADER	?= \\\\grub$(ARCH_SUFFIX).efi
-
-ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
-OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
-
-SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
-
-EFI_INCLUDE	:= /usr/include/efi
-EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
-		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
-
-LIB_GCC		= $(shell $(CC) -print-libgcc-file-name)
-EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC) 
-
-EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
-EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
-
-CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
-		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
-		  -Werror=sign-compare -ffreestanding -std=gnu89 \
-		  -I$(shell $(CC) -print-file-name=include) \
-		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
-		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
-		  $(EFI_INCLUDES)
-
-COMMITID ?= $(shell if [ -d .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo commit id not available; fi)
-
-ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
-	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
-endif
-
-ifneq ($(origin ENABLE_HTTPBOOT), undefined)
-	CFLAGS	+= -DENABLE_HTTPBOOT
-endif
-
-ifneq ($(origin REQUIRE_TPM), undefined)
-	CFLAGS	+= -DREQUIRE_TPM
-endif
-
-ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   -maccumulate-outgoing-args -m64 \
-		   -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64 -DPAGE_SIZE=4096
-	LIBDIR			?= $(prefix)/lib64
-	ARCH_SUFFIX		?= x64
-	ARCH_SUFFIX_UPPER	?= X64
-	ARCH_LDFLAGS		?=
-endif
-ifeq ($(ARCH),ia32)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   -maccumulate-outgoing-args -m32 \
-		   -DMDE_CPU_IA32 -DPAGE_SIZE=4096
-	LIBDIR			?= $(prefix)/lib
-	ARCH_SUFFIX		?= ia32
-	ARCH_SUFFIX_UPPER	?= IA32
-	ARCH_LDFLAGS		?=
-endif
-ifeq ($(ARCH),aarch64)
-	CFLAGS += -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096 -mstrict-align
-	LIBDIR			?= $(prefix)/lib64
-	ARCH_SUFFIX		?= aa64
-	ARCH_SUFFIX_UPPER	?= AA64
-	FORMAT			:= -O binary
-	SUBSYSTEM		:= 0xa
-	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-endif
-ifeq ($(ARCH),arm)
-	CFLAGS += -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mstrict-align
-	LIBDIR			?= $(prefix)/lib
-	ARCH_SUFFIX		?= arm
-	ARCH_SUFFIX_UPPER	?= ARM
-	FORMAT			:= -O binary
-	SUBSYSTEM		:= 0xa
-	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-endif
-
-FORMAT		?= --target efi-app-$(ARCH)
-EFI_PATH	?= $(LIBDIR)/gnuefi
-
-MMSTEM		?= mm$(ARCH_SUFFIX)
-MMNAME		= $(MMSTEM).efi
-MMSONAME	= $(MMSTEM).so
-FBSTEM		?= fb$(ARCH_SUFFIX)
-FBNAME		= $(FBSTEM).efi
-FBSONAME	= $(FBSTEM).so
-SHIMSTEM	?= shim$(ARCH_SUFFIX)
-SHIMNAME	= $(SHIMSTEM).efi
-SHIMSONAME	= $(SHIMSTEM).so
-SHIMHASHNAME	= $(SHIMSTEM).hash
-BOOTEFINAME	?= BOOT$(ARCH_SUFFIX_UPPER).EFI
-BOOTCSVNAME	?= BOOT$(ARCH_SUFFIX_UPPER).CSV
-
-CFLAGS += "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
-
-ifneq ($(origin VENDOR_CERT_FILE), undefined)
-	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
-endif
-ifneq ($(origin VENDOR_DBX_FILE), undefined)
-	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
-endif
-
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+include $(TOPDIR)/Make.defaults
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
@@ -182,7 +58,7 @@ shim_cert.h: shim.cer
 version.c : $(TOPDIR)/version.c.in
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
 		-e "s,@@UNAME@@,$(shell uname -s -m -p -i -o)," \
-		-e "s,@@COMMIT@@,$(COMMITID)," \
+		-e "s,@@COMMIT@@,$(COMMIT_ID)," \
 		< $< > $@
 
 certdb/secmod.db: shim.crt
