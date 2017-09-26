@@ -201,8 +201,6 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 			selector_max_cols = len;
 	}
 
-	if (start < 0)
-		start = 0;
 	if (start >= selector_lines)
 		start = selector_lines - 1;
 
