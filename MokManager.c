@@ -536,10 +536,11 @@ static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 	menu_strings[i+1] = NULL;
 
 	while (key_num < hash_num) {
-		key_num = console_select((CHAR16 *[]){ L"[Hash List]", NULL },
+		int rc;
+		key_num = rc = console_select((CHAR16 *[]){ L"[Hash List]", NULL },
 					 menu_strings, key_num);
 
-		if (key_num < 0 || key_num >= hash_num)
+		if (rc < 0 || key_num >= hash_num)
 			break;
 
 		hash = (UINT8 *)Mok + sig_size*key_num + sizeof(EFI_GUID);
@@ -620,10 +621,11 @@ static EFI_STATUS list_keys (void *KeyList, UINTN KeyListSize, CHAR16 *title)
 	menu_strings[i+1] = NULL;
 
 	while (key_num < MokNum) {
-		key_num = console_select((CHAR16 *[]){ title, NULL },
+		int rc;
+		rc = key_num = console_select((CHAR16 *[]){ title, NULL },
 					 menu_strings, key_num);
 
-		if (key_num < 0 || key_num >= MokNum)
+		if (rc < 0 || key_num >= MokNum)
 			break;
 
 		show_mok_info(keys[key_num].Type, keys[key_num].Mok,
@@ -1766,7 +1768,7 @@ static BOOLEAN verify_certificate(UINT8 *cert, UINTN size)
 {
 	X509 *X509Cert;
 	UINTN length;
-	if (!cert || size < 0)
+	if (!cert || size < 4)
 		return FALSE;
 
 	/*
