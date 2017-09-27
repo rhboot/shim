@@ -1038,9 +1038,6 @@ static EFI_STATUS mok_enrollment_prompt(void *MokNew, UINTN MokNewSize,
 		}
 	}
 
-	if (MokNew)
-		FreePool(MokNew);
-
 	return EFI_SUCCESS;
 }
 
@@ -1582,9 +1579,6 @@ static EFI_STATUS mok_sb_prompt(void *MokSB, UINTN MokSBSize)
 		}
 	}
 
-	if (MokSB)
-		FreePool(MokSB);
-
 	return EFI_SUCCESS;
 }
 
@@ -1704,9 +1698,6 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 		}
 	}
 
-	if (MokDB)
-		FreePool(MokDB);
-
 	return EFI_SUCCESS;
 }
 
@@ -1775,9 +1766,6 @@ static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 
 mokpw_done:
 	LibDeleteVariable(L"MokPW", &SHIM_LOCK_GUID);
-
-	if (MokPW)
-		FreePool(MokPW);
 
 	return EFI_SUCCESS;
 }
@@ -2156,8 +2144,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 				 void *MokXNew, UINTN MokXNewSize,
 				 void *MokXDel, UINTN MokXDelSize)
 {
-	CHAR16 **menu_strings;
-	mok_menu_item *menu_item;
+	CHAR16 **menu_strings = NULL;
+	mok_menu_item *menu_item = NULL;
 	int choice = 0;
 	int mok_changed = 0;
 	EFI_STATUS efi_status;
@@ -2328,12 +2316,24 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			efi_status = mok_reset_prompt(FALSE);
 			break;
 		case MOK_ENROLL_MOK:
+			if (!MokNew) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokNew was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_enrollment_prompt(MokNew, MokNewSize,
 							   TRUE, FALSE);
 			if (!EFI_ERROR(efi_status))
 				MokNew = NULL;
 			break;
 		case MOK_DELETE_MOK:
+			if (!MokDel) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokDel was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_deletion_prompt(MokDel, MokDelSize,
 							 FALSE);
 			if (!EFI_ERROR(efi_status))
@@ -2343,28 +2343,58 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			efi_status = mok_reset_prompt(TRUE);
 			break;
 		case MOK_ENROLL_MOKX:
+			if (!MokXNew) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokXNew was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_enrollment_prompt(MokXNew, MokXNewSize,
 							   TRUE, TRUE);
 			if (!EFI_ERROR(efi_status))
 				MokXNew = NULL;
 			break;
 		case MOK_DELETE_MOKX:
+			if (!MokXDel) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokXDel was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_deletion_prompt(MokXDel, MokXDelSize,
 							 TRUE);
 			if (!EFI_ERROR(efi_status))
 				MokXDel = NULL;
 			break;
 		case MOK_CHANGE_SB:
+			if (!MokSB) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokSB was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_sb_prompt(MokSB, MokSBSize);
 			if (!EFI_ERROR(efi_status))
 				MokSB = NULL;
 			break;
 		case MOK_SET_PW:
+			if (!MokPW) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokPW was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_pw_prompt(MokPW, MokPWSize);
 			if (!EFI_ERROR(efi_status))
 				MokPW = NULL;
 			break;
 		case MOK_CHANGE_DB:
+			if (!MokDB) {
+				Print(L"MokManager: internal error: %s",
+				      L"MokDB was !NULL but is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
 			efi_status = mok_db_prompt(MokDB, MokDBSize);
 			if (!EFI_ERROR(efi_status))
 				MokDB = NULL;
@@ -2381,6 +2411,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			mok_changed = 1;
 
 		free_menu(menu_item, menu_strings);
+		menu_item = NULL;
+		menu_strings = NULL;
 	}
 
 out:
