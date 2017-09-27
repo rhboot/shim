@@ -51,7 +51,7 @@ typedef struct {
 
 static EFI_STATUS get_sha1sum(void *Data, int DataSize, UINT8 * hash)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	unsigned int ctxsize;
 	void *ctx = NULL;
 
@@ -65,25 +65,25 @@ static EFI_STATUS get_sha1sum(void *Data, int DataSize, UINT8 * hash)
 
 	if (!Sha1Init(ctx)) {
 		console_notify(L"Unable to initialise hash");
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
 	if (!(Sha1Update(ctx, Data, DataSize))) {
 		console_notify(L"Unable to generate hash");
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
 	if (!(Sha1Final(ctx, hash))) {
 		console_notify(L"Unable to finalise hash");
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
-	status = EFI_SUCCESS;
+	efi_status = EFI_SUCCESS;
 done:
-	return status;
+	return efi_status;
 }
 
 static BOOLEAN is_sha2_hash(EFI_GUID Type)
@@ -570,7 +570,7 @@ static void show_mok_info(EFI_GUID Type, void *Mok, UINTN MokSize)
 		X509 *X509Cert;
 
 		efi_status = get_sha1sum(Mok, MokSize, hash);
-		if (efi_status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to compute MOK fingerprint");
 			return;
 		}
@@ -649,15 +649,16 @@ static EFI_STATUS get_line(UINT32 * length, CHAR16 * line, UINT32 line_max,
 			   UINT8 show)
 {
 	EFI_INPUT_KEY key;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	unsigned int count = 0;
 
 	do {
-		status = console_get_keystroke(&key);
-		if (EFI_ERROR(status)) {
-			console_error(L"Failed to read the keystroke", status);
+		efi_status = console_get_keystroke(&key);
+		if (EFI_ERROR(efi_status)) {
+			console_error(L"Failed to read the keystroke",
+				      efi_status);
 			*length = 0;
-			return status;
+			return efi_status;
 		}
 
 		if ((count >= line_max &&
@@ -695,7 +696,7 @@ static EFI_STATUS get_line(UINT32 * length, CHAR16 * line, UINT32 line_max,
 static EFI_STATUS compute_pw_hash(void *Data, UINTN DataSize, UINT8 * password,
 				  UINT32 pw_length, UINT8 * hash)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	unsigned int ctxsize;
 	void *ctx = NULL;
 
@@ -708,33 +709,33 @@ static EFI_STATUS compute_pw_hash(void *Data, UINTN DataSize, UINT8 * password,
 
 	if (!Sha256Init(ctx)) {
 		console_notify(L"Unable to initialise hash");
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
 	if (Data && DataSize) {
 		if (!(Sha256Update(ctx, Data, DataSize))) {
 			console_notify(L"Unable to generate hash");
-			status = EFI_OUT_OF_RESOURCES;
+			efi_status = EFI_OUT_OF_RESOURCES;
 			goto done;
 		}
 	}
 
 	if (!(Sha256Update(ctx, password, pw_length))) {
 		console_notify(L"Unable to generate hash");
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
 	if (!(Sha256Final(ctx, hash))) {
 		console_notify(L"Unable to finalise hash");
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
 	}
 
-	status = EFI_SUCCESS;
+	efi_status = EFI_SUCCESS;
 done:
-	return status;
+	return efi_status;
 }
 
 static void console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
@@ -804,7 +805,7 @@ static EFI_STATUS match_password(PASSWORD_CRYPT * pw_crypt,
 				 void *Data, UINTN DataSize,
 				 UINT8 * auth, CHAR16 * prompt)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	UINT8 hash[128];
 	UINT8 *auth_hash;
 	UINT32 auth_size;
@@ -843,18 +844,18 @@ static EFI_STATUS match_password(PASSWORD_CRYPT * pw_crypt,
 				pw_ascii[i] = (char)password[i];
 			pw_ascii[pw_length] = '\0';
 
-			status = password_crypt(pw_ascii, pw_length, pw_crypt,
-						hash);
+			efi_status = password_crypt(pw_ascii, pw_length,
+						    pw_crypt, hash);
 		} else {
 			/*
 			 * For backward compatibility
 			 */
-			status = compute_pw_hash(Data, DataSize,
-						 (UINT8 *) password,
-						 pw_length * sizeof(CHAR16),
-						 hash);
+			efi_status = compute_pw_hash(Data, DataSize,
+						(UINT8 *) password,
+						pw_length * sizeof(CHAR16),
+						hash);
 		}
-		if (status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			console_errorbox(L"Unable to generate password hash");
 			fail_count++;
 			continue;
@@ -877,27 +878,27 @@ static EFI_STATUS match_password(PASSWORD_CRYPT * pw_crypt,
 
 static EFI_STATUS write_db(CHAR16 * db_name, void *MokNew, UINTN MokNewSize)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	UINT32 attributes;
 	void *old_data = NULL;
 	void *new_data = NULL;
 	UINTN old_size;
 	UINTN new_size;
 
-	status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				   &SHIM_LOCK_GUID,
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
+				       &SHIM_LOCK_GUID,
 				   EFI_VARIABLE_NON_VOLATILE
 				   | EFI_VARIABLE_BOOTSERVICE_ACCESS
 				   | EFI_VARIABLE_APPEND_WRITE,
 				   MokNewSize, MokNew);
-	if (status == EFI_SUCCESS || status != EFI_INVALID_PARAMETER) {
-		return status;
+	if (!EFI_ERROR(efi_status) || efi_status != EFI_INVALID_PARAMETER) {
+		return efi_status;
 	}
 
-	status = get_variable_attr(db_name, (UINT8 **)&old_data, &old_size,
-				   SHIM_LOCK_GUID, &attributes);
-	if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		return status;
+	efi_status = get_variable_attr(db_name, (UINT8 **)&old_data, &old_size,
+				       SHIM_LOCK_GUID, &attributes);
+	if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		return efi_status;
 	}
 
 	/* Check if the old db is compromised or not */
@@ -910,18 +911,18 @@ static EFI_STATUS write_db(CHAR16 * db_name, void *MokNew, UINTN MokNewSize)
 	new_size = old_size + MokNewSize;
 	new_data = AllocatePool(new_size);
 	if (new_data == NULL) {
-		status = EFI_OUT_OF_RESOURCES;
+		efi_status = EFI_OUT_OF_RESOURCES;
 		goto out;
 	}
 
 	CopyMem(new_data, old_data, old_size);
 	CopyMem(new_data + old_size, MokNew, MokNewSize);
 
-	status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				   &SHIM_LOCK_GUID,
-				   EFI_VARIABLE_NON_VOLATILE
-				   | EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				   new_size, new_data);
+	efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
+				       &SHIM_LOCK_GUID,
+				       EFI_VARIABLE_NON_VOLATILE |
+				       EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				       new_size, new_data);
 
 out:
 	if (old_size > 0) {
@@ -932,7 +933,7 @@ out:
 		FreePool(new_data);
 	}
 
-	return status;
+	return efi_status;
 }
 
 static EFI_STATUS store_keys(void *MokNew, UINTN MokNewSize, int authenticate,
@@ -958,7 +959,7 @@ static EFI_STATUS store_keys(void *MokNew, UINTN MokNewSize, int authenticate,
 					       &SHIM_LOCK_GUID,
 					       &attributes, &auth_size, auth);
 
-		if (efi_status != EFI_SUCCESS ||
+		if (EFI_ERROR(efi_status) ||
 		    (auth_size != SHA256_DIGEST_SIZE &&
 		     auth_size != PASSWORD_CRYPT_SIZE)) {
 			if (MokX)
@@ -977,7 +978,7 @@ static EFI_STATUS store_keys(void *MokNew, UINTN MokNewSize, int authenticate,
 			efi_status = match_password(NULL, MokNew, MokNewSize,
 						    auth, NULL);
 		}
-		if (efi_status != EFI_SUCCESS)
+		if (EFI_ERROR(efi_status))
 			return EFI_ACCESS_DENIED;
 	}
 
@@ -994,7 +995,7 @@ static EFI_STATUS store_keys(void *MokNew, UINTN MokNewSize, int authenticate,
 		efi_status = write_db(db_name, MokNew, MokNewSize);
 	}
 
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_error(L"Failed to set variable", efi_status);
 		return efi_status;
 	}
@@ -1015,15 +1016,14 @@ static EFI_STATUS mok_enrollment_prompt(void *MokNew, UINTN MokNewSize,
 		title = L"[Enroll MOK]";
 
 	efi_status = list_keys(MokNew, MokNewSize, title);
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	if (console_yes_no(enroll_p) == 0)
 		return EFI_ABORTED;
 
 	efi_status = store_keys(MokNew, MokNewSize, auth, MokX);
-
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Failed to enroll keys\n");
 		return efi_status;
 	}
@@ -1060,7 +1060,7 @@ static EFI_STATUS mok_reset_prompt(BOOLEAN MokX)
 		return EFI_ABORTED;
 
 	efi_status = store_keys(NULL, 0, TRUE, MokX);
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Failed to erase keys\n");
 		return efi_status;
 	}
@@ -1147,7 +1147,7 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 	if (Data)
 		FreePool(Data);
 
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_error(L"Failed to set variable", efi_status);
 		return efi_status;
 	}
@@ -1291,7 +1291,7 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, auth_name,
 				       &SHIM_LOCK_GUID,
 				       &attributes, &auth_size, auth);
-	if (efi_status != EFI_SUCCESS ||
+	if (EFI_ERROR(efi_status) ||
 	    (auth_size != SHA256_DIGEST_SIZE
 	     && auth_size != PASSWORD_CRYPT_SIZE)) {
 		if (MokX)
@@ -1308,12 +1308,12 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		efi_status =
 		    match_password(NULL, MokDel, MokDelSize, auth, NULL);
 	}
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		return EFI_ACCESS_DENIED;
 
 	efi_status = get_variable_attr(db_name, &MokListData, &MokListDataSize,
 				       SHIM_LOCK_GUID, &attributes);
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		if (MokX)
 			console_errorbox(L"Failed to retrieve MokListX");
 		else
@@ -1413,15 +1413,14 @@ static EFI_STATUS mok_deletion_prompt(void *MokDel, UINTN MokDelSize,
 		title = L"[Delete MOK]";
 
 	efi_status = list_keys(MokDel, MokDelSize, title);
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	if (console_yes_no(delete_p) == 0)
 		return EFI_ABORTED;
 
 	efi_status = delete_keys(MokDel, MokDelSize, MokX);
-
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Failed to delete keys");
 		return efi_status;
 	}
@@ -1443,7 +1442,7 @@ static EFI_STATUS mok_deletion_prompt(void *MokDel, UINTN MokDelSize,
 static CHAR16 get_password_charater(CHAR16 * prompt)
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	CHAR16 *message[2];
 	CHAR16 character;
 	UINTN length;
@@ -1458,8 +1457,8 @@ static CHAR16 get_password_charater(CHAR16 * prompt)
 	message[1] = NULL;
 	length = StrLen(message[0]);
 	console_print_box_at(message, -1, -length - 4, -5, length + 4, 3, 0, 1);
-	status = get_line(&pw_length, &character, 1, 0);
-	if (EFI_ERROR(status))
+	efi_status = get_line(&pw_length, &character, 1, 0);
+	if (EFI_ERROR(efi_status))
 		character = 0;
 
 	console_restore_mode(&SavedMode);
@@ -1566,7 +1565,7 @@ static EFI_STATUS mok_sb_prompt(void *MokSB, UINTN MokSBSize)
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       1, &sbval);
-		if (efi_status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to set Secure Boot state");
 			return efi_status;
 		}
@@ -1577,7 +1576,7 @@ static EFI_STATUS mok_sb_prompt(void *MokSB, UINTN MokSBSize)
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
-		if (efi_status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to delete Secure Boot state");
 			return efi_status;
 		}
@@ -1688,7 +1687,7 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       1, &dbval);
-		if (efi_status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to set DB state");
 			return efi_status;
 		}
@@ -1699,7 +1698,7 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
-		if (efi_status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to delete DB state");
 			return efi_status;
 		}
@@ -1755,7 +1754,7 @@ static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 					    L"Confirm MOK passphrase: ");
 	}
 
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Password limit reached");
 		return efi_status;
 	}
@@ -1769,7 +1768,7 @@ static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 				       EFI_VARIABLE_NON_VOLATILE |
 				       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				       MokPWSize, MokPW);
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Failed to set MOK password");
 		return efi_status;
 	}
@@ -1820,7 +1819,7 @@ static BOOLEAN verify_certificate(UINT8 * cert, UINTN size)
 
 static EFI_STATUS enroll_file(void *data, UINTN datasize, BOOLEAN hash)
 {
-	EFI_STATUS status = EFI_SUCCESS;
+	EFI_STATUS efi_status = EFI_SUCCESS;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *CertData;
 	UINTN mokbuffersize;
@@ -1832,28 +1831,25 @@ static EFI_STATUS enroll_file(void *data, UINTN datasize, BOOLEAN hash)
 		SHIM_LOCK *shim_lock;
 		PE_COFF_LOADER_IMAGE_CONTEXT context;
 
-		status = LibLocateProtocol(&SHIM_LOCK_GUID,
-					   (VOID **) &shim_lock);
-		if (status != EFI_SUCCESS)
+		efi_status = LibLocateProtocol(&SHIM_LOCK_GUID,
+					       (VOID **) &shim_lock);
+		if (EFI_ERROR(efi_status))
 			goto out;
 
 		mokbuffersize = sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID) +
 		    SHA256_DIGEST_SIZE;
 
 		mokbuffer = AllocatePool(mokbuffersize);
-
 		if (!mokbuffer)
 			goto out;
 
-		status = shim_lock->Context(data, datasize, &context);
-
-		if (status != EFI_SUCCESS)
+		efi_status = shim_lock->Context(data, datasize, &context);
+		if (EFI_ERROR(efi_status))
 			goto out;
 
-		status = shim_lock->Hash(data, datasize, &context, sha256,
-					 sha1);
-
-		if (status != EFI_SUCCESS)
+		efi_status = shim_lock->Hash(data, datasize, &context, sha256,
+					     sha1);
+		if (EFI_ERROR(efi_status))
 			goto out;
 
 		CertList = mokbuffer;
@@ -1890,12 +1886,13 @@ static EFI_STATUS enroll_file(void *data, UINTN datasize, BOOLEAN hash)
 			goto out;
 	}
 
-	status = mok_enrollment_prompt(mokbuffer, mokbuffersize, FALSE, FALSE);
+	efi_status = mok_enrollment_prompt(mokbuffer, mokbuffersize,
+					  FALSE, FALSE);
 out:
 	if (mokbuffer)
 		FreePool(mokbuffer);
 
-	return status;
+	return efi_status;
 }
 
 static EFI_STATUS mok_hash_enroll(void)
@@ -1921,7 +1918,7 @@ static EFI_STATUS mok_hash_enroll(void)
 		return EFI_INVALID_PARAMETER;
 
 	efi_status = simple_file_open(im, file_name, &file, EFI_FILE_MODE_READ);
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_error(L"Unable to open file", efi_status);
 		return efi_status;
 	}
@@ -1934,7 +1931,7 @@ static EFI_STATUS mok_hash_enroll(void)
 	}
 
 	efi_status = enroll_file(data, filesize, TRUE);
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		console_error(
 			L"Hash failed (did you select a valid EFI binary?)",
 			efi_status);
@@ -2006,7 +2003,7 @@ static EFI_STATUS mok_key_enroll(void)
 	}
 
 	efi_status = simple_file_open(im, file_name, &file, EFI_FILE_MODE_READ);
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_error(L"Unable to open file", efi_status);
 		return efi_status;
 	}
@@ -2043,7 +2040,7 @@ static BOOLEAN verify_pw(BOOLEAN * protected)
 	 * known value, so there's no safety advantage in failing to validate
 	 * purely because of a failure to read the variable
 	 */
-	if (efi_status != EFI_SUCCESS ||
+	if (EFI_ERROR(efi_status) ||
 	    (size != SHA256_DIGEST_SIZE && size != PASSWORD_CRYPT_SIZE))
 		return TRUE;
 
@@ -2067,7 +2064,7 @@ static BOOLEAN verify_pw(BOOLEAN * protected)
 		efi_status = match_password(NULL, NULL, 0, pwhash,
 					    L"Enter MOK password:");
 	}
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Password limit reached");
 		return FALSE;
 	}
@@ -2081,7 +2078,7 @@ static int draw_countdown()
 {
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	EFI_INPUT_KEY key;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	UINTN cols, rows;
 	CHAR16 *title[2];
 	CHAR16 *message = L"Press any key to perform MOK management";
@@ -2106,9 +2103,8 @@ static int draw_countdown()
 			PrintAt(2, rows - 3, L"Booting in %d second   ",
 				timeout);
 
-		status = WaitForSingleEvent(ST->ConIn->WaitForKey, wait);
-
-		if (status != EFI_TIMEOUT) {
+		efi_status = WaitForSingleEvent(ST->ConIn->WaitForKey, wait);
+		if (efi_status != EFI_TIMEOUT) {
 			/* Clear the key in the queue */
 			uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2,
 					  ST->ConIn, &key);
@@ -2188,7 +2184,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
 					       &SHIM_LOCK_GUID,
 					       &attributes, &auth_size, auth);
-		if ((efi_status == EFI_SUCCESS) &&
+		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokAuth = 1;
@@ -2197,8 +2193,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 					       L"MokDelAuth",
 					       &SHIM_LOCK_GUID,
 					       &attributes, &auth_size, auth);
-
-		if ((efi_status == EFI_SUCCESS) &&
+		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokDelAuth = 1;
@@ -2206,8 +2201,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokXAuth",
 					       &SHIM_LOCK_GUID,
 					       &attributes, &auth_size, auth);
-
-		if ((efi_status == EFI_SUCCESS) &&
+		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokXAuth = 1;
@@ -2216,8 +2210,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 					       L"MokXDelAuth",
 					       &SHIM_LOCK_GUID,
 					       &attributes, &auth_size, auth);
-
-		if ((efi_status == EFI_SUCCESS) &&
+		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokXDelAuth = 1;
@@ -2337,13 +2330,13 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		case MOK_ENROLL_MOK:
 			efi_status = mok_enrollment_prompt(MokNew, MokNewSize,
 							   TRUE, FALSE);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokNew = NULL;
 			break;
 		case MOK_DELETE_MOK:
 			efi_status = mok_deletion_prompt(MokDel, MokDelSize,
 							 FALSE);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokDel = NULL;
 			break;
 		case MOK_RESET_MOKX:
@@ -2352,28 +2345,28 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		case MOK_ENROLL_MOKX:
 			efi_status = mok_enrollment_prompt(MokXNew, MokXNewSize,
 							   TRUE, TRUE);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokXNew = NULL;
 			break;
 		case MOK_DELETE_MOKX:
 			efi_status = mok_deletion_prompt(MokXDel, MokXDelSize,
 							 TRUE);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokXDel = NULL;
 			break;
 		case MOK_CHANGE_SB:
 			efi_status = mok_sb_prompt(MokSB, MokSBSize);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokSB = NULL;
 			break;
 		case MOK_SET_PW:
 			efi_status = mok_pw_prompt(MokPW, MokPWSize);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokPW = NULL;
 			break;
 		case MOK_CHANGE_DB:
 			efi_status = mok_db_prompt(MokDB, MokDBSize);
-			if (efi_status == EFI_SUCCESS)
+			if (!EFI_ERROR(efi_status))
 				MokDB = NULL;
 			break;
 		case MOK_KEY_ENROLL:
@@ -2384,7 +2377,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		}
 
-		if (efi_status == EFI_SUCCESS)
+		if (!EFI_ERROR(efi_status))
 			mok_changed = 1;
 
 		free_menu(menu_item, menu_strings);
@@ -2412,82 +2405,76 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	void *MokDB = NULL;
 	void *MokXNew = NULL;
 	void *MokXDel = NULL;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	status = get_variable(L"MokNew", (UINT8 **)&MokNew, &MokNewSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokNew", &SHIM_LOCK_GUID) !=
-		    EFI_SUCCESS) {
+	efi_status = get_variable(L"MokNew", (UINT8 **) & MokNew, &MokNewSize,
+				  SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokNew", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokNew");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokNew", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokNew", efi_status);
 	}
 
-	status = get_variable(L"MokDel", (UINT8 **)&MokDel, &MokDelSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokDel", &SHIM_LOCK_GUID) !=
-		    EFI_SUCCESS) {
+	efi_status = get_variable(L"MokDel", (UINT8 **) & MokDel, &MokDelSize,
+				  SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokDel", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokDel");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokDel", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokDel", efi_status);
 	}
 
-	status = get_variable(L"MokSB", (UINT8 **)&MokSB, &MokSBSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokSB", &SHIM_LOCK_GUID) !=
-		    EFI_SUCCESS) {
+	efi_status = get_variable(L"MokSB", (UINT8 **) & MokSB, &MokSBSize,
+				  SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokSB", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokSB");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokSB", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokSB", efi_status);
 	}
 
-	status = get_variable(L"MokPW", (UINT8 **)&MokPW, &MokPWSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokPW", &SHIM_LOCK_GUID) !=
-		    EFI_SUCCESS) {
+	efi_status = get_variable(L"MokPW", (UINT8 **) & MokPW, &MokPWSize,
+				  SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokPW", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokPW");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokPW", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokPW", efi_status);
 	}
 
-	status = get_variable(L"MokDB", (UINT8 **)&MokDB, &MokDBSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokDB", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
+	efi_status = get_variable(L"MokDB", (UINT8 **) & MokDB, &MokDBSize,
+				  SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokDB", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokDB");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokDB", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokDB", efi_status);
 	}
 
-	status = get_variable(L"MokXNew", (UINT8 **)&MokXNew, &MokXNewSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokXNew", &SHIM_LOCK_GUID) !=
-		    EFI_SUCCESS) {
+	efi_status = get_variable(L"MokXNew", (UINT8 **) & MokXNew,
+				  &MokXNewSize, SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokXNew", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokXNew");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokXNew", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokXNew", efi_status);
 	}
 
-	status = get_variable(L"MokXDel", (UINT8 **)&MokXDel, &MokXDelSize,
-			      SHIM_LOCK_GUID);
-	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokXDel", &SHIM_LOCK_GUID) !=
-		    EFI_SUCCESS) {
+	efi_status = get_variable(L"MokXDel", (UINT8 **) & MokXDel,
+				  &MokXDelSize, SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokXDel", &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
 			console_notify(L"Failed to delete MokXDel");
-		}
-	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
-		console_error(L"Could not retrieve MokXDel", status);
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokXDel", efi_status);
 	}
 
 	enter_mok_menu(image_handle, MokNew, MokNewSize, MokDel, MokDelSize,
@@ -2532,7 +2519,7 @@ static EFI_STATUS setup_rand(void)
 
 	efi_status = uefi_call_wrapper(RT->GetTime, 2, &time, NULL);
 
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	seed = ((UINT64) time.Year << 48) | ((UINT64) time.Month << 40) |
