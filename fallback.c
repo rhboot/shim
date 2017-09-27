@@ -850,24 +850,24 @@ find_boot_options(EFI_HANDLE device)
 	do {
 		bs = 0;
 		rc = uefi_call_wrapper(fh2->Read, 3, fh2, &bs, NULL);
-		if (rc == EFI_BUFFER_TOO_SMALL ||
-				(rc == EFI_SUCCESS && bs != 0)) {
-			buffer = AllocateZeroPool(bs);
-			if (!buffer) {
-				Print(L"Could not allocate memory\n");
-				/* sure, this might work, why not? */
-				uefi_call_wrapper(fh2->Close, 1, fh2);
-				uefi_call_wrapper(fh->Close, 1, fh);
-				return EFI_OUT_OF_RESOURCES;
-			}
-
-			rc = uefi_call_wrapper(fh2->Read, 3, fh2, &bs, buffer);
+		if (EFI_ERROR(rc) && rc != EFI_BUFFER_TOO_SMALL) {
+			Print(L"Could not read \\EFI\\: %d\n", rc);
+			return rc;
 		}
 		if (bs == 0)
 			break;
 
+		buffer = AllocateZeroPool(bs);
+		if (!buffer) {
+			Print(L"Could not allocate memory\n");
+			/* sure, this might work, why not? */
+			uefi_call_wrapper(fh2->Close, 1, fh2);
+			uefi_call_wrapper(fh->Close, 1, fh);
+			return EFI_OUT_OF_RESOURCES;
+		}
+
+		rc = uefi_call_wrapper(fh2->Read, 3, fh2, &bs, buffer);
 		if (EFI_ERROR(rc)) {
-			Print(L"Could not read \\EFI\\: %d\n", rc);
 			if (buffer) {
 				FreePool(buffer);
 				buffer = NULL;
