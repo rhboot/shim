@@ -754,11 +754,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	EFI_IMAGE_DOS_HEADER *DosHdr = (void *)data;
 	unsigned int PEHdr_offset = 0;
 
-	if (datasize_in < 0) {
-		perror(L"Invalid data size\n");
-		return EFI_INVALID_PARAMETER;
-	}
-	size = datasize = (unsigned int)datasize_in;
+	size = datasize = datasize_in;
 
 	if (datasize <= sizeof (*DosHdr) ||
 	    DosHdr->e_magic != EFI_IMAGE_DOS_SIGNATURE) {
@@ -1015,6 +1011,9 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	EFI_STATUS status = EFI_SECURITY_VIOLATION;
 	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
 	unsigned int size = datasize;
+
+	if (datasize < 0)
+		return EFI_INVALID_PARAMETER;
 
 	if (context->SecDir->Size != 0) {
 		if (context->SecDir->Size >= size) {
@@ -1801,6 +1800,9 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
 
+	if ((INT32)size < 0)
+		return EFI_INVALID_PARAMETER;
+
 	loader_is_participating = 1;
 	in_protocol = 1;
 
@@ -1836,6 +1838,9 @@ static EFI_STATUS shim_hash (char *data, int datasize,
 			     UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_STATUS status;
+
+	if (datasize < 0)
+		return EFI_INVALID_PARAMETER;
 
 	in_protocol = 1;
 	status = generate_hash(data, datasize, context, sha256hash, sha1hash);
@@ -1899,17 +1904,20 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		efi_status = FetchNetbootimage(image_handle, &sourcebuffer,
 					       &sourcesize);
 		if (efi_status != EFI_SUCCESS) {
-			perror(L"Unable to fetch TFTP image: %r\n", efi_status);
+			perror(L"Unable to fetch TFTP image: %r\n",
+			       efi_status);
 			return efi_status;
 		}
 		data = sourcebuffer;
 		datasize = sourcesize;
 #if  defined(ENABLE_HTTPBOOT)
 	} else if (find_httpboot(li->DeviceHandle)) {
-		efi_status = httpboot_fetch_buffer (image_handle, &sourcebuffer,
+		efi_status = httpboot_fetch_buffer (image_handle,
+						    &sourcebuffer,
 						    &sourcesize);
 		if (efi_status != EFI_SUCCESS) {
-			perror(L"Unable to fetch HTTP image: %r\n", efi_status);
+			perror(L"Unable to fetch HTTP image: %r\n",
+			       efi_status);
 			return efi_status;
 		}
 		data = sourcebuffer;
@@ -1920,13 +1928,18 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		 * Read the new executable off disk
 		 */
 		efi_status = load_image(li, &data, &datasize, PathName);
-
 		if (efi_status != EFI_SUCCESS) {
-			perror(L"Failed to load image %s: %r\n", PathName, efi_status);
+			perror(L"Failed to load image %s: %r\n",
+			       PathName, efi_status);
 			PrintErrors();
 			ClearErrors();
 			goto done;
 		}
+	}
+
+	if (datasize < 0) {
+		efi_status = EFI_INVALID_PARAMETER;
+		goto done;
 	}
 
 	/*
@@ -1939,7 +1952,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * Verify and, if appropriate, relocate and execute the executable
 	 */
 	efi_status = handle_image(data, datasize, li);
-
 	if (efi_status != EFI_SUCCESS) {
 		perror(L"Failed to load image: %r\n", efi_status);
 		PrintErrors();
