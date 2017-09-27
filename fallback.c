@@ -707,8 +707,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
-	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo call
-	 * in *any* case. */
+	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
+	 * call in *any* case. */
 	if (EFI_ERROR(rc)) {
 		Print(L"Could not get info for \"%s\": %d\n", dirname, rc);
 		if (buffer)
@@ -731,7 +731,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		bs = 0;
 		rc = uefi_call_wrapper(fh->Read, 3, fh, &bs, NULL);
 		if (EFI_ERROR(rc) && rc != EFI_BUFFER_TOO_SMALL) {
-			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname, rc);
+			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname,
+			      rc);
 			if (buffer)
 				FreePool(buffer);
 			return rc;
@@ -749,7 +750,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 		rc = uefi_call_wrapper(fh->Read, 3, fh, &bs, buffer);
 		if (EFI_ERROR(rc)) {
-			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname, rc);
+			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname,
+			      rc);
 			FreePool(buffer);
 			return rc;
 		}
@@ -776,11 +778,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		rc = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
 				       bootarchcsv, EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(rc) || fh2 == NULL) {
-			Print(L"Couldn't open \\EFI\\%s\\%s: %d\n",
+			Print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
 			      dirname, bootarchcsv, rc);
 		} else {
 			rc = try_boot_csv(fh2, dirname, bootarchcsv);
 			uefi_call_wrapper(fh2->Close, 1, fh2);
+			if (EFI_ERROR(rc))
+				Print(L"Could not process \\EFI\\%s\\%s: %r\n",
+				      dirname, bootarchcsv, rc);
 		}
 	}
 	if ((EFI_ERROR(rc) || !bootarchcsv) && bootcsv) {
@@ -788,11 +793,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		rc = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
 				       bootcsv, EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(rc) || fh2 == NULL) {
-			Print(L"Couldn't open \\EFI\\%s\\%s: %d\n",
+			Print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
 			      dirname, bootcsv, rc);
 		} else {
 			rc = try_boot_csv(fh2, dirname, bootcsv);
 			uefi_call_wrapper(fh2->Close, 1, fh2);
+			if (EFI_ERROR(rc))
+				Print(L"Could not process \\EFI\\%s\\%s: %r\n",
+				      dirname, bootarchcsv, rc);
 		}
 	}
 	rc = EFI_SUCCESS;
