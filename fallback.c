@@ -149,6 +149,11 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 		return rc;
 	}
 
+	if (len > 1024 * PAGE_SIZE) {
+		uefi_call_wrapper(fh2->Close, 1, fh2);
+		return EFI_BAD_BUFFER_SIZE;
+	}
+
 	b = AllocateZeroPool(len + 2);
 	if (!buffer) {
 		Print(L"Could not allocate memory\n");
