@@ -450,8 +450,8 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 								      hash, SHA256_DIGEST_SIZE);
 					if (IsFound) {
 						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
-						return DATA_FOUND;
 						drain_openssl_errors();
+						return DATA_FOUND;
 					} else {
 						LogError(L"AuthenticodeVerify(): %d\n", IsFound);
 					}
