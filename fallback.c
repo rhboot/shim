@@ -102,18 +102,20 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
 	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, NULL);
-	if (rc == EFI_BUFFER_TOO_SMALL) {
-		buffer = AllocateZeroPool(bs);
-		if (!buffer) {
-			Print(L"Could not allocate memory\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID,
-					&bs, buffer);
+	if (EFI_ERROR(rc) && rc != EFI_BUFFER_TOO_SMALL)
+		return rc;
+	if (bs == 0)
+		return EFI_SUCCESS;
+
+	buffer = AllocateZeroPool(bs);
+	if (!buffer) {
+		Print(L"Could not allocate memory\n");
+		return EFI_OUT_OF_RESOURCES;
 	}
+	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
-	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo call
-	 * in *any* case. */
+	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
+	 * call in *any* case. */
 	if (EFI_ERROR(rc)) {
 		Print(L"Could not get file info: %d\n", rc);
 		if (buffer)
@@ -141,6 +143,8 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	CHAR16 *b = NULL;
 	rc = get_file_size(fh2, &len);
 	if (EFI_ERROR(rc)) {
+		Print(L"Could not get file size for \"%s\": %r\n",
+		      fullpath, rc);
 		uefi_call_wrapper(fh2->Close, 1, fh2);
 		return rc;
 	}
@@ -682,15 +686,21 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
 	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, NULL);
-	if (rc == EFI_BUFFER_TOO_SMALL) {
-		buffer = AllocateZeroPool(bs);
-		if (!buffer) {
-			Print(L"Could not allocate memory\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID,
-					&bs, buffer);
+	if (EFI_ERROR(rc) && rc != EFI_BUFFER_TOO_SMALL) {
+		Print(L"Could not get directory info for \\EFI\\%s\\: %r\n",
+		      dirname, rc);
+		return rc;
 	}
+	if (bs == 0)
+		return EFI_SUCCESS;
+
+	buffer = AllocateZeroPool(bs);
+	if (!buffer) {
+		Print(L"Could not allocate memory\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo call
 	 * in *any* case. */
