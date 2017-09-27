@@ -399,12 +399,12 @@ free_entries(CHAR16 **entries, int count)
 }
 
 void
-simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
-		     CHAR16 *filter, CHAR16 **result)
+simple_file_selector(EFI_HANDLE * im, CHAR16 ** title, CHAR16 * name,
+		     CHAR16 * filter, CHAR16 ** result)
 {
 	EFI_STATUS status;
 	CHAR16 **entries = NULL;
-	EFI_FILE_INFO *dmp;
+	EFI_FILE_INFO *dmp = NULL;
 	int count, select, len;
 	CHAR16 *newname, *selected;
 
@@ -424,18 +424,17 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 		*im = h;
 	}
 
-	newname = AllocatePool((StrLen(name) + 1)*sizeof(CHAR16));
+	newname = AllocatePool((StrLen(name) + 1) * sizeof(CHAR16));
 	if (!newname)
 		return;
 
 	StrCpy(newname, name);
 	name = newname;
 
- redo:
+redo:
 	status = simple_dir_filter(*im, name, filter, &entries, &count, &dmp);
-
 	if (status != EFI_SUCCESS)
-		goto out_free_name;
+		goto out_free;
 
 	select = console_select(title, entries, 0);
 	if (select < 0)
@@ -459,7 +458,6 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 
 			i = StrLen(name) - 1;
 
-
 			for (i = StrLen(name); i > 0; --i) {
 				if (name[i] == '\\')
 					break;
@@ -477,11 +475,12 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 				goto redo;
 			}
 		}
-		newname = AllocatePool((StrLen(name) + len + 2)*sizeof(CHAR16));
+		newname =
+		    AllocatePool((StrLen(name) + len + 2) * sizeof(CHAR16));
 		if (!newname)
 			goto out_free;
 		StrCpy(newname, name);
-			
+
 		if (name[StrLen(name) - 1] != '\\')
 			StrCat(newname, L"\\");
 		StrCat(newname, selected);
@@ -497,7 +496,7 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 
 		goto redo;
 	}
-	*result = AllocatePool((StrLen(name) + len + 2)*sizeof(CHAR16));
+	*result = AllocatePool((StrLen(name) + len + 2) * sizeof(CHAR16));
 	if (*result) {
 		StrCpy(*result, name);
 		if (name[StrLen(name) - 1] != '\\')
@@ -505,12 +504,12 @@ simple_file_selector(EFI_HANDLE *im, CHAR16 **title, CHAR16 *name,
 		StrCat(*result, selected);
 	}
 
- out_free:
-	FreePool(dmp);
+out_free:
+	if (dmp)
+		FreePool(dmp);
 	if (entries) {
 		free_entries(entries, count);
 		FreePool(entries);
 	}
- out_free_name:
 	FreePool(name);
 }
