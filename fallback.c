@@ -733,8 +733,6 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		if (EFI_ERROR(rc) && rc != EFI_BUFFER_TOO_SMALL) {
 			Print(L"Could not read \\EFI\\%s\\: %d\n", dirname,
 			      rc);
-			if (buffer)
-				FreePool(buffer);
 			return rc;
 		}
 		/* If there's no data to read, don't try to allocate 0 bytes
