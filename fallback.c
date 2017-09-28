@@ -101,7 +101,7 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
-	efi_status = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, NULL);
+	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, NULL);
 	if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL)
 		return efi_status;
 	if (bs == 0)
@@ -112,7 +112,7 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 		Print(L"Could not allocate memory\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
-	efi_status = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, buffer);
+	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
 	 * call in *any* case. */
@@ -134,8 +134,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	EFI_FILE_HANDLE fh2;
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(fh->Open, 5, fh, &fh2, fullpath,
-				       EFI_FILE_READ_ONLY, 0);
+	efi_status = fh->Open(fh, &fh2, fullpath, EFI_FILE_READ_ONLY, 0);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Couldn't open \"%s\": %r\n", fullpath, efi_status);
 		return efi_status;
@@ -147,32 +146,32 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Could not get file size for \"%s\": %r\n",
 		      fullpath, efi_status);
-		uefi_call_wrapper(fh2->Close, 1, fh2);
+		fh2->Close(fh2);
 		return efi_status;
 	}
 
 	if (len > 1024 * PAGE_SIZE) {
-		uefi_call_wrapper(fh2->Close, 1, fh2);
+		fh2->Close(fh2);
 		return EFI_BAD_BUFFER_SIZE;
 	}
 
 	b = AllocateZeroPool(len + 2);
 	if (!buffer) {
 		Print(L"Could not allocate memory\n");
-		uefi_call_wrapper(fh2->Close, 1, fh2);
+		fh2->Close(fh2);
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	efi_status = uefi_call_wrapper(fh->Read, 3, fh, &len, b);
+	efi_status = fh->Read(fh, &len, b);
 	if (EFI_ERROR(efi_status)) {
 		FreePool(buffer);
-		uefi_call_wrapper(fh2->Close, 1, fh2);
+		fh2->Close(fh2);
 		Print(L"Could not read file: %r\n", efi_status);
 		return efi_status;
 	}
 	*buffer = b;
 	*bs = len;
-	uefi_call_wrapper(fh2->Close, 1, fh2);
+	fh2->Close(fh2);
 	return EFI_SUCCESS;
 }
 
@@ -251,12 +250,11 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 			}
 
-			efi_status = uefi_call_wrapper(RT->SetVariable, 5,
-					varname, &GV_GUID,
-					EFI_VARIABLE_NON_VOLATILE |
-					EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					EFI_VARIABLE_RUNTIME_ACCESS,
-					size, data);
+			efi_status = gRT->SetVariable(varname, &GV_GUID,
+						EFI_VARIABLE_NON_VOLATILE |
+						EFI_VARIABLE_BOOTSERVICE_ACCESS |
+						EFI_VARIABLE_RUNTIME_ACCESS,
+						size, data);
 
 			FreePool(data);
 
@@ -433,9 +431,8 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		varname[7] = hexmap[(bootorder[i] & 0x000f) >> 0];
 
 		UINTN candidate_size = max_candidate_size;
-		efi_status = uefi_call_wrapper(RT->GetVariable, 5, varname,
-					       &GV_GUID, NULL,
-					       &candidate_size, candidate);
+		efi_status = gRT->GetVariable(varname, &GV_GUID, NULL,
+					      &candidate_size, candidate);
 		if (EFI_ERROR(efi_status))
 			continue;
 
@@ -500,16 +497,15 @@ update_boot_order(void)
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
 	Print(L"\n");
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"BootOrder",
-				       &GV_GUID, NULL, &len, NULL);
+	efi_status = gRT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &GV_GUID);
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"BootOrder", &GV_GUID,
-				       EFI_VARIABLE_NON_VOLATILE |
-				       EFI_VARIABLE_BOOTSERVICE_ACCESS |
-				       EFI_VARIABLE_RUNTIME_ACCESS,
-				       size, newbootorder);
+	efi_status = gRT->SetVariable(L"BootOrder", &GV_GUID,
+				      EFI_VARIABLE_NON_VOLATILE |
+				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				      EFI_VARIABLE_RUNTIME_ACCESS,
+				      size, newbootorder);
 	FreePool(newbootorder);
 	return efi_status;
 }
@@ -697,7 +693,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
-	efi_status = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, NULL);
+	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, NULL);
 	if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL) {
 		Print(L"Could not get directory info for \\EFI\\%s\\: %r\n",
 		      dirname, efi_status);
@@ -712,7 +708,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	efi_status = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, buffer);
+	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
 	 * call in *any* case. */
@@ -737,7 +733,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	bs = 0;
 	do {
 		bs = 0;
-		efi_status = uefi_call_wrapper(fh->Read, 3, fh, &bs, NULL);
+		efi_status = fh->Read(fh, &bs, NULL);
 		if (EFI_ERROR(efi_status) &&
 		    efi_status != EFI_BUFFER_TOO_SMALL) {
 			Print(L"Could not read \\EFI\\%s\\: %r\n", dirname,
@@ -755,7 +751,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 			return EFI_OUT_OF_RESOURCES;
 		}
 
-		efi_status = uefi_call_wrapper(fh->Read, 3, fh, &bs, buffer);
+		efi_status = fh->Read(fh, &bs, buffer);
 		if (EFI_ERROR(efi_status)) {
 			Print(L"Could not read \\EFI\\%s\\: %r\n", dirname,
 			      efi_status);
@@ -782,15 +778,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	efi_status = EFI_SUCCESS;
 	if (bootarchcsv) {
 		EFI_FILE_HANDLE fh2;
-		efi_status = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
-					       bootarchcsv,
-					       EFI_FILE_READ_ONLY, 0);
+		efi_status = fh->Open(fh, &fh2, bootarchcsv,
+				      EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(efi_status) || fh2 == NULL) {
 			Print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
 			      dirname, bootarchcsv, efi_status);
 		} else {
 			efi_status = try_boot_csv(fh2, dirname, bootarchcsv);
-			uefi_call_wrapper(fh2->Close, 1, fh2);
+			fh2->Close(fh2);
 			if (EFI_ERROR(efi_status))
 				Print(L"Could not process \\EFI\\%s\\%s: %r\n",
 				      dirname, bootarchcsv, efi_status);
@@ -798,14 +793,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	}
 	if ((EFI_ERROR(efi_status) || !bootarchcsv) && bootcsv) {
 		EFI_FILE_HANDLE fh2;
-		efi_status = uefi_call_wrapper(fh->Open, 5, fh, &fh2,
-					       bootcsv, EFI_FILE_READ_ONLY, 0);
+		efi_status = fh->Open(fh, &fh2, bootcsv,
+				      EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(efi_status) || fh2 == NULL) {
 			Print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
 			      dirname, bootcsv, efi_status);
 		} else {
 			efi_status = try_boot_csv(fh2, dirname, bootcsv);
-			uefi_call_wrapper(fh2->Close, 1, fh2);
+			fh2->Close(fh2);
 			if (EFI_ERROR(efi_status))
 				Print(L"Could not process \\EFI\\%s\\%s: %r\n",
 				      dirname, bootarchcsv, efi_status);
@@ -820,8 +815,8 @@ find_boot_options(EFI_HANDLE device)
 	EFI_STATUS efi_status;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &FileSystemProtocol, (void **)&fio);
+	efi_status = gBS->HandleProtocol(device, &FileSystemProtocol,
+					 (void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Couldn't find file system: %r\n", efi_status);
 		return efi_status;
@@ -831,25 +826,24 @@ find_boot_options(EFI_HANDLE device)
 	 * *no idea* what frees the memory allocated here. Hopefully
 	 * Close() does. */
 	EFI_FILE_HANDLE fh = NULL;
-	efi_status = uefi_call_wrapper(fio->OpenVolume, 2, fio, &fh);
+	efi_status = fio->OpenVolume(fio, &fh);
 	if (EFI_ERROR(efi_status) || fh == NULL) {
 		Print(L"Couldn't open file system: %r\n", efi_status);
 		return efi_status;
 	}
 
 	EFI_FILE_HANDLE fh2 = NULL;
-	efi_status = uefi_call_wrapper(fh->Open, 5, fh, &fh2, L"EFI",
-						EFI_FILE_READ_ONLY, 0);
+	efi_status = fh->Open(fh, &fh2, L"EFI", EFI_FILE_READ_ONLY, 0);
 	if (EFI_ERROR(efi_status) || fh2 == NULL) {
 		Print(L"Couldn't open EFI: %r\n", efi_status);
-		uefi_call_wrapper(fh->Close, 1, fh);
+		fh->Close(fh);
 		return efi_status;
 	}
-	efi_status = uefi_call_wrapper(fh2->SetPosition, 2, fh2, 0);
+	efi_status = fh2->SetPosition(fh2, 0);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Couldn't set file position: %r\n", efi_status);
-		uefi_call_wrapper(fh2->Close, 1, fh2);
-		uefi_call_wrapper(fh->Close, 1, fh);
+		fh2->Close(fh2);
+		fh->Close(fh);
 		return efi_status;
 	}
 
@@ -857,7 +851,7 @@ find_boot_options(EFI_HANDLE device)
 	UINTN bs;
 	do {
 		bs = 0;
-		efi_status = uefi_call_wrapper(fh2->Read, 3, fh2, &bs, NULL);
+		efi_status = fh2->Read(fh2, &bs, NULL);
 		if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL) {
 			Print(L"Could not read \\EFI\\: %r\n", efi_status);
 			return efi_status;
@@ -869,19 +863,19 @@ find_boot_options(EFI_HANDLE device)
 		if (!buffer) {
 			Print(L"Could not allocate memory\n");
 			/* sure, this might work, why not? */
-			uefi_call_wrapper(fh2->Close, 1, fh2);
-			uefi_call_wrapper(fh->Close, 1, fh);
+			fh2->Close(fh2);
+			fh->Close(fh);
 			return EFI_OUT_OF_RESOURCES;
 		}
 
-		efi_status = uefi_call_wrapper(fh2->Read, 3, fh2, &bs, buffer);
+		efi_status = fh2->Read(fh2, &bs, buffer);
 		if (EFI_ERROR(efi_status)) {
 			if (buffer) {
 				FreePool(buffer);
 				buffer = NULL;
 			}
-			uefi_call_wrapper(fh2->Close, 1, fh2);
-			uefi_call_wrapper(fh->Close, 1, fh);
+			fh2->Close(fh2);
+			fh->Close(fh);
 			return efi_status;
 		}
 		EFI_FILE_INFO *fi = buffer;
@@ -901,8 +895,8 @@ find_boot_options(EFI_HANDLE device)
 		VerbosePrint(L"Found directory named \"%s\"\n", fi->FileName);
 
 		EFI_FILE_HANDLE fh3;
-		efi_status = uefi_call_wrapper(fh->Open, 5, fh2, &fh3, fi->FileName,
-						EFI_FILE_READ_ONLY, 0);
+		efi_status = fh2->Open(fh2, &fh3, fi->FileName,
+				      EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(efi_status)) {
 			Print(L"%d Couldn't open %s: %r\n", __LINE__, fi->FileName, efi_status);
 			FreePool(buffer);
@@ -911,7 +905,7 @@ find_boot_options(EFI_HANDLE device)
 		}
 
 		efi_status = find_boot_csv(fh3, fi->FileName);
-		uefi_call_wrapper(fh3->Close, 1, fh3);
+		fh3->Close(fh3);
 		FreePool(buffer);
 		buffer = NULL;
 		if (efi_status == EFI_OUT_OF_RESOURCES)
@@ -922,8 +916,8 @@ find_boot_options(EFI_HANDLE device)
 	if (!EFI_ERROR(efi_status) && nbootorder > 0)
 		efi_status = update_boot_order();
 
-	uefi_call_wrapper(fh2->Close, 1, fh2);
-	uefi_call_wrapper(fh->Close, 1, fh);
+	fh2->Close(fh2);
+	fh->Close(fh);
 	return efi_status;
 }
 
@@ -937,9 +931,8 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		return EFI_SUCCESS;
 	}
 
-	efi_status = uefi_call_wrapper(BS->LoadImage, 6, 0,
-				       parent_image_handle, first_new_option,
-				       NULL, 0, &image_handle);
+	efi_status = gBS->LoadImage(0, parent_image_handle, first_new_option,
+				    NULL, 0, &image_handle);
 	if (EFI_ERROR(efi_status)) {
 		CHAR16 *dps = DevicePathToStr(first_new_option);
 		UINTN s = DevicePathSize(first_new_option);
@@ -953,23 +946,22 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		}
 		Print(L"\n");
 
-		uefi_call_wrapper(BS->Stall, 1, 500000000);
+		msleep(500000000);
 		return efi_status;
 	}
 
 	EFI_LOADED_IMAGE *image;
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &LoadedImageProtocol, (void *)&image);
+	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					 (void *) &image);
 	if (!EFI_ERROR(efi_status)) {
 		image->LoadOptions = first_new_option_args;
 		image->LoadOptionsSize = first_new_option_size;
 	}
 
-	efi_status = uefi_call_wrapper(BS->StartImage, 3, image_handle,
-				       NULL, NULL);
+	efi_status = gBS->StartImage(image_handle, NULL, NULL);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"StartImage failed: %r\n", efi_status);
-		uefi_call_wrapper(BS->Stall, 1, 500000000);
+		msleep(500000000);
 	}
 	return efi_status;
 }
@@ -1014,9 +1006,8 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	 */
 	debug_hook();
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
-				       &LoadedImageProtocol,
-				       (void *)&this_image);
+	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
+					 (void *) &this_image);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Error: could not find loaded image: %r\n", efi_status);
 		return efi_status;
@@ -1044,11 +1035,10 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 
 	if (get_fallback_verbose()) {
 		Print(L"Verbose enabled, sleeping for half a second\n");
-		uefi_call_wrapper(BS->Stall, 1, 500000);
+		msleep(500000);
 	}
 
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetCold,
-			  EFI_SUCCESS, 0, NULL);
+	gRT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
 
 	return EFI_SUCCESS;
 }

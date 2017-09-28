@@ -90,11 +90,11 @@ hexdump(UINT8 *data, UINTN size)
 		sz = format_hex(data+offset, size-offset, hexbuf);
 		if (sz == 0)
 			return;
-		uefi_call_wrapper(BS->Stall, 1, 200000);
+		msleep(200000);
 
 		format_text(data+offset, size-offset, txtbuf);
 		Print(L"%08x  %s  %s\n", display_offset, hexbuf, txtbuf);
-		uefi_call_wrapper(BS->Stall, 1, 200000);
+		msleep(200000);
 
 		display_offset += sz;
 		offset += sz;

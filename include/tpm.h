@@ -188,3 +188,4 @@ typedef UINT32                     TCG_EVENTTYPE;
 #define PE_COFF_IMAGE 0x0000000000000010
 
 #endif /* SHIM_TPM_H */
+// vim:fenc=utf-8:tw=75

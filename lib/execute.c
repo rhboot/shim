@@ -101,23 +101,21 @@ execute(EFI_HANDLE image, CHAR16 *name)
 	EFI_DEVICE_PATH *devpath;
 	CHAR16 *PathName;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
-				       &IMAGE_PROTOCOL, (void **)&li);
+	efi_status = gBS->HandleProtocol(image, &IMAGE_PROTOCOL,
+					 (void **) &li);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
-
 
 	efi_status = generate_path(name, li, &devpath, &PathName);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	efi_status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image,
-				       devpath, NULL, 0, &h);
+	efi_status = gBS->LoadImage(FALSE, image, devpath, NULL, 0, &h);
 	if (EFI_ERROR(efi_status))
 		goto out;
 
-	efi_status = uefi_call_wrapper(BS->StartImage, 3, h, NULL, NULL);
-	uefi_call_wrapper(BS->UnloadImage, 1, h);
+	efi_status = gBS->StartImage(h, NULL, NULL);
+	gBS->UnloadImage(h);
 
  out:
 	FreePool(PathName);

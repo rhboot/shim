@@ -266,9 +266,9 @@ get_nic_handle (EFI_MAC_ADDRESS *mac)
 
 	/* Get the list of handles that support the HTTP service binding
 	   protocol */
-	efi_status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol,
-				       &EFI_HTTP_BINDING_GUID, NULL, &NoHandles,
-				       &buffer);
+	efi_status = gBS->LocateHandleBuffer(ByProtocol,
+					     &EFI_HTTP_BINDING_GUID,
+					     NULL, &NoHandles, &buffer);
 	if (EFI_ERROR(efi_status))
 		return NULL;
 
@@ -326,17 +326,16 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	EFI_IPv6_ADDRESS gateway;
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
-				       &EFI_IP6_CONFIG_GUID, (VOID **)&ip6cfg);
+	efi_status = gBS->HandleProtocol(nic, &EFI_IP6_CONFIG_GUID,
+					 (VOID **)&ip6cfg);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	ip6.Address = ip6node->LocalIpAddress;
 	ip6.PrefixLength = ip6node->PrefixLength;
 	ip6.IsAnycast = FALSE;
-	efi_status = uefi_call_wrapper(ip6cfg->SetData, 4, ip6cfg,
-				       Ip6ConfigDataTypeManualAddress,
-				       sizeof(ip6), &ip6);
+	efi_status = ip6cfg->SetData(ip6cfg, Ip6ConfigDataTypeManualAddress,
+				     sizeof(ip6), &ip6);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -344,9 +343,8 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	if (is_unspecified_addr(gateway))
 		return EFI_SUCCESS;
 
-	efi_status = uefi_call_wrapper(ip6cfg->SetData, 4, ip6cfg,
-				       Ip6ConfigDataTypeGateway,
-				       sizeof(gateway), &gateway);
+	efi_status = ip6cfg->SetData(ip6cfg, Ip6ConfigDataTypeGateway,
+				     sizeof(gateway), &gateway);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -361,25 +359,21 @@ set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 	EFI_IPv4_ADDRESS gateway;
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
-				       &EFI_IP4_CONFIG2_GUID,
-				       (VOID **)&ip4cfg2);
+	efi_status = gBS->HandleProtocol(nic, &EFI_IP4_CONFIG2_GUID,
+					 (VOID **)&ip4cfg2);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	ip4.Address = ip4node->LocalIpAddress;
 	ip4.SubnetMask = ip4node->SubnetMask;
-	efi_status = uefi_call_wrapper(ip4cfg2->SetData, 4, ip4cfg2,
-				       Ip4Config2DataTypeManualAddress,
-				       sizeof(ip4), &ip4);
+	efi_status = ip4cfg2->SetData(ip4cfg2, Ip4Config2DataTypeManualAddress,
+				      sizeof(ip4), &ip4);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	gateway = ip4node->GatewayIpAddress;
-	efi_status = uefi_call_wrapper(ip4cfg2->SetData, 4, ip4cfg2,
-				       Ip4Config2DataTypeGateway,
-				       sizeof(gateway),
-				       &gateway);
+	efi_status = ip4cfg2->SetData(ip4cfg2, Ip4Config2DataTypeGateway,
+				      sizeof(gateway), &gateway);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -416,7 +410,7 @@ configure_http (EFI_HTTP_PROTOCOL *http, BOOLEAN is_ip6)
 		http_mode.AccessPoint.IPv6Node = &ip6node;
 	}
 
-	return uefi_call_wrapper(http->Configure, 2, http, &http_mode);
+	return http->Configure(http, &http_mode);
 }
 
 static EFI_STATUS
@@ -457,9 +451,9 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 	tx_token.Message = &tx_message;
 	tx_token.Event = NULL;
 	request_done = FALSE;
-	efi_status = uefi_call_wrapper(BS->CreateEvent, 5, EVT_NOTIFY_SIGNAL,
-				       TPL_NOTIFY, httpnotify, &request_done,
-				       &tx_token.Event);
+	efi_status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL, TPL_NOTIFY,
+				      httpnotify, &request_done,
+				      &tx_token.Event);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to Create Event for HTTP request: %r\n",
 		       efi_status);
@@ -467,7 +461,7 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 	}
 
 	/* Send out the request */
-	efi_status = uefi_call_wrapper(http->Request, 2, http, &tx_token);
+	efi_status = http->Request(http, &tx_token);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"HTTP request failed: %r\n", efi_status);
 		goto error;
@@ -475,7 +469,7 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 
 	/* Wait for the response */
 	while (!request_done)
-		uefi_call_wrapper(http->Poll, 1, http);
+		http->Poll(http);
 
 	if (EFI_ERROR(tx_token.Status)) {
 		perror(L"HTTP request: %r\n", tx_token.Status);
@@ -483,7 +477,7 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 	}
 
 error:
-	event_status = uefi_call_wrapper(BS->CloseEvent, 1, tx_token.Event);
+	event_status = gBS->CloseEvent(tx_token.Event);
 	if (EFI_ERROR(event_status)) {
 		perror(L"Failed to close Event for HTTP request: %r\n",
 		       event_status);
@@ -521,9 +515,9 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	rx_token.Message = &rx_message;
 	rx_token.Event = NULL;
 	response_done = FALSE;
-	efi_status = uefi_call_wrapper(BS->CreateEvent, 5, EVT_NOTIFY_SIGNAL,
-				       TPL_NOTIFY, httpnotify, &response_done,
-				       &rx_token.Event);
+	efi_status = gBS->CreateEvent(EVT_NOTIFY_SIGNAL, TPL_NOTIFY,
+				      httpnotify, &response_done,
+				      &rx_token.Event);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to Create Event for HTTP response: %r\n",
 		       efi_status);
@@ -531,7 +525,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	}
 
 	/* Notify the firmware to receive the HTTP messages */
-	efi_status = uefi_call_wrapper(http->Response, 2, http, &rx_token);
+	efi_status = http->Response(http, &rx_token);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"HTTP response failed: %r\n", efi_status);
 		goto error;
@@ -539,7 +533,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 
 	/* Wait for the response */
 	while (!response_done)
-		uefi_call_wrapper(http->Poll, 1, http);
+		http->Poll(http);
 
 	if (EFI_ERROR(rx_token.Status)) {
 		perror(L"HTTP response: %r\n", rx_token.Status);
@@ -592,15 +586,14 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 		rx_token.Status = EFI_NOT_READY;
 		response_done = FALSE;
 
-		efi_status = uefi_call_wrapper(http->Response, 2, http,
-					       &rx_token);
+		efi_status = http->Response(http, &rx_token);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"HTTP response failed: %r\n", efi_status);
 			goto error;
 		}
 
 		while (!response_done)
-			uefi_call_wrapper(http->Poll, 1, http);
+			http->Poll(http);
 
 		if (EFI_ERROR(rx_token.Status)) {
 			perror(L"HTTP response: %r\n", rx_token.Status);
@@ -619,7 +612,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	}
 
 error:
-	event_status = uefi_call_wrapper(BS->CloseEvent, 1, rx_token.Event);
+	event_status = gBS->CloseEvent(rx_token.Event);
 	if (EFI_ERROR(event_status)) {
 		perror(L"Failed to close Event for HTTP response: %r\n",
 		       event_status);
@@ -647,9 +640,8 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	*buf_size = 0;
 
 	/* Open HTTP Service Binding Protocol */
-	efi_status = uefi_call_wrapper(BS->OpenProtocol, 6, device,
-				       &EFI_HTTP_BINDING_GUID, (VOID **)&service,
-				       image, NULL,
+	efi_status = gBS->OpenProtocol(device, &EFI_HTTP_BINDING_GUID,
+				       (VOID **) &service, image, NULL,
 				       EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
@@ -657,14 +649,13 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	/* Create the ChildHandle from the Service Binding */
 	/* Set the handle to NULL to request a new handle */
 	http_handle = NULL;
-	efi_status = uefi_call_wrapper(service->CreateChild, 2, service,
-				       &http_handle);
+	efi_status = service->CreateChild(service, &http_handle);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	/* Get the http protocol */
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, http_handle,
-				       &EFI_HTTP_PROTOCOL_GUID, (VOID **)&http);
+	efi_status = gBS->HandleProtocol(http_handle, &EFI_HTTP_PROTOCOL_GUID,
+					 (VOID **) &http);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to get http\n");
 		goto error;
@@ -689,9 +680,7 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	}
 
 error:
-	child_status = uefi_call_wrapper(service->DestroyChild, 2, service,
-					 http_handle);
-
+	child_status = service->DestroyChild(service, http_handle);
 	if (EFI_ERROR(efi_status)) {
 		return efi_status;
 	} else if (EFI_ERROR(child_status)) {
