@@ -16,23 +16,21 @@ simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UIN
 	EFI_FILE_IO_INTERFACE *drive;
 	EFI_FILE *root;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &EFI_SIMPLE_FILE_SYSTEM_GUID, (void **)&drive);
-
+	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					 (void **)&drive);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Unable to find simple file protocol (%d)\n", efi_status);
+		Print(L"Unable to find simple file protocol (%d)\n",
+		      efi_status);
 		goto error;
 	}
 
-	efi_status = uefi_call_wrapper(drive->OpenVolume, 2, drive, &root);
-
+	efi_status = drive->OpenVolume(drive, &root);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Failed to open drive volume (%d)\n", efi_status);
 		goto error;
 	}
 
-	efi_status = uefi_call_wrapper(root->Open, 5, root, file, name,
-				       mode, 0);
+	efi_status = root->Open(root, file, name, mode, 0);
 
  error:
 	return efi_status;
@@ -47,14 +45,12 @@ simple_file_open(EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 	EFI_DEVICE_PATH *loadpath = NULL;
 	CHAR16 *PathName = NULL;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
-				       &IMAGE_PROTOCOL, (void **)&li);
-
+	efi_status = gBS->HandleProtocol(image, &IMAGE_PROTOCOL,
+					 (void **) &li);
 	if (EFI_ERROR(efi_status))
 		return simple_file_open_by_handle(image, name, file, mode);
 
 	efi_status = generate_path(name, li, &loadpath, &PathName);
-
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Unable to generate load path for %s\n", name);
 		return efi_status;
@@ -79,8 +75,7 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 	UINTN size = sizeof(buf);
 	EFI_FILE_INFO *fi = (void *)buf;
 
-	efi_status = uefi_call_wrapper(file->GetInfo, 4, file, &EFI_FILE_INFO_GUID,
-				       &size, fi);
+	efi_status = file->GetInfo(file, &EFI_FILE_INFO_GUID, &size, fi);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Failed to get file info\n");
 		goto out;
@@ -94,13 +89,13 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 	*count = 0;
 	for (;;) {
 		UINTN len = sizeof(buf);
-		efi_status = uefi_call_wrapper(file->Read, 3, file, &len, buf);
+		efi_status = file->Read(file, &len, buf);
 		if (EFI_ERROR(efi_status) || len == 0)
 			break;
 		(*count)++;
 		size += len;
 	}
-	uefi_call_wrapper(file->SetPosition, 2, file, 0);
+	file->SetPosition(file, 0);
 
 	char *ptr = AllocatePool(size);
 	*entries = (EFI_FILE_INFO *)ptr;
@@ -109,13 +104,13 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 	int i;
 	for (i = 0; i < *count; i++) {
 		UINTN len = size;
-		uefi_call_wrapper(file->Read, 3, file, &len, ptr);
+		file->Read(file, &len, ptr);
 		ptr += len;
 		size -= len;
 	}
 	efi_status = EFI_SUCCESS;
  out:
-	simple_file_close(file);
+	file->Close(file);
 	if (EFI_ERROR(efi_status) && *entries) {
 		FreePool(*entries);
 		*entries = NULL;
@@ -149,8 +144,7 @@ simple_file_read_all(EFI_FILE *file, UINTN *size, void **buffer)
 	*size = sizeof(buf);
 	fi = (void *)buf;
 
-	efi_status = uefi_call_wrapper(file->GetInfo, 4, file,
-				       &EFI_FILE_INFO_GUID, size, fi);
+	efi_status = file->GetInfo(file, &EFI_FILE_INFO_GUID, size, fi);
 	if (EFI_ERROR(efi_status)) {
 		Print(L"Failed to get file info\n");
 		return efi_status;
@@ -163,8 +157,8 @@ simple_file_read_all(EFI_FILE *file, UINTN *size, void **buffer)
 		Print(L"Failed to allocate buffer of size %d\n", *size);
 		return EFI_OUT_OF_RESOURCES;
 	}
-	efi_status = uefi_call_wrapper(file->Read, 3, file, size, *buffer);
 
+	efi_status = file->Read(file, size, *buffer);
 	return efi_status;
 }
 
@@ -174,15 +168,8 @@ simple_file_write_all(EFI_FILE *file, UINTN size, void *buffer)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(file->Write, 3, file, &size, buffer);
-
+	efi_status = file->Write(file, &size, buffer);
 	return efi_status;
-}
-
-void
-simple_file_close(EFI_FILE *file)
-{
-	uefi_call_wrapper(file->Close, 1, file);
 }
 
 EFI_STATUS
@@ -194,9 +181,11 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	CHAR16 **entries;
 	int val;
 
-	uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol,
-			  &EFI_SIMPLE_FILE_SYSTEM_GUID, NULL, &count, &vol_handles);
-
+	efi_status = gBS->LocateHandleBuffer(ByProtocol,
+					     &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					     NULL, &count, &vol_handles);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 	if (!count || !vol_handles)
 		return EFI_NOT_FOUND;
 
@@ -212,21 +201,18 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 		CHAR16 *name;
 		EFI_FILE_IO_INTERFACE *drive;
 
-		efi_status = uefi_call_wrapper(BS->HandleProtocol, 3,
-					       vol_handles[i],
+		efi_status = gBS->HandleProtocol(vol_handles[i],
 					       &EFI_SIMPLE_FILE_SYSTEM_GUID,
-					       (void **)&drive);
+						 (void **) &drive);
 		if (EFI_ERROR(efi_status) || !drive)
 			continue;
 
-		efi_status = uefi_call_wrapper(drive->OpenVolume, 2, drive,
-					       &root);
+		efi_status = drive->OpenVolume(drive, &root);
 		if (EFI_ERROR(efi_status))
 			continue;
 
-		efi_status = uefi_call_wrapper(root->GetInfo, 4, root,
-					       &EFI_FILE_SYSTEM_INFO_GUID,
-					       &size, fi);
+		efi_status = root->GetInfo(root, &EFI_FILE_SYSTEM_INFO_GUID,
+					   &size, fi);
 		if (EFI_ERROR(efi_status))
 			continue;
 

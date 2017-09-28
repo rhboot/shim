@@ -55,6 +55,14 @@
 
 static EFI_SYSTEM_TABLE *systab;
 
+EFI_SYSTEM_TABLE *
+get_active_systab(void)
+{
+	if (systab)
+		return systab;
+	return ST;
+}
+
 static typeof(systab->BootServices->LoadImage) system_load_image;
 static typeof(systab->BootServices->StartImage) system_start_image;
 static typeof(systab->BootServices->Exit) system_exit;
@@ -71,6 +79,7 @@ unhook_system_services(void)
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
+	gBS = systab->BootServices;
 }
 
 static EFI_STATUS EFIAPI
@@ -79,12 +88,10 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	UINTN SourceSize, EFI_HANDLE *ImageHandle)
 {
 	EFI_STATUS efi_status;
-	unhook_system_services();
 
-	efi_status = systab->BootServices->LoadImage(BootPolicy,
-						     ParentImageHandle,
-						     DevicePath, SourceBuffer,
-						     SourceSize, ImageHandle);
+	unhook_system_services();
+	efi_status = gBS->LoadImage(BootPolicy, ParentImageHandle, DevicePath,
+				    SourceBuffer, SourceSize, ImageHandle);
 	hook_system_services(systab);
 	if (EFI_ERROR(efi_status))
 		last_loaded_image = NULL;
@@ -103,8 +110,7 @@ start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 		loader_is_participating = 1;
 		uninstall_shim_protocols();
 	}
-	efi_status = systab->BootServices->StartImage(image_handle, exit_data_size,
-						      exit_data);
+	efi_status = gBS->StartImage(image_handle, exit_data_size, exit_data);
 	if (EFI_ERROR(efi_status)) {
 		if (image_handle == last_loaded_image) {
 			EFI_STATUS efi_status2 = install_shim_protocols();
@@ -114,9 +120,9 @@ start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 					efi_status2);
 				Print(L"shim cannot continue, sorry.\n");
 				msleep(5000000);
-				systab->RuntimeServices->ResetSystem(
-					EfiResetShutdown,
-					EFI_SECURITY_VIOLATION, 0, NULL);
+				gRT->ResetSystem(EfiResetShutdown,
+						 EFI_SECURITY_VIOLATION,
+						 0, NULL);
 			}
 		}
 		hook_system_services(systab);
@@ -132,8 +138,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 	    verification_method == VERIFIED_BY_HASH) {
 		unhook_system_services();
 		EFI_STATUS efi_status;
-		efi_status = systab->BootServices->ExitBootServices(image_key,
-								    map_key);
+		efi_status = gBS->ExitBootServices(image_key, map_key);
 		if (EFI_ERROR(efi_status))
 			hook_system_services(systab);
 		return efi_status;
@@ -142,7 +147,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 	Print(L"Bootloader has not verified loaded image.\n");
 	Print(L"System is compromised.  halting.\n");
 	msleep(5000000);
-	systab->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
+	gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
 	return EFI_SECURITY_VIOLATION;
 }
 
@@ -154,8 +159,8 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 
 	shim_fini();
 
-	efi_status = systab->BootServices->Exit(ImageHandle, ExitStatus,
-						ExitDataSize, ExitData);
+	efi_status = gBS->Exit(ImageHandle, ExitStatus,
+			       ExitDataSize, ExitData);
 	if (EFI_ERROR(efi_status)) {
 		EFI_STATUS efi_status2 = shim_init();
 
@@ -164,9 +169,8 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 				efi_status2);
 			Print(L"shim cannot continue, sorry.\n");
 			msleep(5000000);
-			systab->RuntimeServices->ResetSystem(
-				EfiResetShutdown,
-				EFI_SECURITY_VIOLATION, 0, NULL);
+			gRT->ResetSystem(EfiResetShutdown,
+					 EFI_SECURITY_VIOLATION, 0, NULL);
 		}
 	}
 	return efi_status;
@@ -176,6 +180,7 @@ void
 hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 {
 	systab = local_systab;
+	gBS = systab->BootServices;
 
 	/* We need to hook various calls to make this work... */
 
@@ -204,12 +209,14 @@ void
 unhook_exit(void)
 {
 	systab->BootServices->Exit = system_exit;
+	gBS = systab->BootServices;
 }
 
 void
 hook_exit(EFI_SYSTEM_TABLE *local_systab)
 {
 	systab = local_systab;
+	gBS = local_systab->BootServices;
 
 	/* we need to hook Exit() so that we can allow users to quit the
 	 * bootloader and still e.g. start a new one or run an internal

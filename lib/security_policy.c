@@ -10,6 +10,7 @@
 #include <efilib.h>
 
 #include "shim.h"
+
 #include <variables.h>
 #include <simple_file.h>
 #include <errors.h>
@@ -84,8 +85,7 @@ security2_policy_authentication (
 
 	/* Chain original security policy */
 
-	efi_status = uefi_call_wrapper(es2fa, 5, This, DevicePath, FileBuffer,
-				       FileSize, BootPolicy);
+	efi_status = es2fa(This, DevicePath, FileBuffer, FileSize, BootPolicy);
 	/* if OK, don't bother with MOK check */
 	if (!EFI_ERROR(efi_status))
 		return efi_status;
@@ -120,10 +120,10 @@ security_policy_authentication (
 	VOID *FileBuffer;
 	UINTN FileSize;
 	CHAR16* DevPathStr;
+	EFI_GUID SIMPLE_FS_PROTOCOL = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 
 	/* Chain original security policy */
-	efi_status = uefi_call_wrapper(esfas, 3, This, AuthenticationStatus,
-				       DevicePathConst);
+	efi_status = esfas(This, AuthenticationStatus, DevicePathConst);
 	/* if OK avoid checking MOK: It's a bit expensive to
 	 * read the whole file in again (esfas already did this) */
 	if (!EFI_ERROR(efi_status))
@@ -133,8 +133,7 @@ security_policy_authentication (
 	 * EFI_SECURITY_VIOLATION */
 	fail_status = efi_status;
 
-	efi_status = uefi_call_wrapper(BS->LocateDevicePath, 3,
-				       &SIMPLE_FS_PROTOCOL, &DevPath, &h);
+	efi_status = gBS->LocateDevicePath(&SIMPLE_FS_PROTOCOL, &DevPath, &h);
 	if (EFI_ERROR(efi_status))
 		goto out;
 
@@ -147,7 +146,7 @@ security_policy_authentication (
 		goto out;
 
 	efi_status = simple_file_read_all(f, &FileSize, &FileBuffer);
-	simple_file_close(f);
+	f->Close(f);
 	if (EFI_ERROR(efi_status))
 		goto out;
 
@@ -273,13 +272,11 @@ security_policy_install(SecurityHook hook)
 	/* Don't bother with status here.  The call is allowed
 	 * to fail, since SECURITY2 was introduced in PI 1.2.1
 	 * If it fails, use security2_protocol == NULL as indicator */
-	uefi_call_wrapper(BS->LocateProtocol, 3,
-			  &SECURITY2_PROTOCOL_GUID, NULL,
+	LibLocateProtocol(&SECURITY2_PROTOCOL_GUID,
 			  (VOID **) &security2_protocol);
 
-	efi_status = uefi_call_wrapper(BS->LocateProtocol, 3,
-				   &SECURITY_PROTOCOL_GUID, NULL,
-				   (VOID **) &security_protocol);
+	efi_status = LibLocateProtocol(&SECURITY_PROTOCOL_GUID,
+				       (VOID **) &security_protocol);
 	if (EFI_ERROR(efi_status))
 		/* This one is mandatory, so there's a serious problem */
 		return efi_status;
@@ -308,8 +305,7 @@ security_policy_uninstall(void)
 	if (esfas) {
 		EFI_SECURITY_PROTOCOL *security_protocol;
 
-		efi_status = uefi_call_wrapper(BS->LocateProtocol, 3,
-					       &SECURITY_PROTOCOL_GUID, NULL,
+		efi_status = LibLocateProtocol(&SECURITY_PROTOCOL_GUID,
 					       (VOID **) &security_protocol);
 		if (EFI_ERROR(efi_status))
 			return efi_status;
@@ -324,8 +320,7 @@ security_policy_uninstall(void)
 	if (es2fa) {
 		EFI_SECURITY2_PROTOCOL *security2_protocol;
 
-		efi_status = uefi_call_wrapper(BS->LocateProtocol, 3,
-					       &SECURITY2_PROTOCOL_GUID, NULL,
+		efi_status = LibLocateProtocol(&SECURITY2_PROTOCOL_GUID,
 					       (VOID **) &security2_protocol);
 		if (EFI_ERROR(efi_status))
 			return efi_status;

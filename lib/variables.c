@@ -89,7 +89,7 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	DescriptorData = (EFI_VARIABLE_AUTHENTICATION_2 *) (NewData);
 
 	ZeroMem(&Time, sizeof(EFI_TIME));
-	efi_status = uefi_call_wrapper(RT->GetTime, 2, &Time, NULL);
+	efi_status = gRT->GetTime(&Time, NULL);
 	if (EFI_ERROR(efi_status)) {
 		FreePool(NewData);
 		return efi_status;
@@ -157,14 +157,12 @@ SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID owner,
 		return efi_status;
 	}
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, var, &owner,
-				       EFI_VARIABLE_NON_VOLATILE
-				       | EFI_VARIABLE_RUNTIME_ACCESS 
-				       | EFI_VARIABLE_BOOTSERVICE_ACCESS
-				       | EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS
-				       | options,
-				       DataSize, Cert);
-
+	efi_status = gRT->SetVariable(var, &owner,
+			EFI_VARIABLE_NON_VOLATILE |
+			EFI_VARIABLE_RUNTIME_ACCESS |
+			EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS |
+			options, DataSize, Cert);
 	return efi_status;
 }
 
@@ -175,7 +173,8 @@ GetOSIndications(void)
 	UINTN DataSize = sizeof(indications);
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"OsIndicationsSupported", &GV_GUID, NULL, &DataSize, &indications);
+	efi_status = gRT->GetVariable(L"OsIndicationsSupported", &GV_GUID,
+				      NULL, &DataSize, &indications);
 	if (EFI_ERROR(efi_status))
 		return 0;
 
@@ -188,17 +187,15 @@ SETOSIndicationsAndReboot(UINT64 indications)
 	UINTN DataSize = sizeof(indications);
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"OsIndications",
-				       &GV_GUID,
-				       EFI_VARIABLE_NON_VOLATILE
-				       | EFI_VARIABLE_RUNTIME_ACCESS
-				       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				       DataSize, &indications);
-
+	efi_status = gRT->SetVariable(L"OsIndications", &GV_GUID,
+				      EFI_VARIABLE_NON_VOLATILE |
+				      EFI_VARIABLE_RUNTIME_ACCESS |
+				      EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				      DataSize, &indications);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm, EFI_SUCCESS, 0, NULL);
+	gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
 	/* does not return */
 
 	return EFI_SUCCESS;
@@ -212,8 +209,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 
 	*len = 0;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, var, &owner,
-				       NULL, len, NULL);
+	efi_status = gRT->GetVariable(var, &owner, NULL, len, NULL);
 	if (efi_status != EFI_BUFFER_TOO_SMALL) {
 		if (!EFI_ERROR(efi_status)) /* this should never happen */
 			return EFI_PROTOCOL_ERROR;
@@ -224,8 +220,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 	if (!*data)
 		return EFI_OUT_OF_RESOURCES;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, var, &owner,
-				       attributes, len, *data);
+	efi_status = gRT->GetVariable(var, &owner, attributes, len, *data);
 	if (EFI_ERROR(efi_status)) {
 		FreePool(*data);
 		*data = NULL;
@@ -282,8 +277,8 @@ variable_is_setupmode(int default_return)
 	UINTN DataSize = sizeof(SetupMode);
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"SetupMode",
-				       &GV_GUID, NULL, &DataSize, &SetupMode);
+	efi_status = gRT->GetVariable(L"SetupMode", &GV_GUID, NULL,
+				      &DataSize, &SetupMode);
 	if (EFI_ERROR(efi_status))
 		return default_return;
 
@@ -299,8 +294,8 @@ variable_is_secureboot(void)
 	EFI_STATUS efi_status;
 
 	DataSize = sizeof(SecureBoot);
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"SecureBoot",
-				       &GV_GUID, NULL, &DataSize, &SecureBoot);
+	efi_status = gRT->GetVariable(L"SecureBoot", &GV_GUID, NULL,
+				      &DataSize, &SecureBoot);
 	if (EFI_ERROR(efi_status))
 		return 0;
 
@@ -333,10 +328,10 @@ variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 		efi_status = SetSecureVariable(var, sig, sizeof(sig), owner,
 					       EFI_VARIABLE_APPEND_WRITE, 0);
 	else
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5, var, &owner,
-					EFI_VARIABLE_NON_VOLATILE |
-					EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					EFI_VARIABLE_APPEND_WRITE,
-					sizeof(sig), sig);
+		efi_status = gRT->SetVariable(var, &owner,
+					      EFI_VARIABLE_NON_VOLATILE |
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					      EFI_VARIABLE_APPEND_WRITE,
+					      sizeof(sig), sig);
 	return efi_status;
 }

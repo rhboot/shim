@@ -1,8 +1,32 @@
 #ifndef SHIM_H_
 #define SHIM_H_
 
+#if defined __GNUC__ && defined __GNUC_MINOR__
+# define GNUC_PREREQ(maj, min) \
+        ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
+#else
+# define GNUC_PREREQ(maj, min) 0
+#endif
+#if defined __clang_major__ && defined __clang_minor__
+# define CLANG_PREREQ(maj, min) \
+  ((__clang_major__ << 16) + __clang_minor__ >= ((maj) << 16) + (min))
+#else
+# define CLANG_PREREQ(maj, min) 0
+#endif
+
+#if defined(__x86_64__)
+#if !defined(GNU_EFI_USE_MS_ABI)
+#error On x86_64 you must use ms_abi (GNU_EFI_USE_MS_ABI) in gnu-efi and shim.
+#endif
+/* gcc 4.5.4 is the first documented release with -mabi=ms */
+#if !GNUC_PREREQ(4, 7) && !CLANG_PREREQ(3, 4)
+#error On x86_64 you must have a compiler new enough to support __attribute__((__ms_abi__))
+#endif
+#endif
+
 #include <efi.h>
 #include <efilib.h>
+#undef uefi_call_wrapper
 
 #include <stddef.h>
 

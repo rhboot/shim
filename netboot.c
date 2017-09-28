@@ -60,8 +60,8 @@ BOOLEAN findNetboot(EFI_HANDLE device)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &PxeBaseCodeProtocol, (VOID **)&pxe);
+	efi_status = gBS->HandleProtocol(device, &PxeBaseCodeProtocol,
+					 (VOID **) &pxe);
 	if (EFI_ERROR(efi_status)) {
 		pxe = NULL;
 		return FALSE;
@@ -333,9 +333,8 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *buf
 	}
 
 try_again:
-	efi_status = uefi_call_wrapper(pxe->Mtftp, 10, pxe, read, *buffer,
-				       overwrite, bufsiz, &blksz, &tftp_addr,
-				       full_path, NULL, nobuffer);
+	efi_status = pxe->Mtftp(pxe, read, *buffer, overwrite, bufsiz, &blksz,
+			      &tftp_addr, full_path, NULL, nobuffer);
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		/* try again, doubling buf size */
 		*bufsiz *= 2;

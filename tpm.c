@@ -31,7 +31,7 @@ static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
 	EFI_PHYSICAL_ADDRESS eventlog, lastevent;
 
 	caps.Size = (UINT8)sizeof(caps);
-	efi_status = uefi_call_wrapper(tpm->status_check, 5, tpm, &caps, &flags,
+	efi_status = tpm->status_check(tpm, &caps, &flags,
 				       &eventlog, &lastevent);
 	if (EFI_ERROR(efi_status) ||
 	    caps.TPMDeactivatedFlag || !caps.TPMPresentFlag)
@@ -48,7 +48,7 @@ static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
 
 	caps->Size = (UINT8)sizeof(*caps);
 
-	efi_status = uefi_call_wrapper(tpm->get_capability, 2, tpm, caps);
+	efi_status = tpm->get_capability(tpm, caps);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -108,8 +108,7 @@ static EFI_STATUS trigger_tcg2_final_events_table(efi_tpm2_protocol_t *tpm2,
 	else
 		log_fmt = EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2;
 
-	return uefi_call_wrapper(tpm2->get_event_log, 5, tpm2, log_fmt,
-				 &start, &end, &truncated);
+	return tpm2->get_event_log(tpm2, log_fmt, &start, &end, &truncated);
 }
 
 static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
@@ -194,15 +193,13 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			   themselves if we pass PE_COFF_IMAGE.  In case that
 			   fails we fall back to measuring without it.
 			*/
-			efi_status = uefi_call_wrapper(tpm2->hash_log_extend_event,
-						       5, tpm2, PE_COFF_IMAGE, buf,
-						       (UINT64) size, event);
+			efi_status = tpm2->hash_log_extend_event(tpm2,
+				PE_COFF_IMAGE, buf, (UINT64) size, event);
 		}
 
 	        if (!hash || EFI_ERROR(efi_status)) {
-			efi_status = uefi_call_wrapper(tpm2->hash_log_extend_event,
-						       5, tpm2, 0, buf,
-						       (UINT64) size, event);
+			efi_status = tpm2->hash_log_extend_event(tpm2,
+				0, buf, (UINT64) size, event);
 		}
 		FreePool(event);
 		return efi_status;
@@ -234,15 +231,12 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			   hash rather than allowing the firmware to attempt
 			   to calculate it */
 			CopyMem(event->digest, hash, sizeof(event->digest));
-			efi_status = uefi_call_wrapper(tpm->log_extend_event, 7,
-						       tpm, 0, 0, TPM_ALG_SHA,
-						       event, &eventnum,
-						       &lastevent);
+			efi_status = tpm->log_extend_event(tpm, 0, 0,
+				TPM_ALG_SHA, event, &eventnum, &lastevent);
 		} else {
-			efi_status = uefi_call_wrapper(tpm->log_extend_event, 7,
-						       tpm, buf, (UINT64)size,
-						       TPM_ALG_SHA, event,
-						       &eventnum, &lastevent);
+			efi_status = tpm->log_extend_event(tpm, buf,
+				(UINT64)size, TPM_ALG_SHA, event, &eventnum,
+				&lastevent);
 		}
 		FreePool(event);
 		return efi_status;

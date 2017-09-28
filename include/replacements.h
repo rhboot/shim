@@ -29,6 +29,8 @@
 #ifndef SHIM_REPLACEMENTS_H
 #define SHIM_REPLACEMENTS_H
 
+extern EFI_SYSTEM_TABLE *get_active_systab(void);
+
 typedef enum {
 	VERIFIED_BY_NOTHING,
 	VERIFIED_BY_CERT,

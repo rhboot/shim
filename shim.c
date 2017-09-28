@@ -1324,12 +1324,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	alloc_size = ALIGN_VALUE(context.ImageSize + context.SectionAlignment,
 				 PAGE_SIZE);
 
-	efi_status = uefi_call_wrapper (BS->AllocatePages, 4,
-					AllocateAnyPages,
-					EfiLoaderCode,
-					alloc_size / PAGE_SIZE,
-					&alloc_address);
-
+	efi_status = gBS->AllocatePages(AllocateAnyPages, EfiLoaderCode,
+					alloc_size / PAGE_SIZE, &alloc_address);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to allocate image buffer\n");
 		return EFI_OUT_OF_RESOURCES;
@@ -1342,8 +1338,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!entry_point) {
 		perror(L"Entry point is invalid\n");
-		uefi_call_wrapper(BS->FreePages, 2, alloc_address,
-				  alloc_size / PAGE_SIZE);
+		gBS->FreePages(alloc_address, alloc_size / PAGE_SIZE);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -1377,8 +1372,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		if (end < base) {
 			perror(L"Section %d has negative size\n", i);
-			uefi_call_wrapper(BS->FreePages, 2,  alloc_address,
-					  alloc_size / PAGE_SIZE);
+			gBS->FreePages(alloc_address, alloc_size / PAGE_SIZE);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -1499,8 +1493,8 @@ should_use_fallback(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	int ret = 0;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &EFI_LOADED_IMAGE_GUID, (void **)&li);
+	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					 (void **)&li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get image for bootx64.efi: %r\n",
 		       efi_status);
@@ -1524,23 +1518,22 @@ should_use_fallback(EFI_HANDLE image_handle)
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
 		goto error;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, li->DeviceHandle,
-				       &FileSystemProtocol, (void **)&fio);
+	efi_status = gBS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
+					 (void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get fio for li->DeviceHandle: %r\n",
 		       efi_status);
 		goto error;
 	}
 
-	efi_status = uefi_call_wrapper(fio->OpenVolume, 2, fio, &vh);
+	efi_status = fio->OpenVolume(fio, &vh);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not open fio volume: %r\n", efi_status);
 		goto error;
 	}
 
-	efi_status = uefi_call_wrapper(vh->Open, 5, vh, &fh,
-				       L"\\EFI\\BOOT" FALLBACK,
-				       EFI_FILE_MODE_READ, 0);
+	efi_status = vh->Open(vh, &fh, L"\\EFI\\BOOT" FALLBACK,
+			      EFI_FILE_MODE_READ, 0);
 	if (EFI_ERROR(efi_status)) {
 		/* Do not print the error here - this is an acceptable case
 		 * for removable media, where we genuinely don't want
@@ -1554,9 +1547,9 @@ should_use_fallback(EFI_HANDLE image_handle)
 	ret = 1;
 error:
 	if (fh)
-		uefi_call_wrapper(fh->Close, 1, fh);
+		fh->Close(fh);
 	if (vh)
-	    uefi_call_wrapper(vh->Close, 1, vh);
+		vh->Close(vh);
 	if (bootpath)
 		FreePool(bootpath);
 
@@ -1672,15 +1665,14 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	/*
 	 * Open the device
 	 */
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &EFI_SIMPLE_FILE_SYSTEM_GUID,
-				       (void **)&drive);
+	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					 (void **) &drive);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to find fs: %r\n", efi_status);
 		goto error;
 	}
 
-	efi_status = uefi_call_wrapper(drive->OpenVolume, 2, drive, &root);
+	efi_status = drive->OpenVolume(drive, &root);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to open fs: %r\n", efi_status);
 		goto error;
@@ -1689,8 +1681,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	/*
 	 * And then open the file
 	 */
-	efi_status = uefi_call_wrapper(root->Open, 5, root, &grub, PathName,
-				       EFI_FILE_MODE_READ, 0);
+	efi_status = root->Open(root, &grub, PathName, EFI_FILE_MODE_READ, 0);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to open %s - %r\n", PathName, efi_status);
 		goto error;
@@ -1708,8 +1699,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	 * Find out how big the file is in order to allocate the storage
 	 * buffer
 	 */
-	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &EFI_FILE_INFO_GUID,
-				       &buffersize, fileinfo);
+	efi_status = grub->GetInfo(grub, &EFI_FILE_INFO_GUID, &buffersize,
+				   fileinfo);
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		FreePool(fileinfo);
 		fileinfo = AllocatePool(buffersize);
@@ -1718,9 +1709,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 			efi_status = EFI_OUT_OF_RESOURCES;
 			goto error;
 		}
-		efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub,
-					       &EFI_FILE_INFO_GUID, &buffersize,
-					       fileinfo);
+		efi_status = grub->GetInfo(grub, &EFI_FILE_INFO_GUID,
+					   &buffersize, fileinfo);
 	}
 
 	if (EFI_ERROR(efi_status)) {
@@ -1739,13 +1729,11 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	/*
 	 * Perform the actual read
 	 */
-	efi_status = uefi_call_wrapper(grub->Read, 3, grub, &buffersize,
-				       *data);
+	efi_status = grub->Read(grub, &buffersize, *data);
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		FreePool(*data);
 		*data = AllocatePool(buffersize);
-		efi_status = uefi_call_wrapper(grub->Read, 3, grub,
-					       &buffersize, *data);
+		efi_status = grub->Read(grub, &buffersize, *data);
 	}
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unexpected return from initial read: %r, buffersize %x\n",
@@ -1860,8 +1848,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * We need to refer to the loaded image protocol on the running
 	 * binary in order to find our path
 	 */
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &EFI_LOADED_IMAGE_GUID, (void **)&li);
+	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					 (void **)&li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to init protocol\n");
 		return efi_status;
@@ -1947,7 +1935,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	/*
 	 * The binary is trusted and relocated. Run it
 	 */
-	efi_status = uefi_call_wrapper(entry_point, 2, image_handle, systab);
+	efi_status = entry_point(image_handle, systab);
 
 	/*
 	 * Restore our original loaded image values
@@ -2112,11 +2100,10 @@ EFI_STATUS mirror_mok_list()
 	}
 
 	if (FullDataSize) {
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
-					       &SHIM_LOCK_GUID,
-					       EFI_VARIABLE_BOOTSERVICE_ACCESS
-					       | EFI_VARIABLE_RUNTIME_ACCESS,
-					       FullDataSize, FullData);
+		efi_status = gRT->SetVariable(L"MokListRT", &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					      EFI_VARIABLE_RUNTIME_ACCESS,
+					      FullDataSize, FullData);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to set MokListRT: %r\n", efi_status);
 		}
@@ -2140,11 +2127,10 @@ EFI_STATUS mirror_mok_list_x()
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListXRT",
-				       &SHIM_LOCK_GUID,
-				       EFI_VARIABLE_BOOTSERVICE_ACCESS
-				       | EFI_VARIABLE_RUNTIME_ACCESS,
-				       DataSize, Data);
+	efi_status = gRT->SetVariable(L"MokListXRT", &SHIM_LOCK_GUID,
+				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				      EFI_VARIABLE_RUNTIME_ACCESS,
+				      DataSize, Data);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Failed to set MokListRT", efi_status);
 	}
@@ -2174,12 +2160,10 @@ EFI_STATUS mirror_mok_sb_state()
 		if (!EFI_ERROR(efi_status) || efi_status != EFI_NOT_FOUND)
 			LibDeleteVariable(L"MokSBStateRT", &SHIM_LOCK_GUID);
 
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5,
-					       L"MokSBStateRT",
-					       &SHIM_LOCK_GUID,
-					       EFI_VARIABLE_BOOTSERVICE_ACCESS
-					       | EFI_VARIABLE_RUNTIME_ACCESS,
-					       DataSize, Data);
+		efi_status = gRT->SetVariable(L"MokSBStateRT", &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					      EFI_VARIABLE_RUNTIME_ACCESS,
+					      DataSize, Data);
 		if (EFI_ERROR(efi_status)) {
 			console_error(L"Failed to set MokSBStateRT", efi_status);
 		}
@@ -2197,10 +2181,8 @@ static BOOLEAN check_var(CHAR16 *varname)
 	UINT32 MokVar;
 	UINT32 attributes;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, varname,
-				       &SHIM_LOCK_GUID, &attributes,
-				       &size, (void *)&MokVar);
-
+	efi_status = gRT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
+				      &size, (void *)&MokVar);
 	if (!EFI_ERROR(efi_status) || efi_status == EFI_BUFFER_TOO_SMALL)
 		return TRUE;
 
@@ -2244,9 +2226,9 @@ static EFI_STATUS check_mok_sb (void)
 	user_insecure_mode = 0;
 	ignore_db = 0;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSBState",
-				       &SHIM_LOCK_GUID, &attributes,
-				       &MokSBStateSize, &MokSBState);
+	efi_status = gRT->GetVariable(L"MokSBState", &SHIM_LOCK_GUID,
+				      &attributes, &MokSBStateSize,
+				      &MokSBState);
 	if (EFI_ERROR(efi_status))
 		return EFI_SECURITY_VIOLATION;
 
@@ -2281,9 +2263,9 @@ static EFI_STATUS check_mok_db (void)
 	UINTN MokDBStateSize = sizeof(MokDBState);
 	UINT32 attributes;
 
-	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDBState",
-				       &SHIM_LOCK_GUID, &attributes,
-				       &MokDBStateSize, &MokDBState);
+	efi_status = gRT->GetVariable(L"MokDBState", &SHIM_LOCK_GUID,
+				      &attributes, &MokDBStateSize,
+				      &MokDBState);
 	if (EFI_ERROR(efi_status))
 		return EFI_SECURITY_VIOLATION;
 
@@ -2318,11 +2300,10 @@ static EFI_STATUS mok_ignore_db()
 	check_mok_db();
 
 	if (ignore_db) {
-		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokIgnoreDB",
-				&SHIM_LOCK_GUID,
-				EFI_VARIABLE_BOOTSERVICE_ACCESS
-				| EFI_VARIABLE_RUNTIME_ACCESS,
-				DataSize, (void *)&Data);
+		efi_status = gRT->SetVariable(L"MokIgnoreDB", &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					      EFI_VARIABLE_RUNTIME_ACCESS,
+					      DataSize, (void *)&Data);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to set MokIgnoreDB: %r\n", efi_status);
 		}
@@ -2477,8 +2458,8 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	load_options = NULL;
 	load_options_size = 0;
 
-	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &LoadedImageProtocol, (void **) &li);
+	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					 (void **) &li);
 	if (EFI_ERROR(efi_status)) {
 		perror (L"Failed to get load options: %r\n", efi_status);
 		return efi_status;
@@ -2744,9 +2725,10 @@ install_shim_protocols(void)
 	/*
 	 * Install the protocol
 	 */
-	efi_status = uefi_call_wrapper(BS->InstallProtocolInterface, 4,
-			  &shim_lock_handle, &SHIM_LOCK_GUID,
-			  EFI_NATIVE_INTERFACE, &shim_lock_interface);
+	efi_status = gBS->InstallProtocolInterface(&shim_lock_handle,
+						   &SHIM_LOCK_GUID,
+						   EFI_NATIVE_INTERFACE,
+						   &shim_lock_interface);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Could not install security protocol",
 			      efi_status);
@@ -2772,8 +2754,8 @@ uninstall_shim_protocols(void)
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
-	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, shim_lock_handle,
-			  &SHIM_LOCK_GUID, &shim_lock_interface);
+	gBS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
+					&shim_lock_interface);
 
 	if (!secure_mode())
 		return;
@@ -2932,9 +2914,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		Print(L"Something has gone seriously wrong: %r\n", efi_status);
 		Print(L"Shim was unable to measure state into the TPM\n");
 		msleep(5000000);
-		uefi_call_wrapper(systab->RuntimeServices->ResetSystem, 4,
-				  EfiResetShutdown, EFI_SECURITY_VIOLATION,
-				  0, NULL);
+		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
+				 0, NULL);
 	}
 
 	/*
@@ -2948,9 +2929,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		Print(L"Something has gone seriously wrong: %r\n", efi_status);
 		Print(L"shim cannot continue, sorry.\n");
 		msleep(5000000);
-		uefi_call_wrapper(systab->RuntimeServices->ResetSystem, 4,
-				  EfiResetShutdown, EFI_SECURITY_VIOLATION,
-				  0, NULL);
+		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
+				 0, NULL);
 	}
 
 	/*
