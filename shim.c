@@ -229,7 +229,7 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	EFI_IMAGE_BASE_RELOCATION *RelocBase, *RelocBaseEnd;
 	UINT64 Adjust;
 	UINT16 *Reloc, *RelocEnd;
-	char *Fixup, *FixupBase, *FixupData = NULL;
+	char *Fixup, *FixupBase;
 	UINT16 *Fixup16;
 	UINT32 *Fixup32;
 	UINT64 *Fixup64;
@@ -315,39 +315,21 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 			case EFI_IMAGE_REL_BASED_HIGH:
 				Fixup16   = (UINT16 *) Fixup;
 				*Fixup16 = (UINT16) (*Fixup16 + ((UINT16) ((UINT32) Adjust >> 16)));
-				if (FixupData != NULL) {
-					*(UINT16 *) FixupData = *Fixup16;
-					FixupData             = FixupData + sizeof (UINT16);
-				}
 				break;
 
 			case EFI_IMAGE_REL_BASED_LOW:
 				Fixup16   = (UINT16 *) Fixup;
 				*Fixup16  = (UINT16) (*Fixup16 + (UINT16) Adjust);
-				if (FixupData != NULL) {
-					*(UINT16 *) FixupData = *Fixup16;
-					FixupData             = FixupData + sizeof (UINT16);
-				}
 				break;
 
 			case EFI_IMAGE_REL_BASED_HIGHLOW:
 				Fixup32   = (UINT32 *) Fixup;
 				*Fixup32  = *Fixup32 + (UINT32) Adjust;
-				if (FixupData != NULL) {
-					FixupData             = ALIGN_POINTER (FixupData, sizeof (UINT32));
-					*(UINT32 *)FixupData  = *Fixup32;
-					FixupData             = FixupData + sizeof (UINT32);
-				}
 				break;
 
 			case EFI_IMAGE_REL_BASED_DIR64:
 				Fixup64 = (UINT64 *) Fixup;
 				*Fixup64 = *Fixup64 + (UINT64) Adjust;
-				if (FixupData != NULL) {
-					FixupData = ALIGN_POINTER (FixupData, sizeof(UINT64));
-					*(UINT64 *)(FixupData) = *Fixup64;
-					FixupData = FixupData + sizeof(UINT64);
-				}
 				break;
 
 			default:
