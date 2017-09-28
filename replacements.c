@@ -78,38 +78,40 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	EFI_DEVICE_PATH *DevicePath, VOID *SourceBuffer,
 	UINTN SourceSize, EFI_HANDLE *ImageHandle)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	unhook_system_services();
 
-	status = systab->BootServices->LoadImage(BootPolicy,
-			ParentImageHandle, DevicePath,
-			SourceBuffer, SourceSize, ImageHandle);
+	efi_status = systab->BootServices->LoadImage(BootPolicy,
+						     ParentImageHandle,
+						     DevicePath, SourceBuffer,
+						     SourceSize, ImageHandle);
 	hook_system_services(systab);
-	if (EFI_ERROR(status))
+	if (EFI_ERROR(efi_status))
 		last_loaded_image = NULL;
 	else
 		last_loaded_image = *ImageHandle;
-	return status;
+	return efi_status;
 }
 
 static EFI_STATUS EFIAPI
 start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	unhook_system_services();
 
 	if (image_handle == last_loaded_image) {
 		loader_is_participating = 1;
 		uninstall_shim_protocols();
 	}
-	status = systab->BootServices->StartImage(image_handle, exit_data_size, exit_data);
-	if (EFI_ERROR(status)) {
+	efi_status = systab->BootServices->StartImage(image_handle, exit_data_size,
+						      exit_data);
+	if (EFI_ERROR(efi_status)) {
 		if (image_handle == last_loaded_image) {
-			EFI_STATUS status2 = install_shim_protocols();
+			EFI_STATUS efi_status2 = install_shim_protocols();
 
-			if (EFI_ERROR(status2)) {
-				Print(L"Something has gone seriously wrong: %d\n",
-					status2);
+			if (EFI_ERROR(efi_status2)) {
+				Print(L"Something has gone seriously wrong: %r\n",
+					efi_status2);
 				Print(L"shim cannot continue, sorry.\n");
 				msleep(5000000);
 				systab->RuntimeServices->ResetSystem(
@@ -120,19 +122,21 @@ start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 		hook_system_services(systab);
 		loader_is_participating = 0;
 	}
-	return status;
+	return efi_status;
 }
 
 static EFI_STATUS EFIAPI
 exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 {
-	if (loader_is_participating || verification_method == VERIFIED_BY_HASH) {
+	if (loader_is_participating ||
+	    verification_method == VERIFIED_BY_HASH) {
 		unhook_system_services();
-		EFI_STATUS status;
-		status = systab->BootServices->ExitBootServices(image_key, map_key);
-		if (status != EFI_SUCCESS)
+		EFI_STATUS efi_status;
+		efi_status = systab->BootServices->ExitBootServices(image_key,
+								    map_key);
+		if (EFI_ERROR(efi_status))
 			hook_system_services(systab);
-		return status;
+		return efi_status;
 	}
 
 	Print(L"Bootloader has not verified loaded image.\n");
@@ -146,18 +150,18 @@ static EFI_STATUS EFIAPI
 do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 	UINTN ExitDataSize, CHAR16 *ExitData)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	shim_fini();
 
-	status = systab->BootServices->Exit(ImageHandle, ExitStatus,
-					    ExitDataSize, ExitData);
-	if (EFI_ERROR(status)) {
-		EFI_STATUS status2 = shim_init();
+	efi_status = systab->BootServices->Exit(ImageHandle, ExitStatus,
+						ExitDataSize, ExitData);
+	if (EFI_ERROR(efi_status)) {
+		EFI_STATUS efi_status2 = shim_init();
 
-		if (EFI_ERROR(status2)) {
+		if (EFI_ERROR(efi_status2)) {
 			Print(L"Something has gone seriously wrong: %r\n",
-				status2);
+				efi_status2);
 			Print(L"shim cannot continue, sorry.\n");
 			msleep(5000000);
 			systab->RuntimeServices->ResetSystem(
@@ -165,7 +169,7 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 				EFI_SECURITY_VIOLATION, 0, NULL);
 		}
 	}
-	return status;
+	return efi_status;
 }
 
 void

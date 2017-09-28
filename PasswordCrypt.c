@@ -286,7 +286,7 @@ static EFI_STATUS blowfish_crypt (const char *key, const char *salt, UINT8 *hash
 EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 			   const PASSWORD_CRYPT *pw_crypt, UINT8 *hash)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	if (!pw_crypt)
 		return EFI_INVALID_PARAMETER;
@@ -294,32 +294,36 @@ EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 	switch (pw_crypt->method) {
 	case TRADITIONAL_DES:
 	case EXTEND_BSDI_DES:
-		status = EFI_UNSUPPORTED;
+		efi_status = EFI_UNSUPPORTED;
 		break;
 	case MD5_BASED:
-		status = md5_crypt (password, pw_length, (char *)pw_crypt->salt,
-				    pw_crypt->salt_size, hash);
+		efi_status = md5_crypt (password, pw_length,
+					(char *)pw_crypt->salt,
+					pw_crypt->salt_size, hash);
 		break;
 	case SHA256_BASED:
-		status = sha256_crypt(password, pw_length, (char *)pw_crypt->salt,
-				      pw_crypt->salt_size, pw_crypt->iter_count,
-				      hash);
+		efi_status = sha256_crypt(password, pw_length,
+					  (char *)pw_crypt->salt,
+					  pw_crypt->salt_size,
+					  pw_crypt->iter_count, hash);
 		break;
 	case SHA512_BASED:
-		status = sha512_crypt(password, pw_length, (char *)pw_crypt->salt,
-				      pw_crypt->salt_size, pw_crypt->iter_count,
-				      hash);
+		efi_status = sha512_crypt(password, pw_length,
+					  (char *)pw_crypt->salt,
+					  pw_crypt->salt_size,
+					  pw_crypt->iter_count, hash);
 		break;
 	case BLOWFISH_BASED:
 		if (pw_crypt->salt_size != (7 + 22 + 1)) {
-			status = EFI_INVALID_PARAMETER;
+			efi_status = EFI_INVALID_PARAMETER;
 			break;
 		}
-		status = blowfish_crypt(password, (char *)pw_crypt->salt, hash);
+		efi_status = blowfish_crypt(password, (char *)pw_crypt->salt,
+					    hash);
 		break;
 	default:
 		return EFI_INVALID_PARAMETER;
 	}
 
-	return status;
+	return efi_status;
 }

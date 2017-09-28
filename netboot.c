@@ -58,11 +58,11 @@ typedef struct {
  */
 BOOLEAN findNetboot(EFI_HANDLE device)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				   &PxeBaseCodeProtocol, (VOID **)&pxe);
-	if (status != EFI_SUCCESS) {
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
+				       &PxeBaseCodeProtocol, (VOID **)&pxe);
+	if (EFI_ERROR(efi_status)) {
 		pxe = NULL;
 		return FALSE;
 	}
@@ -298,7 +298,7 @@ static EFI_STATUS parseDhcp4()
 EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle)
 {
 
-	EFI_STATUS rc;
+	EFI_STATUS efi_status;
 
 	if (!pxe)
 		return EFI_NOT_READY;
@@ -310,15 +310,15 @@ EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle)
 	 * if its ipv4 or ipv6
 	 */
 	if (pxe->Mode->UsingIpv6){
-		rc = parseDhcp6();
+		efi_status = parseDhcp6();
 	} else
-		rc = parseDhcp4();
-	return rc;
+		efi_status = parseDhcp4();
+	return efi_status;
 }
 
 EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *bufsiz)
 {
-	EFI_STATUS rc;
+	EFI_STATUS efi_status;
 	EFI_PXE_BASE_CODE_TFTP_OPCODE read = EFI_PXE_BASE_CODE_TFTP_READ_FILE;
 	BOOLEAN overwrite = FALSE;
 	BOOLEAN nobuffer = FALSE;
@@ -328,15 +328,15 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *buf
 	if (*buffer == NULL) {
 		*buffer = AllocatePool(4096 * 1024);
 		if (!*buffer)
-			return EFI_OUT_OF_RESOURCES; 
+			return EFI_OUT_OF_RESOURCES;
 		*bufsiz = 4096 * 1024;
 	}
 
 try_again:
-	rc = uefi_call_wrapper(pxe->Mtftp, 10, pxe, read, *buffer, overwrite,
-				bufsiz, &blksz, &tftp_addr, full_path, NULL, nobuffer);
-
-	if (rc == EFI_BUFFER_TOO_SMALL) {
+	efi_status = uefi_call_wrapper(pxe->Mtftp, 10, pxe, read, *buffer,
+				       overwrite, bufsiz, &blksz, &tftp_addr,
+				       full_path, NULL, nobuffer);
+	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		/* try again, doubling buf size */
 		*bufsiz *= 2;
 		FreePool(*buffer);
@@ -346,8 +346,8 @@ try_again:
 		goto try_again;
 	}
 
-	if (rc != EFI_SUCCESS && *buffer) {
+	if (EFI_ERROR(efi_status) && *buffer) {
 		FreePool(*buffer);
 	}
-	return rc;
+	return efi_status;
 }
