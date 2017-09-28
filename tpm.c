@@ -25,17 +25,16 @@ VARIABLE_RECORD *measureddata = NULL;
 
 static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	TCG_EFI_BOOT_SERVICE_CAPABILITY caps;
 	UINT32 flags;
 	EFI_PHYSICAL_ADDRESS eventlog, lastevent;
 
 	caps.Size = (UINT8)sizeof(caps);
-	status = uefi_call_wrapper(tpm->status_check, 5, tpm, &caps, &flags,
-				   &eventlog, &lastevent);
-
-	if (status != EFI_SUCCESS || caps.TPMDeactivatedFlag
-	    || !caps.TPMPresentFlag)
+	efi_status = uefi_call_wrapper(tpm->status_check, 5, tpm, &caps, &flags,
+				       &eventlog, &lastevent);
+	if (EFI_ERROR(efi_status) ||
+	    caps.TPMDeactivatedFlag || !caps.TPMPresentFlag)
 		return FALSE;
 
 	return TRUE;
@@ -45,14 +44,13 @@ static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
 				EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
 				BOOLEAN *old_caps)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	caps->Size = (UINT8)sizeof(*caps);
 
-	status = uefi_call_wrapper(tpm->get_capability, 2, tpm, caps);
-
-	if (status != EFI_SUCCESS)
-		return status;
+	efi_status = uefi_call_wrapper(tpm->get_capability, 2, tpm, caps);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	if (caps->StructureVersion.Major == 1 &&
 	    caps->StructureVersion.Minor == 0)
@@ -119,19 +117,19 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 				      BOOLEAN *old_caps_p,
 				      EFI_TCG2_BOOT_SERVICE_CAPABILITY *capsp)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	*tpm = NULL;
 	*tpm2 = NULL;
-	status = LibLocateProtocol(&EFI_TPM2_GUID, (VOID **)tpm2);
+	efi_status = LibLocateProtocol(&EFI_TPM2_GUID, (VOID **)tpm2);
 	/* TPM 2.0 */
-	if (status == EFI_SUCCESS) {
+	if (!EFI_ERROR(efi_status)) {
 		BOOLEAN old_caps;
 		EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
 
-		status = tpm2_get_caps(*tpm2, &caps, &old_caps);
-		if (EFI_ERROR(status))
-			return status;
+		efi_status = tpm2_get_caps(*tpm2, &caps, &old_caps);
+		if (EFI_ERROR(efi_status))
+			return efi_status;
 
 		if (tpm2_present(&caps, old_caps)) {
 			if (old_caps_p)
@@ -141,9 +139,9 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 			return EFI_SUCCESS;
 		}
 	} else {
-		status = LibLocateProtocol(&EFI_TPM_GUID, (VOID **)tpm);
-		if (EFI_ERROR(status))
-			return status;
+		efi_status = LibLocateProtocol(&EFI_TPM_GUID, (VOID **)tpm);
+		if (EFI_ERROR(efi_status))
+			return efi_status;
 
 		if (tpm_present(*tpm))
 			return EFI_SUCCESS;
@@ -156,25 +154,27 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
 				    UINT32 type, CHAR8 *hash)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	efi_tpm_protocol_t *tpm;
 	efi_tpm2_protocol_t *tpm2;
 	BOOLEAN old_caps;
 	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
 
-	status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
-	if (EFI_ERROR(status)) {
-		return status;
+	efi_status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
+	if (EFI_ERROR(efi_status)) {
+		return efi_status;
 	} else if (tpm2) {
 		EFI_TCG2_EVENT *event;
 		EFI_TCG2_EVENT_LOG_BITMAP supported_logs;
 
 		supported_logs = tpm2_get_supported_logs(tpm2, &caps, old_caps);
 
-		status = trigger_tcg2_final_events_table(tpm2, supported_logs);
-		if (EFI_ERROR(status)) {
-			perror(L"Unable to trigger tcg2 final events table: %r\n", status);
-			return status;
+		efi_status = trigger_tcg2_final_events_table(tpm2,
+							     supported_logs);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Unable to trigger tcg2 final events table: %r\n",
+			       efi_status);
+			return efi_status;
 		}
 
 		event = AllocatePool(sizeof(*event) + logsize);
@@ -194,26 +194,25 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			   themselves if we pass PE_COFF_IMAGE.  In case that
 			   fails we fall back to measuring without it.
 			*/
-			status = uefi_call_wrapper(tpm2->hash_log_extend_event,
-						   5, tpm2, PE_COFF_IMAGE, buf,
-						   (UINT64) size, event);
+			efi_status = uefi_call_wrapper(tpm2->hash_log_extend_event,
+						       5, tpm2, PE_COFF_IMAGE, buf,
+						       (UINT64) size, event);
 		}
 
-	        if (!hash || EFI_ERROR(status)) {
-			status = uefi_call_wrapper(tpm2->hash_log_extend_event,
-						   5, tpm2, 0, buf,
-						   (UINT64) size, event);
+	        if (!hash || EFI_ERROR(efi_status)) {
+			efi_status = uefi_call_wrapper(tpm2->hash_log_extend_event,
+						       5, tpm2, 0, buf,
+						       (UINT64) size, event);
 		}
 		FreePool(event);
-		return status;
+		return efi_status;
 	} else if (tpm) {
 		TCG_PCR_EVENT *event;
 		UINT32 eventnum = 0;
 		EFI_PHYSICAL_ADDRESS lastevent;
 
-		status = LibLocateProtocol(&EFI_TPM_GUID, (VOID **)&tpm);
-
-		if (status != EFI_SUCCESS)
+		efi_status = LibLocateProtocol(&EFI_TPM_GUID, (VOID **)&tpm);
+		if (EFI_ERROR(efi_status))
 			return EFI_SUCCESS;
 
 		if (!tpm_present(tpm))
@@ -235,18 +234,18 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			   hash rather than allowing the firmware to attempt
 			   to calculate it */
 			CopyMem(event->digest, hash, sizeof(event->digest));
-			status = uefi_call_wrapper(tpm->log_extend_event, 7,
-						   tpm, 0, 0, TPM_ALG_SHA,
-						   event, &eventnum,
-						   &lastevent);
+			efi_status = uefi_call_wrapper(tpm->log_extend_event, 7,
+						       tpm, 0, 0, TPM_ALG_SHA,
+						       event, &eventnum,
+						       &lastevent);
 		} else {
-			status = uefi_call_wrapper(tpm->log_extend_event, 7,
-						   tpm, buf, (UINT64)size,
-						   TPM_ALG_SHA, event,
-						   &eventnum, &lastevent);
+			efi_status = uefi_call_wrapper(tpm->log_extend_event, 7,
+						       tpm, buf, (UINT64)size,
+						       TPM_ALG_SHA, event,
+						       &eventnum, &lastevent);
 		}
 		FreePool(event);
-		return status;
+		return efi_status;
 	}
 
 	return EFI_SUCCESS;
@@ -333,7 +332,7 @@ static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGu
 
 EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
 {
-	EFI_STATUS Status;
+	EFI_STATUS efi_status;
 	UINTN VarNameLength;
 	EFI_VARIABLE_DATA_TREE *VarLog;
 	UINT32 VarLogSize;
@@ -363,14 +362,14 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 	CopyMem ((CHAR16 *)VarLog->UnicodeName + VarNameLength, VarData,
 		 VarSize);
 
-	Status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)VarLog,
-				   VarLogSize, 7, (CHAR8 *)VarLog, VarLogSize,
-				   EV_EFI_VARIABLE_AUTHORITY, NULL);
+	efi_status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)VarLog,
+				       VarLogSize, 7, (CHAR8 *)VarLog, VarLogSize,
+				       EV_EFI_VARIABLE_AUTHORITY, NULL);
 
 	FreePool(VarLog);
 
-	if (Status != EFI_SUCCESS)
-		return Status;
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	return tpm_record_data_measurement(VarName, VendorGuid, VarSize,
 					   VarData);
@@ -379,12 +378,12 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 EFI_STATUS
 fallback_should_prefer_reset(void)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	efi_tpm_protocol_t *tpm;
 	efi_tpm2_protocol_t *tpm2;
 
-	status = tpm_locate_protocol(&tpm, &tpm2, NULL, NULL);
-	if (EFI_ERROR(status))
+	efi_status = tpm_locate_protocol(&tpm, &tpm2, NULL, NULL);
+	if (EFI_ERROR(efi_status))
 		return EFI_NOT_FOUND;
 	return EFI_SUCCESS;
 }

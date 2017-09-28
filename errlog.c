@@ -54,13 +54,13 @@ EFI_STATUS
 LogError(const char *file, int line, const char *func, CHAR16 *fmt, ...)
 {
 	va_list args;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	va_start(args, fmt);
-	status = VLogError(file, line, func, fmt, args);
+	efi_status = VLogError(file, line, func, fmt, args);
 	va_end(args);
 
-	return status;
+	return efi_status;
 }
 
 VOID

@@ -262,17 +262,14 @@ get_nic_handle (EFI_MAC_ADDRESS *mac)
 	EFI_HANDLE *buffer;
 	UINTN NoHandles;
 	UINTN i;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	/* Get the list of handles that support the HTTP service binding
 	   protocol */
-	status = uefi_call_wrapper(BS->LocateHandleBuffer, 5,
-				   ByProtocol,
-				   &EFI_HTTP_BINDING_GUID,
-				   NULL,
-				   &NoHandles,
-				   &buffer);
-	if (EFI_ERROR(status))
+	efi_status = uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol,
+				       &EFI_HTTP_BINDING_GUID, NULL, &NoHandles,
+				       &buffer);
+	if (EFI_ERROR(efi_status))
 		return NULL;
 
 	for (i = 0; i < NoHandles; i++) {
@@ -327,35 +324,31 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	EFI_IP6_CONFIG_PROTOCOL *ip6cfg;
 	EFI_IP6_CONFIG_MANUAL_ADDRESS ip6;
 	EFI_IPv6_ADDRESS gateway;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
-				   &EFI_IP6_CONFIG_GUID, (VOID **)&ip6cfg);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
+				       &EFI_IP6_CONFIG_GUID, (VOID **)&ip6cfg);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	ip6.Address = ip6node->LocalIpAddress;
 	ip6.PrefixLength = ip6node->PrefixLength;
 	ip6.IsAnycast = FALSE;
-	status = uefi_call_wrapper(ip6cfg->SetData, 4,
-				   ip6cfg,
-				   Ip6ConfigDataTypeManualAddress,
-				   sizeof(ip6),
-				   &ip6);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(ip6cfg->SetData, 4, ip6cfg,
+				       Ip6ConfigDataTypeManualAddress,
+				       sizeof(ip6), &ip6);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	gateway = ip6node->GatewayIpAddress;
 	if (is_unspecified_addr(gateway))
 		return EFI_SUCCESS;
 
-	status = uefi_call_wrapper(ip6cfg->SetData, 4,
-				   ip6cfg,
-				   Ip6ConfigDataTypeGateway,
-				   sizeof(gateway),
-				   &gateway);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(ip6cfg->SetData, 4, ip6cfg,
+				       Ip6ConfigDataTypeGateway,
+				       sizeof(gateway), &gateway);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	return EFI_SUCCESS;
 }
@@ -366,31 +359,29 @@ set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 	EFI_IP4_CONFIG2_PROTOCOL *ip4cfg2;
 	EFI_IP4_CONFIG2_MANUAL_ADDRESS ip4;
 	EFI_IPv4_ADDRESS gateway;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
-				   &EFI_IP4_CONFIG2_GUID, (VOID **)&ip4cfg2);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
+				       &EFI_IP4_CONFIG2_GUID,
+				       (VOID **)&ip4cfg2);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	ip4.Address = ip4node->LocalIpAddress;
 	ip4.SubnetMask = ip4node->SubnetMask;
-	status = uefi_call_wrapper(ip4cfg2->SetData, 4,
-				   ip4cfg2,
-				   Ip4Config2DataTypeManualAddress,
-				   sizeof(ip4),
-				   &ip4);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(ip4cfg2->SetData, 4, ip4cfg2,
+				       Ip4Config2DataTypeManualAddress,
+				       sizeof(ip4), &ip4);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	gateway = ip4node->GatewayIpAddress;
-	status = uefi_call_wrapper(ip4cfg2->SetData, 4,
-				   ip4cfg2,
-				   Ip4Config2DataTypeGateway,
-				   sizeof(gateway),
-				   &gateway);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(ip4cfg2->SetData, 4, ip4cfg2,
+				       Ip4Config2DataTypeGateway,
+				       sizeof(gateway),
+				       &gateway);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	return EFI_SUCCESS;
 }
@@ -437,7 +428,7 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 	EFI_HTTP_HEADER headers[3];
 	BOOLEAN request_done;
 	CHAR16 *Url = NULL;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_STATUS event_status;
 
 	/* Convert the ascii string to the UCS2 string */
@@ -466,21 +457,19 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 	tx_token.Message = &tx_message;
 	tx_token.Event = NULL;
 	request_done = FALSE;
-	status = uefi_call_wrapper(BS->CreateEvent, 5,
-				   EVT_NOTIFY_SIGNAL,
-				   TPL_NOTIFY,
-				   httpnotify,
-				   &request_done,
-				   &tx_token.Event);
-	if (EFI_ERROR(status)) {
-		perror(L"Failed to Create Event for HTTP request: %r\n", status);
+	efi_status = uefi_call_wrapper(BS->CreateEvent, 5, EVT_NOTIFY_SIGNAL,
+				       TPL_NOTIFY, httpnotify, &request_done,
+				       &tx_token.Event);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to Create Event for HTTP request: %r\n",
+		       efi_status);
 		goto no_event;
 	}
 
 	/* Send out the request */
-	status = uefi_call_wrapper(http->Request, 2, http, &tx_token);
-	if (EFI_ERROR(status)) {
-		perror(L"HTTP request failed: %r\n", status);
+	efi_status = uefi_call_wrapper(http->Request, 2, http, &tx_token);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"HTTP request failed: %r\n", efi_status);
 		goto error;
 	}
 
@@ -490,7 +479,7 @@ send_http_request (EFI_HTTP_PROTOCOL *http, CHAR8 *hostname, CHAR8 *uri)
 
 	if (EFI_ERROR(tx_token.Status)) {
 		perror(L"HTTP request: %r\n", tx_token.Status);
-		status = tx_token.Status;
+		efi_status = tx_token.Status;
 	}
 
 error:
@@ -504,7 +493,7 @@ no_event:
 	if (Url)
 		FreePool(Url);
 
-	return status;
+	return efi_status;
 }
 
 static EFI_STATUS
@@ -517,7 +506,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	BOOLEAN response_done;
 	UINTN i, downloaded;
 	CHAR8 rx_buffer[9216];
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_STATUS event_status;
 
 	/* Initialize the rx message and buffer */
@@ -532,21 +521,19 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	rx_token.Message = &rx_message;
 	rx_token.Event = NULL;
 	response_done = FALSE;
-	status = uefi_call_wrapper(BS->CreateEvent, 5,
-				   EVT_NOTIFY_SIGNAL,
-				   TPL_NOTIFY,
-				   httpnotify,
-				   &response_done,
-				   &rx_token.Event);
-	if (EFI_ERROR(status)) {
-		perror(L"Failed to Create Event for HTTP response: %r\n", status);
+	efi_status = uefi_call_wrapper(BS->CreateEvent, 5, EVT_NOTIFY_SIGNAL,
+				       TPL_NOTIFY, httpnotify, &response_done,
+				       &rx_token.Event);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to Create Event for HTTP response: %r\n",
+		       efi_status);
 		goto no_event;
 	}
 
 	/* Notify the firmware to receive the HTTP messages */
-	status = uefi_call_wrapper(http->Response, 2, http, &rx_token);
-	if (EFI_ERROR(status)) {
-		perror(L"HTTP response failed: %r\n", status);
+	efi_status = uefi_call_wrapper(http->Response, 2, http, &rx_token);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"HTTP response failed: %r\n", efi_status);
 		goto error;
 	}
 
@@ -556,7 +543,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 
 	if (EFI_ERROR(rx_token.Status)) {
 		perror(L"HTTP response: %r\n", rx_token.Status);
-		status = rx_token.Status;
+		efi_status = rx_token.Status;
 		goto error;
 	}
 
@@ -565,7 +552,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	if (http_status != HTTP_STATUS_200_OK) {
 		perror(L"HTTP Status Code: %d\n",
 		       convert_http_status_code(http_status));
-		status = EFI_ABORTED;
+		efi_status = EFI_ABORTED;
 		goto error;
 	}
 
@@ -605,9 +592,10 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 		rx_token.Status = EFI_NOT_READY;
 		response_done = FALSE;
 
-		status = uefi_call_wrapper(http->Response, 2, http, &rx_token);
-		if (EFI_ERROR(status)) {
-			perror(L"HTTP response failed: %r\n", status);
+		efi_status = uefi_call_wrapper(http->Response, 2, http,
+					       &rx_token);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"HTTP response failed: %r\n", efi_status);
 			goto error;
 		}
 
@@ -616,12 +604,12 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 
 		if (EFI_ERROR(rx_token.Status)) {
 			perror(L"HTTP response: %r\n", rx_token.Status);
-			status = rx_token.Status;
+			efi_status = rx_token.Status;
 			goto error;
 		}
 
 		if (rx_message.BodyLength + downloaded > *buf_size) {
-			status = EFI_BAD_BUFFER_SIZE;
+			efi_status = EFI_BAD_BUFFER_SIZE;
 			goto error;
 		}
 
@@ -638,10 +626,10 @@ error:
 	}
 
 no_event:
-	if (EFI_ERROR(status) && *buffer)
+	if (EFI_ERROR(efi_status) && *buffer)
 		FreePool(*buffer);
 
-	return status;
+	return efi_status;
 }
 
 static EFI_STATUS
@@ -652,50 +640,51 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	EFI_SERVICE_BINDING *service;
 	EFI_HANDLE http_handle;
 	EFI_HTTP_PROTOCOL *http;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_STATUS child_status;
 
 	*buffer = NULL;
 	*buf_size = 0;
 
 	/* Open HTTP Service Binding Protocol */
-	status = uefi_call_wrapper(BS->OpenProtocol, 6, device,
-				   &EFI_HTTP_BINDING_GUID, (VOID **)&service,
-				   image, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(BS->OpenProtocol, 6, device,
+				       &EFI_HTTP_BINDING_GUID, (VOID **)&service,
+				       image, NULL,
+				       EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	/* Create the ChildHandle from the Service Binding */
 	/* Set the handle to NULL to request a new handle */
 	http_handle = NULL;
-	status = uefi_call_wrapper(service->CreateChild, 2, service,
-				   &http_handle);
-	if (EFI_ERROR (status))
-		return status;
+	efi_status = uefi_call_wrapper(service->CreateChild, 2, service,
+				       &http_handle);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
 	/* Get the http protocol */
-	status = uefi_call_wrapper(BS->HandleProtocol, 3, http_handle,
-				   &EFI_HTTP_PROTOCOL_GUID, (VOID **)&http);
-	if (EFI_ERROR (status)) {
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, http_handle,
+				       &EFI_HTTP_PROTOCOL_GUID, (VOID **)&http);
+	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to get http\n");
 		goto error;
 	}
 
-	status = configure_http(http, is_ip6);
-	if (EFI_ERROR (status)) {
-		perror(L"Failed to configure http: %r\n", status);
+	efi_status = configure_http(http, is_ip6);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to configure http: %r\n", efi_status);
 		goto error;
 	}
 
-	status = send_http_request(http, hostname, uri);
-	if (EFI_ERROR(status)) {
-		perror(L"Failed to send HTTP request: %r\n", status);
+	efi_status = send_http_request(http, hostname, uri);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to send HTTP request: %r\n", efi_status);
 		goto error;
 	}
 
-	status = receive_http_response(http, buffer, buf_size);
-	if (EFI_ERROR(status)) {
-		perror(L"Failed to receive HTTP response: %r\n", status);
+	efi_status = receive_http_response(http, buffer, buf_size);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to receive HTTP response: %r\n", efi_status);
 		goto error;
 	}
 
@@ -703,8 +692,8 @@ error:
 	child_status = uefi_call_wrapper(service->DestroyChild, 2, service,
 					 http_handle);
 
-	if (EFI_ERROR(status)) {
-		return status;
+	if (EFI_ERROR(efi_status)) {
+		return efi_status;
 	} else if (EFI_ERROR(child_status)) {
 		return child_status;
 	}
@@ -715,7 +704,7 @@ error:
 EFI_STATUS
 httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_HANDLE nic;
 	CHAR8 *next_loader = NULL;
 	CHAR8 *next_uri = NULL;
@@ -727,16 +716,16 @@ httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 	next_loader = translate_slashes(DEFAULT_LOADER_CHAR);
 
 	/* Create the URI for the next loader based on the original URI */
-	status = generate_next_uri(uri, next_loader, &next_uri);
-	if (EFI_ERROR (status)) {
-		perror(L"Next URI: %a, %r\n", next_uri, status);
+	efi_status = generate_next_uri(uri, next_loader, &next_uri);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Next URI: %a, %r\n", next_uri, efi_status);
 		goto error;
 	}
 
 	/* Extract the hostname (or IP) from URI */
-	status = extract_hostname(uri, &hostname);
-	if (EFI_ERROR (status)) {
-		perror(L"hostname: %a, %r\n", hostname, status);
+	efi_status = extract_hostname(uri, &hostname);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"hostname: %a, %r\n", hostname, efi_status);
 		goto error;
 	}
 
@@ -751,19 +740,19 @@ httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 	   information in the device path node. We have to set up the
 	   connection on our own for the further operations. */
 	if (!is_ip6)
-		status = set_ip4(nic, &ip4_node);
+		efi_status = set_ip4(nic, &ip4_node);
 	else
-		status = set_ip6(nic, &ip6_node);
-	if (EFI_ERROR (status)) {
-		perror(L"Failed to set IP for HTTPBoot: %r\n", status);
+		efi_status = set_ip6(nic, &ip6_node);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to set IP for HTTPBoot: %r\n", efi_status);
 		goto error;
 	}
 
 	/* Use HTTP protocl to fetch the remote file */
-	status = http_fetch (image, nic, hostname, next_uri, is_ip6,
-			     buffer, buf_size);
-	if (EFI_ERROR (status)) {
-		perror(L"Failed to fetch image: %r\n", status);
+	efi_status = http_fetch (image, nic, hostname, next_uri, is_ip6,
+				 buffer, buf_size);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to fetch image: %r\n", efi_status);
 		goto error;
 	}
 
@@ -775,5 +764,5 @@ error:
 	if (hostname)
 		FreePool(hostname);
 
-	return status;
+	return efi_status;
 }
