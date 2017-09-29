@@ -113,6 +113,7 @@ static void handle_one(char *f)
 	char *b = NULL;
 	size_t sz;
 	uint8_t *data;
+	ssize_t written;
 
 	if (!strcmp(f, "-")) {
 		fd = STDIN_FILENO;
@@ -132,10 +133,14 @@ static void handle_one(char *f)
 		b = alloca(sz * 2 + 1);
 		data2hex(data, sz, b);
 		if (b) {
-			write(1, f, strlen(f));
-			write(1, " ", 1);
-			write(1, b, strlen(b));
-			write(1, "\n", 1);
+			written = write(1, f, strlen(f));
+			if (written < 0)
+				errx(1, "Error writing build id");
+			written = write(1, " ", 1);
+			written = write(1, b, strlen(b));
+			if (written < 0)
+				errx(1, "Error writing build id");
+			written = write(1, "\n", 1);
 		}
 	}
 	elf_end(elf);
