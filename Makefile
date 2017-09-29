@@ -171,7 +171,7 @@ shim.cer: shim.crt
 
 .NOTPARALLEL: shim_cert.h
 shim_cert.h: shim.cer
-	echo "static UINT8 shim_cert[] = {" > $@
+	echo "static UINT8 shim_cert[] __attribute__((__unused__)) = {" > $@
 	$(HEXDUMP) -v -e '1/1 "0x%02x, "' $< >> $@
 	echo "};" >> $@
 
