@@ -35,6 +35,8 @@
 
 #include "shim.h"
 
+#include <stdarg.h>
+
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/dh.h>
@@ -46,7 +48,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/rsa.h>
-#include <openssl/dso.h>
+#include <internal/dso.h>
 
 #include <Library/BaseCryptLib.h>
 
@@ -400,8 +402,6 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
 
 		X509_free(x509);
 	}
-
-	OBJ_cleanup();
 
 	return TRUE;
 }
@@ -2314,13 +2314,13 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 }
 
 static void *
-ossl_malloc(size_t num)
+ossl_malloc(size_t num, const char *file, int line)
 {
 	return AllocatePool(num);
 }
 
 static void
-ossl_free(void *addr)
+ossl_free(void *addr, const char *file, int line)
 {
 	FreePool(addr);
 }
