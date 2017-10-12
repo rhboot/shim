@@ -382,4 +382,7 @@ extern FILE  *stdout;
 #define gmtime_r(timer,result)            (result = NULL)
 #define abort()
 
+void clear_ca_warning();
+BOOLEAN get_ca_warning();
+
 #endif
