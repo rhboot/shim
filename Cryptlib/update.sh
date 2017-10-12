@@ -36,3 +36,4 @@ cp $DIR/CryptoPkg/Library/Include/openssl/opensslconf.h Include/openssl/
 
 patch -p2 <Cryptlib.diff
 patch -p2 <opensslconf-diff.patch
+patch -p2 <ca-check-workaround.patch

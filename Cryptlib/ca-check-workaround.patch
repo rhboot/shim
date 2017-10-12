@@ -1,0 +1,60 @@
+diff --git a/Cryptlib/Pk/CryptPkcs7Verify.c b/Cryptlib/Pk/CryptPkcs7Verify.c
+index bf24e92..cbd9669 100644
+--- a/Cryptlib/Pk/CryptPkcs7Verify.c
++++ b/Cryptlib/Pk/CryptPkcs7Verify.c
+@@ -30,6 +30,43 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+ 
+ UINT8 mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
+ 
++BOOLEAN ca_warning;
++
++void
++clear_ca_warning()
++{
++  ca_warning = FALSE;
++}
++
++BOOLEAN
++get_ca_warning()
++{
++  return ca_warning;
++}
++
++int
++X509VerifyCb (
++  IN int            Status,
++  IN X509_STORE_CTX *Context
++  )
++{
++  INTN         Error;
++
++  Error = (INTN) X509_STORE_CTX_get_error (Context);
++
++  if (Error == X509_V_ERR_INVALID_CA) {
++    /* Due to the historical reason, we have to relax the the x509 v3 extension
++     * check to allow the CA certificates without the CA flag in the basic
++     * constraints or KeyCertSign in the key usage to be loaded. In the future,
++     * this callback should be removed to enforce the proper check. */
++    ca_warning = TRUE;
++
++    return 1;
++  }
++
++  return Status;
++}
++
+ /**
+   Check input P7Data is a wrapped ContentInfo structure or not. If not construct
+   a new structure to wrap P7Data.
+@@ -858,6 +895,8 @@ Pkcs7Verify (
+     goto _Exit;
+   }
+ 
++  X509_STORE_set_verify_cb (CertStore, X509VerifyCb);
++
+   //
+   // For generic PKCS#7 handling, InData may be NULL if the content is present
+   // in PKCS#7 structure. So ignore NULL checking here.
+-- 
+2.14.2
+
