@@ -1,19 +1,19 @@
 diff --git a/Cryptlib/OpenSSL/crypto/bio/b_print.c b/Cryptlib/OpenSSL/crypto/bio/b_print.c
-index 90248fa..dfc26bc 100644
+index e91ab6d..f33caa2 100644
 --- a/Cryptlib/OpenSSL/crypto/bio/b_print.c
 +++ b/Cryptlib/OpenSSL/crypto/bio/b_print.c
-@@ -129,8 +129,10 @@ static int fmtstr(char **, char **, size_t *, size_t *,
+@@ -51,8 +51,10 @@ static int fmtstr(char **, char **, size_t *, size_t *,
                    const char *, int, int, int);
  static int fmtint(char **, char **, size_t *, size_t *,
                    LLONG, int, int, int, int);
 +#ifndef OPENSSL_SYS_UEFI
  static int fmtfp(char **, char **, size_t *, size_t *,
-                  LDOUBLE, int, int, int);
+                  LDOUBLE, int, int, int, int);
 +#endif
  static int doapr_outch(char **, char **, size_t *, size_t *, int);
  static int _dopr(char **sbuffer, char **buffer,
                   size_t *maxlen, size_t *retlen, int *truncated,
-@@ -173,7 +175,9 @@ _dopr(char **sbuffer,
+@@ -107,7 +109,9 @@ _dopr(char **sbuffer,
  {
      char ch;
      LLONG value;
@@ -23,7 +23,7 @@ index 90248fa..dfc26bc 100644
      char *strvalue;
      int min;
      int max;
-@@ -276,10 +280,12 @@ _dopr(char **sbuffer,
+@@ -210,10 +214,12 @@ _dopr(char **sbuffer,
                  cflags = DP_C_LLONG;
                  ch = *format++;
                  break;
@@ -36,7 +36,7 @@ index 90248fa..dfc26bc 100644
              default:
                  break;
              }
-@@ -333,6 +339,7 @@ _dopr(char **sbuffer,
+@@ -267,6 +273,7 @@ _dopr(char **sbuffer,
                              min, max, flags))
                      return 0;
                  break;
@@ -44,15 +44,15 @@ index 90248fa..dfc26bc 100644
              case 'f':
                  if (cflags == DP_C_LDOUBLE)
                      fvalue = va_arg(args, LDOUBLE);
-@@ -358,6 +365,7 @@ _dopr(char **sbuffer,
-                 else
-                     fvalue = va_arg(args, double);
+@@ -298,6 +305,7 @@ _dopr(char **sbuffer,
+                            flags, G_FORMAT))
+                     return 0;
                  break;
 +#endif
              case 'c':
                  if(!doapr_outch(sbuffer, buffer, &currlen, maxlen,
                              va_arg(args, int)))
-@@ -575,6 +583,7 @@ fmtint(char **sbuffer,
+@@ -530,6 +538,7 @@ fmtint(char **sbuffer,
      return 1;
  }
  
@@ -60,7 +60,7 @@ index 90248fa..dfc26bc 100644
  static LDOUBLE abs_val(LDOUBLE value)
  {
      LDOUBLE result = value;
-@@ -733,6 +742,7 @@ fmtfp(char **sbuffer,
+@@ -816,6 +825,7 @@ fmtfp(char **sbuffer,
      }
      return 1;
  }

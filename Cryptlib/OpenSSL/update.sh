@@ -1,444 +1,87 @@
 #/bin/sh
 DIR=$1
-version="1.0.2k"
+OPENSSLLIB_PATH=$DIR/CryptoPkg/Library/OpensslLib
+OPENSSL_PATH=$OPENSSLLIB_PATH/openssl
 
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/e_os.h e_os.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/constant_time_locl.h crypto/constant_time_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md32_common.h crypto/md32_common.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cryptlib.h crypto/cryptlib.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cryptlib.c crypto/cryptlib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/mem.c crypto/mem.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/mem_clr.c crypto/mem_clr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/mem_dbg.c crypto/mem_dbg.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cversion.c crypto/cversion.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ex_data.c crypto/ex_data.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cpt_err.c crypto/cpt_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ebcdic.c crypto/ebcdic.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/uid.c crypto/uid.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_time.h crypto/o_time.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_time.c crypto/o_time.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_str.h crypto/o_str.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_str.c crypto/o_str.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_dir.h crypto/o_dir.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_dir.c crypto/o_dir.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_fips.c crypto/o_fips.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/o_init.c crypto/o_init.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/fips_ers.c crypto/fips_ers.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/LPdir_nyi.c crypto/LPdir_nyi.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md5/md5_locl.h crypto/md5/md5_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md5/md5_dgst.c crypto/md5/md5_dgst.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/md5/md5_one.c crypto/md5/md5_one.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha_locl.h crypto/sha/sha_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha_dgst.c crypto/sha/sha_dgst.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha1dgst.c crypto/sha/sha1dgst.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha_one.c crypto/sha/sha_one.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha1_one.c crypto/sha/sha1_one.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha256.c crypto/sha/sha256.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/sha/sha512.c crypto/sha/sha512.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/hmac/hmac.c crypto/hmac/hmac.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/hmac/hm_ameth.c crypto/hmac/hm_ameth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/hmac/hm_pmeth.c crypto/hmac/hm_pmeth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rc4/rc4_locl.h crypto/rc4/rc4_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rc4/rc4_enc.c crypto/rc4/rc4_enc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rc4/rc4_skey.c crypto/rc4/rc4_skey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rc4/rc4_utl.c crypto/rc4/rc4_utl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_locl.h crypto/aes/aes_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_misc.c crypto/aes/aes_misc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_ecb.c crypto/aes/aes_ecb.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_cfb.c crypto/aes/aes_cfb.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_ofb.c crypto/aes/aes_ofb.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_ctr.c crypto/aes/aes_ctr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_ige.c crypto/aes/aes_ige.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_wrap.c crypto/aes/aes_wrap.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_core.c crypto/aes/aes_core.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/aes/aes_cbc.c crypto/aes/aes_cbc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/modes_lcl.h crypto/modes/modes_lcl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/cbc128.c crypto/modes/cbc128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/ctr128.c crypto/modes/ctr128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/cts128.c crypto/modes/cts128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/cfb128.c crypto/modes/cfb128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/ofb128.c crypto/modes/ofb128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/gcm128.c crypto/modes/gcm128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/ccm128.c crypto/modes/ccm128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/xts128.c crypto/modes/xts128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/modes/wrap128.c crypto/modes/wrap128.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn.h crypto/bn/bn.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_lcl.h crypto/bn/bn_lcl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_prime.h crypto/bn/bn_prime.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_add.c crypto/bn/bn_add.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_div.c crypto/bn/bn_div.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_exp.c crypto/bn/bn_exp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_lib.c crypto/bn/bn_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_ctx.c crypto/bn/bn_ctx.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_mul.c crypto/bn/bn_mul.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_mod.c crypto/bn/bn_mod.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_print.c crypto/bn/bn_print.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_rand.c crypto/bn/bn_rand.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_shift.c crypto/bn/bn_shift.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_word.c crypto/bn/bn_word.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_blind.c crypto/bn/bn_blind.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_kron.c crypto/bn/bn_kron.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_sqrt.c crypto/bn/bn_sqrt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_gcd.c crypto/bn/bn_gcd.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_prime.c crypto/bn/bn_prime.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_err.c crypto/bn/bn_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_sqr.c crypto/bn/bn_sqr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_asm.c crypto/bn/bn_asm.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_recp.c crypto/bn/bn_recp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_mont.c crypto/bn/bn_mont.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_mpi.c crypto/bn/bn_mpi.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_exp2.c crypto/bn/bn_exp2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_gf2m.c crypto/bn/bn_gf2m.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_nist.c crypto/bn/bn_nist.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_depr.c crypto/bn/bn_depr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_x931p.c crypto/bn/bn_x931p.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/bn_const.c crypto/bn/bn_const.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bn/rsaz_exp.h crypto/bn/rsaz_exp.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_locl.h crypto/rsa/rsa_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_eay.c crypto/rsa/rsa_eay.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_gen.c crypto/rsa/rsa_gen.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_lib.c crypto/rsa/rsa_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_sign.c crypto/rsa/rsa_sign.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_saos.c crypto/rsa/rsa_saos.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_err.c crypto/rsa/rsa_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_pk1.c crypto/rsa/rsa_pk1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_ssl.c crypto/rsa/rsa_ssl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_none.c crypto/rsa/rsa_none.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_oaep.c crypto/rsa/rsa_oaep.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_chk.c crypto/rsa/rsa_chk.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_null.c crypto/rsa/rsa_null.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_pss.c crypto/rsa/rsa_pss.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_x931.c crypto/rsa/rsa_x931.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_asn1.c crypto/rsa/rsa_asn1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_depr.c crypto/rsa/rsa_depr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_ameth.c crypto/rsa/rsa_ameth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_prn.c crypto/rsa/rsa_prn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_pmeth.c crypto/rsa/rsa_pmeth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rsa/rsa_crpt.c crypto/rsa/rsa_crpt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_dl.c crypto/dso/dso_dl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_dlfcn.c crypto/dso/dso_dlfcn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_err.c crypto/dso/dso_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_lib.c crypto/dso/dso_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_null.c crypto/dso/dso_null.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_openssl.c crypto/dso/dso_openssl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_win32.c crypto/dso/dso_win32.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_vms.c crypto/dso/dso_vms.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dso/dso_beos.c crypto/dso/dso_beos.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_asn1.c crypto/dh/dh_asn1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_gen.c crypto/dh/dh_gen.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_key.c crypto/dh/dh_key.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_lib.c crypto/dh/dh_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_check.c crypto/dh/dh_check.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_err.c crypto/dh/dh_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_depr.c crypto/dh/dh_depr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_ameth.c crypto/dh/dh_ameth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_pmeth.c crypto/dh/dh_pmeth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_prn.c crypto/dh/dh_prn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/dh/dh_rfc5114.c crypto/dh/dh_rfc5114.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/buffer/buffer.c crypto/buffer/buffer.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/buffer/buf_str.c crypto/buffer/buf_str.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/buffer/buf_err.c crypto/buffer/buf_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bio_lcl.h crypto/bio/bio_lcl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bio_lib.c crypto/bio/bio_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bio_cb.c crypto/bio/bio_cb.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bio_err.c crypto/bio/bio_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_mem.c crypto/bio/bss_mem.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_null.c crypto/bio/bss_null.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_fd.c crypto/bio/bss_fd.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_file.c crypto/bio/bss_file.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_sock.c crypto/bio/bss_sock.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_conn.c crypto/bio/bss_conn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bf_null.c crypto/bio/bf_null.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bf_buff.c crypto/bio/bf_buff.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/b_dump.c crypto/bio/b_dump.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/b_print.c crypto/bio/b_print.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/b_sock.c crypto/bio/b_sock.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_acpt.c crypto/bio/bss_acpt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bf_nbio.c crypto/bio/bf_nbio.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_log.c crypto/bio/bss_log.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_bio.c crypto/bio/bss_bio.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/bio/bss_dgram.c crypto/bio/bss_dgram.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/stack/stack.c crypto/stack/stack.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/lhash/lhash.c crypto/lhash/lhash.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/lhash/lh_stats.c crypto/lhash/lh_stats.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rand/rand_lcl.h crypto/rand/rand_lcl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rand/md_rand.c crypto/rand/md_rand.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rand/randfile.c crypto/rand/randfile.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rand/rand_lib.c crypto/rand/rand_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rand/rand_err.c crypto/rand/rand_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/rand/rand_unix.c crypto/rand/rand_unix.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/err/err.c crypto/err/err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/err/err_all.c crypto/err/err_all.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/err/err_prn.c crypto/err/err_prn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/o_names.c crypto/objects/o_names.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/obj_dat.h crypto/objects/obj_dat.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/obj_dat.c crypto/objects/obj_dat.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/obj_lib.c crypto/objects/obj_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/obj_err.c crypto/objects/obj_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/obj_xref.h crypto/objects/obj_xref.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/objects/obj_xref.c crypto/objects/obj_xref.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_locl.h crypto/evp/evp_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/encode.c crypto/evp/encode.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/digest.c crypto/evp/digest.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_enc.c crypto/evp/evp_enc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_key.c crypto/evp/evp_key.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_acnf.c crypto/evp/evp_acnf.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_cnf.c crypto/evp/evp_cnf.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_des.c crypto/evp/e_des.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_bf.c crypto/evp/e_bf.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_idea.c crypto/evp/e_idea.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_des3.c crypto/evp/e_des3.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_camellia.c crypto/evp/e_camellia.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_rc4.c crypto/evp/e_rc4.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_aes.c crypto/evp/e_aes.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/names.c crypto/evp/names.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_seed.c crypto/evp/e_seed.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_xcbc_d.c crypto/evp/e_xcbc_d.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_rc2.c crypto/evp/e_rc2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_cast.c crypto/evp/e_cast.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_rc5.c crypto/evp/e_rc5.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_null.c crypto/evp/m_null.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_md2.c crypto/evp/m_md2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_md4.c crypto/evp/m_md4.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_md5.c crypto/evp/m_md5.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_sha.c crypto/evp/m_sha.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_sha1.c crypto/evp/m_sha1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_wp.c crypto/evp/m_wp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_dss.c crypto/evp/m_dss.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_dss1.c crypto/evp/m_dss1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_mdc2.c crypto/evp/m_mdc2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_ripemd.c crypto/evp/m_ripemd.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_ecdsa.c crypto/evp/m_ecdsa.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_open.c crypto/evp/p_open.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_seal.c crypto/evp/p_seal.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_sign.c crypto/evp/p_sign.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_verify.c crypto/evp/p_verify.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_lib.c crypto/evp/p_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_enc.c crypto/evp/p_enc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p_dec.c crypto/evp/p_dec.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/bio_md.c crypto/evp/bio_md.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/bio_b64.c crypto/evp/bio_b64.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/bio_enc.c crypto/evp/bio_enc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_err.c crypto/evp/evp_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_null.c crypto/evp/e_null.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/c_all.c crypto/evp/c_all.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/c_allc.c crypto/evp/c_allc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/c_alld.c crypto/evp/c_alld.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_lib.c crypto/evp/evp_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/bio_ok.c crypto/evp/bio_ok.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_pkey.c crypto/evp/evp_pkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/evp_pbe.c crypto/evp/evp_pbe.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p5_crpt.c crypto/evp/p5_crpt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/p5_crpt2.c crypto/evp/p5_crpt2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_old.c crypto/evp/e_old.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/pmeth_lib.c crypto/evp/pmeth_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/pmeth_fn.c crypto/evp/pmeth_fn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/pmeth_gn.c crypto/evp/pmeth_gn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/m_sigver.c crypto/evp/m_sigver.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_aes_cbc_hmac_sha1.c crypto/evp/e_aes_cbc_hmac_sha1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_aes_cbc_hmac_sha256.c crypto/evp/e_aes_cbc_hmac_sha256.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/evp/e_rc4_hmac_md5.c crypto/evp/e_rc4_hmac_md5.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn1_locl.h crypto/asn1/asn1_locl.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/charmap.h crypto/asn1/charmap.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_object.c crypto/asn1/a_object.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_bitstr.c crypto/asn1/a_bitstr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_utctm.c crypto/asn1/a_utctm.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_gentm.c crypto/asn1/a_gentm.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_time.c crypto/asn1/a_time.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_int.c crypto/asn1/a_int.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_octet.c crypto/asn1/a_octet.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_print.c crypto/asn1/a_print.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_type.c crypto/asn1/a_type.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_set.c crypto/asn1/a_set.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_dup.c crypto/asn1/a_dup.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_d2i_fp.c crypto/asn1/a_d2i_fp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_i2d_fp.c crypto/asn1/a_i2d_fp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_enum.c crypto/asn1/a_enum.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_utf8.c crypto/asn1/a_utf8.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_sign.c crypto/asn1/a_sign.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_digest.c crypto/asn1/a_digest.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_verify.c crypto/asn1/a_verify.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_mbstr.c crypto/asn1/a_mbstr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_strex.c crypto/asn1/a_strex.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_algor.c crypto/asn1/x_algor.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_val.c crypto/asn1/x_val.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_pubkey.c crypto/asn1/x_pubkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_sig.c crypto/asn1/x_sig.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_req.c crypto/asn1/x_req.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_attrib.c crypto/asn1/x_attrib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_bignum.c crypto/asn1/x_bignum.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_long.c crypto/asn1/x_long.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_name.c crypto/asn1/x_name.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_x509.c crypto/asn1/x_x509.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_x509a.c crypto/asn1/x_x509a.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_crl.c crypto/asn1/x_crl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_info.c crypto/asn1/x_info.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_spki.c crypto/asn1/x_spki.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/nsseq.c crypto/asn1/nsseq.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_nx509.c crypto/asn1/x_nx509.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/d2i_pu.c crypto/asn1/d2i_pu.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/d2i_pr.c crypto/asn1/d2i_pr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/i2d_pu.c crypto/asn1/i2d_pu.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/i2d_pr.c crypto/asn1/i2d_pr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_req.c crypto/asn1/t_req.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_x509.c crypto/asn1/t_x509.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_x509a.c crypto/asn1/t_x509a.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_crl.c crypto/asn1/t_crl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_pkey.c crypto/asn1/t_pkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_spki.c crypto/asn1/t_spki.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/t_bitst.c crypto/asn1/t_bitst.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_new.c crypto/asn1/tasn_new.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_fre.c crypto/asn1/tasn_fre.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_enc.c crypto/asn1/tasn_enc.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_dec.c crypto/asn1/tasn_dec.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_utl.c crypto/asn1/tasn_utl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_typ.c crypto/asn1/tasn_typ.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/tasn_prn.c crypto/asn1/tasn_prn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/ameth_lib.c crypto/asn1/ameth_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/f_int.c crypto/asn1/f_int.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/f_string.c crypto/asn1/f_string.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/n_pkey.c crypto/asn1/n_pkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/f_enum.c crypto/asn1/f_enum.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_pkey.c crypto/asn1/x_pkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_bool.c crypto/asn1/a_bool.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/x_exten.c crypto/asn1/x_exten.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/bio_asn1.c crypto/asn1/bio_asn1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/bio_ndef.c crypto/asn1/bio_ndef.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn_mime.c crypto/asn1/asn_mime.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn1_gen.c crypto/asn1/asn1_gen.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn1_par.c crypto/asn1/asn1_par.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn1_lib.c crypto/asn1/asn1_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn1_err.c crypto/asn1/asn1_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_bytes.c crypto/asn1/a_bytes.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/a_strnid.c crypto/asn1/a_strnid.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/evp_asn1.c crypto/asn1/evp_asn1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn_pack.c crypto/asn1/asn_pack.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/p5_pbe.c crypto/asn1/p5_pbe.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/p5_pbev2.c crypto/asn1/p5_pbev2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/p8_pkey.c crypto/asn1/p8_pkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/asn1/asn_moid.c crypto/asn1/asn_moid.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_sign.c crypto/pem/pem_sign.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_seal.c crypto/pem/pem_seal.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_info.c crypto/pem/pem_info.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_lib.c crypto/pem/pem_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_all.c crypto/pem/pem_all.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_err.c crypto/pem/pem_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_x509.c crypto/pem/pem_x509.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_xaux.c crypto/pem/pem_xaux.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_oth.c crypto/pem/pem_oth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_pk8.c crypto/pem/pem_pk8.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pem_pkey.c crypto/pem/pem_pkey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pem/pvkfmt.c crypto/pem/pvkfmt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/vpm_int.h crypto/x509/vpm_int.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_def.c crypto/x509/x509_def.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_d2.c crypto/x509/x509_d2.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_r2x.c crypto/x509/x509_r2x.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_cmp.c crypto/x509/x509_cmp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_obj.c crypto/x509/x509_obj.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_req.c crypto/x509/x509_req.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509spki.c crypto/x509/x509spki.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_vfy.c crypto/x509/x509_vfy.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_set.c crypto/x509/x509_set.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509cset.c crypto/x509/x509cset.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509rset.c crypto/x509/x509rset.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_err.c crypto/x509/x509_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509name.c crypto/x509/x509name.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_v3.c crypto/x509/x509_v3.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_ext.c crypto/x509/x509_ext.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_att.c crypto/x509/x509_att.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509type.c crypto/x509/x509type.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_lu.c crypto/x509/x509_lu.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x_all.c crypto/x509/x_all.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_txt.c crypto/x509/x509_txt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_trs.c crypto/x509/x509_trs.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509/x509_vpm.c crypto/x509/x509_vpm.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/ext_dat.h crypto/x509v3/ext_dat.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_int.h crypto/x509v3/pcy_int.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_bcons.c crypto/x509v3/v3_bcons.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_bitst.c crypto/x509v3/v3_bitst.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_conf.c crypto/x509v3/v3_conf.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_extku.c crypto/x509v3/v3_extku.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_ia5.c crypto/x509v3/v3_ia5.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_lib.c crypto/x509v3/v3_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_prn.c crypto/x509v3/v3_prn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_utl.c crypto/x509v3/v3_utl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3err.c crypto/x509v3/v3err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_genn.c crypto/x509v3/v3_genn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_alt.c crypto/x509v3/v3_alt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_skey.c crypto/x509v3/v3_skey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_akey.c crypto/x509v3/v3_akey.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_pku.c crypto/x509v3/v3_pku.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_int.c crypto/x509v3/v3_int.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_enum.c crypto/x509v3/v3_enum.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_sxnet.c crypto/x509v3/v3_sxnet.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_cpols.c crypto/x509v3/v3_cpols.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_crld.c crypto/x509v3/v3_crld.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_purp.c crypto/x509v3/v3_purp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_info.c crypto/x509v3/v3_info.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_ocsp.c crypto/x509v3/v3_ocsp.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_akeya.c crypto/x509v3/v3_akeya.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_pmaps.c crypto/x509v3/v3_pmaps.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_pcons.c crypto/x509v3/v3_pcons.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_ncons.c crypto/x509v3/v3_ncons.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_pcia.c crypto/x509v3/v3_pcia.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_pci.c crypto/x509v3/v3_pci.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_cache.c crypto/x509v3/pcy_cache.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_node.c crypto/x509v3/pcy_node.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_data.c crypto/x509v3/pcy_data.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_map.c crypto/x509v3/pcy_map.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_tree.c crypto/x509v3/pcy_tree.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/pcy_lib.c crypto/x509v3/pcy_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_asid.c crypto/x509v3/v3_asid.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/x509v3/v3_addr.c crypto/x509v3/v3_addr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_err.c crypto/conf/conf_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_lib.c crypto/conf/conf_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_api.c crypto/conf/conf_api.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_def.h crypto/conf/conf_def.h
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_def.c crypto/conf/conf_def.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_mod.c crypto/conf/conf_mod.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_mall.c crypto/conf/conf_mall.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/conf/conf_sap.c crypto/conf/conf_sap.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/txt_db/txt_db.c crypto/txt_db/txt_db.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pk7_asn1.c crypto/pkcs7/pk7_asn1.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pk7_lib.c crypto/pkcs7/pk7_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pkcs7err.c crypto/pkcs7/pkcs7err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pk7_doit.c crypto/pkcs7/pk7_doit.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pk7_smime.c crypto/pkcs7/pk7_smime.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pk7_attr.c crypto/pkcs7/pk7_attr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/pk7_mime.c crypto/pkcs7/pk7_mime.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs7/bio_pk7.c crypto/pkcs7/bio_pk7.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_add.c crypto/pkcs12/p12_add.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_asn.c crypto/pkcs12/p12_asn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_attr.c crypto/pkcs12/p12_attr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_crpt.c crypto/pkcs12/p12_crpt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_crt.c crypto/pkcs12/p12_crt.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_decr.c crypto/pkcs12/p12_decr.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_init.c crypto/pkcs12/p12_init.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_key.c crypto/pkcs12/p12_key.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_kiss.c crypto/pkcs12/p12_kiss.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_mutl.c crypto/pkcs12/p12_mutl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_utl.c crypto/pkcs12/p12_utl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_npas.c crypto/pkcs12/p12_npas.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/pk12err.c crypto/pkcs12/pk12err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_p8d.c crypto/pkcs12/p12_p8d.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/pkcs12/p12_p8e.c crypto/pkcs12/p12_p8e.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/comp/comp_lib.c crypto/comp/comp_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/comp/comp_err.c crypto/comp/comp_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/comp/c_rle.c crypto/comp/c_rle.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/comp/c_zlib.c crypto/comp/c_zlib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_asn.c crypto/ocsp/ocsp_asn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_ext.c crypto/ocsp/ocsp_ext.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_ht.c crypto/ocsp/ocsp_ht.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_lib.c crypto/ocsp/ocsp_lib.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_cl.c crypto/ocsp/ocsp_cl.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_srv.c crypto/ocsp/ocsp_srv.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_prn.c crypto/ocsp/ocsp_prn.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_vfy.c crypto/ocsp/ocsp_vfy.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/ocsp/ocsp_err.c crypto/ocsp/ocsp_err.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cmac.c crypto/cmac/cmac.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cm_ameth.c crypto/cmac/cm_ameth.c
-install -D $DIR/CryptoPkg/Library/OpensslLib/openssl-$version/crypto/cmac/cm_pmeth.c crypto/cmac/cm_pmeth.c
+cp $OPENSSLLIB_PATH/buildinf.h buildinf.h
+cp $OPENSSL_PATH/e_os.h e_os.h
+
+mkdir -p crypto
+C_FILES="
+	LPdir_nyi.c
+	cpt_err.c
+	cryptlib.c
+	cversion.c
+	ebcdic.c
+	ex_data.c
+	init.c
+	mem.c
+	mem_clr.c
+	mem_dbg.c
+	mem_sec.c
+	o_dir.c
+	o_fips.c
+	o_fopen.c
+	o_init.c
+	o_str.c
+	o_time.c
+	threads_none.c
+	threads_pthread.c
+	threads_win.c uid.c
+"
+for file in $C_FILES
+do
+	cp $OPENSSL_PATH/crypto/$file crypto
+done
+
+SUBDIRS="
+	include/internal/
+	aes
+	asn1
+	async/arch
+	async
+	bio
+	bn
+	buffer
+	cmac
+	comp
+	conf
+	dh
+	dso
+	err
+	evp
+	hmac
+	kdf
+	lhash
+	md5
+	modes
+	objects
+	ocsp
+	pem
+	pkcs12
+	pkcs7
+	rand
+	rc4
+	rsa
+	sha
+	stack
+	txt_db
+	x509
+	x509v3
+"
+for dir in $SUBDIRS
+do
+	mkdir -p crypto/$dir
+	cp $OPENSSL_PATH/crypto/$dir/*.[ch] crypto/$dir
+done
+
+# Remove unused files
+rm -f crypto/aes/aes_x86core.c
+rm -f crypto/x509v3/tabtest.c
+rm -f crypto/x509v3/v3conf.c
+rm -f crypto/x509v3/v3prin.c
 
 find . -name "*.[ch]" -exec chmod -x {} \;
 
 patch -p3 < openssl-bio-b_print-disable-sse.patch
+patch -p3 < openssl-pk7-smime-error-message.patch

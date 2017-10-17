@@ -35,6 +35,8 @@
 
 #include "shim.h"
 
+#include <stdarg.h>
+
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/dh.h>
@@ -46,7 +48,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/rsa.h>
-#include <openssl/dso.h>
+#include <internal/dso.h>
 
 #include <Library/BaseCryptLib.h>
 
@@ -425,9 +427,25 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
 		X509_free(x509);
 	}
 
-	OBJ_cleanup();
-
 	return TRUE;
+}
+
+static void show_ca_warning()
+{
+	CHAR16 *text[9];
+
+	text[0] = L"WARNING!";
+	text[1] = L"";
+	text[2] = L"The CA certificate used to verify this image doesn't   ";
+	text[3] = L"contain the CA flag in Basic Constraints or KeyCertSign";
+	text[4] = L"in KeyUsage. Such CA certificates will not be supported";
+	text[5] = L"in the future.                                         ";
+	text[6] = L"";
+	text[7] = L"Please contact the issuer to update the certificate.   ";
+	text[8] = NULL;
+
+	console_reset();
+	console_print_box(text, -1);
 }
 
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
@@ -447,15 +465,19 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
 				if (verify_eku(Cert->SignatureData, CertSize)) {
+					clear_ca_warning();
 					IsFound = AuthenticodeVerify (data->CertData,
 								      data->Hdr.dwLength - sizeof(data->Hdr),
 								      Cert->SignatureData,
 								      CertSize,
 								      hash, SHA256_DIGEST_SIZE);
 					if (IsFound) {
+						if (get_ca_warning()) {
+							show_ca_warning();
+						}
 						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
-						return DATA_FOUND;
 						drain_openssl_errors();
+						return DATA_FOUND;
 					} else {
 						LogError(L"AuthenticodeVerify(): %d\n", IsFound);
 					}
@@ -1102,11 +1124,15 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		/*
 		 * Check against the shim build key
 		 */
+		clear_ca_warning();
 		if (sizeof(shim_cert) &&
 		    AuthenticodeVerify(cert->CertData,
 			       cert->Hdr.dwLength - sizeof(cert->Hdr),
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
+			if (get_ca_warning()) {
+				show_ca_warning();
+			}
 			update_verification_method(VERIFIED_BY_CERT);
 			tpm_measure_variable(L"Shim", shim_var, sizeof(shim_cert), shim_cert);
 			status = EFI_SUCCESS;
@@ -1120,11 +1146,15 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		/*
 		 * And finally, check against shim's built-in key
 		 */
+		clear_ca_warning();
 		if (vendor_cert_size &&
 		    AuthenticodeVerify(cert->CertData,
 				       cert->Hdr.dwLength - sizeof(cert->Hdr),
 				       vendor_cert, vendor_cert_size,
 				       sha256hash, SHA256_DIGEST_SIZE)) {
+			if (get_ca_warning()) {
+				show_ca_warning();
+			}
 			update_verification_method(VERIFIED_BY_CERT);
 			tpm_measure_variable(L"Shim", shim_var, vendor_cert_size, vendor_cert);
 			status = EFI_SUCCESS;
@@ -2681,13 +2711,13 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 }
 
 static void *
-ossl_malloc(size_t num)
+ossl_malloc(size_t num, const char *file, int line)
 {
 	return AllocatePool(num);
 }
 
 static void
-ossl_free(void *addr)
+ossl_free(void *addr, const char *file, int line)
 {
 	FreePool(addr);
 }

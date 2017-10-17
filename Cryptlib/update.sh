@@ -1,7 +1,6 @@
 #!/bin/bash
 
 DIR=$1
-OPENSSL_VERSION="1.0.2k"
 
 cp $DIR/CryptoPkg/Library/BaseCryptLib/InternalCryptLib.h InternalCryptLib.h
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptMd4Null.c Hash/CryptMd4Null.c
@@ -24,12 +23,17 @@ cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptDhNull.c Pk/CryptDhNull.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptTs.c Pk/CryptTs.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptX509.c Pk/CryptX509.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptAuthenticode.c Pk/CryptAuthenticode.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Pem/CryptPem.c Pem/CryptPem.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Pem/CryptPemNull.c Pem/CryptPemNull.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/CrtWrapper.c SysCall/CrtWrapper.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/TimerWrapper.c SysCall/TimerWrapper.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/SysCall/BaseMemAllocation.c SysCall/BaseMemAllocation.c
 
-cp $DIR/CryptoPkg/Library/OpensslLib/openssl-${OPENSSL_VERSION}/include/openssl/* Include/openssl/
+cp $DIR/CryptoPkg/Library/OpensslLib/openssl/include/openssl/*.h Include/openssl/
+cp $DIR/CryptoPkg/Library/OpensslLib/openssl/include/internal/*.h Include/internal/
+cp $DIR/CryptoPkg/Library/Include/internal/dso_conf.h Include/internal/
+
+cp $DIR/CryptoPkg/Library/Include/openssl/opensslconf.h Include/openssl/
 
 patch -p2 <Cryptlib.diff
 patch -p2 <opensslconf-diff.patch
+patch -p2 <ca-check-workaround.patch
