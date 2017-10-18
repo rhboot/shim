@@ -916,10 +916,12 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 			goto done;
 		}
 
+#if 1
+	}
+#else // we have to migrate to doing this later :/
 		SumOfBytesHashed += hashsize;
 	}
 
-#if 0 // we have to migrate to doing this later :/
 	/* Hash all remaining data */
 	if (datasize > SumOfBytesHashed) {
 		hashbase = data + SumOfBytesHashed;
