@@ -92,6 +92,9 @@
 #endif
 #endif
 
+#define FALLBACK L"\\fb" EFI_ARCH L".efi"
+#define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
+
 #include "include/configtable.h"
 #include "include/console.h"
 #include "include/crypt_blowfish.h"
@@ -160,13 +163,18 @@ extern EFI_STATUS LogError_(const char *file, int line, const char *func, CHAR16
 extern EFI_STATUS VLogError(const char *file, int line, const char *func, CHAR16 *fmt, va_list args);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
+extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
+extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
 extern UINT32 vendor_cert_size;
 extern UINT32 vendor_dbx_size;
 extern UINT8 *vendor_cert;
 extern UINT8 *vendor_dbx;
 
+extern UINT8 user_insecure_mode;
+extern UINT8 ignore_db;
 extern UINT8 in_protocol;
+
 #define perror_(file, line, func, fmt, ...) ({				\
 		UINTN __perror_ret = 0;					\
 		if (!in_protocol)					\

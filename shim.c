@@ -52,9 +52,6 @@
 
 #include <stdint.h>
 
-#define FALLBACK L"\\fb" EFI_ARCH L".efi"
-#define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
-
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
 static EFI_SYSTEM_TABLE *systab;
@@ -972,34 +969,6 @@ done:
 }
 
 /*
- * Ensure that the MOK database hasn't been set or modified from an OS
- */
-static EFI_STATUS verify_mok (void) {
-	EFI_STATUS efi_status;
-	UINT8 *MokListData = NULL;
-	UINTN MokListDataSize = 0;
-	UINT32 attributes;
-
-	efi_status = get_variable_attr(L"MokList", &MokListData,
-				       &MokListDataSize, SHIM_LOCK_GUID,
-				       &attributes);
-	if (!EFI_ERROR(efi_status) &&
-	    attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
-		perror(L"MokList is compromised!\nErase all keys in MokList!\n");
-		efi_status = LibDeleteVariable(L"MokList", &SHIM_LOCK_GUID);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to erase MokList\n");
-                        return EFI_SECURITY_VIOLATION;
-		}
-	}
-
-	if (MokListData)
-		FreePool(MokListData);
-
-	return EFI_SUCCESS;
-}
-
-/*
  * Check that the signature is valid and matches the binary
  */
 static EFI_STATUS verify_buffer (char *data, int datasize,
@@ -1050,15 +1019,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status)) {
 		LogError(L"generate_hash: %r\n", efi_status);
-		return efi_status;
-	}
-
-	/*
-	 * Check that the MOK database hasn't been modified
-	 */
-	efi_status = verify_mok();
-	if (EFI_ERROR(efi_status)) {
-		LogError(L"verify_mok: %r\n", efi_status);
 		return efi_status;
 	}
 
@@ -1997,337 +1957,6 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	return efi_status;
 }
 
-/*
- * Measure some of the MOK variables into the TPM. We measure the entirety
- * of MokList into PCR 14, and also measure the raw MokSBState there. PCR 7
- * will be extended with MokSBState in the Microsoft format, and we'll
- * measure any matching hashes or certificates later on in order to behave
- * consistently with the PCR 7 spec.
- */
-EFI_STATUS measure_mok()
-{
-	EFI_STATUS efi_status, ret = EFI_SUCCESS;
-	UINT8 *Data = NULL;
-	UINTN DataSize = 0;
-
-	efi_status = get_variable(L"MokList", &Data, &DataSize, SHIM_LOCK_GUID);
-	if (!EFI_ERROR(efi_status)) {
-		efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
-					   DataSize, 14, (CHAR8 *)"MokList");
-		FreePool(Data);
-
-		if (EFI_ERROR(efi_status))
-			ret = efi_status;
-	} else {
-		ret = efi_status;
-	}
-
-	efi_status = get_variable(L"MokListX", &Data, &DataSize, SHIM_LOCK_GUID);
-	if (!EFI_ERROR(efi_status)) {
-		efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
-					   DataSize, 14, (CHAR8 *)"MokListX");
-		FreePool(Data);
-
-		if (EFI_ERROR(efi_status) && !EFI_ERROR(ret))
-			ret = efi_status;
-
-	} else if (!EFI_ERROR(ret)) {
-		ret = efi_status;
-	}
-
-	efi_status = get_variable(L"MokSBState", &Data, &DataSize,
-				  SHIM_LOCK_GUID);
-	if (!EFI_ERROR(efi_status)) {
-		efi_status = tpm_measure_variable(L"MokSBState",
-						  SHIM_LOCK_GUID,
-						  DataSize, Data);
-		if (!EFI_ERROR(efi_status)) {
-			efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)
-						    (UINTN)Data, DataSize, 14,
-						   (CHAR8 *)"MokSBState");
-		}
-
-		FreePool(Data);
-
-		if (EFI_ERROR(efi_status) && !EFI_ERROR(ret))
-			ret = efi_status;
-	} else if (!EFI_ERROR(ret)) {
-		ret = efi_status;
-	}
-
-	return efi_status;
-}
-
-/*
- * Copy the boot-services only MokList variable to the runtime-accessible
- * MokListRT variable. It's not marked NV, so the OS can't modify it.
- */
-EFI_STATUS mirror_mok_list()
-{
-	EFI_STATUS efi_status;
-	UINT8 *Data = NULL;
-	UINTN DataSize = 0;
-	void *FullData = NULL;
-	UINTN FullDataSize = 0;
-	EFI_SIGNATURE_LIST *CertList = NULL;
-	EFI_SIGNATURE_DATA *CertData = NULL;
-	uint8_t *p = NULL;
-
-	efi_status = get_variable(L"MokList", &Data, &DataSize, SHIM_LOCK_GUID);
-	if (EFI_ERROR(efi_status))
-		DataSize = 0;
-
-	if (vendor_cert_size) {
-		FullDataSize = DataSize
-			     + sizeof (*CertList)
-			     + sizeof (EFI_GUID)
-			     + vendor_cert_size
-			     ;
-		FullData = AllocatePool(FullDataSize);
-		if (!FullData) {
-			perror(L"Failed to allocate space for MokListRT\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		p = FullData;
-
-		if (!EFI_ERROR(efi_status) && DataSize > 0) {
-			CopyMem(p, Data, DataSize);
-			p += DataSize;
-		}
-		CertList = (EFI_SIGNATURE_LIST *)p;
-		p += sizeof (*CertList);
-		CertData = (EFI_SIGNATURE_DATA *)p;
-		p += sizeof (EFI_GUID);
-
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
-		CertList->SignatureListSize = vendor_cert_size
-					      + sizeof (*CertList)
-					      + sizeof (*CertData)
-					      -1;
-		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = vendor_cert_size + sizeof (EFI_GUID);
-
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
-		CopyMem(p, vendor_cert, vendor_cert_size);
-	} else {
-		FullDataSize = DataSize;
-		FullData = Data;
-	}
-
-	if (FullDataSize) {
-		efi_status = gRT->SetVariable(L"MokListRT", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					      EFI_VARIABLE_RUNTIME_ACCESS,
-					      FullDataSize, FullData);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to set MokListRT: %r\n", efi_status);
-		}
-	}
-
-	return efi_status;
-}
-
-/*
- * Copy the boot-services only MokListX variable to the runtime-accessible
- * MokListXRT variable. It's not marked NV, so the OS can't modify it.
- */
-EFI_STATUS mirror_mok_list_x()
-{
-	EFI_STATUS efi_status;
-	UINT8 *Data = NULL;
-	UINTN DataSize = 0;
-
-	efi_status = get_variable(L"MokListX", &Data, &DataSize,
-				  SHIM_LOCK_GUID);
-	if (EFI_ERROR(efi_status))
-		return efi_status;
-
-	efi_status = gRT->SetVariable(L"MokListXRT", &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-				      EFI_VARIABLE_RUNTIME_ACCESS,
-				      DataSize, Data);
-	if (EFI_ERROR(efi_status)) {
-		console_error(L"Failed to set MokListRT", efi_status);
-	}
-
-	return efi_status;
-}
-
-/*
- * Copy the boot-services only MokSBState variable to the runtime-accessible
- * MokSBStateRT variable. It's not marked NV, so the OS can't modify it.
- */
-EFI_STATUS mirror_mok_sb_state()
-{
-	EFI_STATUS efi_status;
-	UINT8 *Data = NULL;
-	UINTN DataSize = 0;
-
-	efi_status = get_variable(L"MokSBState", &Data, &DataSize,
-				  SHIM_LOCK_GUID);
-	if (!EFI_ERROR(efi_status)) {
-		UINT8 *Data_RT = NULL;
-		UINTN DataSize_RT = 0;
-
-		efi_status = get_variable(L"MokSBStateRT",
-					  &Data_RT, &DataSize_RT,
-					  SHIM_LOCK_GUID);
-		if (!EFI_ERROR(efi_status) || efi_status != EFI_NOT_FOUND)
-			LibDeleteVariable(L"MokSBStateRT", &SHIM_LOCK_GUID);
-
-		efi_status = gRT->SetVariable(L"MokSBStateRT", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					      EFI_VARIABLE_RUNTIME_ACCESS,
-					      DataSize, Data);
-		if (EFI_ERROR(efi_status)) {
-			console_error(L"Failed to set MokSBStateRT", efi_status);
-		}
-	}
-	return efi_status;
-}
-
-/*
- * Check if a variable exists
- */
-static BOOLEAN check_var(CHAR16 *varname)
-{
-	EFI_STATUS efi_status;
-	UINTN size = sizeof(UINT32);
-	UINT32 MokVar;
-	UINT32 attributes;
-
-	efi_status = gRT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
-				      &size, (void *)&MokVar);
-	if (!EFI_ERROR(efi_status) || efi_status == EFI_BUFFER_TOO_SMALL)
-		return TRUE;
-
-	return FALSE;
-}
-
-/*
- * If the OS has set any of these variables we need to drop into MOK and
- * handle them appropriately
- */
-EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
-{
-	EFI_STATUS efi_status;
-
-	if (check_var(L"MokNew") || check_var(L"MokSB") ||
-	    check_var(L"MokPW") || check_var(L"MokAuth") ||
-	    check_var(L"MokDel") || check_var(L"MokDB") ||
-	    check_var(L"MokXNew") || check_var(L"MokXDel") ||
-	    check_var(L"MokXAuth")) {
-		efi_status = start_image(image_handle, MOK_MANAGER);
-
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to start MokManager: %r\n", efi_status);
-			return efi_status;
-		}
-	}
-
-	return EFI_SUCCESS;
-}
-
-/*
- * Verify that MokSBState is valid, and if appropriate set insecure mode
- */
-static EFI_STATUS check_mok_sb (void)
-{
-	EFI_STATUS efi_status;
-	UINT8 MokSBState;
-	UINTN MokSBStateSize = sizeof(MokSBState);
-	UINT32 attributes;
-
-	user_insecure_mode = 0;
-	ignore_db = 0;
-
-	efi_status = gRT->GetVariable(L"MokSBState", &SHIM_LOCK_GUID,
-				      &attributes, &MokSBStateSize,
-				      &MokSBState);
-	if (EFI_ERROR(efi_status))
-		return EFI_SECURITY_VIOLATION;
-
-	/*
-	 * Delete and ignore the variable if it's been set from or could be
-	 * modified by the OS
-	 */
-	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
-		perror(L"MokSBState is compromised! Clearing it\n");
-		efi_status = LibDeleteVariable(L"MokSBState", &SHIM_LOCK_GUID);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to erase MokSBState\n");
-		}
-		efi_status = EFI_SECURITY_VIOLATION;
-	} else {
-		if (MokSBState == 1) {
-			user_insecure_mode = 1;
-		}
-	}
-
-	return efi_status;
-}
-
-/*
- * Verify that MokDBState is valid, and if appropriate set ignore db mode
- */
-
-static EFI_STATUS check_mok_db (void)
-{
-	EFI_STATUS efi_status;
-	UINT8 MokDBState;
-	UINTN MokDBStateSize = sizeof(MokDBState);
-	UINT32 attributes;
-
-	efi_status = gRT->GetVariable(L"MokDBState", &SHIM_LOCK_GUID,
-				      &attributes, &MokDBStateSize,
-				      &MokDBState);
-	if (EFI_ERROR(efi_status))
-		return EFI_SECURITY_VIOLATION;
-
-	ignore_db = 0;
-
-	/*
-	 * Delete and ignore the variable if it's been set from or could be
-	 * modified by the OS
-	 */
-	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
-		perror(L"MokDBState is compromised! Clearing it\n");
-		efi_status = LibDeleteVariable(L"MokDBState", &SHIM_LOCK_GUID);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to erase MokDBState\n");
-		}
-		efi_status = EFI_SECURITY_VIOLATION;
-	} else {
-		if (MokDBState == 1) {
-			ignore_db = 1;
-		}
-	}
-
-	return efi_status;
-}
-
-static EFI_STATUS mok_ignore_db()
-{
-	EFI_STATUS efi_status = EFI_SUCCESS;
-	UINT8 Data = 1;
-	UINTN DataSize = sizeof(UINT8);
-
-	check_mok_db();
-
-	if (ignore_db) {
-		efi_status = gRT->SetVariable(L"MokIgnoreDB", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					      EFI_VARIABLE_RUNTIME_ACCESS,
-					      DataSize, (void *)&Data);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to set MokIgnoreDB: %r\n", efi_status);
-		}
-	}
-
-	return efi_status;
-
-}
-
 static inline EFI_STATUS
 get_load_option_optional_data(UINT8 *data, UINTN data_size,
 			      UINT8 **od, UINTN *ods)
@@ -2922,31 +2551,22 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	debug_hook();
 
 	/*
-	 * Measure the MOK variables
+	 * Before we do anything else, validate our non-volatile,
+	 * boot-services-only state variables are what we think they are.
 	 */
-	efi_status = measure_mok();
-	if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
-		Print(L"Something has gone seriously wrong: %r\n", efi_status);
-		Print(L"Shim was unable to measure state into the TPM\n");
+	efi_status = import_mok_state(image_handle);
+	if (EFI_ERROR(efi_status)) {
+die:
+		Print(L"Something has gone seriously wrong: %r\n",
+		      efi_status);
 		msleep(5000000);
 		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				 0, NULL);
 	}
-
-	/*
-	 * Check whether the user has configured the system to run in
-	 * insecure mode
-	 */
-	check_mok_sb();
 
 	efi_status = shim_init();
-	if (EFI_ERROR(efi_status)) {
-		Print(L"Something has gone seriously wrong: %r\n", efi_status);
-		Print(L"shim cannot continue, sorry.\n");
-		msleep(5000000);
-		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
-				 0, NULL);
-	}
+	if (EFI_ERROR(efi_status))
+		goto die;
 
 	/*
 	 * Tell the user that we're in insecure mode if necessary
@@ -2955,31 +2575,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		Print(L"Booting in insecure mode\n");
 		msleep(2000000);
 	}
-
-	/*
-	 * Enter MokManager if necessary
-	 */
-	efi_status = check_mok_request(image_handle);
-
-	/*
-	 * Copy the MOK list to a runtime variable so the kernel can
-	 * make use of it
-	 */
-	efi_status = mirror_mok_list();
-
-	efi_status = mirror_mok_list_x();
-
-	/*
-	 * Copy the MOK SB State to a runtime variable so the kernel can
-	 * make use of it
-	 */
-	efi_status = mirror_mok_sb_state();
-
-	/*
-	 * Create the runtime MokIgnoreDB variable so the kernel can
-	 * make use of it
-	 */
-	mok_ignore_db();
 
 	/*
 	 * Hand over control to the second stage bootloader
