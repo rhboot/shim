@@ -20,6 +20,7 @@ VPATH		= $(TOPDIR)
 include $(TOPDIR)/Make.defaults
 include $(TOPDIR)/Make.rules
 include $(TOPDIR)/Make.coverity
+include $(TOPDIR)/Make.scan-build
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug

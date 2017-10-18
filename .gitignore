@@ -26,3 +26,4 @@ shim_cert.h
 *.tar.*
 version.c
 cov-int/
+scan-results/
