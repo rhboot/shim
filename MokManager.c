@@ -1273,7 +1273,7 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	UINT32 attributes;
 	UINT8 *MokListData = NULL;
 	UINTN MokListDataSize = 0;
-	MokListNode *mok, *del_key;
+	MokListNode *mok = NULL, *del_key = NULL;
 	INTN mok_num, del_num;
 	int i;
 
