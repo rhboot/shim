@@ -101,7 +101,7 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 }
 
 static EFI_STATUS EFIAPI
-start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
+replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 {
 	EFI_STATUS efi_status;
 	unhook_system_services();
@@ -187,9 +187,9 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 	/* We need LoadImage() hooked so that fallback.c can load shim
 	 * without having to fake LoadImage as well.  This allows it
 	 * to call the system LoadImage(), and have us track the output
-	 * and mark loader_is_participating in start_image.  This means
-	 * anything added by fallback has to be verified by the system db,
-	 * which we want to preserve anyway, since that's all launching
+	 * and mark loader_is_participating in replacement_start_image.  This
+	 * means anything added by fallback has to be verified by the system
+	 * db, which we want to preserve anyway, since that's all launching
 	 * through BDS gives us. */
 	system_load_image = systab->BootServices->LoadImage;
 	systab->BootServices->LoadImage = load_image;
@@ -197,7 +197,7 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 	/* we need StartImage() so that we can allow chain booting to an
 	 * image trusted by the firmware */
 	system_start_image = systab->BootServices->StartImage;
-	systab->BootServices->StartImage = start_image;
+	systab->BootServices->StartImage = replacement_start_image;
 
 	/* we need to hook ExitBootServices() so a) we can enforce the policy
 	 * and b) we can unwrap when we're done. */
