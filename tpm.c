@@ -55,6 +55,8 @@ static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
 	if (caps->StructureVersion.Major == 1 &&
 	    caps->StructureVersion.Minor == 0)
 		*old_caps = TRUE;
+	else
+		*old_caps = FALSE;
 
 	return EFI_SUCCESS;
 }
