@@ -156,11 +156,25 @@ typedef struct _SHIM_LOCK {
 
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
-extern EFI_STATUS LogError(const char *file, int line, const char *func, CHAR16 *fmt, ...);
+extern EFI_STATUS LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...);
 extern EFI_STATUS VLogError(const char *file, int line, const char *func, CHAR16 *fmt, va_list args);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
 
-#define LogError(fmt, ...) LogError(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)
+extern UINT32 vendor_cert_size;
+extern UINT32 vendor_dbx_size;
+extern UINT8 *vendor_cert;
+extern UINT8 *vendor_dbx;
+
+extern UINT8 in_protocol;
+#define perror_(file, line, func, fmt, ...) ({				\
+		UINTN __perror_ret = 0;					\
+		if (!in_protocol)					\
+			__perror_ret = Print((fmt), ##__VA_ARGS__);	\
+		LogError_(file, line, func, fmt, ##__VA_ARGS__);		\
+		__perror_ret;						\
+	})
+#define perror(fmt, ...) perror_(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)
+#define LogError(fmt, ...) LogError_(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)
 
 #endif /* SHIM_H_ */

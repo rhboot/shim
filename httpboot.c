@@ -36,13 +36,6 @@
 
 #include "shim.h"
 
-#define perror(fmt, ...) ({						\
-		UINTN __perror_ret = 0;					\
-		if (!in_protocol)					\
-			__perror_ret = Print((fmt), ##__VA_ARGS__);	\
-		__perror_ret;						\
-	})
-
 static UINTN
 ascii_to_int (CONST CHAR8 *str)
 {
