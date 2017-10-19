@@ -50,10 +50,8 @@
 #include <efi.h>
 #include <efiapi.h>
 #include <efilib.h>
+
 #include "shim.h"
-#include "replacements.h"
-#include "console.h"
-#include "errors.h"
 
 static EFI_SYSTEM_TABLE *systab;
 

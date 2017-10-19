@@ -6,15 +6,8 @@
 #include <openssl/x509v3.h>
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
-#include "shim.h"
-#include "PeImage.h"
-#include "PasswordCrypt.h"
 
-#include "guid.h"
-#include "console.h"
-#include "variables.h"
-#include "simple_file.h"
-#include "efiauthenticated.h"
+#include "shim.h"
 
 #define PASSWORD_MAX 256
 #define PASSWORD_MIN 1

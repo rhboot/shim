@@ -41,8 +41,7 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <guid.h>
-#include <execute.h>
+#include "shim.h"
 
 EFI_STATUS
 generate_path(CHAR16* name, EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **path, CHAR16 **PathName)

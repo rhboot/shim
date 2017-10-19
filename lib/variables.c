@@ -22,12 +22,7 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <efiauthenticated.h>
-
-#include <variables.h>
-#include <guid.h>
-#include <console.h>
-#include <errors.h>
+#include "shim.h"
 
 EFI_STATUS
 variable_create_esl(void *cert, int cert_len, EFI_GUID *type, EFI_GUID *owner,

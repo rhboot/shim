@@ -33,11 +33,8 @@
 
 #include <efi.h>
 #include <efilib.h>
-#include "str.h"
-#include "console.h"
-#include "Http.h"
-#include "Ip4Config2.h"
-#include "Ip6Config.h"
+
+#include "shim.h"
 
 #define perror(fmt, ...) ({						\
 		UINTN __perror_ret = 0;					\

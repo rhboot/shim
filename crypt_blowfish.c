@@ -47,7 +47,7 @@
 #include <efilib.h>
 
 /* Just to make sure the prototypes match the actual definitions */
-#include "crypt_blowfish.h"
+#include "shim.h"
 
 typedef unsigned int BF_word;
 typedef signed int BF_word_signed;

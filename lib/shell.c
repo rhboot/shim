@@ -8,7 +8,7 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <shell.h>
+#include "shim.h"
 
 EFI_STATUS
 argsplit(EFI_HANDLE image, int *argc, CHAR16*** ARGV)
