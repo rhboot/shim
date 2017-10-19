@@ -8,14 +8,12 @@
 #include <efilib.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <console.h>
-#include <variables.h>
-#include <errors.h>
+
+#include "shim.h"
+
 #include <Library/BaseCryptLib.h>
 #include <openssl/err.h>
 #include <openssl/crypto.h>
-
-#include "shim.h"
 
 static int
 count_lines(CHAR16 *str_arr[])
@@ -417,13 +415,12 @@ VOID
 setup_verbosity(VOID)
 {
 	EFI_STATUS status;
-	EFI_GUID guid = SHIM_LOCK_GUID;
 	UINT8 verbose_check;
 	UINTN verbose_check_size;
 
 	verbose_check_size = 1;
 	status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
-				  &verbose_check_size, guid);
+				  &verbose_check_size, SHIM_LOCK_GUID);
 	verbose = 0;
 	if (!EFI_ERROR(status))
 		verbose = verbose_check;
@@ -432,13 +429,13 @@ setup_verbosity(VOID)
 VOID setup_console (int text)
 {
 	EFI_STATUS status;
-	EFI_GUID console_control_guid = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
 	EFI_CONSOLE_CONTROL_PROTOCOL *concon;
 	static EFI_CONSOLE_CONTROL_SCREEN_MODE mode =
 					EfiConsoleControlScreenGraphics;
 	EFI_CONSOLE_CONTROL_SCREEN_MODE new_mode;
 
-	status = LibLocateProtocol(&console_control_guid, (VOID **)&concon);
+	status = LibLocateProtocol(&EFI_CONSOLE_CONTROL_GUID,
+				   (VOID **)&concon);
 	if (status != EFI_SUCCESS)
 		return;
 

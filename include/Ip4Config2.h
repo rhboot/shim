@@ -20,11 +20,6 @@ This Protocol is introduced in UEFI Specification 2.5
 
 #include <efiip.h>
 
-#define EFI_IP4_CONFIG2_PROTOCOL_GUID \
-  { \
-    0x5b446ed1, 0xe30b, 0x4faa, {0x87, 0x1a, 0x36, 0x54, 0xec, 0xa3, 0x60, 0x80 } \
-  }
-
 typedef struct _EFI_IP4_CONFIG2_PROTOCOL EFI_IP4_CONFIG2_PROTOCOL;
 
 

@@ -26,9 +26,6 @@ void
 console_reset(void);
 #define NOSEL 0x7fffffff
 
-#define EFI_CONSOLE_CONTROL_PROTOCOL_GUID \
-  { 0xf42f7782, 0x12e, 0x4c12, {0x99, 0x56, 0x49, 0xf9, 0x43, 0x4, 0xf7, 0x21} }
-
 typedef struct _EFI_CONSOLE_CONTROL_PROTOCOL   EFI_CONSOLE_CONTROL_PROTOCOL;
 
 typedef enum {

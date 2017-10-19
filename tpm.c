@@ -23,9 +23,6 @@ typedef struct {
 UINTN measuredcount = 0;
 VARIABLE_RECORD *measureddata = NULL;
 
-EFI_GUID tpm_guid = EFI_TPM_GUID;
-EFI_GUID tpm2_guid = EFI_TPM2_GUID;
-
 static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
 {
 	EFI_STATUS status;
@@ -126,7 +123,7 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 
 	*tpm = NULL;
 	*tpm2 = NULL;
-	status = LibLocateProtocol(&tpm2_guid, (VOID **)tpm2);
+	status = LibLocateProtocol(&EFI_TPM2_GUID, (VOID **)tpm2);
 	/* TPM 2.0 */
 	if (status == EFI_SUCCESS) {
 		BOOLEAN old_caps;
@@ -144,7 +141,7 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 			return EFI_SUCCESS;
 		}
 	} else {
-		status = LibLocateProtocol(&tpm_guid, (VOID **)tpm);
+		status = LibLocateProtocol(&EFI_TPM_GUID, (VOID **)tpm);
 		if (EFI_ERROR(status))
 			return status;
 
@@ -214,7 +211,7 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 		UINT32 eventnum = 0;
 		EFI_PHYSICAL_ADDRESS lastevent;
 
-		status = LibLocateProtocol(&tpm_guid, (VOID **)&tpm);
+		status = LibLocateProtocol(&EFI_TPM_GUID, (VOID **)&tpm);
 
 		if (status != EFI_SUCCESS)
 			return EFI_SUCCESS;

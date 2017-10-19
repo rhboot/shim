@@ -9,9 +9,6 @@
 
 #include "shim.h"
 
-static EFI_GUID FILE_INFO = EFI_FILE_INFO_ID;
-static EFI_GUID FS_INFO = EFI_FILE_SYSTEM_INFO_ID;
-
 EFI_STATUS
 simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 {
@@ -20,7 +17,7 @@ simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UIN
 	EFI_FILE *root;
 
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &SIMPLE_FS_PROTOCOL, (void **)&drive);
+				       &EFI_SIMPLE_FILE_SYSTEM_GUID, (void **)&drive);
 
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Unable to find simple file protocol (%d)\n", efi_status);
@@ -81,8 +78,8 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 	char buf[4096];
 	UINTN size = sizeof(buf);
 	EFI_FILE_INFO *fi = (void *)buf;
-	
-	status = uefi_call_wrapper(file->GetInfo, 4, file, &FILE_INFO,
+
+	status = uefi_call_wrapper(file->GetInfo, 4, file, &EFI_FILE_INFO_GUID,
 				   &size, fi);
 	if (status != EFI_SUCCESS) {
 		Print(L"Failed to get file info\n");
@@ -151,10 +148,9 @@ simple_file_read_all(EFI_FILE *file, UINTN *size, void **buffer)
 
 	*size = sizeof(buf);
 	fi = (void *)buf;
-	
 
-	efi_status = uefi_call_wrapper(file->GetInfo, 4, file, &FILE_INFO,
-				       size, fi);
+	efi_status = uefi_call_wrapper(file->GetInfo, 4, file,
+				       &EFI_FILE_INFO_GUID, size, fi);
 	if (efi_status != EFI_SUCCESS) {
 		Print(L"Failed to get file info\n");
 		return efi_status;
@@ -199,7 +195,7 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	int val;
 
 	uefi_call_wrapper(BS->LocateHandleBuffer, 5, ByProtocol,
-			  &SIMPLE_FS_PROTOCOL, NULL, &count, &vol_handles);
+			  &EFI_SIMPLE_FILE_SYSTEM_GUID, NULL, &count, &vol_handles);
 
 	if (!count || !vol_handles)
 		return EFI_NOT_FOUND;
@@ -218,7 +214,7 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 
 		status = uefi_call_wrapper(BS->HandleProtocol, 3,
 					   vol_handles[i],
-					   &SIMPLE_FS_PROTOCOL,
+					   &EFI_SIMPLE_FILE_SYSTEM_GUID,
 					   (void **)&drive);
 		if (status != EFI_SUCCESS || !drive)
 			continue;
@@ -227,14 +223,13 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 		if (status != EFI_SUCCESS)
 			continue;
 
-		status = uefi_call_wrapper(root->GetInfo, 4, root, &FS_INFO,
-					   &size, fi);
+		status = uefi_call_wrapper(root->GetInfo, 4, root,
+					   &EFI_FILE_SYSTEM_INFO_GUID, &size, fi);
 		if (status != EFI_SUCCESS)
 			continue;
 
 		name = fi->VolumeLabel;
-		
-		if (!name || StrLen(name) == 0 || StrCmp(name, L" ") == 0) 
+		if (!name || StrLen(name) == 0 || StrCmp(name, L" ") == 0)
 			name = DevicePathToStr(DevicePathFromHandle(vol_handles[i]));
 
 		entries[i] = AllocatePool((StrLen(name) + 2) * sizeof(CHAR16));
@@ -264,7 +259,6 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	FreePool(entries);
 	FreePool(vol_handles);
 
-	
 	return EFI_SUCCESS;
 }
 
@@ -304,7 +298,6 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 	*count = 0;
 
 	status = simple_dir_read_all(image, name, entries, &tot);
-		
 	if (status != EFI_SUCCESS)
 		goto out;
 	ptr = next = *entries;
