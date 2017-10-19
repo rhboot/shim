@@ -80,16 +80,15 @@ security2_policy_authentication (
 	BOOLEAN	BootPolicy
 				 )
 {
-	EFI_STATUS status, auth;
+	EFI_STATUS efi_status, auth;
 
 	/* Chain original security policy */
 
-	status = uefi_call_wrapper(es2fa, 5, This, DevicePath, FileBuffer,
-				   FileSize, BootPolicy);
-
+	efi_status = uefi_call_wrapper(es2fa, 5, This, DevicePath, FileBuffer,
+				       FileSize, BootPolicy);
 	/* if OK, don't bother with MOK check */
-	if (status == EFI_SUCCESS)
-		return status;
+	if (!EFI_ERROR(efi_status))
+		return efi_status;
 
 	if (extra_check)
 		auth = extra_check(FileBuffer, FileSize);
@@ -100,7 +99,7 @@ security2_policy_authentication (
 		/* return previous status, which is the correct one
 		 * for the platform: may be either EFI_ACCESS_DENIED
 		 * or EFI_SECURITY_VIOLATION */
-		return status;
+		return efi_status;
 
 	return auth;
 }
@@ -112,7 +111,7 @@ security_policy_authentication (
 	const EFI_DEVICE_PATH_PROTOCOL *DevicePathConst
 	)
 {
-	EFI_STATUS status, fail_status;
+	EFI_STATUS efi_status, fail_status;
 	EFI_DEVICE_PATH *DevPath 
 		= DuplicateDevicePath((EFI_DEVICE_PATH *)DevicePathConst),
 		*OrigDevPath = DevPath;
@@ -123,48 +122,48 @@ security_policy_authentication (
 	CHAR16* DevPathStr;
 
 	/* Chain original security policy */
-	status = uefi_call_wrapper(esfas, 3, This, AuthenticationStatus,
-				   DevicePathConst);
-
+	efi_status = uefi_call_wrapper(esfas, 3, This, AuthenticationStatus,
+				       DevicePathConst);
 	/* if OK avoid checking MOK: It's a bit expensive to
 	 * read the whole file in again (esfas already did this) */
-	if (status == EFI_SUCCESS)
+	if (!EFI_ERROR(efi_status))
 		goto out;
 
 	/* capture failure status: may be either EFI_ACCESS_DENIED or
 	 * EFI_SECURITY_VIOLATION */
-	fail_status = status;
+	fail_status = efi_status;
 
-	status = uefi_call_wrapper(BS->LocateDevicePath, 3,
-				   &SIMPLE_FS_PROTOCOL, &DevPath, &h);
-	if (status != EFI_SUCCESS)
+	efi_status = uefi_call_wrapper(BS->LocateDevicePath, 3,
+				       &SIMPLE_FS_PROTOCOL, &DevPath, &h);
+	if (EFI_ERROR(efi_status))
 		goto out;
 
 	DevPathStr = DevicePathToStr(DevPath);
 
-	status = simple_file_open_by_handle(h, DevPathStr, &f,
-					    EFI_FILE_MODE_READ);
+	efi_status = simple_file_open_by_handle(h, DevPathStr, &f,
+						EFI_FILE_MODE_READ);
 	FreePool(DevPathStr);
-	if (status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		goto out;
 
-	status = simple_file_read_all(f, &FileSize, &FileBuffer);
+	efi_status = simple_file_read_all(f, &FileSize, &FileBuffer);
 	simple_file_close(f);
-	if (status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		goto out;
 
 	if (extra_check)
-		status = extra_check(FileBuffer, FileSize);
+		efi_status = extra_check(FileBuffer, FileSize);
 	else
-		status = EFI_SECURITY_VIOLATION;
+		efi_status = EFI_SECURITY_VIOLATION;
 	FreePool(FileBuffer);
 
-	if (status == EFI_ACCESS_DENIED || status == EFI_SECURITY_VIOLATION)
+	if (efi_status == EFI_ACCESS_DENIED ||
+	    efi_status == EFI_SECURITY_VIOLATION)
 		/* return what the platform originally said */
-		status = fail_status;
+		efi_status = fail_status;
  out:
 	FreePool(OrigDevPath);
-	return status;
+	return efi_status;
 }
 
 
@@ -265,7 +264,7 @@ security_policy_install(SecurityHook hook)
 {
 	EFI_SECURITY_PROTOCOL *security_protocol;
 	EFI_SECURITY2_PROTOCOL *security2_protocol = NULL;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	if (esfas)
 		/* Already Installed */
@@ -278,16 +277,16 @@ security_policy_install(SecurityHook hook)
 			  &SECURITY2_PROTOCOL_GUID, NULL,
 			  (VOID **) &security2_protocol);
 
-	status = uefi_call_wrapper(BS->LocateProtocol, 3,
+	efi_status = uefi_call_wrapper(BS->LocateProtocol, 3,
 				   &SECURITY_PROTOCOL_GUID, NULL,
 				   (VOID **) &security_protocol);
-	if (status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		/* This one is mandatory, so there's a serious problem */
-		return status;
+		return efi_status;
 
 	if (security2_protocol) {
 		es2fa = security2_protocol->FileAuthentication;
-		security2_protocol->FileAuthentication = 
+		security2_protocol->FileAuthentication =
 			(EFI_SECURITY2_FILE_AUTHENTICATION) thunk_security2_policy_authentication;
 	}
 
@@ -304,17 +303,16 @@ security_policy_install(SecurityHook hook)
 EFI_STATUS
 security_policy_uninstall(void)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	if (esfas) {
 		EFI_SECURITY_PROTOCOL *security_protocol;
 
-		status = uefi_call_wrapper(BS->LocateProtocol, 3,
-					   &SECURITY_PROTOCOL_GUID, NULL,
-					   (VOID **) &security_protocol);
-
-		if (status != EFI_SUCCESS)
-			return status;
+		efi_status = uefi_call_wrapper(BS->LocateProtocol, 3,
+					       &SECURITY_PROTOCOL_GUID, NULL,
+					       (VOID **) &security_protocol);
+		if (EFI_ERROR(efi_status))
+			return efi_status;
 
 		security_protocol->FileAuthenticationState = esfas;
 		esfas = NULL;
@@ -326,12 +324,11 @@ security_policy_uninstall(void)
 	if (es2fa) {
 		EFI_SECURITY2_PROTOCOL *security2_protocol;
 
-		status = uefi_call_wrapper(BS->LocateProtocol, 3,
-					   &SECURITY2_PROTOCOL_GUID, NULL,
-					   (VOID **) &security2_protocol);
-
-		if (status != EFI_SUCCESS)
-			return status;
+		efi_status = uefi_call_wrapper(BS->LocateProtocol, 3,
+					       &SECURITY2_PROTOCOL_GUID, NULL,
+					       (VOID **) &security2_protocol);
+		if (EFI_ERROR(efi_status))
+			return efi_status;
 
 		security2_protocol->FileAuthentication = es2fa;
 		es2fa = NULL;

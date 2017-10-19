@@ -14,16 +14,17 @@ EFI_STATUS
 argsplit(EFI_HANDLE image, int *argc, CHAR16*** ARGV)
 {
 	unsigned int i, count = 1;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *info;
 	CHAR16 *start;
 
 	*argc = 0;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3, image, &LoadedImageProtocol, (VOID **) &info);
-	if (EFI_ERROR(status)) {
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
+				       &LoadedImageProtocol, (VOID **) &info);
+	if (EFI_ERROR(efi_status)) {
 		Print(L"Failed to get arguments\n");
-		return status;
+		return efi_status;
 	}
 
 	for (i = 0; i < info->LoadOptionsSize; i += 2) {

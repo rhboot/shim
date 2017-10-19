@@ -54,7 +54,7 @@ variable_create_esl(void *cert, int cert_len, EFI_GUID *type, EFI_GUID *owner,
 EFI_STATUS
 CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 {
-	EFI_STATUS Status;
+	EFI_STATUS efi_status;
 	UINT8 *NewData;
 	UINT8 *Payload;
 	UINTN PayloadSize;
@@ -65,12 +65,13 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	if (Data == NULL || DataSize == NULL) {
 		return EFI_INVALID_PARAMETER;
 	}
-	//
-	// In Setup mode or Custom mode, the variable does not need to be signed but the
-	// parameters to the SetVariable() call still need to be prepared as authenticated
-	// variable. So we create EFI_VARIABLE_AUTHENTICATED_2 descriptor without certificate
-	// data in it.
-	//
+	/*
+	 * In Setup mode or Custom mode, the variable does not need to be
+	 * signed but the
+	 * parameters to the SetVariable() call still need to be prepared as
+	 * authenticated variable. So we create EFI_VARIABLE_AUTHENTICATED_2
+	 * descriptor without certificate data in it.
+	 */
 	Payload = *Data;
 	PayloadSize = *DataSize;
 
@@ -88,10 +89,10 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	DescriptorData = (EFI_VARIABLE_AUTHENTICATION_2 *) (NewData);
 
 	ZeroMem(&Time, sizeof(EFI_TIME));
-	Status = uefi_call_wrapper(RT->GetTime, 2, &Time, NULL);
-	if (EFI_ERROR(Status)) {
+	efi_status = uefi_call_wrapper(RT->GetTime, 2, &Time, NULL);
+	if (EFI_ERROR(efi_status)) {
 		FreePool(NewData);
-		return Status;
+		return efi_status;
 	}
 	Time.Pad1 = 0;
 	Time.Nanosecond = 0;
@@ -106,8 +107,10 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	DescriptorData->AuthInfo.Hdr.wCertificateType = WIN_CERT_TYPE_EFI_GUID;
 	DescriptorData->AuthInfo.CertType = EFI_CERT_TYPE_PKCS7_GUID;
 
-	/* we're expecting an EFI signature list, so don't free the input since
-	 * it might not be in a pool */
+	/*
+	 * we're expecting an EFI signature list, so don't free the input
+	 * since it might not be in a pool
+	 */
 #if 0
 	if (Payload != NULL) {
 		FreePool(Payload);
@@ -137,7 +140,7 @@ SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID owner,
 		int ds;
 		efi_status = variable_create_esl(Data, len, &X509_GUID, NULL,
 						 (void **)&Cert, &ds);
-		if (efi_status != EFI_SUCCESS) {
+		if (EFI_ERROR(efi_status)) {
 			Print(L"Failed to create %s certificate %d\n", var, efi_status);
 			return efi_status;
 		}
@@ -149,7 +152,7 @@ SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID owner,
 		DataSize = len;
 	}
 	efi_status = CreateTimeBasedPayload(&DataSize, (UINT8 **)&Cert);
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		Print(L"Failed to create time based payload %d\n", efi_status);
 		return efi_status;
 	}
@@ -173,7 +176,7 @@ GetOSIndications(void)
 	EFI_STATUS efi_status;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"OsIndicationsSupported", &GV_GUID, NULL, &DataSize, &indications);
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		return 0;
 
 	return indications;
@@ -188,11 +191,11 @@ SETOSIndicationsAndReboot(UINT64 indications)
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"OsIndications",
 				       &GV_GUID,
 				       EFI_VARIABLE_NON_VOLATILE
-				       | EFI_VARIABLE_RUNTIME_ACCESS 
+				       | EFI_VARIABLE_RUNTIME_ACCESS
 				       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				       DataSize, &indications);
 
-	if (efi_status != EFI_SUCCESS)
+	if (EFI_ERROR(efi_status))
 		return efi_status;
 
 	uefi_call_wrapper(RT->ResetSystem, 4, EfiResetWarm, EFI_SUCCESS, 0, NULL);
@@ -223,8 +226,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, var, &owner,
 				       attributes, len, *data);
-
-	if (efi_status != EFI_SUCCESS) {
+	if (EFI_ERROR(efi_status)) {
 		FreePool(*data);
 		*data = NULL;
 	}
@@ -259,17 +261,17 @@ find_in_variable_esl(CHAR16* var, EFI_GUID owner, UINT8 *key, UINTN keylen)
 {
 	UINTN DataSize = 0;
 	UINT8 *Data = NULL;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	status = get_variable(var, &Data, &DataSize, owner);
-	if (status != EFI_SUCCESS)
-		return status;
+	efi_status = get_variable(var, &Data, &DataSize, owner);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
-	status = find_in_esl(Data, DataSize, key, keylen);
+	efi_status = find_in_esl(Data, DataSize, key, keylen);
 
 	FreePool(Data);
 
-	return status;
+	return efi_status;
 }
 
 int
@@ -278,11 +280,11 @@ variable_is_setupmode(int default_return)
 	/* set to 1 because we return true if SetupMode doesn't exist */
 	UINT8 SetupMode = default_return;
 	UINTN DataSize = sizeof(SetupMode);
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	status = uefi_call_wrapper(RT->GetVariable, 5, L"SetupMode", &GV_GUID, NULL,
-				   &DataSize, &SetupMode);
-	if (EFI_ERROR(status))
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"SetupMode",
+				       &GV_GUID, NULL, &DataSize, &SetupMode);
+	if (EFI_ERROR(efi_status))
 		return default_return;
 
 	return SetupMode;
@@ -294,12 +296,12 @@ variable_is_secureboot(void)
 	/* return false if variable doesn't exist */
 	UINT8 SecureBoot = 0;
 	UINTN DataSize;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	DataSize = sizeof(SecureBoot);
-	status = uefi_call_wrapper(RT->GetVariable, 5, L"SecureBoot", &GV_GUID, NULL,
-				   &DataSize, &SecureBoot);
-	if (EFI_ERROR(status))
+	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"SecureBoot",
+				       &GV_GUID, NULL, &DataSize, &SecureBoot);
+	if (EFI_ERROR(efi_status))
 		return 0;
 
 	return SecureBoot;
@@ -309,14 +311,15 @@ EFI_STATUS
 variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 		     UINT8 hash[SHA256_DIGEST_SIZE])
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
-	if (find_in_variable_esl(var, owner, hash, SHA256_DIGEST_SIZE)
-	    == EFI_SUCCESS)
+	efi_status = find_in_variable_esl(var, owner, hash, SHA256_DIGEST_SIZE);
+	if (!EFI_ERROR(efi_status))
 		/* hash already present */
 		return EFI_ALREADY_STARTED;
 
-	UINT8 sig[sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_SIGNATURE_DATA) - 1 + SHA256_DIGEST_SIZE];
+	UINT8 sig[sizeof(EFI_SIGNATURE_LIST)
+		  + sizeof(EFI_SIGNATURE_DATA) - 1 + SHA256_DIGEST_SIZE];
 	EFI_SIGNATURE_LIST *l = (void *)sig;
 	EFI_SIGNATURE_DATA *d = (void *)sig + sizeof(EFI_SIGNATURE_LIST);
 	SetMem(sig, 0, sizeof(sig));
@@ -327,13 +330,13 @@ variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 	d->SignatureOwner = SHIM_LOCK_GUID;
 
 	if (CompareGuid(&owner, &SIG_DB) == 0)
-		status = SetSecureVariable(var, sig, sizeof(sig), owner,
-					   EFI_VARIABLE_APPEND_WRITE, 0);
+		efi_status = SetSecureVariable(var, sig, sizeof(sig), owner,
+					       EFI_VARIABLE_APPEND_WRITE, 0);
 	else
-		status = uefi_call_wrapper(RT->SetVariable, 5, var, &owner,
-					   EFI_VARIABLE_NON_VOLATILE
-					   | EFI_VARIABLE_BOOTSERVICE_ACCESS
-					   | EFI_VARIABLE_APPEND_WRITE,
-					   sizeof(sig), sig);
-	return status;
+		efi_status = uefi_call_wrapper(RT->SetVariable, 5, var, &owner,
+					EFI_VARIABLE_NON_VOLATILE |
+					EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					EFI_VARIABLE_APPEND_WRITE,
+					sizeof(sig), sig);
+	return efi_status;
 }
