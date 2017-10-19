@@ -323,7 +323,7 @@ variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 	l->SignatureListSize = sizeof(sig);
 	l->SignatureSize = 16 +32; /* UEFI defined */
 	CopyMem(&d->SignatureData, hash, SHA256_DIGEST_SIZE);
-	d->SignatureOwner = MOK_OWNER;
+	d->SignatureOwner = SHIM_LOCK_GUID;
 
 	if (CompareGuid(&owner, &SIG_DB) == 0)
 		status = SetSecureVariable(var, sig, sizeof(sig), owner,

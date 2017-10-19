@@ -19,11 +19,6 @@
 #define SHIM_VENDOR L"Shim"
 #endif
 
-EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
-EFI_GUID EFI_CERT_SHA224_GUID = { 0xb6e5233, 0xa65c, 0x44c9, {0x94, 0x7, 0xd9, 0xab, 0x83, 0xbf, 0xc8, 0xbd} };
-EFI_GUID EFI_CERT_SHA384_GUID = { 0xff3e5307, 0x9fd0, 0x48c9, {0x85, 0xf1, 0x8a, 0xd5, 0x6c, 0x70, 0x1e, 0x1} };
-EFI_GUID EFI_CERT_SHA512_GUID = { 0x93e0fae, 0xa6c4, 0x4f50, {0x9f, 0x1b, 0xd4, 0x1e, 0x2b, 0x89, 0xc1, 0x9a} };
-
 #define CERT_STRING L"Select an X509 certificate to enroll:\n\n"
 #define HASH_STRING L"Select a file to trust:\n\n"
 
@@ -93,18 +88,13 @@ done:
 
 static BOOLEAN is_sha2_hash (EFI_GUID Type)
 {
-	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
-	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
-	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
-	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
-
-	if (CompareGuid(&Type, &Sha224) == 0)
+	if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID) == 0)
 		return TRUE;
-	else if (CompareGuid(&Type, &Sha256) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID) == 0)
 		return TRUE;
-	else if (CompareGuid(&Type, &Sha384) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID) == 0)
 		return TRUE;
-	else if (CompareGuid(&Type, &Sha512) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID) == 0)
 		return TRUE;
 
 	return FALSE;
@@ -112,21 +102,15 @@ static BOOLEAN is_sha2_hash (EFI_GUID Type)
 
 static UINT32 sha_size (EFI_GUID Type)
 {
-	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
-	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
-	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
-	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
-	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
-
-	if (CompareGuid(&Type, &Sha1) == 0)
+	if (CompareGuid(&Type, &EFI_CERT_SHA1_GUID) == 0)
 		return SHA1_DIGEST_SIZE;
-	else if (CompareGuid(&Type, &Sha224) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID) == 0)
 		return SHA224_DIGEST_LENGTH;
-	else if (CompareGuid(&Type, &Sha256) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID) == 0)
 		return SHA256_DIGEST_SIZE;
-	else if (CompareGuid(&Type, &Sha384) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID) == 0)
 		return SHA384_DIGEST_LENGTH;
-	else if (CompareGuid(&Type, &Sha512) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID) == 0)
 		return SHA512_DIGEST_LENGTH;
 
 	return 0;
@@ -134,10 +118,9 @@ static UINT32 sha_size (EFI_GUID Type)
 
 static BOOLEAN is_valid_siglist (EFI_GUID Type, UINT32 SigSize)
 {
-	EFI_GUID CertType = X509_GUID;
 	UINT32 hash_sig_size;
 
-	if (CompareGuid (&Type, &CertType) == 0 && SigSize != 0)
+	if (CompareGuid (&Type, &X509_GUID) == 0 && SigSize != 0)
 		return TRUE;
 
 	if (!is_sha2_hash (Type))
@@ -191,7 +174,6 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 	MokListNode *list;
 	EFI_SIGNATURE_LIST *CertList = Data;
 	EFI_SIGNATURE_DATA *Cert;
-	EFI_GUID CertType = X509_GUID;
 	UINTN dbsize = DataSize;
 	UINTN count = 0;
 	void *end = Data + DataSize;
@@ -223,7 +205,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize) {
 		}
 
 		list[count].Type = CertList->SignatureType;
-		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
+		if (CompareGuid (&CertList->SignatureType, &X509_GUID) == 0) {
 			list[count].MokSize = CertList->SignatureSize -
 					      sizeof(EFI_GUID);
 			list[count].Mok = (void *)Cert->SignatureData;
@@ -472,30 +454,25 @@ static void show_x509_info (X509 *X509Cert, UINT8 *hash)
 
 static void show_sha_digest (EFI_GUID Type, UINT8 *hash)
 {
-	EFI_GUID Sha1 = EFI_CERT_SHA1_GUID;
-	EFI_GUID Sha224 = EFI_CERT_SHA224_GUID;
-	EFI_GUID Sha256 = EFI_CERT_SHA256_GUID;
-	EFI_GUID Sha384 = EFI_CERT_SHA384_GUID;
-	EFI_GUID Sha512 = EFI_CERT_SHA512_GUID;
 	CHAR16 *text[5];
 	POOL_PRINT hash_string1;
 	POOL_PRINT hash_string2;
 	int i;
 	int length;
 
-	if (CompareGuid(&Type, &Sha1) == 0) {
+	if (CompareGuid(&Type, &EFI_CERT_SHA1_GUID) == 0) {
 		length = SHA1_DIGEST_SIZE;
 		text[0] = L"SHA1 hash";
-	} else if (CompareGuid(&Type, &Sha224) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID) == 0) {
 		length = SHA224_DIGEST_LENGTH;
 		text[0] = L"SHA224 hash";
-	} else if (CompareGuid(&Type, &Sha256) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID) == 0) {
 		length = SHA256_DIGEST_SIZE;
 		text[0] = L"SHA256 hash";
-	} else if (CompareGuid(&Type, &Sha384) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID) == 0) {
 		length = SHA384_DIGEST_LENGTH;
 		text[0] = L"SHA384 hash";
-	} else if (CompareGuid(&Type, &Sha512) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID) == 0) {
 		length = SHA512_DIGEST_LENGTH;
 		text[0] = L"SHA512 hash";
 	} else {
@@ -578,12 +555,11 @@ static void show_efi_hash (EFI_GUID Type, void *Mok, UINTN MokSize)
 static void show_mok_info (EFI_GUID Type, void *Mok, UINTN MokSize)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID CertType = X509_GUID;
 
 	if (!Mok || MokSize == 0)
 		return;
 
-	if (CompareGuid (&Type, &CertType) == 0) {
+	if (CompareGuid (&Type, &X509_GUID) == 0) {
 		UINT8 hash[SHA1_DIGEST_SIZE];
 		X509 *X509Cert;
 		efi_status = get_sha1sum(Mok, MokSize, hash);
@@ -893,7 +869,6 @@ static EFI_STATUS match_password (PASSWORD_CRYPT *pw_crypt,
 
 static EFI_STATUS write_db (CHAR16 *db_name, void *MokNew, UINTN MokNewSize)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status;
 	UINT32 attributes;
 	void *old_data = NULL;
@@ -902,7 +877,7 @@ static EFI_STATUS write_db (CHAR16 *db_name, void *MokNew, UINTN MokNewSize)
 	UINTN new_size;
 
 	status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				   &shim_lock_guid,
+				   &SHIM_LOCK_GUID,
 				   EFI_VARIABLE_NON_VOLATILE
 				   | EFI_VARIABLE_BOOTSERVICE_ACCESS
 				   | EFI_VARIABLE_APPEND_WRITE,
@@ -912,7 +887,7 @@ static EFI_STATUS write_db (CHAR16 *db_name, void *MokNew, UINTN MokNewSize)
 	}
 
 	status = get_variable_attr(db_name, (UINT8 **)&old_data, &old_size,
-				   shim_lock_guid, &attributes);
+				   SHIM_LOCK_GUID, &attributes);
 	if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
 		return status;
 	}
@@ -935,7 +910,7 @@ static EFI_STATUS write_db (CHAR16 *db_name, void *MokNew, UINTN MokNewSize)
 	CopyMem(new_data + old_size, MokNew, MokNewSize);
 
 	status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				   &shim_lock_guid,
+				   &SHIM_LOCK_GUID,
 				   EFI_VARIABLE_NON_VOLATILE
 				   | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				   new_size, new_data);
@@ -955,7 +930,6 @@ out:
 static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 			      BOOLEAN MokX)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *db_name;
 	CHAR16 *auth_name;
@@ -973,7 +947,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 
 	if (authenticate) {
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, auth_name,
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       &attributes, &auth_size, auth);
 
 		if (efi_status != EFI_SUCCESS ||
@@ -1000,7 +974,7 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 	if (!MokNewSize) {
 		/* Delete MOK */
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_NON_VOLATILE
 					       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
@@ -1020,7 +994,6 @@ static EFI_STATUS store_keys (void *MokNew, UINTN MokNewSize, int authenticate,
 static EFI_STATUS mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int auth,
 				    BOOLEAN MokX)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *title;
 
@@ -1045,11 +1018,11 @@ static EFI_STATUS mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int aut
 
 	if (auth) {
 		if (MokX) {
-			LibDeleteVariable(L"MokXNew", &shim_lock_guid);
-			LibDeleteVariable(L"MokXAuth", &shim_lock_guid);
+			LibDeleteVariable(L"MokXNew", &SHIM_LOCK_GUID);
+			LibDeleteVariable(L"MokXAuth", &SHIM_LOCK_GUID);
 		} else {
-			LibDeleteVariable(L"MokNew", &shim_lock_guid);
-			LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+			LibDeleteVariable(L"MokNew", &SHIM_LOCK_GUID);
+			LibDeleteVariable(L"MokAuth", &SHIM_LOCK_GUID);
 		}
 	}
 
@@ -1061,7 +1034,6 @@ static EFI_STATUS mok_enrollment_prompt (void *MokNew, UINTN MokNewSize, int aut
 
 static EFI_STATUS mok_reset_prompt (BOOLEAN MokX)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *prompt;
 
@@ -1082,11 +1054,11 @@ static EFI_STATUS mok_reset_prompt (BOOLEAN MokX)
 	}
 
 	if (MokX) {
-		LibDeleteVariable(L"MokXNew", &shim_lock_guid);
-		LibDeleteVariable(L"MokXAuth", &shim_lock_guid);
+		LibDeleteVariable(L"MokXNew", &SHIM_LOCK_GUID);
+		LibDeleteVariable(L"MokXAuth", &SHIM_LOCK_GUID);
 	} else {
-		LibDeleteVariable(L"MokNew", &shim_lock_guid);
-		LibDeleteVariable(L"MokAuth", &shim_lock_guid);
+		LibDeleteVariable(L"MokNew", &SHIM_LOCK_GUID);
+		LibDeleteVariable(L"MokAuth", &SHIM_LOCK_GUID);
 	}
 
 	return EFI_SUCCESS;
@@ -1095,8 +1067,6 @@ static EFI_STATUS mok_reset_prompt (BOOLEAN MokX)
 static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 				       BOOLEAN MokX)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	EFI_GUID CertType = X509_GUID;
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *CertData;
@@ -1115,7 +1085,7 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 			continue;
 
 		DataSize += sizeof(EFI_SIGNATURE_LIST);
-		if (CompareGuid(&(list[i].Type), &CertType) == 0)
+		if (CompareGuid(&(list[i].Type), &X509_GUID) == 0)
 			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
@@ -1137,13 +1107,13 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 		CertList->SignatureType = list[i].Type;
 		CertList->SignatureHeaderSize = 0;
 
-		if (CompareGuid(&(list[i].Type), &CertType) == 0) {
+		if (CompareGuid(&(list[i].Type), &X509_GUID) == 0) {
 			CertList->SignatureListSize = list[i].MokSize +
 						      sizeof(EFI_SIGNATURE_LIST) +
 						      sizeof(EFI_GUID);
 			CertList->SignatureSize = list[i].MokSize + sizeof(EFI_GUID);
 
-			CertData->SignatureOwner = shim_lock_guid;
+			CertData->SignatureOwner = SHIM_LOCK_GUID;
 			CopyMem(CertData->SignatureData, list[i].Mok, list[i].MokSize);
 		} else {
 			CertList->SignatureListSize = list[i].MokSize +
@@ -1156,7 +1126,7 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 	}
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				       &shim_lock_guid,
+				       &SHIM_LOCK_GUID,
 				       EFI_VARIABLE_NON_VOLATILE
 				       | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				       DataSize, Data);
@@ -1174,11 +1144,10 @@ static EFI_STATUS write_back_mok_list (MokListNode *list, INTN key_num,
 static void delete_cert (void *key, UINT32 key_size,
 			 MokListNode *mok, INTN mok_num)
 {
-	EFI_GUID CertType = X509_GUID;
 	int i;
 
 	for (i = 0; i < mok_num; i++) {
-		if (CompareGuid(&(mok[i].Type), &CertType) != 0)
+		if (CompareGuid(&(mok[i].Type), &X509_GUID) != 0)
 			continue;
 
 		if (mok[i].MokSize == key_size &&
@@ -1285,8 +1254,6 @@ static void delete_hash_list (EFI_GUID Type, void *hash_list, UINT32 list_size,
 
 static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-	EFI_GUID CertType = X509_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *db_name;
 	CHAR16 *auth_name;
@@ -1310,7 +1277,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	}
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, auth_name,
-				       &shim_lock_guid,
+				       &SHIM_LOCK_GUID,
 				       &attributes, &auth_size, auth);
 
 	if (efi_status != EFI_SUCCESS ||
@@ -1332,7 +1299,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		return EFI_ACCESS_DENIED;
 
 	efi_status = get_variable_attr (db_name, &MokListData, &MokListDataSize,
-				        shim_lock_guid, &attributes);
+				        SHIM_LOCK_GUID, &attributes);
 	if (efi_status != EFI_SUCCESS) {
 		if (MokX)
 			console_errorbox(L"Failed to retrieve MokListX");
@@ -1349,7 +1316,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		}
 		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
 		uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				  &shim_lock_guid,
+				  &SHIM_LOCK_GUID,
 				  EFI_VARIABLE_NON_VOLATILE |
 				  EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				  0, NULL);
@@ -1372,7 +1339,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		}
 		console_alertbox((CHAR16 *[]){err_str1, err_str2, NULL});
 		uefi_call_wrapper(RT->SetVariable, 5, db_name,
-				  &shim_lock_guid,
+				  &SHIM_LOCK_GUID,
 				  EFI_VARIABLE_NON_VOLATILE |
 				  EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				  0, NULL);
@@ -1400,7 +1367,7 @@ static EFI_STATUS delete_keys (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 
 	/* Search and destroy */
 	for (i = 0; i < del_num; i++) {
-		if (CompareGuid(&(del_key[i].Type), &CertType) == 0) {
+		if (CompareGuid(&(del_key[i].Type), &X509_GUID) == 0) {
 			delete_cert(del_key[i].Mok, del_key[i].MokSize,
 				    mok, mok_num);
 		} else if (is_sha2_hash(del_key[i].Type)) {
@@ -1424,7 +1391,6 @@ error:
 
 static EFI_STATUS mok_deletion_prompt (void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	CHAR16 *title;
 
@@ -1448,11 +1414,11 @@ static EFI_STATUS mok_deletion_prompt (void *MokDel, UINTN MokDelSize, BOOLEAN M
 	}
 
 	if (MokX) {
-		LibDeleteVariable(L"MokXDel", &shim_lock_guid);
-		LibDeleteVariable(L"MokXDelAuth", &shim_lock_guid);
+		LibDeleteVariable(L"MokXDel", &SHIM_LOCK_GUID);
+		LibDeleteVariable(L"MokXDelAuth", &SHIM_LOCK_GUID);
 	} else {
-		LibDeleteVariable(L"MokDel", &shim_lock_guid);
-		LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
+		LibDeleteVariable(L"MokDel", &SHIM_LOCK_GUID);
+		LibDeleteVariable(L"MokDelAuth", &SHIM_LOCK_GUID);
 	}
 
 	if (MokDel)
@@ -1489,7 +1455,6 @@ static CHAR16 get_password_charater (CHAR16 *prompt)
 }
 
 static EFI_STATUS mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	MokSBvar *var = MokSB;
@@ -1574,14 +1539,14 @@ static EFI_STATUS mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 		ret = console_yes_no((CHAR16 *[]){L"Enable Secure Boot", NULL});
 
 	if (ret == 0) {
-		LibDeleteVariable(L"MokSB", &shim_lock_guid);
+		LibDeleteVariable(L"MokSB", &SHIM_LOCK_GUID);
 		return EFI_ABORTED;
 	}
 
 	if (var->MokSBState == 0) {
 		efi_status = uefi_call_wrapper(RT->SetVariable,
 					       5, L"MokSBState",
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       1, &sbval);
@@ -1592,7 +1557,7 @@ static EFI_STATUS mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 	} else {
 		efi_status = uefi_call_wrapper(RT->SetVariable,
 					       5, L"MokSBState",
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
@@ -1609,7 +1574,6 @@ static EFI_STATUS mok_sb_prompt (void *MokSB, UINTN MokSBSize) {
 }
 
 static EFI_STATUS mok_db_prompt (void *MokDB, UINTN MokDBSize) {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	MokDBvar *var = MokDB;
@@ -1694,14 +1658,14 @@ static EFI_STATUS mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 		ret = console_yes_no((CHAR16 *[]){L"Use DB certs/hashes", NULL});
 
 	if (ret == 0) {
-		LibDeleteVariable(L"MokDB", &shim_lock_guid);
+		LibDeleteVariable(L"MokDB", &SHIM_LOCK_GUID);
 		return EFI_ABORTED;
 	}
 
 	if (var->MokDBState == 0) {
 		efi_status = uefi_call_wrapper(RT->SetVariable,
 					       5, L"MokDBState",
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       1, &dbval);
@@ -1712,7 +1676,7 @@ static EFI_STATUS mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 	} else {
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5,
 					       L"MokDBState",
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_NON_VOLATILE |
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 					       0, NULL);
@@ -1729,7 +1693,6 @@ static EFI_STATUS mok_db_prompt (void *MokDB, UINTN MokDBSize) {
 }
 
 static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	UINT8 hash[PASSWORD_CRYPT_SIZE];
 	UINT8 clear = 0;
@@ -1756,7 +1719,7 @@ static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 			return EFI_ABORTED;
 
 		uefi_call_wrapper(RT->SetVariable, 5, L"MokPWStore",
-				  &shim_lock_guid,
+				  &SHIM_LOCK_GUID,
 				  EFI_VARIABLE_NON_VOLATILE
 				  | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				  0, NULL);
@@ -1781,7 +1744,7 @@ static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5,
 				       L"MokPWStore",
-				       &shim_lock_guid,
+				       &SHIM_LOCK_GUID,
 				       EFI_VARIABLE_NON_VOLATILE |
 				       EFI_VARIABLE_BOOTSERVICE_ACCESS,
 				       MokPWSize, MokPW);
@@ -1791,7 +1754,7 @@ static EFI_STATUS mok_pw_prompt (void *MokPW, UINTN MokPWSize) {
 	}
 
 mokpw_done:
-	LibDeleteVariable(L"MokPW", &shim_lock_guid);
+	LibDeleteVariable(L"MokPW", &SHIM_LOCK_GUID);
 
 	if (MokPW)
 		FreePool(MokPW);
@@ -1837,7 +1800,6 @@ static BOOLEAN verify_certificate(UINT8 *cert, UINTN size)
 static EFI_STATUS enroll_file (void *data, UINTN datasize, BOOLEAN hash)
 {
 	EFI_STATUS status = EFI_SUCCESS;
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *CertData;
 	UINTN mokbuffersize;
@@ -1847,11 +1809,10 @@ static EFI_STATUS enroll_file (void *data, UINTN datasize, BOOLEAN hash)
 		UINT8 sha256[SHA256_DIGEST_SIZE];
 		UINT8 sha1[SHA1_DIGEST_SIZE];
 		SHIM_LOCK *shim_lock;
-		EFI_GUID shim_guid = SHIM_LOCK_GUID;
 		PE_COFF_LOADER_IMAGE_CONTEXT context;
-	
-		status = LibLocateProtocol(&shim_guid, (VOID **)&shim_lock);
 
+		status = LibLocateProtocol(&SHIM_LOCK_GUID,
+					   (VOID **) &shim_lock);
 		if (status != EFI_SUCCESS)
 			goto out;
 
@@ -1901,7 +1862,7 @@ static EFI_STATUS enroll_file (void *data, UINTN datasize, BOOLEAN hash)
 
 	CertList->SignatureListSize = mokbuffersize;
 	CertList->SignatureHeaderSize = 0;
-	CertData->SignatureOwner = shim_lock_guid;
+	CertData->SignatureOwner = SHIM_LOCK_GUID;
 
 	if (!hash) {
 		if (!verify_certificate(CertData->SignatureData, datasize))
@@ -2043,7 +2004,6 @@ static EFI_STATUS mok_key_enroll(void)
 
 static BOOLEAN verify_pw(BOOLEAN *protected)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	UINT8 pwhash[PASSWORD_CRYPT_SIZE];
@@ -2054,7 +2014,7 @@ static BOOLEAN verify_pw(BOOLEAN *protected)
 	*protected = FALSE;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokPWStore",
-				       &shim_lock_guid, &attributes, &size,
+				       &SHIM_LOCK_GUID, &attributes, &size,
 				       pwhash);
 
 	/*
@@ -2182,7 +2142,6 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 	int choice = 0;
 	int mok_changed = 0;
 	EFI_STATUS efi_status;
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINT8 auth[PASSWORD_CRYPT_SIZE];
 	UINTN auth_size = PASSWORD_CRYPT_SIZE;
 	UINT32 attributes;
@@ -2203,7 +2162,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 		UINT32 MokXDelAuth = 0;
 
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokAuth",
-						       &shim_lock_guid,
+						       &SHIM_LOCK_GUID,
 						       &attributes, &auth_size, auth);
 
 		if ((efi_status == EFI_SUCCESS) &&
@@ -2211,7 +2170,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			MokAuth = 1;
 
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDelAuth",
-						       &shim_lock_guid,
+						       &SHIM_LOCK_GUID,
 						       &attributes, &auth_size, auth);
 
 		if ((efi_status == EFI_SUCCESS) &&
@@ -2219,7 +2178,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			MokDelAuth = 1;
 
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokXAuth",
-						       &shim_lock_guid,
+						       &SHIM_LOCK_GUID,
 						       &attributes, &auth_size, auth);
 
 		if ((efi_status == EFI_SUCCESS) &&
@@ -2227,7 +2186,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			MokXAuth = 1;
 
 		efi_status = uefi_call_wrapper(RT->GetVariable, 5, L"MokXDelAuth",
-						       &shim_lock_guid,
+						       &SHIM_LOCK_GUID,
 						       &attributes, &auth_size, auth);
 
 		if ((efi_status == EFI_SUCCESS) &&
@@ -2414,7 +2373,6 @@ out:
 
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINTN MokNewSize = 0, MokDelSize = 0, MokSBSize = 0, MokPWSize = 0;
 	UINTN MokDBSize = 0, MokXNewSize = 0, MokXDelSize = 0;
 	void *MokNew = NULL;
@@ -2427,9 +2385,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	EFI_STATUS status;
 
 	status = get_variable(L"MokNew", (UINT8 **)&MokNew, &MokNewSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokNew", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokNew", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokNew");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2437,9 +2395,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 
 	status = get_variable(L"MokDel", (UINT8 **)&MokDel, &MokDelSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokDel", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokDel", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokDel");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2447,9 +2405,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 
 	status = get_variable(L"MokSB", (UINT8 **)&MokSB, &MokSBSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokSB", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokSB", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokSB");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2457,9 +2415,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 
 	status = get_variable(L"MokPW", (UINT8 **)&MokPW, &MokPWSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokPW", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokPW", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokPW");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2467,9 +2425,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 
 	status = get_variable(L"MokDB", (UINT8 **)&MokDB, &MokDBSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokDB", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokDB", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokDB");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2477,9 +2435,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 
 	status = get_variable(L"MokXNew", (UINT8 **)&MokXNew, &MokXNewSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokXNew", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokXNew", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokXNew");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2487,9 +2445,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	}
 
 	status = get_variable(L"MokXDel", (UINT8 **)&MokXDel, &MokXDelSize,
-				shim_lock_guid);
+				SHIM_LOCK_GUID);
 	if (status == EFI_SUCCESS) {
-		if (LibDeleteVariable(L"MokXDel", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokXDel", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			console_notify(L"Failed to delete MokXDel");
 		}
 	} else if (EFI_ERROR(status) && status != EFI_NOT_FOUND) {
@@ -2521,10 +2479,10 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	if (MokXDel)
 		FreePool (MokXDel);
 
-	LibDeleteVariable(L"MokAuth", &shim_lock_guid);
-	LibDeleteVariable(L"MokDelAuth", &shim_lock_guid);
-	LibDeleteVariable(L"MokXAuth", &shim_lock_guid);
-	LibDeleteVariable(L"MokXDelAuth", &shim_lock_guid);
+	LibDeleteVariable(L"MokAuth", &SHIM_LOCK_GUID);
+	LibDeleteVariable(L"MokDelAuth", &SHIM_LOCK_GUID);
+	LibDeleteVariable(L"MokXAuth", &SHIM_LOCK_GUID);
+	LibDeleteVariable(L"MokXDelAuth", &SHIM_LOCK_GUID);
 
 	return EFI_SUCCESS;
 }

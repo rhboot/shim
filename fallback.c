@@ -10,18 +10,13 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include "ucs2.h"
-#include "variables.h"
-#include "tpm.h"
+#include "shim.h"
 
 EFI_LOADED_IMAGE *this_image = NULL;
-
-EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
 
 int
 get_fallback_verbose(void)
 {
-	EFI_GUID guid = SHIM_LOCK_GUID;
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
@@ -32,7 +27,7 @@ get_fallback_verbose(void)
 		return state;
 
 	efi_status = get_variable(L"FALLBACK_VERBOSE",
-				  &data, &dataSize, guid);
+				  &data, &dataSize, SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		state = 0;
 		return state;
@@ -103,18 +98,17 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 	EFI_STATUS rc;
 	void *buffer = NULL;
 	UINTN bs = 0;
-	EFI_GUID finfo = EFI_FILE_INFO_ID;
 
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
-	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &finfo, &bs, NULL);
+	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, NULL);
 	if (rc == EFI_BUFFER_TOO_SMALL) {
 		buffer = AllocateZeroPool(bs);
 		if (!buffer) {
 			Print(L"Could not allocate memory\n");
 			return EFI_OUT_OF_RESOURCES;
 		}
-		rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &finfo,
+		rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID,
 					&bs, buffer);
 	}
 	/* This checks *either* the error from the first GetInfo, if it isn't
@@ -210,7 +204,6 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 	static int i = 0;
 	CHAR16 varname[] = L"Boot0000";
 	CHAR16 hexmap[] = L"0123456789ABCDEF";
-	EFI_GUID global = EFI_GLOBAL_VARIABLE;
 	EFI_STATUS rc;
 
 	for(; i <= 0xffff; i++) {
@@ -219,7 +212,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 		varname[6] = hexmap[(i & 0x00f0) >> 4];
 		varname[7] = hexmap[(i & 0x000f) >> 0];
 
-		void *var = LibGetVariable(varname, &global);
+		void *var = LibGetVariable(varname, &GV_GUID);
 		if (!var) {
 			int size = sizeof(UINT32) + sizeof (UINT16) +
 				StrLen(label)*2 + 2 + DevicePathSize(hddp) +
@@ -248,9 +241,9 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			}
 
 			rc = uefi_call_wrapper(RT->SetVariable, 5, varname,
-				&global, EFI_VARIABLE_NON_VOLATILE |
-					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					 EFI_VARIABLE_RUNTIME_ACCESS,
+				&GV_GUID, EFI_VARIABLE_NON_VOLATILE |
+					  EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					  EFI_VARIABLE_RUNTIME_ACCESS,
 				size, data);
 
 			FreePool(data);
@@ -412,7 +405,6 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	int i = 0;
 	CHAR16 varname[] = L"Boot0000";
 	CHAR16 hexmap[] = L"0123456789ABCDEF";
-	EFI_GUID global = EFI_GLOBAL_VARIABLE;
 	EFI_STATUS rc;
 
 	UINTN max_candidate_size = calc_masked_boot_option_size(size);
@@ -429,7 +421,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		varname[7] = hexmap[(bootorder[i] & 0x000f) >> 0];
 
 		UINTN candidate_size = max_candidate_size;
-		rc = uefi_call_wrapper(RT->GetVariable, 5, varname, &global,
+		rc = uefi_call_wrapper(RT->GetVariable, 5, varname, &GV_GUID,
 					NULL, &candidate_size, candidate);
 		if (EFI_ERROR(rc))
 			continue;
@@ -466,9 +458,8 @@ set_boot_order(void)
 {
 	CHAR16 *oldbootorder;
 	UINTN size;
-	EFI_GUID global = EFI_GLOBAL_VARIABLE;
 
-	oldbootorder = LibGetVariableAndSize(L"BootOrder", &global, &size);
+	oldbootorder = LibGetVariableAndSize(L"BootOrder", &GV_GUID, &size);
 	if (oldbootorder) {
 		nbootorder = size / sizeof (CHAR16);
 		bootorder = oldbootorder;
@@ -482,7 +473,6 @@ update_boot_order(void)
 {
 	UINTN size;
 	UINTN len = 0;
-	EFI_GUID global = EFI_GLOBAL_VARIABLE;
 	CHAR16 *newbootorder = NULL;
 	EFI_STATUS rc;
 
@@ -497,12 +487,12 @@ update_boot_order(void)
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
 	Print(L"\n");
-	rc = uefi_call_wrapper(RT->GetVariable, 5, L"BootOrder", &global,
+	rc = uefi_call_wrapper(RT->GetVariable, 5, L"BootOrder", &GV_GUID,
 			       NULL, &len, NULL);
 	if (rc == EFI_BUFFER_TOO_SMALL)
-		LibDeleteVariable(L"BootOrder", &global);
+		LibDeleteVariable(L"BootOrder", &GV_GUID);
 
-	rc = uefi_call_wrapper(RT->SetVariable, 5, L"BootOrder", &global,
+	rc = uefi_call_wrapper(RT->SetVariable, 5, L"BootOrder", &GV_GUID,
 					EFI_VARIABLE_NON_VOLATILE |
 					 EFI_VARIABLE_BOOTSERVICE_ACCESS |
 					 EFI_VARIABLE_RUNTIME_ACCESS,
@@ -688,18 +678,17 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	EFI_STATUS rc;
 	void *buffer = NULL;
 	UINTN bs = 0;
-	EFI_GUID finfo = EFI_FILE_INFO_ID;
 
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
-	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &finfo, &bs, NULL);
+	rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID, &bs, NULL);
 	if (rc == EFI_BUFFER_TOO_SMALL) {
 		buffer = AllocateZeroPool(bs);
 		if (!buffer) {
 			Print(L"Could not allocate memory\n");
 			return EFI_OUT_OF_RESOURCES;
 		}
-		rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &finfo,
+		rc = uefi_call_wrapper(fh->GetInfo, 4, fh, &EFI_FILE_INFO_GUID,
 					&bs, buffer);
 	}
 	/* This checks *either* the error from the first GetInfo, if it isn't
@@ -960,14 +949,14 @@ static void
 __attribute__((__optimize__("0")))
 debug_hook(void)
 {
-	EFI_GUID guid = SHIM_LOCK_GUID;
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
 	volatile register int x = 0;
 	extern char _etext, _edata;
 
-	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize, guid);
+	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
+				  SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		return;
 	}

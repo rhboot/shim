@@ -95,8 +95,6 @@
 #include "shim_cert.h"
 #endif
 
-extern EFI_GUID SHIM_LOCK_GUID;
-
 INTERFACE_DECL(_SHIM_LOCK);
 
 typedef

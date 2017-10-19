@@ -71,8 +71,6 @@ static UINT32 load_options_size;
 		__perror_ret;						\
 	})
 
-EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
-
 /*
  * The vendor certificate used for validating the second stage loader
  */
@@ -438,10 +436,9 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
 	BOOLEAN IsFound = FALSE;
-	EFI_GUID CertType = X509_GUID;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		if (CompareGuid (&CertList->SignatureType, &CertType) == 0) {
+		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
@@ -570,52 +567,50 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
-	EFI_GUID shim_var = SHIM_LOCK_GUID;
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
-				 SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID,
-				 L"dbx", secure_var) ==
-				DATA_FOUND) {
+			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
+			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
-				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID,
-				 L"dbx", secure_var) ==
-				DATA_FOUND) {
+				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert && check_db_cert_in_ram(dbx, vendor_dbx_size, cert,
-					 sha256hash, L"dbx",
-					 secure_var) == DATA_FOUND) {
+	if (cert &&
+	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", secure_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha256hash,
+			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", secure_var, sha1hash, SHA1_DIGEST_SIZE,
-			  EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha1hash,
+			  SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert && check_db_cert(L"dbx", secure_var, cert, sha256hash) ==
-				DATA_FOUND) {
+	if (cert &&
+	    check_db_cert(L"dbx", EFI_SECURE_BOOT_DB_GUID,
+			  cert, sha256hash) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"MokListX", shim_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha256hash,
+			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert && check_db_cert(L"MokListX", shim_var, cert, sha256hash) ==
-				DATA_FOUND) {
+	if (cert &&
+	    check_db_cert(L"MokListX", SHIM_LOCK_GUID,
+			  cert, sha256hash) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
@@ -636,18 +631,15 @@ static void update_verification_method(verification_method_t method)
 static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_GUID secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
-	EFI_GUID shim_var = SHIM_LOCK_GUID;
-
 	if (!ignore_db) {
-		if (check_db_hash(L"db", secure_var, sha256hash, SHA256_DIGEST_SIZE,
+		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha256hash, SHA256_DIGEST_SIZE,
 					EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		} else {
 			LogError(L"check_db_hash(db, sha256hash) != DATA_FOUND\n");
 		}
-		if (check_db_hash(L"db", secure_var, sha1hash, SHA1_DIGEST_SIZE,
+		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha1hash, SHA1_DIGEST_SIZE,
 					EFI_CERT_SHA1_GUID) == DATA_FOUND) {
 			verification_method = VERIFIED_BY_HASH;
 			update_verification_method(VERIFIED_BY_HASH);
@@ -655,7 +647,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		} else {
 			LogError(L"check_db_hash(db, sha1hash) != DATA_FOUND\n");
 		}
-		if (cert && check_db_cert(L"db", secure_var, cert, sha256hash)
+		if (cert && check_db_cert(L"db", EFI_SECURE_BOOT_DB_GUID, cert, sha256hash)
 					== DATA_FOUND) {
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
@@ -665,16 +657,17 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		}
 	}
 
-	if (check_db_hash(L"MokList", shim_var, sha256hash, SHA256_DIGEST_SIZE,
-			  EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
+			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
+				== DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
 	} else {
 		LogError(L"check_db_hash(MokList, sha256hash) != DATA_FOUND\n");
 	}
-	if (cert && check_db_cert(L"MokList", shim_var, cert, sha256hash) ==
-				DATA_FOUND) {
+	if (cert && check_db_cert(L"MokList", SHIM_LOCK_GUID, cert, sha256hash)
+			== DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
@@ -990,18 +983,17 @@ done:
  * Ensure that the MOK database hasn't been set or modified from an OS
  */
 static EFI_STATUS verify_mok (void) {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
 	UINT8 *MokListData = NULL;
 	UINTN MokListDataSize = 0;
 	UINT32 attributes;
 
 	status = get_variable_attr(L"MokList", &MokListData, &MokListDataSize,
-				   shim_lock_guid, &attributes);
+				   SHIM_LOCK_GUID, &attributes);
 
 	if (!EFI_ERROR(status) && attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		perror(L"MokList is compromised!\nErase all keys in MokList!\n");
-		if (LibDeleteVariable(L"MokList", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokList", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			perror(L"Failed to erase MokList\n");
                         return EFI_SECURITY_VIOLATION;
 		}
@@ -1023,7 +1015,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	EFI_STATUS status = EFI_SECURITY_VIOLATION;
 	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
 	unsigned int size = datasize;
-	EFI_GUID shim_var = SHIM_LOCK_GUID;
 
 	if (context->SecDir->Size != 0) {
 		if (context->SecDir->Size >= size) {
@@ -1107,7 +1098,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			       shim_cert, sizeof(shim_cert), sha256hash,
 			       SHA256_DIGEST_SIZE)) {
 			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", shim_var, sizeof(shim_cert), shim_cert);
+			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
+					     sizeof(shim_cert), shim_cert);
 			status = EFI_SUCCESS;
 			drain_openssl_errors();
 			return status;
@@ -1125,7 +1117,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				       vendor_cert, vendor_cert_size,
 				       sha256hash, SHA256_DIGEST_SIZE)) {
 			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", shim_var, vendor_cert_size, vendor_cert);
+			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
+					     vendor_cert_size, vendor_cert);
 			status = EFI_SUCCESS;
 			drain_openssl_errors();
 			return status;
@@ -1515,7 +1508,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 static int
 should_use_fallback(EFI_HANDLE image_handle)
 {
-	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_LOADED_IMAGE *li;
 	unsigned int pathlen = 0;
 	CHAR16 *bootpath = NULL;
@@ -1526,7 +1518,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	int ret = 0;
 
 	rc = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, (void **)&li);
+			       &EFI_LOADED_IMAGE_GUID, (void **)&li);
 	if (EFI_ERROR(rc)) {
 		perror(L"Could not get image for bootx64.efi: %r\n", rc);
 		return 0;
@@ -1683,8 +1675,6 @@ error:
 static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 			      int *datasize, CHAR16 *PathName)
 {
-	EFI_GUID simple_file_system_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
-	EFI_GUID file_info_id = EFI_FILE_INFO_ID;
 	EFI_STATUS efi_status;
 	EFI_HANDLE device;
 	EFI_FILE_INFO *fileinfo = NULL;
@@ -1698,9 +1688,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	 * Open the device
 	 */
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, device,
-				       &simple_file_system_protocol,
+				       &EFI_SIMPLE_FILE_SYSTEM_GUID,
 				       (void **)&drive);
-
 	if (efi_status != EFI_SUCCESS) {
 		perror(L"Failed to find fs: %r\n", efi_status);
 		goto error;
@@ -1736,7 +1725,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	 * Find out how big the file is in order to allocate the storage
 	 * buffer
 	 */
-	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &file_info_id,
+	efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub, &EFI_FILE_INFO_GUID,
 				       &buffersize, fileinfo);
 
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
@@ -1748,7 +1737,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 			goto error;
 		}
 		efi_status = uefi_call_wrapper(grub->GetInfo, 4, grub,
-					       &file_info_id, &buffersize,
+					       &EFI_FILE_INFO_GUID, &buffersize,
 					       fileinfo);
 	}
 
@@ -1872,7 +1861,6 @@ static EFI_STATUS shim_read_header(void *data, unsigned int datasize,
  */
 EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 {
-	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
 	CHAR16 *PathName = NULL;
@@ -1886,8 +1874,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * binary in order to find our path
 	 */
 	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image_handle,
-				       &loaded_image_protocol, (void **)&li);
-
+				       &EFI_LOADED_IMAGE_GUID, (void **)&li);
 	if (efi_status != EFI_SUCCESS) {
 		perror(L"Unable to init protocol\n");
 		return efi_status;
@@ -2022,12 +2009,11 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
  */
 EFI_STATUS measure_mok()
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status, ret = EFI_SUCCESS;
 	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
 
-	efi_status = get_variable(L"MokList", &Data, &DataSize, shim_lock_guid);
+	efi_status = get_variable(L"MokList", &Data, &DataSize, SHIM_LOCK_GUID);
 	if (!EFI_ERROR(efi_status)) {
 		efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
 					   DataSize, 14, (CHAR8 *)"MokList");
@@ -2040,7 +2026,7 @@ EFI_STATUS measure_mok()
 		ret = efi_status;
 	}
 
-	efi_status = get_variable(L"MokListX", &Data, &DataSize, shim_lock_guid);
+	efi_status = get_variable(L"MokListX", &Data, &DataSize, SHIM_LOCK_GUID);
 	if (!EFI_ERROR(efi_status)) {
 		efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)(UINTN)Data,
 					   DataSize, 14, (CHAR8 *)"MokListX");
@@ -2054,10 +2040,10 @@ EFI_STATUS measure_mok()
 	}
 
 	efi_status = get_variable(L"MokSBState", &Data, &DataSize,
-				  shim_lock_guid);
+				  SHIM_LOCK_GUID);
 	if (!EFI_ERROR(efi_status)) {
 		efi_status = tpm_measure_variable(L"MokSBState",
-						  shim_lock_guid,
+						  SHIM_LOCK_GUID,
 						  DataSize, Data);
 		if (!EFI_ERROR(efi_status)) {
 			efi_status = tpm_log_event((EFI_PHYSICAL_ADDRESS)
@@ -2082,7 +2068,6 @@ EFI_STATUS measure_mok()
  */
 EFI_STATUS mirror_mok_list()
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
@@ -2092,7 +2077,7 @@ EFI_STATUS mirror_mok_list()
 	EFI_SIGNATURE_DATA *CertData = NULL;
 	uint8_t *p = NULL;
 
-	efi_status = get_variable(L"MokList", &Data, &DataSize, shim_lock_guid);
+	efi_status = get_variable(L"MokList", &Data, &DataSize, SHIM_LOCK_GUID);
 	if (efi_status != EFI_SUCCESS)
 		DataSize = 0;
 
@@ -2118,7 +2103,7 @@ EFI_STATUS mirror_mok_list()
 		CertData = (EFI_SIGNATURE_DATA *)p;
 		p += sizeof (EFI_GUID);
 
-		CertList->SignatureType = EFI_CERT_X509_GUID;
+		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
 		CertList->SignatureListSize = vendor_cert_size
 					      + sizeof (*CertList)
 					      + sizeof (*CertData)
@@ -2135,7 +2120,7 @@ EFI_STATUS mirror_mok_list()
 
 	if (FullDataSize) {
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListRT",
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS
 					       | EFI_VARIABLE_RUNTIME_ACCESS,
 					       FullDataSize, FullData);
@@ -2153,17 +2138,17 @@ EFI_STATUS mirror_mok_list()
  */
 EFI_STATUS mirror_mok_list_x()
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
 
-	efi_status = get_variable(L"MokListX", &Data, &DataSize, shim_lock_guid);
+	efi_status = get_variable(L"MokListX", &Data, &DataSize,
+				  SHIM_LOCK_GUID);
 	if (efi_status != EFI_SUCCESS)
 		return efi_status;
 
 	efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokListXRT",
-				       &shim_lock_guid,
+				       &SHIM_LOCK_GUID,
 				       EFI_VARIABLE_BOOTSERVICE_ACCESS
 				       | EFI_VARIABLE_RUNTIME_ACCESS,
 				       DataSize, Data);
@@ -2180,22 +2165,21 @@ EFI_STATUS mirror_mok_list_x()
  */
 EFI_STATUS mirror_mok_sb_state()
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status;
 	UINT8 *Data = NULL;
 	UINTN DataSize = 0;
 
-	efi_status = get_variable(L"MokSBState", &Data, &DataSize, shim_lock_guid);
+	efi_status = get_variable(L"MokSBState", &Data, &DataSize, SHIM_LOCK_GUID);
 	if (efi_status == EFI_SUCCESS) {
 		UINT8 *Data_RT = NULL;
 		UINTN DataSize_RT = 0;
 
 		efi_status = get_variable(L"MokSBStateRT", &Data_RT,
-					  &DataSize_RT, shim_lock_guid);
+					  &DataSize_RT, SHIM_LOCK_GUID);
 		if (efi_status == EFI_SUCCESS) {
 			efi_status = uefi_call_wrapper(RT->SetVariable, 5,
 						L"MokSBStateRT",
-						&shim_lock_guid,
+						&SHIM_LOCK_GUID,
 						EFI_VARIABLE_BOOTSERVICE_ACCESS
 						| EFI_VARIABLE_RUNTIME_ACCESS
 						| EFI_VARIABLE_NON_VOLATILE,
@@ -2204,7 +2188,7 @@ EFI_STATUS mirror_mok_sb_state()
 
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5,
 					       L"MokSBStateRT",
-					       &shim_lock_guid,
+					       &SHIM_LOCK_GUID,
 					       EFI_VARIABLE_BOOTSERVICE_ACCESS
 					       | EFI_VARIABLE_RUNTIME_ACCESS,
 					       DataSize, Data);
@@ -2221,13 +2205,12 @@ EFI_STATUS mirror_mok_sb_state()
 static BOOLEAN check_var(CHAR16 *varname)
 {
 	EFI_STATUS efi_status;
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	UINTN size = sizeof(UINT32);
 	UINT32 MokVar;
 	UINT32 attributes;
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, varname,
-				       &shim_lock_guid, &attributes,
+				       &SHIM_LOCK_GUID, &attributes,
 				       &size, (void *)&MokVar);
 
 	if (efi_status == EFI_SUCCESS || efi_status == EFI_BUFFER_TOO_SMALL)
@@ -2265,7 +2248,6 @@ EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
  */
 static EFI_STATUS check_mok_sb (void)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
 	UINT8 MokSBState;
 	UINTN MokSBStateSize = sizeof(MokSBState);
@@ -2274,8 +2256,9 @@ static EFI_STATUS check_mok_sb (void)
 	user_insecure_mode = 0;
 	ignore_db = 0;
 
-	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSBState", &shim_lock_guid,
-				   &attributes, &MokSBStateSize, &MokSBState);
+	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokSBState",
+				   &SHIM_LOCK_GUID, &attributes,
+				   &MokSBStateSize, &MokSBState);
 	if (status != EFI_SUCCESS)
 		return EFI_SECURITY_VIOLATION;
 
@@ -2285,7 +2268,7 @@ static EFI_STATUS check_mok_sb (void)
 	 */
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		perror(L"MokSBState is compromised! Clearing it\n");
-		if (LibDeleteVariable(L"MokSBState", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokSBState", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			perror(L"Failed to erase MokSBState\n");
 		}
 		status = EFI_SECURITY_VIOLATION;
@@ -2304,14 +2287,14 @@ static EFI_STATUS check_mok_sb (void)
 
 static EFI_STATUS check_mok_db (void)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS status = EFI_SUCCESS;
 	UINT8 MokDBState;
 	UINTN MokDBStateSize = sizeof(MokDBState);
 	UINT32 attributes;
 
-	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDBState", &shim_lock_guid,
-				   &attributes, &MokDBStateSize, &MokDBState);
+	status = uefi_call_wrapper(RT->GetVariable, 5, L"MokDBState",
+				   &SHIM_LOCK_GUID, &attributes,
+				   &MokDBStateSize, &MokDBState);
 	if (status != EFI_SUCCESS)
 		return EFI_SECURITY_VIOLATION;
 
@@ -2323,7 +2306,7 @@ static EFI_STATUS check_mok_db (void)
 	 */
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS) {
 		perror(L"MokDBState is compromised! Clearing it\n");
-		if (LibDeleteVariable(L"MokDBState", &shim_lock_guid) != EFI_SUCCESS) {
+		if (LibDeleteVariable(L"MokDBState", &SHIM_LOCK_GUID) != EFI_SUCCESS) {
 			perror(L"Failed to erase MokDBState\n");
 		}
 		status = EFI_SECURITY_VIOLATION;
@@ -2338,7 +2321,6 @@ static EFI_STATUS check_mok_db (void)
 
 static EFI_STATUS mok_ignore_db()
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	UINT8 Data = 1;
 	UINTN DataSize = sizeof(UINT8);
@@ -2347,7 +2329,7 @@ static EFI_STATUS mok_ignore_db()
 
 	if (ignore_db) {
 		efi_status = uefi_call_wrapper(RT->SetVariable, 5, L"MokIgnoreDB",
-				&shim_lock_guid,
+				&SHIM_LOCK_GUID,
 				EFI_VARIABLE_BOOTSERVICE_ACCESS
 				| EFI_VARIABLE_RUNTIME_ACCESS,
 				DataSize, (void *)&Data);
@@ -2359,8 +2341,6 @@ static EFI_STATUS mok_ignore_db()
 	return efi_status;
 
 }
-
-EFI_GUID bds_guid = { 0x8108ac4e, 0x9f11, 0x4d59, { 0x85, 0x0e, 0xe2, 0x1a, 0x52, 0x2c, 0x59, 0xb2 } };
 
 static inline EFI_STATUS
 get_load_option_optional_data(UINT8 *data, UINTN data_size,
@@ -2581,7 +2561,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	if (li->LoadOptionsSize > 16) {
 		if (CompareGuid((EFI_GUID *)(li->LoadOptions
 					     + (li->LoadOptionsSize - 16)),
-				&bds_guid) == 0)
+				&BDS_GUID) == 0)
 			li->LoadOptionsSize -= 16;
 	}
 
@@ -2747,7 +2727,6 @@ static EFI_HANDLE shim_lock_handle;
 EFI_STATUS
 install_shim_protocols(void)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 	SHIM_LOCK *shim_lock;
 	EFI_STATUS efi_status;
 
@@ -2768,7 +2747,7 @@ install_shim_protocols(void)
 	 * replacements.  So even though it will participate and verify
 	 * the kernel, the systab never finds out.
 	 */
-	efi_status = LibLocateProtocol(&shim_lock_guid, (VOID **)&shim_lock);
+	efi_status = LibLocateProtocol(&SHIM_LOCK_GUID, (VOID **)&shim_lock);
 	if (!EFI_ERROR(efi_status))
 		uninstall_shim_protocols();
 
@@ -2776,7 +2755,7 @@ install_shim_protocols(void)
 	 * Install the protocol
 	 */
 	efi_status = uefi_call_wrapper(BS->InstallProtocolInterface, 4,
-			  &shim_lock_handle, &shim_lock_guid,
+			  &shim_lock_handle, &SHIM_LOCK_GUID,
 			  EFI_NATIVE_INTERFACE, &shim_lock_interface);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Could not install security protocol",
@@ -2800,13 +2779,11 @@ install_shim_protocols(void)
 void
 uninstall_shim_protocols(void)
 {
-	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
-
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
 	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, shim_lock_handle,
-			  &shim_lock_guid, &shim_lock_interface);
+			  &SHIM_LOCK_GUID, &shim_lock_interface);
 
 	if (!secure_mode())
 		return;
@@ -2880,7 +2857,6 @@ static void
 __attribute__((__optimize__("0")))
 debug_hook(void)
 {
-	EFI_GUID guid = SHIM_LOCK_GUID;
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
@@ -2890,7 +2866,8 @@ debug_hook(void)
 	if (x)
 		return;
 
-	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize, guid);
+	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
+				  SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		return;
 	}
@@ -2901,7 +2878,7 @@ debug_hook(void)
 
 	Print(L"Pausing for debugger attachment.\n");
 	Print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
-	      &guid);
+	      &SHIM_LOCK_GUID);
 	x = 1;
 	while (x++) {
 		/* Make this so it can't /totally/ DoS us. */

@@ -254,7 +254,6 @@ extract_hostname (CONST CHAR8 *url, CHAR8 **hostname)
 static EFI_HANDLE
 get_nic_handle (EFI_MAC_ADDRESS *mac)
 {
-	EFI_GUID http_binding_guid = EFI_HTTP_SERVICE_BINDING_PROTOCOL_GUID;
 	EFI_DEVICE_PATH *unpacked = NULL;
 	EFI_DEVICE_PATH *Node;
 	EFI_DEVICE_PATH *temp_path = NULL;
@@ -269,7 +268,7 @@ get_nic_handle (EFI_MAC_ADDRESS *mac)
 	   protocol */
 	status = uefi_call_wrapper(BS->LocateHandleBuffer, 5,
 				   ByProtocol,
-				   &http_binding_guid,
+				   &EFI_HTTP_BINDING_GUID,
 				   NULL,
 				   &NoHandles,
 				   &buffer);
@@ -325,16 +324,13 @@ is_unspecified_addr (EFI_IPv6_ADDRESS ip6)
 static EFI_STATUS
 set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 {
-	EFI_GUID ip6_config_guid = EFI_IP6_CONFIG_PROTOCOL_GUID;
 	EFI_IP6_CONFIG_PROTOCOL *ip6cfg;
 	EFI_IP6_CONFIG_MANUAL_ADDRESS ip6;
 	EFI_IPv6_ADDRESS gateway;
 	EFI_STATUS status;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3,
-				   nic,
-				   &ip6_config_guid,
-				   (VOID **)&ip6cfg);
+	status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
+				   &EFI_IP6_CONFIG_GUID, (VOID **)&ip6cfg);
 	if (EFI_ERROR (status))
 		return status;
 
@@ -367,16 +363,13 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 static EFI_STATUS
 set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 {
-	EFI_GUID ip4_config2_guid = EFI_IP4_CONFIG2_PROTOCOL_GUID;
 	EFI_IP4_CONFIG2_PROTOCOL *ip4cfg2;
 	EFI_IP4_CONFIG2_MANUAL_ADDRESS ip4;
 	EFI_IPv4_ADDRESS gateway;
 	EFI_STATUS status;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3,
-				   nic,
-				   &ip4_config2_guid,
-				   (VOID **)&ip4cfg2);
+	status = uefi_call_wrapper(BS->HandleProtocol, 3, nic,
+				   &EFI_IP4_CONFIG2_GUID, (VOID **)&ip4cfg2);
 	if (EFI_ERROR (status))
 		return status;
 
@@ -656,8 +649,6 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	    CHAR8 *hostname, CHAR8 *uri, BOOLEAN is_ip6,
 	    VOID **buffer, UINT64 *buf_size)
 {
-	EFI_GUID http_binding_guid = EFI_HTTP_SERVICE_BINDING_PROTOCOL_GUID;
-	EFI_GUID http_protocol_guid = EFI_HTTP_PROTOCOL_GUID;
 	EFI_SERVICE_BINDING *service;
 	EFI_HANDLE http_handle;
 	EFI_HTTP_PROTOCOL *http;
@@ -669,7 +660,7 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 
 	/* Open HTTP Service Binding Protocol */
 	status = uefi_call_wrapper(BS->OpenProtocol, 6, device,
-				   &http_binding_guid, (VOID **)&service,
+				   &EFI_HTTP_BINDING_GUID, (VOID **)&service,
 				   image, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR (status))
 		return status;
@@ -684,7 +675,7 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 
 	/* Get the http protocol */
 	status = uefi_call_wrapper(BS->HandleProtocol, 3, http_handle,
-				   &http_protocol_guid, (VOID **)&http);
+				   &EFI_HTTP_PROTOCOL_GUID, (VOID **)&http);
 	if (EFI_ERROR (status)) {
 		perror(L"Failed to get http\n");
 		goto error;
