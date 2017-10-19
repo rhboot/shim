@@ -456,8 +456,6 @@ redo:
 		} else if (StrCmp(selected, L"../") == 0) {
 			int i;
 
-			i = StrLen(name) - 1;
-
 			for (i = StrLen(name); i > 0; --i) {
 				if (name[i] == '\\')
 					break;
