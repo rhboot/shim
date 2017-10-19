@@ -39,14 +39,16 @@ EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key)
 {
 	UINTN EventIndex;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 
 	do {
-		uefi_call_wrapper(BS->WaitForEvent, 3, 1, &ST->ConIn->WaitForKey, &EventIndex);
-		status = uefi_call_wrapper(ST->ConIn->ReadKeyStroke, 2, ST->ConIn, key);
-	} while (status == EFI_NOT_READY);
+		uefi_call_wrapper(BS->WaitForEvent, 3, 1,
+				  &ST->ConIn->WaitForKey, &EventIndex);
+		efi_status = uefi_call_wrapper(ST->ConIn->ReadKeyStroke,
+					       2, ST->ConIn, key);
+	} while (efi_status == EFI_NOT_READY);
 
-	return status;
+	return efi_status;
 }
 
 void
@@ -183,7 +185,7 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 	SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	EFI_INPUT_KEY k;
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	int selector;
 	unsigned int selector_lines = count_lines(selectors);
 	int selector_max_cols = 0;
@@ -236,9 +238,9 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 			     size_cols, size_rows, 0, lines);
 
 	do {
-		status = console_get_keystroke(&k);
-		if (EFI_ERROR (status)) {
-			Print(L"Failed to read the keystroke: %r", status);
+		efi_status = console_get_keystroke(&k);
+		if (EFI_ERROR (efi_status)) {
+			Print(L"Failed to read the keystroke: %r", efi_status);
 			selector = -1;
 			break;
 		}
@@ -365,13 +367,13 @@ static struct {
 
 static CHAR16 *
 err_string (
-    IN EFI_STATUS       Status
+    IN EFI_STATUS       efi_status
     )
 {
 	UINTN           Index;
 
 	for (Index = 0; error_table[Index].Desc; Index +=1) {
-		if (error_table[Index].Code == Status) {
+		if (error_table[Index].Code == efi_status) {
 			return error_table[Index].Desc;
 		}
 	}
@@ -380,7 +382,7 @@ err_string (
 }
 
 void
-console_error(CHAR16 *err, EFI_STATUS status)
+console_error(CHAR16 *err, EFI_STATUS efi_status)
 {
 	CHAR16 **err_arr = (CHAR16 *[]){
 		L"ERROR",
@@ -390,8 +392,8 @@ console_error(CHAR16 *err, EFI_STATUS status)
 	};
 	CHAR16 str[512];
 
-	SPrint(str, sizeof(str), L"%s: (0x%x) %s", err, status, err_string(status));
-
+	SPrint(str, sizeof(str), L"%s: (0x%x) %s", err, efi_status,
+	       err_string(efi_status));
 
 	err_arr[2] = str;
 
@@ -414,38 +416,38 @@ UINT8 verbose;
 VOID
 setup_verbosity(VOID)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	UINT8 verbose_check;
 	UINTN verbose_check_size;
 
 	verbose_check_size = 1;
-	status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
+	efi_status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
 				  &verbose_check_size, SHIM_LOCK_GUID);
 	verbose = 0;
-	if (!EFI_ERROR(status))
+	if (!EFI_ERROR(efi_status))
 		verbose = verbose_check;
 }
 
 VOID setup_console (int text)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_CONSOLE_CONTROL_PROTOCOL *concon;
 	static EFI_CONSOLE_CONTROL_SCREEN_MODE mode =
 					EfiConsoleControlScreenGraphics;
 	EFI_CONSOLE_CONTROL_SCREEN_MODE new_mode;
 
-	status = LibLocateProtocol(&EFI_CONSOLE_CONTROL_GUID,
-				   (VOID **)&concon);
-	if (status != EFI_SUCCESS)
+	efi_status = LibLocateProtocol(&EFI_CONSOLE_CONTROL_GUID,
+				       (VOID **)&concon);
+	if (EFI_ERROR(efi_status))
 		return;
 
 	if (text) {
 		new_mode = EfiConsoleControlScreenText;
 
-		status = uefi_call_wrapper(concon->GetMode, 4, concon, &mode,
-						0, 0);
+		efi_status = uefi_call_wrapper(concon->GetMode, 4, concon,
+					       &mode, 0, 0);
 		/* If that didn't work, assume it's graphics */
-		if (status != EFI_SUCCESS)
+		if (EFI_ERROR(efi_status))
 			mode = EfiConsoleControlScreenGraphics;
 	} else {
 		new_mode = mode;
@@ -463,15 +465,16 @@ print_errors_cb(const char *str, size_t len, void *u)
 }
 
 EFI_STATUS
-print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line)
+print_crypto_errors(EFI_STATUS efi_status,
+		    char *file, const char *func, int line)
 {
-	if (!(verbose && EFI_ERROR(rc)))
-		return rc;
+	if (!(verbose && EFI_ERROR(efi_status)))
+		return efi_status;
 
-	Print(L"SSL Error: %a:%d %a(): %r\n", file, line, func, rc);
+	Print(L"SSL Error: %a:%d %a(): %r\n", file, line, func, efi_status);
 	ERR_print_errors_cb(print_errors_cb, NULL);
 
-	return rc;
+	return efi_status;
 }
 
 VOID

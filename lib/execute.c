@@ -95,32 +95,32 @@ error:
 EFI_STATUS
 execute(EFI_HANDLE image, CHAR16 *name)
 {
-	EFI_STATUS status;
+	EFI_STATUS efi_status;
 	EFI_HANDLE h;
 	EFI_LOADED_IMAGE *li;
 	EFI_DEVICE_PATH *devpath;
 	CHAR16 *PathName;
 
-	status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
-				   &IMAGE_PROTOCOL, (void **)&li);
-	if (status != EFI_SUCCESS)
-		return status;
+	efi_status = uefi_call_wrapper(BS->HandleProtocol, 3, image,
+				       &IMAGE_PROTOCOL, (void **)&li);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
-	
-	status = generate_path(name, li, &devpath, &PathName);
-	if (status != EFI_SUCCESS)
-		return status;
 
-	status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image,
-				   devpath, NULL, 0, &h);
-	if (status != EFI_SUCCESS)
+	efi_status = generate_path(name, li, &devpath, &PathName);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = uefi_call_wrapper(BS->LoadImage, 6, FALSE, image,
+				       devpath, NULL, 0, &h);
+	if (EFI_ERROR(efi_status))
 		goto out;
-	
-	status = uefi_call_wrapper(BS->StartImage, 3, h, NULL, NULL);
+
+	efi_status = uefi_call_wrapper(BS->StartImage, 3, h, NULL, NULL);
 	uefi_call_wrapper(BS->UnloadImage, 1, h);
 
  out:
 	FreePool(PathName);
 	FreePool(devpath);
-	return status;
+	return efi_status;
 }
