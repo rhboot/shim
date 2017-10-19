@@ -211,13 +211,16 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, var, &owner,
 				       NULL, len, NULL);
-	if (efi_status != EFI_BUFFER_TOO_SMALL)
+	if (efi_status != EFI_BUFFER_TOO_SMALL) {
+		if (!EFI_ERROR(efi_status)) /* this should never happen */
+			return EFI_PROTOCOL_ERROR;
 		return efi_status;
+	}
 
 	*data = AllocateZeroPool(*len);
 	if (!*data)
 		return EFI_OUT_OF_RESOURCES;
-	
+
 	efi_status = uefi_call_wrapper(RT->GetVariable, 5, var, &owner,
 				       attributes, len, *data);
 
@@ -254,8 +257,8 @@ find_in_esl(UINT8 *Data, UINTN DataSize, UINT8 *key, UINTN keylen)
 EFI_STATUS
 find_in_variable_esl(CHAR16* var, EFI_GUID owner, UINT8 *key, UINTN keylen)
 {
-	UINTN DataSize;
-	UINT8 *Data;
+	UINTN DataSize = 0;
+	UINT8 *Data = NULL;
 	EFI_STATUS status;
 
 	status = get_variable(var, &Data, &DataSize, owner);
