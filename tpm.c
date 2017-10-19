@@ -5,14 +5,6 @@
 
 #include "shim.h"
 
-#define perror(fmt, ...) ({                                             \
-			UINTN __perror_ret = 0;                               \
-			if (!in_protocol)                                     \
-				__perror_ret = Print((fmt), ##__VA_ARGS__);   \
-			__perror_ret;                                         \
-		})
-
-
 typedef struct {
 	CHAR16 *VariableName;
 	EFI_GUID *VendorGuid;

@@ -65,14 +65,6 @@ static CHAR16 *second_stage;
 static void *load_options;
 static UINT32 load_options_size;
 
-#define perror(fmt, ...) ({						\
-		UINTN __perror_ret = 0;					\
-		if (!in_protocol)					\
-			__perror_ret = Print((fmt), ##__VA_ARGS__);	\
-		LogError(fmt, ##__VA_ARGS__);				\
-		__perror_ret;						\
-	})
-
 /*
  * The vendor certificate used for validating the second stage loader
  */
