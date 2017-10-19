@@ -2979,7 +2979,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Create the runtime MokIgnoreDB variable so the kernel can
 	 * make use of it
 	 */
-	efi_status = mok_ignore_db();
+	mok_ignore_db();
 
 	/*
 	 * Hand over control to the second stage bootloader
