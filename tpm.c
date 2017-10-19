@@ -3,8 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "tpm.h"
-#include "console.h"
+#include "shim.h"
 
 #define perror(fmt, ...) ({                                             \
 			UINTN __perror_ret = 0;                               \

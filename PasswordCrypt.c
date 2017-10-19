@@ -3,8 +3,8 @@
 #include <Library/BaseCryptLib.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
-#include "PasswordCrypt.h"
-#include "crypt_blowfish.h"
+
+#include "shim.h"
 
 #define TRAD_DES_HASH_SIZE 13 /* (64/6+1) + (12/6) */
 #define BSDI_DES_HASH_SIZE 20 /* (64/6+1) + (24/6) + 4 + 1 */

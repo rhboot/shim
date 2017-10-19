@@ -9,7 +9,7 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <guid.h>
+#include "shim.h"
 #include <variables.h>
 #include <simple_file.h>
 #include <errors.h>

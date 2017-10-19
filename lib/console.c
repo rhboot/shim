@@ -15,14 +15,7 @@
 #include <openssl/err.h>
 #include <openssl/crypto.h>
 
-static EFI_GUID SHIM_LOCK_GUID = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
-
-static int min(int a, int b)
-{
-	if (a < b)
-		return a;
-	return b;
-}
+#include "shim.h"
 
 static int
 count_lines(CHAR16 *str_arr[])

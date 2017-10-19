@@ -35,15 +35,15 @@ TARGETS += $(MMNAME) $(FBNAME)
 endif
 OBJS	= shim.o netboot.o cert.o replacements.o tpm.o version.o errlog.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
-ORIG_SOURCES	= shim.c shim.h netboot.c include/PeImage.h include/wincert.h include/console.h replacements.c replacements.h tpm.c tpm.h version.h errlog.c
+ORIG_SOURCES	= shim.c netboot.c replacements.c tpm.c errlog.c shim.h version.h $(wildcard include/*.h)
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
-ORIG_MOK_SOURCES = MokManager.c shim.h include/console.h PasswordCrypt.c PasswordCrypt.h crypt_blowfish.c crypt_blowfish.h
+ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
 FALLBACK_OBJS = fallback.o tpm.o
 ORIG_FALLBACK_SRCS = fallback.c
 
 ifneq ($(origin ENABLE_HTTPBOOT), undefined)
 	OBJS += httpboot.o
-	SOURCES += httpboot.c httpboot.h
+	SOURCES += httpboot.c include/httpboot.h
 endif
 
 SOURCES = $(foreach source,$(ORIG_SOURCES),$(TOPDIR)/$(source)) version.c

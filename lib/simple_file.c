@@ -7,13 +7,8 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <console.h>
-#include <simple_file.h>
-#include <efiauthenticated.h>
-#include <execute.h>		/* for generate_path() */
+#include "shim.h"
 
-static EFI_GUID IMAGE_PROTOCOL = LOADED_IMAGE_PROTOCOL;
-static EFI_GUID SIMPLE_FS_PROTOCOL = SIMPLE_FILE_SYSTEM_PROTOCOL;
 static EFI_GUID FILE_INFO = EFI_FILE_INFO_ID;
 static EFI_GUID FS_INFO = EFI_FILE_SYSTEM_INFO_ID;
 

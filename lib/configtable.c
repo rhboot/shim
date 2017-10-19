@@ -8,8 +8,7 @@
 #include <efi.h>
 #include <efilib.h>
 
-#include <guid.h>
-#include <configtable.h>
+#include "shim.h"
 
 void *
 configtable_get_table(EFI_GUID *guid)
