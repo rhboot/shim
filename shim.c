@@ -847,6 +847,19 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		sizeof (UINT32) +
 		sizeof (EFI_IMAGE_FILE_HEADER) +
 		context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader);
+	/* But check it again just for better error messaging, and so
+	 * clang-analyzer doesn't get confused. */
+	if (Section == NULL) {
+		uint64_t addr;
+
+		addr = PEHdr_offset + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER)
+			+ context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader;
+		perror(L"Malformed file header.\n");
+		perror(L"Image address for Section 0 is 0x%016llx\n", addr);
+		perror(L"File size is 0x%016llx\n", datasize);
+		efi_status = EFI_INVALID_PARAMETER;
+		goto done;
+	}
 
 	/* Sort the section headers */
 	for (index = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
