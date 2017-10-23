@@ -22,15 +22,6 @@
 #define CERT_STRING L"Select an X509 certificate to enroll:\n\n"
 #define HASH_STRING L"Select a file to trust:\n\n"
 
-struct menu_item {
-	CHAR16 *text;
-	INTN (*callback)(void *data, void *data2, void *data3);
-	void *data;
-	void *data2;
-	void *data3;
-	UINTN colour;
-};
-
 typedef struct {
 	UINT32 MokSize;
 	UINT8 *Mok;
