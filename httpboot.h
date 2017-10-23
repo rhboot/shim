@@ -34,8 +34,8 @@
 #ifndef _HTTPBOOT_H_
 #define _HTTPBOOT_H_
 
-BOOLEAN find_httpboot (EFI_DEVICE_PATH *devpath);
-
-EFI_STATUS httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size);
+extern BOOLEAN find_httpboot(EFI_HANDLE device);
+extern EFI_STATUS httpboot_fetch_buffer(EFI_HANDLE image, VOID **buffer,
+					UINT64 *buf_size);
 
 #endif
