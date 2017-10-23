@@ -911,6 +911,7 @@ find_boot_options(EFI_HANDLE device)
 		}
 
 		efi_status = find_boot_csv(fh3, fi->FileName);
+		uefi_call_wrapper(fh3->Close, 1, fh3);
 		FreePool(buffer);
 		buffer = NULL;
 		if (efi_status == EFI_OUT_OF_RESOURCES)
