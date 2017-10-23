@@ -1590,8 +1590,9 @@ error:
  * Generate the path of an executable given shim's path and the name
  * of the executable
  */
-static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
-				CHAR16 **PathName)
+static EFI_STATUS generate_path_from_image_path(EFI_LOADED_IMAGE *li,
+						CHAR16 *ImagePath,
+						CHAR16 **PathName)
 {
 	EFI_DEVICE_PATH *devpath;
 	unsigned int i;
@@ -1895,10 +1896,10 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	/*
 	 * Build a new path from the existing one plus the executable name
 	 */
-	efi_status = generate_path(li, ImagePath, &PathName);
-
-	if (efi_status != EFI_SUCCESS) {
-		perror(L"Unable to generate path %s: %r\n", ImagePath, efi_status);
+	efi_status = generate_path_from_image_path(li, ImagePath, &PathName);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Unable to generate path %s: %r\n", ImagePath,
+		       efi_status);
 		goto done;
 	}
 
