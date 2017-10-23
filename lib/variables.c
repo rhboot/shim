@@ -74,10 +74,8 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	Payload = *Data;
 	PayloadSize = *DataSize;
 
-	DescriptorSize =
-	    OFFSET_OF(EFI_VARIABLE_AUTHENTICATION_2,
-		      AuthInfo) + OFFSET_OF(WIN_CERTIFICATE_UEFI_GUID,
-					    CertData);
+	DescriptorSize = offsetof(EFI_VARIABLE_AUTHENTICATION_2, AuthInfo)
+			+ offsetof(WIN_CERTIFICATE_UEFI_GUID, CertData);
 	NewData = (UINT8 *) AllocateZeroPool(DescriptorSize + PayloadSize);
 	if (NewData == NULL) {
 		return EFI_OUT_OF_RESOURCES;
@@ -103,7 +101,7 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	CopyMem(&DescriptorData->TimeStamp, &Time, sizeof(EFI_TIME));
 
 	DescriptorData->AuthInfo.Hdr.dwLength =
-	    OFFSET_OF(WIN_CERTIFICATE_UEFI_GUID, CertData);
+		offsetof(WIN_CERTIFICATE_UEFI_GUID, CertData);
 	DescriptorData->AuthInfo.Hdr.wRevision = 0x0200;
 	DescriptorData->AuthInfo.Hdr.wCertificateType = WIN_CERT_TYPE_EFI_GUID;
 	DescriptorData->AuthInfo.CertType = EFI_CERT_TYPE_PKCS7_GUID;
