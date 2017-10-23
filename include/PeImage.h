@@ -19,8 +19,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 **/
 
-#ifndef __PE_IMAGE_H__
-#define __PE_IMAGE_H__
+#ifndef SHIM_PEIMAGE_H
+#define SHIM_PEIMAGE_H
 
 #include <wincert.h>
 
@@ -786,4 +786,4 @@ typedef struct {
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
 } PE_COFF_LOADER_IMAGE_CONTEXT;
 
-#endif
+#endif /* SHIM_PEIMAGE_H */
