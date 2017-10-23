@@ -4,6 +4,8 @@
 #include <efi.h>
 #include <efilib.h>
 
+#include <stddef.h>
+
 #define min(a, b) ({(a) < (b) ? (a) : (b);})
 
 #ifdef __x86_64__

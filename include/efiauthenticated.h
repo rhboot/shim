@@ -119,8 +119,6 @@ typedef struct {
 	//UINT8 Signature[];
 } WIN_CERTIFICATE_EFI_PKCS1_15;
 
-#define OFFSET_OF(TYPE, Field) ((UINTN) &(((TYPE *)0)->Field))
-
 /*
  * Attributes of Authenticated Variable
  */
@@ -182,14 +180,14 @@ typedef struct {
 /*
  * Size of AuthInfo prior to the data payload.
  */
-#define AUTHINFO_SIZE ((OFFSET_OF (EFI_VARIABLE_AUTHENTICATION, AuthInfo)) + \
-                       (OFFSET_OF (WIN_CERTIFICATE_UEFI_GUID, CertData)) + \
+#define AUTHINFO_SIZE ((offsetof(EFI_VARIABLE_AUTHENTICATION, AuthInfo)) + \
+                       (offsetof(WIN_CERTIFICATE_UEFI_GUID, CertData)) + \
                        sizeof (EFI_CERT_BLOCK_RSA_2048_SHA256))
 
-#define AUTHINFO2_SIZE(VarAuth2) ((OFFSET_OF (EFI_VARIABLE_AUTHENTICATION_2, AuthInfo)) + \
+#define AUTHINFO2_SIZE(VarAuth2) ((offsetof(EFI_VARIABLE_AUTHENTICATION_2, AuthInfo)) + \
                                   (UINTN) ((EFI_VARIABLE_AUTHENTICATION_2 *) (VarAuth2))->AuthInfo.Hdr.dwLength)
 
-#define OFFSET_OF_AUTHINFO2_CERT_DATA ((OFFSET_OF (EFI_VARIABLE_AUTHENTICATION_2, AuthInfo)) + \
-                                       (OFFSET_OF (WIN_CERTIFICATE_UEFI_GUID, CertData)))
+#define OFFSET_OF_AUTHINFO2_CERT_DATA ((offsetof(EFI_VARIABLE_AUTHENTICATION_2, AuthInfo)) + \
+                                       (offsetof(WIN_CERTIFICATE_UEFI_GUID, CertData)))
 
 #endif /* SHIM_EFIAUTHENTICATED_H */
