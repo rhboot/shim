@@ -15,8 +15,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 This Protocol is introduced in UEFI Specification 2.5
 
 **/
-#ifndef __EFI_IP4CONFIG2_PROTOCOL_H__
-#define __EFI_IP4CONFIG2_PROTOCOL_H__
+#ifndef SHIM_IP4CONFIG2_H
+#define SHIM_IP4CONFIG2_H
 
 #include <efiip.h>
 
@@ -312,4 +312,4 @@ struct _EFI_IP4_CONFIG2_PROTOCOL {
   EFI_IP4_CONFIG2_UNREGISTER_NOTIFY  UnregisterDataNotify;
 };
 
-#endif
+#endif /* SHIM_IP4CONFIG2_H */

@@ -1,3 +1,6 @@
+#ifndef SHIM_CONFIGTABLE_H
+#define SHIM_CONFIGTABLE_H
+
 /* definitions straight from TianoCore */
 
 typedef UINT32 EFI_IMAGE_EXECUTION_ACTION;
@@ -66,3 +69,4 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath);
 int
 configtable_image_is_forbidden(const EFI_DEVICE_PATH *DevicePath);
 
+#endif /* SHIM_CONFIGTABLE_H */

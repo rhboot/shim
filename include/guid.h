@@ -1,3 +1,6 @@
+#ifndef SHIM_GUID_H
+#define SHIM_GUID_H
+
 #include <efi.h>
 
 extern EFI_GUID GV_GUID;
@@ -12,3 +15,5 @@ extern EFI_GUID EFI_CERT_SHA256_GUID;
 extern EFI_GUID MOK_OWNER;
 extern EFI_GUID SECURITY_PROTOCOL_GUID;
 extern EFI_GUID SECURITY2_PROTOCOL_GUID;
+
+#endif /* SHIM_GUID_H */

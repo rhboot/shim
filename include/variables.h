@@ -1,5 +1,7 @@
-#include <efiauthenticated.h>
+#ifndef SHIM_VARIABLES_H
+#define SHIM_VARIABLES_H
 
+#include <efiauthenticated.h>
 #include <PeImage.h>		/* for SHA256_DIGEST_SIZE */
 
 #define certlist_for_each_certentry(cl, cl_init, s, s_init)		\
@@ -57,3 +59,5 @@ variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 EFI_STATUS
 variable_create_esl(void *cert, int cert_len, EFI_GUID *type, EFI_GUID *owner,
 		    void **out, int *outlen);
+
+#endif /* SHIM_VARIABLES_H */

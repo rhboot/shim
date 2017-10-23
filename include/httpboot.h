@@ -31,11 +31,11 @@
  * Corporation.
  */
 
-#ifndef _HTTPBOOT_H_
-#define _HTTPBOOT_H_
+#ifndef SHIM_HTTPBOOT_H
+#define SHIM_HTTPBOOT_H
 
 extern BOOLEAN find_httpboot(EFI_HANDLE device);
 extern EFI_STATUS httpboot_fetch_buffer(EFI_HANDLE image, VOID **buffer,
 					UINT64 *buf_size);
 
-#endif
+#endif /* SHIM_HTTPBOOT_H */

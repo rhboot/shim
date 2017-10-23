@@ -101,4 +101,4 @@ hexdump(UINT8 *data, UINTN size)
 	}
 }
 
-#endif
+#endif /* STATIC_HEXDUMP_H */

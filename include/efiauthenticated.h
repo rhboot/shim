@@ -1,5 +1,6 @@
-#ifndef _INC_EFIAUTHENTICATED_H
-#define _INC_EFIAUTHENTICATED_H
+#ifndef SHIM_EFIAUTHENTICATED_H
+#define SHIM_EFIAUTHENTICATED_H
+
 #include <wincert.h>
 //***********************************************************************
 // Signature Database
@@ -219,4 +220,4 @@ typedef struct {
 #define OFFSET_OF_AUTHINFO2_CERT_DATA ((OFFSET_OF (EFI_VARIABLE_AUTHENTICATION_2, AuthInfo)) + \
                                        (OFFSET_OF (WIN_CERTIFICATE_UEFI_GUID, CertData)))
 
-#endif
+#endif /* SHIM_EFIAUTHENTICATED_H */

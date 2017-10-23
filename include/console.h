@@ -1,5 +1,5 @@
-#ifndef _SHIM_LIB_CONSOLE_H
-#define _SHIM_LIB_CONSOLE_H 1
+#ifndef SHIM_CONSOLE_H
+#define SHIM_CONSOLE_H
 
 EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key);
@@ -42,7 +42,7 @@ EFI_STATUS
 (EFIAPI *EFI_CONSOLE_CONTROL_PROTOCOL_GET_MODE) (
   IN  EFI_CONSOLE_CONTROL_PROTOCOL      *This,
   OUT EFI_CONSOLE_CONTROL_SCREEN_MODE   *Mode,
-  OUT BOOLEAN                           *GopUgaExists,  OPTIONAL  
+  OUT BOOLEAN                           *GopUgaExists,  OPTIONAL
   OUT BOOLEAN                           *StdInLocked    OPTIONAL
   );
 
@@ -97,4 +97,4 @@ extern VOID msleep(unsigned long msecs);
  * console */
 extern UINT8 in_protocol;
 
-#endif /* _SHIM_LIB_CONSOLE_H */
+#endif /* SHIM_CONSOLE_H */

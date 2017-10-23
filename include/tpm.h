@@ -1,3 +1,6 @@
+#ifndef SHIM_TPM_H
+#define SHIM_TPM_H
+
 #include <efilib.h>
 
 #define EFI_TPM_GUID {0xf541796d, 0xa62e, 0x4954, {0xa7, 0x75, 0x95, 0x84, 0xf6, 0x1b, 0x9c, 0xdd }};
@@ -186,3 +189,5 @@ typedef UINT32                     TCG_EVENTTYPE;
 #define EV_EFI_VARIABLE_AUTHORITY           (EV_EFI_EVENT_BASE + 0xE0)
 
 #define PE_COFF_IMAGE 0x0000000000000010
+
+#endif /* SHIM_TPM_H */

@@ -1,5 +1,5 @@
-#ifndef _INC_WINCERT_H
-#define _INC_WINCERT_H
+#ifndef SHIM_WINCERT_H
+#define SHIM_WINCERT_H
 
 ///
 /// The WIN_CERTIFICATE structure is part of the PE/COFF specification.
@@ -30,4 +30,4 @@ typedef struct {
 } WIN_CERTIFICATE;
 
 
-#endif
+#endif /* SHIM_WINCERT_H */

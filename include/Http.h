@@ -19,8 +19,8 @@
 
 **/
 
-#ifndef __EFI_HTTP_PROTOCOL_H__
-#define __EFI_HTTP_PROTOCOL_H__
+#ifndef SHIM_HTTP_H
+#define SHIM_HTTP_H
 
 #define EFI_HTTP_SERVICE_BINDING_PROTOCOL_GUID \
   { \
@@ -514,4 +514,4 @@ struct _EFI_HTTP_PROTOCOL {
   EFI_HTTP_POLL                 Poll;
 };
 
-#endif
+#endif /* SHIM_HTTP_H */

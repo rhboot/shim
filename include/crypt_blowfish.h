@@ -14,9 +14,10 @@
  * See crypt_blowfish.c for more information.
  */
 
-#ifndef _CRYPT_BLOWFISH_H
-#define _CRYPT_BLOWFISH_H
+#ifndef SHIM_CRYPT_BLOWFISH_H
+#define SHIM_CRYPT_BLOWFISH_H
 
 char *crypt_blowfish_rn(const char *key, const char *setting,
 			char *output, int size);
-#endif
+
+#endif /* SHIM_CRYPT_BLOWFISH_H */

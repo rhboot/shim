@@ -1,5 +1,5 @@
-#ifndef __PASSWORD_CRYPT_H__
-#define __PASSWORD_CRYPT_H__
+#ifndef SHIM_PASSWORDCRYPT_H
+#define SHIM_PASSWORDCRYPT_H
 
 enum HashMethod {
 	TRADITIONAL_DES = 0,
@@ -24,4 +24,4 @@ EFI_STATUS password_crypt (const char *password, UINT32 pw_length,
 			   const PASSWORD_CRYPT *pw_hash, UINT8 *hash);
 UINT16 get_hash_size (const UINT16 method);
 
-#endif /* __PASSWORD_CRYPT_H__ */
+#endif /* SHIM_PASSWORDCRYPT_H */
