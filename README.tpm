@@ -3,6 +3,8 @@ The following PCRs are extended by shim:
 PCR4:
 - the Authenticode hash of the binary being loaded will be extended into
   PCR4 before SB verification.
+- the hash of any binary for which Verify is called through the shim_lock
+  protocol
 
 PCR7:
 - Any certificate in one of our certificate databases that matches a binary
