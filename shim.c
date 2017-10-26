@@ -1820,7 +1820,11 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (status != EFI_SUCCESS)
 		goto done;
 
+	/* Measure the binary into the TPM */
+	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)buffer, size, sha1hash, 4);
+
 	status = verify_buffer(buffer, size, &context, sha256hash, sha1hash);
+
 done:
 	in_protocol = 0;
 	return status;
