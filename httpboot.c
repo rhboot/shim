@@ -105,10 +105,11 @@ find_httpboot (EFI_HANDLE device)
 {
 	EFI_DEVICE_PATH *unpacked;
 	EFI_DEVICE_PATH *Node;
-	EFI_DEVICE_PATH *NextNode;
 	MAC_ADDR_DEVICE_PATH *MacNode;
 	URI_DEVICE_PATH *UriNode;
 	UINTN uri_size;
+	BOOLEAN ip_found = FALSE;
+	BOOLEAN ret = FALSE;
 
 	if (uri) {
 		FreePool(uri);
@@ -128,50 +129,51 @@ find_httpboot (EFI_HANDLE device)
 	}
 	Node = unpacked;
 
-	/* Traverse the device path to find IPv4()/Uri() or IPv6()/Uri() */
+	/* Traverse the device path to find IPv4()/.../Uri() or
+	 * IPv6()/.../Uri() */
 	while (!IsDevicePathEnd(Node)) {
 		/* Save the MAC node so we can match the net card later */
 		if (DevicePathType(Node) == MESSAGING_DEVICE_PATH &&
 		    DevicePathSubType(Node) == MSG_MAC_ADDR_DP) {
 			MacNode = (MAC_ADDR_DEVICE_PATH *)Node;
-			CopyMem(&mac_addr, &MacNode->MacAddress, sizeof(EFI_MAC_ADDRESS));
-		}
-
-		if (DevicePathType(Node) == MESSAGING_DEVICE_PATH &&
-		    (DevicePathSubType(Node) == MSG_IPv4_DP ||
-		     DevicePathSubType(Node) == MSG_IPv6_DP)) {
-			/* Save the IP node so we can set up the connection later */
+			CopyMem(&mac_addr, &MacNode->MacAddress,
+				sizeof(EFI_MAC_ADDRESS));
+		} else if (DevicePathType(Node) == MESSAGING_DEVICE_PATH &&
+			   (DevicePathSubType(Node) == MSG_IPv4_DP ||
+			    DevicePathSubType(Node) == MSG_IPv6_DP)) {
+			/* Save the IP node so we can set up the connection
+			 * later */
 			if (DevicePathSubType(Node) == MSG_IPv6_DP) {
-				CopyMem(&ip6_node, Node, sizeof(IPv6_DEVICE_PATH));
+				CopyMem(&ip6_node, Node,
+					sizeof(IPv6_DEVICE_PATH));
 				is_ip6 = TRUE;
 			} else {
-				CopyMem(&ip4_node, Node, sizeof(IPv4_DEVICE_PATH));
+				CopyMem(&ip4_node, Node,
+					sizeof(IPv4_DEVICE_PATH));
 				is_ip6 = FALSE;
 			}
 
-			Node = NextDevicePathNode(Node);
-			NextNode = NextDevicePathNode(Node);
-			if (DevicePathType(Node) == MESSAGING_DEVICE_PATH &&
-			    DevicePathSubType(Node) == MSG_URI_DP &&
-			    IsDevicePathEnd(NextNode)) {
-				/* Save the current URI */
-				UriNode = (URI_DEVICE_PATH *)Node;
-				uri_size = strlena(UriNode->Uri);
-				uri = AllocatePool(uri_size + 1);
-				if (!uri) {
-					perror(L"Failed to allocate uri\n");
-					return FALSE;
-				}
-				CopyMem(uri, UriNode->Uri, uri_size + 1);
-				FreePool(unpacked);
-				return TRUE;
+			ip_found = TRUE;
+		} else if (ip_found == TRUE &&
+			   (DevicePathType(Node) == MESSAGING_DEVICE_PATH &&
+			    DevicePathSubType(Node) == MSG_URI_DP)) {
+			/* Save the current URI */
+			UriNode = (URI_DEVICE_PATH *)Node;
+			uri_size = strlena(UriNode->Uri);
+			uri = AllocatePool(uri_size + 1);
+			if (!uri) {
+				perror(L"Failed to allocate uri\n");
+				goto out;
 			}
+			CopyMem(uri, UriNode->Uri, uri_size + 1);
+			ret = TRUE;
+			goto out;
 		}
 		Node = NextDevicePathNode(Node);
 	}
-
+out:
 	FreePool(unpacked);
-	return FALSE;
+	return ret;
 }
 
 static EFI_STATUS
