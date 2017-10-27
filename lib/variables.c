@@ -11,13 +11,13 @@
  * Copyright (c) 2011 - 2012, Intel Corporation. All rights reserved.<BR>
  * This program and the accompanying materials
  * are licensed and made available under the terms and conditions of the BSD License
- * which accompanies this distribution.  The full text of the license may be found 
+ * which accompanies this distribution.  The full text of the license may be found
  * at
  * http://opensource.org/licenses/bsd-license.php
  *
  * THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
  * WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
- * 
+ *
  */
 #include <efi.h>
 #include <efilib.h>
@@ -51,76 +51,74 @@ variable_create_esl(void *cert, int cert_len, EFI_GUID *type, EFI_GUID *owner,
 	return EFI_SUCCESS;
 }
 
-
 EFI_STATUS
-CreateTimeBasedPayload (
-  IN OUT UINTN            *DataSize,
-  IN OUT UINT8            **Data
-  )
+CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 {
-  EFI_STATUS                       Status;
-  UINT8                            *NewData;
-  UINT8                            *Payload;
-  UINTN                            PayloadSize;
-  EFI_VARIABLE_AUTHENTICATION_2    *DescriptorData;
-  UINTN                            DescriptorSize;
-  EFI_TIME                         Time;
-  EFI_GUID efi_cert_type = EFI_CERT_TYPE_PKCS7_GUID;
-  
-  if (Data == NULL || DataSize == NULL) {
-    return EFI_INVALID_PARAMETER;
-  }
-  
-  //
-  // In Setup mode or Custom mode, the variable does not need to be signed but the 
-  // parameters to the SetVariable() call still need to be prepared as authenticated
-  // variable. So we create EFI_VARIABLE_AUTHENTICATED_2 descriptor without certificate
-  // data in it.
-  //
-  Payload     = *Data;
-  PayloadSize = *DataSize;
-  
-  DescriptorSize    = OFFSET_OF(EFI_VARIABLE_AUTHENTICATION_2, AuthInfo) + OFFSET_OF(WIN_CERTIFICATE_UEFI_GUID, CertData);
-  NewData = (UINT8*) AllocateZeroPool (DescriptorSize + PayloadSize);
-  if (NewData == NULL) {
-    return EFI_OUT_OF_RESOURCES;
-  }
+	EFI_STATUS Status;
+	UINT8 *NewData;
+	UINT8 *Payload;
+	UINTN PayloadSize;
+	EFI_VARIABLE_AUTHENTICATION_2 *DescriptorData;
+	UINTN DescriptorSize;
+	EFI_TIME Time;
 
-  if ((Payload != NULL) && (PayloadSize != 0)) {
-    CopyMem (NewData + DescriptorSize, Payload, PayloadSize);
-  }
+	if (Data == NULL || DataSize == NULL) {
+		return EFI_INVALID_PARAMETER;
+	}
+	//
+	// In Setup mode or Custom mode, the variable does not need to be signed but the
+	// parameters to the SetVariable() call still need to be prepared as authenticated
+	// variable. So we create EFI_VARIABLE_AUTHENTICATED_2 descriptor without certificate
+	// data in it.
+	//
+	Payload = *Data;
+	PayloadSize = *DataSize;
 
-  DescriptorData = (EFI_VARIABLE_AUTHENTICATION_2 *) (NewData);
+	DescriptorSize =
+	    OFFSET_OF(EFI_VARIABLE_AUTHENTICATION_2,
+		      AuthInfo) + OFFSET_OF(WIN_CERTIFICATE_UEFI_GUID,
+					    CertData);
+	NewData = (UINT8 *) AllocateZeroPool(DescriptorSize + PayloadSize);
+	if (NewData == NULL) {
+		return EFI_OUT_OF_RESOURCES;
+	}
 
-  ZeroMem (&Time, sizeof (EFI_TIME));
-  Status = uefi_call_wrapper(RT->GetTime,2, &Time, NULL);
-  if (EFI_ERROR (Status)) {
-    FreePool(NewData);
-    return Status;
-  }
-  Time.Pad1       = 0;
-  Time.Nanosecond = 0;
-  Time.TimeZone   = 0;
-  Time.Daylight   = 0;
-  Time.Pad2       = 0;
-  CopyMem (&DescriptorData->TimeStamp, &Time, sizeof (EFI_TIME));
- 
-  DescriptorData->AuthInfo.Hdr.dwLength         = OFFSET_OF (WIN_CERTIFICATE_UEFI_GUID, CertData);
-  DescriptorData->AuthInfo.Hdr.wRevision        = 0x0200;
-  DescriptorData->AuthInfo.Hdr.wCertificateType = WIN_CERT_TYPE_EFI_GUID;
-  DescriptorData->AuthInfo.CertType =  efi_cert_type;
- 
-  /* we're expecting an EFI signature list, so don't free the input since
-   * it might not be in a pool */
+	if ((Payload != NULL) && (PayloadSize != 0)) {
+		CopyMem(NewData + DescriptorSize, Payload, PayloadSize);
+	}
+
+	DescriptorData = (EFI_VARIABLE_AUTHENTICATION_2 *) (NewData);
+
+	ZeroMem(&Time, sizeof(EFI_TIME));
+	Status = uefi_call_wrapper(RT->GetTime, 2, &Time, NULL);
+	if (EFI_ERROR(Status)) {
+		FreePool(NewData);
+		return Status;
+	}
+	Time.Pad1 = 0;
+	Time.Nanosecond = 0;
+	Time.TimeZone = 0;
+	Time.Daylight = 0;
+	Time.Pad2 = 0;
+	CopyMem(&DescriptorData->TimeStamp, &Time, sizeof(EFI_TIME));
+
+	DescriptorData->AuthInfo.Hdr.dwLength =
+	    OFFSET_OF(WIN_CERTIFICATE_UEFI_GUID, CertData);
+	DescriptorData->AuthInfo.Hdr.wRevision = 0x0200;
+	DescriptorData->AuthInfo.Hdr.wCertificateType = WIN_CERT_TYPE_EFI_GUID;
+	DescriptorData->AuthInfo.CertType = EFI_CERT_TYPE_PKCS7_GUID;
+
+	/* we're expecting an EFI signature list, so don't free the input since
+	 * it might not be in a pool */
 #if 0
-  if (Payload != NULL) {
-    FreePool(Payload);
-  }
+	if (Payload != NULL) {
+		FreePool(Payload);
+	}
 #endif
-  
-  *DataSize = DescriptorSize + PayloadSize;
-  *Data     = NewData;
-  return EFI_SUCCESS;
+
+	*DataSize = DescriptorSize + PayloadSize;
+	*Data = NewData;
+	return EFI_SUCCESS;
 }
 
 EFI_STATUS
