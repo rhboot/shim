@@ -62,7 +62,6 @@ static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TAB
 static CHAR16 *second_stage;
 static void *load_options;
 static UINT32 load_options_size;
-static UINT8 in_protocol;
 
 #define perror(fmt, ...) ({						\
 		UINTN __perror_ret = 0;					\

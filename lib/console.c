@@ -489,3 +489,7 @@ msleep(unsigned long msecs)
 {
 	uefi_call_wrapper(BS->Stall, 1, msecs);
 }
+
+/* This is used in various things to determine if we should print to the
+ * console */
+UINT8 in_protocol = 0;

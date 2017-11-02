@@ -4,8 +4,7 @@
 #include <stdint.h>
 
 #include "tpm.h"
-
-extern UINT8 in_protocol;
+#include "console.h"
 
 #define perror(fmt, ...) ({                                             \
 			UINTN __perror_ret = 0;                               \

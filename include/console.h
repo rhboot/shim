@@ -93,4 +93,8 @@ extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *fun
 
 extern VOID msleep(unsigned long msecs);
 
+/* This is used in various things to determine if we should print to the
+ * console */
+extern UINT8 in_protocol;
+
 #endif /* _SHIM_LIB_CONSOLE_H */

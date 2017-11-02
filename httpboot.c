@@ -38,8 +38,6 @@
 #include "Ip4Config2.h"
 #include "Ip6Config.h"
 
-extern UINT8 in_protocol;
-
 #define perror(fmt, ...) ({						\
 		UINTN __perror_ret = 0;					\
 		if (!in_protocol)					\
