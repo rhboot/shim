@@ -1809,9 +1809,6 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	loader_is_participating = 1;
 	in_protocol = 1;
 
-	if (!secure_mode())
-		goto done;
-
 	status = read_header(buffer, size, &context);
 	if (status != EFI_SUCCESS)
 		goto done;
@@ -1822,6 +1819,9 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 
 	/* Measure the binary into the TPM */
 	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)buffer, size, sha1hash, 4);
+
+	if (!secure_mode())
+		goto done;
 
 	status = verify_buffer(buffer, size, &context, sha256hash, sha1hash);
 
