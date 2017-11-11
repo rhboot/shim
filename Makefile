@@ -70,7 +70,7 @@ endif
 
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   -maccumulate-outgoing-args \
+		   -maccumulate-outgoing-args -m64 \
 		   -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
 		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64 -DPAGE_SIZE=4096
 	LIBDIR			?= $(prefix)/lib64
