@@ -2743,9 +2743,6 @@ install_shim_protocols(void)
 	SHIM_LOCK *shim_lock;
 	EFI_STATUS efi_status;
 
-	if (!secure_mode())
-		return EFI_SUCCESS;
-
 	/*
 	 * Did another instance of shim earlier already install the
 	 * protocol? If so, get rid of it.
@@ -2779,6 +2776,9 @@ install_shim_protocols(void)
 		return efi_status;
 	}
 
+	if (!secure_mode())
+		return EFI_SUCCESS;
+
 #if defined(OVERRIDE_SECURITY_POLICY)
 	/*
 	 * Install the security protocol hook
@@ -2794,6 +2794,12 @@ uninstall_shim_protocols(void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
 
+	/*
+	 * If we're back here then clean everything up before exiting
+	 */
+	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, shim_lock_handle,
+			  &shim_lock_guid, &shim_lock_interface);
+
 	if (!secure_mode())
 		return;
 
@@ -2803,18 +2809,11 @@ uninstall_shim_protocols(void)
 	 */
 	security_policy_uninstall();
 #endif
-
-	/*
-	 * If we're back here then clean everything up before exiting
-	 */
-	uefi_call_wrapper(BS->UninstallProtocolInterface, 3, shim_lock_handle,
-			  &shim_lock_guid, &shim_lock_interface);
 }
 
 EFI_STATUS
 shim_init(void)
 {
-	EFI_STATUS status = EFI_SUCCESS;
 	setup_console(1);
 	setup_verbosity();
 	dprinta(shim_version);
@@ -2835,19 +2834,20 @@ shim_init(void)
 
 		hook_exit(systab);
 
-		status = install_shim_protocols();
 	}
-	return status;
+
+	return install_shim_protocols();
 }
 
 void
 shim_fini(void)
 {
+	/*
+	 * Remove our protocols
+	 */
+	uninstall_shim_protocols();
+
 	if (secure_mode()) {
-		/*
-		 * Remove our protocols
-		 */
-		uninstall_shim_protocols();
 
 		/*
 		 * Remove our hooks from system services.
