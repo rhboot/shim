@@ -2726,10 +2726,32 @@ EFI_STATUS
 install_shim_protocols(void)
 {
 	EFI_GUID shim_lock_guid = SHIM_LOCK_GUID;
+	SHIM_LOCK *shim_lock;
 	EFI_STATUS efi_status;
 
 	if (!secure_mode())
 		return EFI_SUCCESS;
+
+	/*
+	 * Did another instance of shim earlier already install the
+	 * protocol? If so, get rid of it.
+	 *
+	 * We have to uninstall shim's protocol here, because if we're
+	 * On the fallback.efi path, then our call pathway is:
+	 *
+	 * shim->fallback->shim->grub
+	 * ^               ^      ^
+	 * |               |      \- gets protocol #0
+	 * |               \- installs its protocol (#1)
+	 * \- installs its protocol (#0)
+	 * and if we haven't removed this, then grub will get the *first*
+	 * shim's protocol, but it'll get the second shim's systab
+	 * replacements.  So even though it will participate and verify
+	 * the kernel, the systab never finds out.
+	 */
+	efi_status = LibLocateProtocol(&shim_lock_guid, (VOID **)&shim_lock);
+	if (!EFI_ERROR(efi_status))
+		uninstall_shim_protocols();
 
 	/*
 	 * Install the protocol
