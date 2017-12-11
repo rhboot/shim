@@ -100,19 +100,6 @@ start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 	EFI_STATUS status;
 	unhook_system_services();
 
-	/* We have to uninstall shim's protocol here, because if we're
-	 * On the fallback.efi path, then our call pathway is:
-	 *
-	 * shim->fallback->shim->grub
-	 * ^               ^      ^
-	 * |               |      \- gets protocol #0
-	 * |               \- installs its protocol (#1)
-	 * \- installs its protocol (#0)
-	 * and if we haven't removed this, then grub will get the *first*
-	 * shim's protocol, but it'll get the second shim's systab
-	 * replacements.  So even though it will participate and verify
-	 * the kernel, the systab never finds out.
-	 */
 	if (image_handle == last_loaded_image) {
 		loader_is_participating = 1;
 		uninstall_shim_protocols();
