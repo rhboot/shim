@@ -257,11 +257,18 @@ static EFI_STATUS parseDhcp4()
 {
 	CHAR8 *template = (CHAR8 *)translate_slashes(DEFAULT_LOADER_CHAR);
 	INTN template_len = strlen(template) + 1;
+	EFI_PXE_BASE_CODE_DHCPV4_PACKET* pkt_v4 = (EFI_PXE_BASE_CODE_DHCPV4_PACKET *)&pxe->Mode->DhcpAck.Dhcpv4;
 
-	INTN dir_len = strnlena(pxe->Mode->DhcpAck.Dhcpv4.BootpBootFile, 127);
+	if(pxe->Mode->ProxyOfferReceived) {
+		//Proxy should not have precedence.  Check if DhcpAck contained boot info.
+		if(pxe->Mode->DhcpAck.Dhcpv4.BootpBootFile[0] == '\0')
+			pkt_v4 = &pxe->Mode->ProxyOffer.Dhcpv4;
+	}
+
+	INTN dir_len = strnlena(pkt_v4->BootpBootFile, 127);
 	INTN i;
-	UINT8 *dir = pxe->Mode->DhcpAck.Dhcpv4.BootpBootFile;
-
+	UINT8 *dir = pkt_v4->BootpBootFile;
+	
 	for (i = dir_len; i >= 0; i--) {
 		if (dir[i] == '/')
 			break;
@@ -281,7 +288,7 @@ static EFI_STATUS parseDhcp4()
 	if (dir_len == 0 && dir[0] != '/' && template[0] == '/')
 		template++;
 	strcata(full_path, template);
-	memcpy(&tftp_addr.v4, pxe->Mode->DhcpAck.Dhcpv4.BootpSiAddr, 4);
+	memcpy(&tftp_addr.v4, pkt_v4->BootpSiAddr, 4);
 
 	return EFI_SUCCESS;
 }
