@@ -1441,8 +1441,10 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	li->ImageSize = context.ImageSize;
 
 	/* Pass the load options to the second stage loader */
-	li->LoadOptions = load_options;
-	li->LoadOptionsSize = load_options_size;
+	if ( load_options ) {
+		li->LoadOptions = load_options;
+		li->LoadOptionsSize = load_options_size;
+	}
 
 	if (!found_entry_point) {
 		perror(L"Entry point is not within sections\n");
