@@ -40,7 +40,7 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    Pk/CryptTs.o \
 		    Pk/CryptX509.o \
 		    Pk/CryptAuthenticode.o \
-		    Pem/CryptPem.o \
+		    Pem/CryptPemNull.o \
 		    SysCall/CrtWrapper.o \
 		    SysCall/TimerWrapper.o \
 		    SysCall/BaseMemAllocation.o \
