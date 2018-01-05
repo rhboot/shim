@@ -162,7 +162,7 @@ find_httpboot (EFI_HANDLE device)
 			/* to download the second stage loader in that case. */
 			NextNode = NextDevicePathNode(Node);
 			if (!IsDevicePathEnd(NextNode))
-				continue;
+				goto out;
 
 			/* Save the current URI */
 			UriNode = (URI_DEVICE_PATH *)Node;
