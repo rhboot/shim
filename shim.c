@@ -1595,6 +1595,16 @@ static EFI_STATUS generate_path(EFI_LOADED_IMAGE *li, CHAR16 *ImagePath,
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	CHAR16 *bootpath;
 
+	// Remove volume label if present, ie "FSx:"
+	if (StrSize(ImagePath) > 4 && 
+		StrnCmp(ImagePath, L"FS", 2) == 0 &&
+		StrnCmp(ImagePath + 3, L":", 1) == 0) {
+		*PathName = StrDuplicate(ImagePath + 4);
+		// Since volume label was present, ImagePath is a full path. No
+		// additional checks are required.
+		return EFI_SUCCESS;
+	}
+
 	/*
 	 * Suuuuper lazy technique here, but check and see if this is a full
 	 * path to something on the ESP.  Backwards compatibility demands
