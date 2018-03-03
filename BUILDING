@@ -59,5 +59,8 @@ Variables you could set to customize the build:
 - OSLABEL
   This is the label that will be put in BOOT$(EFI_ARCH).CSV for your OS.
   By default this is the same value as EFIDIR .
+- ALLOW_32BIT_KERNEL_ON_X64
+  Allow the shim protocol to verify 32-bit kernel even when the shim is 64-bit.
+  Specifying a 32-bit secondary loader with a 64-bit shim is still prohibited.
 
 # vim:filetype=mail:tw=74

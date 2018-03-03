@@ -101,6 +101,10 @@ ifneq ($(origin REQUIRE_TPM), undefined)
 	CFLAGS  += -DREQUIRE_TPM
 endif
 
+ifneq ($(origin ALLOW_32BIT_KERNEL_ON_X64), undefined)
+    CFLAGS  += -DALLOW_32BIT_KERNEL_ON_X64
+endif
+
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --target efi-app-$(ARCH)
