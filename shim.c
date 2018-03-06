@@ -2583,6 +2583,12 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	}
 
 	/*
+	 * Apparently sometimes we get L"\0\0"?  Which isn't useful at all.
+	 */
+	if (is_all_nuls(li->LoadOptions, li->LoadOptionsSize))
+		return EFI_SUCCESS;
+
+	/*
 	 * Check and see if this is just a list of strings.  If it's an
 	 * EFI_LOAD_OPTION, it'll be 0, since we know EndEntire device path
 	 * won't pass muster as UCS2-LE.
