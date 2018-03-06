@@ -33,6 +33,8 @@ Variables you could set to customize the build:
   install targets
 - ENABLE_HTTPBOOT
   build support for http booting
+- REQUIRE_TPM
+  if tpm logging or extends return an error code, treat that as a fatal error.
 - ARCH
   This allows you to do a build for a different arch that we support.  For
   instance, on x86_64 you could do "setarch linux32 make ARCH=ia32" to get
