@@ -195,12 +195,15 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 		CopyMem(event->Event, (VOID *)log, logsize);
 		if (hash) {
 			/* TPM 2 systems will generate the appropriate hash
-			   themselves if we pass PE_COFF_IMAGE
+			   themselves if we pass PE_COFF_IMAGE.
+               In case that fails we fall back to measuring without it.
 			*/
 			status = uefi_call_wrapper(tpm2->hash_log_extend_event,
 						   5, tpm2, PE_COFF_IMAGE, buf,
 						   (UINT64) size, event);
-		} else {
+		}
+
+        if (!hash || EFI_ERROR(status)) {
 			status = uefi_call_wrapper(tpm2->hash_log_extend_event,
 						   5, tpm2, 0, buf,
 						   (UINT64) size, event);
