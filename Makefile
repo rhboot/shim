@@ -33,7 +33,6 @@ DEBUGINFO	?= $(prefix)/lib/debug/
 DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
 DEFAULT_LOADER	?= \\\\grub$(ARCH_SUFFIX).efi
-REQUIRE_TPM	?=
 
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
