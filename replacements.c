@@ -65,6 +65,7 @@ get_active_systab(void)
 
 static typeof(systab->BootServices->LoadImage) system_load_image;
 static typeof(systab->BootServices->StartImage) system_start_image;
+static typeof(systab->BootServices->UnloadImage) system_unload_image;
 static typeof(systab->BootServices->Exit) system_exit;
 static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
 
@@ -78,6 +79,7 @@ unhook_system_services(void)
 
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
+	systab->BootServices->UnloadImage = system_unload_image;
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
 	gBS = systab->BootServices;
 }
@@ -93,6 +95,12 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	efi_status = gBS->LoadImage(BootPolicy, ParentImageHandle, DevicePath,
 				    SourceBuffer, SourceSize, ImageHandle);
 	hook_system_services(systab);
+	if ((efi_status == EFI_SECURITY_VIOLATION) ||
+	    (efi_status == EFI_ACCESS_DENIED)) {
+		efi_status = loader_install(systab, ParentImageHandle,
+					    DevicePath, SourceBuffer,
+					    SourceSize, ImageHandle);
+	}
 	if (EFI_ERROR(efi_status))
 		last_loaded_image = NULL;
 	else
@@ -103,7 +111,18 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 static EFI_STATUS EFIAPI
 replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
 {
+	LOADER_PROTOCOL *loader;
 	EFI_STATUS efi_status;
+
+	loader = loader_protocol(image_handle);
+	if (loader) {
+		loader_is_participating = 1;
+		efi_status = loader->StartImage(loader, exit_data_size,
+						exit_data);
+		loader_is_participating = 0;
+		return efi_status;
+	}
+
 	unhook_system_services();
 
 	if (image_handle == last_loaded_image) {
@@ -132,6 +151,18 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 }
 
 static EFI_STATUS EFIAPI
+unload_image(EFI_HANDLE image_handle)
+{
+	LOADER_PROTOCOL *loader;
+
+	loader = loader_protocol(image_handle);
+	if (loader)
+		return loader->UnloadImage(loader);
+
+	return system_unload_image(image_handle);
+}
+
+static EFI_STATUS EFIAPI
 exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 {
 	if (loader_is_participating ||
@@ -155,7 +186,14 @@ static EFI_STATUS EFIAPI
 do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 	UINTN ExitDataSize, CHAR16 *ExitData)
 {
+	LOADER_PROTOCOL *loader;
 	EFI_STATUS efi_status;
+
+	loader = loader_protocol(ImageHandle);
+	if (loader) {
+		return loader->Exit(ImageHandle, ExitStatus, ExitDataSize,
+				    ExitData);
+	}
 
 	shim_fini();
 
@@ -198,6 +236,10 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 	 * image trusted by the firmware */
 	system_start_image = systab->BootServices->StartImage;
 	systab->BootServices->StartImage = replacement_start_image;
+
+	/* we need UnloadImage() to handle LOADER_PROTOCOL */
+	system_unload_image = systab->BootServices->UnloadImage;
+	systab->BootServices->UnloadImage = unload_image;
 
 	/* we need to hook ExitBootServices() so a) we can enforce the policy
 	 * and b) we can unwrap when we're done. */
