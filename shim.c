@@ -1221,7 +1221,9 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
  */
 static EFI_STATUS handle_image (void *data, unsigned int datasize,
 				EFI_LOADED_IMAGE *li,
-				EFI_IMAGE_ENTRY_POINT *entry_point)
+				EFI_IMAGE_ENTRY_POINT *entry_point,
+				EFI_PHYSICAL_ADDRESS *alloc_address,
+				UINTN *alloc_pages)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -1230,7 +1232,6 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	unsigned int alignment, alloc_size;
-	EFI_PHYSICAL_ADDRESS alloc_address;
 	int found_entry_point = 0;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
@@ -1293,22 +1294,23 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 	alloc_size = ALIGN_VALUE(context.ImageSize + context.SectionAlignment,
 				 PAGE_SIZE);
+	*alloc_pages = alloc_size / PAGE_SIZE;
 
 	efi_status = gBS->AllocatePages(AllocateAnyPages, EfiLoaderCode,
-					alloc_size / PAGE_SIZE, &alloc_address);
+					*alloc_pages, alloc_address);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to allocate image buffer\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	buffer = (void *)ALIGN_VALUE((unsigned long)alloc_address, alignment);
+	buffer = (void *)ALIGN_VALUE((unsigned long)*alloc_address, alignment);
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
 	*entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!*entry_point) {
 		perror(L"Entry point is invalid\n");
-		gBS->FreePages(alloc_address, alloc_size / PAGE_SIZE);
+		gBS->FreePages(*alloc_address, *alloc_pages);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -1342,7 +1344,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		if (end < base) {
 			perror(L"Section %d has negative size\n", i);
-			gBS->FreePages(alloc_address, alloc_size / PAGE_SIZE);
+			gBS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -1811,6 +1813,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
 	EFI_IMAGE_ENTRY_POINT entry_point;
+	EFI_PHYSICAL_ADDRESS alloc_address;
+	UINTN alloc_pages;
 	CHAR16 *PathName = NULL;
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
@@ -1894,7 +1898,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	/*
 	 * Verify and, if appropriate, relocate and execute the executable
 	 */
-	efi_status = handle_image(data, datasize, li, &entry_point);
+	efi_status = handle_image(data, datasize, li, &entry_point,
+				  &alloc_address, &alloc_pages);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to load image: %r\n", efi_status);
 		PrintErrors();
