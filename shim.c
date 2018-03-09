@@ -56,7 +56,6 @@
 
 static EFI_SYSTEM_TABLE *systab;
 static EFI_HANDLE global_image_handle;
-static EFI_STATUS (EFIAPI *entry_point) (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table);
 
 static CHAR16 *second_stage;
 static void *load_options;
@@ -1221,7 +1220,8 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
  * Once the image has been loaded it needs to be validated and relocated
  */
 static EFI_STATUS handle_image (void *data, unsigned int datasize,
-				EFI_LOADED_IMAGE *li)
+				EFI_LOADED_IMAGE *li,
+				EFI_IMAGE_ENTRY_POINT *entry_point)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -1305,8 +1305,8 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
-	entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
-	if (!entry_point) {
+	*entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
+	if (!*entry_point) {
 		perror(L"Entry point is invalid\n");
 		gBS->FreePages(alloc_address, alloc_size / PAGE_SIZE);
 		return EFI_UNSUPPORTED;
@@ -1810,6 +1810,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 {
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li, li_bak;
+	EFI_IMAGE_ENTRY_POINT entry_point;
 	CHAR16 *PathName = NULL;
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
@@ -1893,7 +1894,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	/*
 	 * Verify and, if appropriate, relocate and execute the executable
 	 */
-	efi_status = handle_image(data, datasize, li);
+	efi_status = handle_image(data, datasize, li, &entry_point);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to load image: %r\n", efi_status);
 		PrintErrors();
