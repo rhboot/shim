@@ -34,7 +34,8 @@ argsplit(EFI_HANDLE image, int *argc, CHAR16*** ARGV)
 		}
 	}
 
-	(*argc)++;		/* we counted spaces, so add one for initial */
+	/* we counted spaces, so add one for initial */
+	(*argc)++;
 
 	*ARGV = AllocatePool(*argc * sizeof(**ARGV));
 	if (!*ARGV) {
