@@ -665,19 +665,19 @@ static EFI_STATUS get_line(UINT32 * length, CHAR16 * line, UINT32 line_max,
 			continue;
 		} else if (key.UnicodeChar == CHAR_BACKSPACE) {
 			if (show) {
-				Print(L"\b");
+				console_print(L"\b");
 			}
 			line[--count] = '\0';
 			continue;
 		}
 
 		if (show) {
-			Print(L"%c", key.UnicodeChar);
+			console_print(L"%c", key.UnicodeChar);
 		}
 
 		line[count++] = key.UnicodeChar;
 	} while (key.UnicodeChar != CHAR_CARRIAGE_RETURN);
-	Print(L"\n");
+	console_print(L"\n");
 
 	*length = count;
 
@@ -734,7 +734,7 @@ static void console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 
 	if (!SavedMode) {
-		Print(L"Invalid parameter: SavedMode\n");
+		console_print(L"Invalid parameter: SavedMode\n");
 		return;
 	}
 
@@ -1513,7 +1513,7 @@ static EFI_STATUS mok_sb_prompt(void *MokSB, UINTN MokSBSize)
 		if (pass1 != var->Password[pos1] ||
 		    pass2 != var->Password[pos2] ||
 		    pass3 != var->Password[pos3]) {
-			Print(L"Invalid character\n");
+			console_print(L"Invalid character\n");
 			fail_count++;
 		} else {
 			break;
@@ -1628,7 +1628,7 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 		if (pass1 != var->Password[pos1] ||
 		    pass2 != var->Password[pos2] ||
 		    pass3 != var->Password[pos3]) {
-			Print(L"Invalid character\n");
+			console_print(L"Invalid character\n");
 			fail_count++;
 		} else {
 			break;
@@ -2051,14 +2051,16 @@ static int draw_countdown()
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
-	PrintAt((cols - StrLen(message)) / 2, rows / 2, message);
+	console_print_at((cols - StrLen(message)) / 2, rows / 2, message);
 	while (1) {
 		if (timeout > 1)
-			PrintAt(2, rows - 3, L"Booting in %d seconds  ",
-				timeout);
+			console_print_at(2, rows - 3,
+					 L"Booting in %d seconds  ",
+					 timeout);
 		else if (timeout)
-			PrintAt(2, rows - 3, L"Booting in %d second   ",
-				timeout);
+			console_print_at(2, rows - 3,
+					 L"Booting in %d second   ",
+					 timeout);
 
 		efi_status = WaitForSingleEvent(ci->WaitForKey, wait);
 		if (efi_status != EFI_TIMEOUT) {
@@ -2279,8 +2281,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_ENROLL_MOK:
 			if (!MokNew) {
-				Print(L"MokManager: internal error: %s",
-				      L"MokNew was !NULL but is now NULL\n");
+				console_print(L"MokManager: internal error: %s",
+					L"MokNew was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;
 			}
@@ -2291,8 +2293,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_DELETE_MOK:
 			if (!MokDel) {
-				Print(L"MokManager: internal error: %s",
-				      L"MokDel was !NULL but is now NULL\n");
+				console_print(L"MokManager: internal error: %s",
+					L"MokDel was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;
 			}
@@ -2306,7 +2308,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_ENROLL_MOKX:
 			if (!MokXNew) {
-				Print(L"MokManager: internal error: %s",
+				console_print(L"MokManager: internal error: %s",
 				      L"MokXNew was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;
@@ -2318,7 +2320,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_DELETE_MOKX:
 			if (!MokXDel) {
-				Print(L"MokManager: internal error: %s",
+				console_print(L"MokManager: internal error: %s",
 				      L"MokXDel was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;
@@ -2330,7 +2332,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_CHANGE_SB:
 			if (!MokSB) {
-				Print(L"MokManager: internal error: %s",
+				console_print(L"MokManager: internal error: %s",
 				      L"MokSB was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;
@@ -2341,7 +2343,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_SET_PW:
 			if (!MokPW) {
-				Print(L"MokManager: internal error: %s",
+				console_print(L"MokManager: internal error: %s",
 				      L"MokPW was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;
@@ -2352,7 +2354,7 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
 			break;
 		case MOK_CHANGE_DB:
 			if (!MokDB) {
-				Print(L"MokManager: internal error: %s",
+				console_print(L"MokManager: internal error: %s",
 				      L"MokDB was !NULL but is now NULL\n");
 				ret = EFI_ABORTED;
 				goto out;

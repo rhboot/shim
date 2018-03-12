@@ -23,7 +23,7 @@ argsplit(EFI_HANDLE image, int *argc, CHAR16*** ARGV)
 	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
 					 (VOID **) &info);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Failed to get arguments\n");
+		console_print(L"Failed to get arguments\n");
 		return efi_status;
 	}
 

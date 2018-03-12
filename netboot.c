@@ -195,12 +195,12 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	memset(ip6inv, 0, sizeof(ip6inv));
 
 	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
-		Print(L"URLS MUST START WITH tftp://\n");
+		console_print(L"URLS MUST START WITH tftp://\n");
 		return FALSE;
 	}
 	start = url + 7;
 	if (*start != '[') {
-		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
+		console_print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
 	}
 
@@ -209,12 +209,12 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	while ((*end != '\0') && (*end != ']')) {
 		end++;
 		if (end - start >= (int)sizeof(ip6str)) {
-			Print(L"TFTP URL includes malformed IPv6 address\n");
+			console_print(L"TFTP URL includes malformed IPv6 address\n");
 			return FALSE;
 		}
 	}
 	if (*end == '\0') {
-		Print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
+		console_print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
 		return FALSE;
 	}
 	memset(ip6str, 0, sizeof(ip6str));
@@ -324,7 +324,7 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *buf
 	BOOLEAN nobuffer = FALSE;
 	UINTN blksz = 512;
 
-	Print(L"Fetching Netboot Image\n");
+	console_print(L"Fetching Netboot Image\n");
 	if (*buffer == NULL) {
 		*buffer = AllocatePool(4096 * 1024);
 		if (!*buffer)

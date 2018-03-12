@@ -80,7 +80,7 @@ hexdump(UINT8 *data, UINTN size)
 {
 	UINTN display_offset = (UINTN)data & 0xffffffff;
 	UINTN offset = 0;
-	//Print(L"hexdump: data=0x%016x size=0x%x\n", data, size);
+	//console_print(L"hexdump: data=0x%016x size=0x%x\n", data, size);
 
 	while (offset < size) {
 		CHAR16 hexbuf[49];
@@ -93,7 +93,7 @@ hexdump(UINT8 *data, UINTN size)
 		msleep(200000);
 
 		format_text(data+offset, size-offset, txtbuf);
-		Print(L"%08x  %s  %s\n", display_offset, hexbuf, txtbuf);
+		console_print(L"%08x  %s  %s\n", display_offset, hexbuf, txtbuf);
 		msleep(200000);
 
 		display_offset += sz;

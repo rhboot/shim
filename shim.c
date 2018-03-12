@@ -910,10 +910,10 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
 		    (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress)) {
 			perror(L"Malformed binary after Attribute Certificate Table\n");
-			Print(L"datasize: %u SumOfBytesHashed: %u SecDir->Size: %lu\n",
-			      datasize, SumOfBytesHashed, context->SecDir->Size);
-			Print(L"hashsize: %u SecDir->VirtualAddress: 0x%08lx\n",
-			      hashsize, context->SecDir->VirtualAddress);
+			console_print(L"datasize: %u SumOfBytesHashed: %u SecDir->Size: %lu\n",
+				      datasize, SumOfBytesHashed, context->SecDir->Size);
+			console_print(L"hashsize: %u SecDir->VirtualAddress: 0x%08lx\n",
+				      hashsize, context->SecDir->VirtualAddress);
 			efi_status = EFI_INVALID_PARAMETER;
 			goto done;
 		}
@@ -1942,7 +1942,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	    efi_status == EFI_ACCESS_DENIED) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 		if (EFI_ERROR(efi_status)) {
-			Print(L"start_image() returned %r\n", efi_status);
+			console_print(L"start_image() returned %r\n", efi_status);
 			msleep(2000000);
 			return efi_status;
 		}
@@ -1952,7 +1952,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	}
 
 	if (EFI_ERROR(efi_status)) {
-		Print(L"start_image() returned %r\n", efi_status);
+		console_print(L"start_image() returned %r\n", efi_status);
 		msleep(2000000);
 	}
 
@@ -2078,8 +2078,8 @@ static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path, UINTN len)
 	if (!dppath)
 		return 0;
 
-	Print(L"dppath: %s\n", dppath);
-	Print(L"path:   %s\n", path);
+	console_print(L"dppath: %s\n", dppath);
+	console_print(L"path:   %s\n", path);
 	if (StrnCaseCmp(dppath, path, len))
 		ret = 0;
 
@@ -2489,13 +2489,13 @@ debug_hook(void)
 		return;
 	}
 
-	Print(L"add-symbol-file "DEBUGDIR
-	      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n", &_text,
-	      &_data);
+	console_print(L"add-symbol-file "DEBUGDIR
+		      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
+		      &_text, &_data);
 
-	Print(L"Pausing for debugger attachment.\n");
-	Print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
-	      &SHIM_LOCK_GUID);
+	console_print(L"Pausing for debugger attachment.\n");
+	console_print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
+		      &SHIM_LOCK_GUID);
 	x = 1;
 	while (x++) {
 		/* Make this so it can't /totally/ DoS us. */
@@ -2559,8 +2559,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	efi_status = import_mok_state(image_handle);
 	if (EFI_ERROR(efi_status)) {
 die:
-		Print(L"Something has gone seriously wrong: %r\n",
-		      efi_status);
+		console_print(L"Something has gone seriously wrong: %r\n",
+			      efi_status);
 		msleep(5000000);
 		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				 0, NULL);
@@ -2574,7 +2574,7 @@ die:
 	 * Tell the user that we're in insecure mode if necessary
 	 */
 	if (user_insecure_mode) {
-		Print(L"Booting in insecure mode\n");
+		console_print(L"Booting in insecure mode\n");
 		msleep(2000000);
 	}
 

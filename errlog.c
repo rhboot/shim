@@ -68,7 +68,7 @@ PrintErrors(VOID)
 		return;
 
 	for (i = 0; i < nerrs; i++)
-		Print(L"%s", errs[i]);
+		console_print(L"%s", errs[i]);
 }
 
 VOID

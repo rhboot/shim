@@ -11,10 +11,6 @@
 
 #include "shim.h"
 
-#include <Library/BaseCryptLib.h>
-#include <openssl/err.h>
-#include <openssl/crypto.h>
-
 static int
 count_lines(CHAR16 *str_arr[])
 {
@@ -50,6 +46,36 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 	return efi_status;
 }
 
+UINTN
+console_print(const CHAR16 *fmt, ...)
+{
+       va_list args;
+       UINTN ret;
+
+       va_start(args, fmt);
+       ret = VPrint(fmt, args);
+       va_end(args);
+
+       return ret;
+}
+
+UINTN
+console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
+{
+       SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+       va_list args;
+       UINTN ret;
+
+       co->SetCursorPosition(co, col, row);
+
+       va_start(args, fmt);
+       ret = VPrint(fmt, args);
+       va_end(args);
+
+       return ret;
+}
+
+
 void
 console_print_box_at(CHAR16 *str_arr[], int highlight,
 		     int start_col, int start_row,
@@ -84,8 +110,8 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 		start_row = 0;
 
 	if (start_col > (int)cols || start_row > (int)rows) {
-		Print(L"Starting Position (%d,%d) is off screen\n",
-		      start_col, start_row);
+		console_print(L"Starting Position (%d,%d) is off screen\n",
+			      start_col, start_row);
 		return;
 	}
 	if (size_cols + start_col > (int)cols)
@@ -98,7 +124,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 
 	Line = AllocatePool((size_cols+1)*sizeof(CHAR16));
 	if (!Line) {
-		Print(L"Failed Allocation\n");
+		console_print(L"Failed Allocation\n");
 		return;
 	}
 
@@ -242,7 +268,8 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 	do {
 		efi_status = console_get_keystroke(&k);
 		if (EFI_ERROR (efi_status)) {
-			Print(L"Failed to read the keystroke: %r", efi_status);
+			console_print(L"Failed to read the keystroke: %r",
+				      efi_status);
 			selector = -1;
 			break;
 		}
@@ -458,10 +485,15 @@ VOID setup_console (int text)
 	concon->SetMode(concon, new_mode);
 }
 
+/* Included here because they mess up the definition of va_list and friends */
+#include <Library/BaseCryptLib.h>
+#include <openssl/err.h>
+#include <openssl/crypto.h>
+
 static int
 print_errors_cb(const char *str, size_t len, void *u)
 {
-	Print(L"%a", str);
+	console_print(L"%a", str);
 
 	return len;
 }
@@ -473,7 +505,8 @@ print_crypto_errors(EFI_STATUS efi_status,
 	if (!(verbose && EFI_ERROR(efi_status)))
 		return efi_status;
 
-	Print(L"SSL Error: %a:%d %a(): %r\n", file, line, func, efi_status);
+	console_print(L"SSL Error: %a:%d %a(): %r\n", file, line, func,
+		      efi_status);
 	ERR_print_errors_cb(print_errors_cb, NULL);
 
 	return efi_status;

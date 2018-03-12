@@ -116,9 +116,9 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 			EFI_STATUS efi_status2 = install_shim_protocols();
 
 			if (EFI_ERROR(efi_status2)) {
-				Print(L"Something has gone seriously wrong: %r\n",
-					efi_status2);
-				Print(L"shim cannot continue, sorry.\n");
+				console_print(L"Something has gone seriously wrong: %r\n",
+					      efi_status2);
+				console_print(L"shim cannot continue, sorry.\n");
 				msleep(5000000);
 				gRT->ResetSystem(EfiResetShutdown,
 						 EFI_SECURITY_VIOLATION,
@@ -144,8 +144,8 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 		return efi_status;
 	}
 
-	Print(L"Bootloader has not verified loaded image.\n");
-	Print(L"System is compromised.  halting.\n");
+	console_print(L"Bootloader has not verified loaded image.\n");
+	console_print(L"System is compromised.  halting.\n");
 	msleep(5000000);
 	gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
 	return EFI_SECURITY_VIOLATION;
@@ -165,9 +165,9 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 		EFI_STATUS efi_status2 = shim_init();
 
 		if (EFI_ERROR(efi_status2)) {
-			Print(L"Something has gone seriously wrong: %r\n",
-				efi_status2);
-			Print(L"shim cannot continue, sorry.\n");
+			console_print(L"Something has gone seriously wrong: %r\n",
+				      efi_status2);
+			console_print(L"shim cannot continue, sorry.\n");
 			msleep(5000000);
 			gRT->ResetSystem(EfiResetShutdown,
 					 EFI_SECURITY_VIOLATION, 0, NULL);

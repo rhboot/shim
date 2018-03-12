@@ -175,12 +175,12 @@ extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;
 extern UINT8 in_protocol;
 
-#define perror_(file, line, func, fmt, ...) ({				\
-		UINTN __perror_ret = 0;					\
-		if (!in_protocol)					\
-			__perror_ret = Print((fmt), ##__VA_ARGS__);	\
+#define perror_(file, line, func, fmt, ...) ({					\
+		UINTN __perror_ret = 0;						\
+		if (!in_protocol)						\
+			__perror_ret = console_print((fmt), ##__VA_ARGS__);	\
 		LogError_(file, line, func, fmt, ##__VA_ARGS__);		\
-		__perror_ret;						\
+		__perror_ret;							\
 	})
 #define perror(fmt, ...) perror_(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)
 #define LogError(fmt, ...) LogError_(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)

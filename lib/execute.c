@@ -73,7 +73,7 @@ generate_path(CHAR16* name, EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **path, CHAR16
 	*PathName = AllocatePool((pathlen + 1 + StrLen(name))*sizeof(CHAR16));
 
 	if (!*PathName) {
-		Print(L"Failed to allocate path buffer\n");
+		console_print(L"Failed to allocate path buffer\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto error;
 	}

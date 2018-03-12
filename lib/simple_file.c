@@ -19,14 +19,14 @@ simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UIN
 	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
 					 (void **)&drive);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Unable to find simple file protocol (%d)\n",
-		      efi_status);
+		console_print(L"Unable to find simple file protocol (%d)\n",
+			      efi_status);
 		goto error;
 	}
 
 	efi_status = drive->OpenVolume(drive, &root);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Failed to open drive volume (%d)\n", efi_status);
+		console_print(L"Failed to open drive volume (%d)\n", efi_status);
 		goto error;
 	}
 
@@ -52,7 +52,7 @@ simple_file_open(EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 
 	efi_status = generate_path(name, li, &loadpath, &PathName);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Unable to generate load path for %s\n", name);
+		console_print(L"Unable to generate load path for %s\n", name);
 		return efi_status;
 	}
 
@@ -77,11 +77,11 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 
 	efi_status = file->GetInfo(file, &EFI_FILE_INFO_GUID, &size, fi);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Failed to get file info\n");
+		console_print(L"Failed to get file info\n");
 		goto out;
 	}
 	if ((fi->Attribute & EFI_FILE_DIRECTORY) == 0) {
-		Print(L"Not a directory %s\n", name);
+		console_print(L"Not a directory %s\n", name);
 		efi_status = EFI_INVALID_PARAMETER;
 		goto out;
 	}
@@ -127,7 +127,7 @@ simple_dir_read_all(EFI_HANDLE image, CHAR16 *name, EFI_FILE_INFO **entries,
 
 	efi_status = simple_file_open(image, name, &file, EFI_FILE_MODE_READ);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"failed to open file %s: %d\n", name, efi_status);
+		console_print(L"failed to open file %s: %d\n", name, efi_status);
 		return efi_status;
 	}
 
@@ -146,7 +146,7 @@ simple_file_read_all(EFI_FILE *file, UINTN *size, void **buffer)
 
 	efi_status = file->GetInfo(file, &EFI_FILE_INFO_GUID, size, fi);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Failed to get file info\n");
+		console_print(L"Failed to get file info\n");
 		return efi_status;
 	}
 
@@ -154,7 +154,7 @@ simple_file_read_all(EFI_FILE *file, UINTN *size, void **buffer)
 
 	*buffer = AllocatePool(*size);
 	if (!*buffer) {
-		Print(L"Failed to allocate buffer of size %d\n", *size);
+		console_print(L"Failed to allocate buffer of size %d\n", *size);
 		return EFI_OUT_OF_RESOURCES;
 	}
 
@@ -323,7 +323,7 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 		if (next->Attribute & EFI_FILE_DIRECTORY) {
 				(*result)[(*count)] = PoolPrint(L"%s/", next->FileName);
 				if (!(*result)[(*count)]) {
-					Print(L"Failed to allocate buffer");
+					console_print(L"Failed to allocate buffer");
 					return EFI_OUT_OF_RESOURCES;
 				}
 				(*count)++;
@@ -336,7 +336,7 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 			if (StrCmp(&next->FileName[len - offs], filterarr[c]) == 0) {
 				(*result)[(*count)] = StrDuplicate(next->FileName);
 				if (!(*result)[(*count)]) {
-					Print(L"Failed to allocate buffer");
+					console_print(L"Failed to allocate buffer");
 					return EFI_OUT_OF_RESOURCES;
 				}
 				(*count)++;

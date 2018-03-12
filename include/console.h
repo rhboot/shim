@@ -1,8 +1,18 @@
 #ifndef SHIM_CONSOLE_H
 #define SHIM_CONSOLE_H
 
+#define Print(fmt, ...) \
+	({"Do not directly call Print() use console_print() instead" = 1;});
+
+#define PrintAt(fmt, ...) \
+	({"Do not directly call PrintAt() use console_print_at() instead" = 1;});
+
 EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key);
+UINTN
+console_print(const CHAR16 *fmt, ...);
+UINTN
+console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...);
 void
 console_print_box_at(CHAR16 *str_arr[], int highlight,
 		     int start_col, int start_row,
@@ -66,11 +76,11 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
 extern VOID setup_console (int text);
 extern VOID setup_verbosity(VOID);
 extern UINT8 verbose;
-#define dprint(fmt, ...) ({						\
-		UINTN __dprint_ret = 0;					\
-		if (verbose)						\
-			__dprint_ret = Print((fmt), ##__VA_ARGS__);	\
-		__dprint_ret;						\
+#define dprint(fmt, ...) ({							\
+		UINTN __dprint_ret = 0;						\
+		if (verbose)							\
+			__dprint_ret = console_print((fmt), ##__VA_ARGS__);	\
+		__dprint_ret;							\
 	})
 #define dprinta(fmt, ...) ({									\
 		UINTN __dprinta_ret = 0;							\
@@ -79,7 +89,7 @@ extern UINT8 verbose;
 			CHAR16 *__dprinta_str = AllocateZeroPool((strlena(fmt) + 1) * 2);	\
 			for (__dprinta_i = 0; fmt[__dprinta_i] != '\0'; __dprinta_i++)		\
 				__dprinta_str[__dprinta_i] = fmt[__dprinta_i];			\
-			__dprinta_ret = Print((__dprinta_str), ##__VA_ARGS__);			\
+			__dprinta_ret = console_print((__dprinta_str), ##__VA_ARGS__);		\
 			FreePool(__dprinta_str);						\
 		}										\
 		__dprinta_ret;									\

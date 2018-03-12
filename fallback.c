@@ -48,7 +48,7 @@ get_fallback_verbose(void)
 	({								\
 		UINTN ret_ = 0;						\
 		if (get_fallback_verbose())				\
-			ret_ = Print((fmt), ##__VA_ARGS__);		\
+			ret_ = console_print((fmt), ##__VA_ARGS__);	\
 		ret_;							\
 	})
 
@@ -56,8 +56,8 @@ get_fallback_verbose(void)
 	({	UINTN line_ = __LINE__;					\
 		UINTN ret_ = 0;						\
 		if (get_fallback_verbose()) {				\
-			Print(L"%a:%d: ", __func__, line_);		\
-			ret_ = Print((fmt), ##__VA_ARGS__);		\
+			console_print(L"%a:%d: ", __func__, line_);	\
+			ret_ = console_print((fmt), ##__VA_ARGS__);	\
 		}							\
 		ret_;							\
 	})
@@ -109,7 +109,7 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 
 	buffer = AllocateZeroPool(bs);
 	if (!buffer) {
-		Print(L"Could not allocate memory\n");
+		console_print(L"Could not allocate memory\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, buffer);
@@ -117,7 +117,7 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
 	 * call in *any* case. */
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Could not get file info: %r\n", efi_status);
+		console_print(L"Could not get file info: %r\n", efi_status);
 		if (buffer)
 			FreePool(buffer);
 		return efi_status;
@@ -136,7 +136,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 
 	efi_status = fh->Open(fh, &fh2, fullpath, EFI_FILE_READ_ONLY, 0);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Couldn't open \"%s\": %r\n", fullpath, efi_status);
+		console_print(L"Couldn't open \"%s\": %r\n", fullpath, efi_status);
 		return efi_status;
 	}
 
@@ -144,8 +144,8 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	CHAR16 *b = NULL;
 	efi_status = get_file_size(fh2, &len);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Could not get file size for \"%s\": %r\n",
-		      fullpath, efi_status);
+		console_print(L"Could not get file size for \"%s\": %r\n",
+			      fullpath, efi_status);
 		fh2->Close(fh2);
 		return efi_status;
 	}
@@ -157,7 +157,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 
 	b = AllocateZeroPool(len + 2);
 	if (!buffer) {
-		Print(L"Could not allocate memory\n");
+		console_print(L"Could not allocate memory\n");
 		fh2->Close(fh2);
 		return EFI_OUT_OF_RESOURCES;
 	}
@@ -166,7 +166,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	if (EFI_ERROR(efi_status)) {
 		FreePool(buffer);
 		fh2->Close(fh2);
-		Print(L"Could not read file: %r\n", efi_status);
+		console_print(L"Could not read file: %r\n", efi_status);
 		return efi_status;
 	}
 	*buffer = b;
@@ -186,7 +186,7 @@ make_full_path(CHAR16 *dirname, CHAR16 *filename, CHAR16 **out, UINT64 *outlen)
 
 	CHAR16 *fullpath = AllocateZeroPool(len*sizeof(CHAR16));
 	if (!fullpath) {
-		Print(L"Could not allocate memory\n");
+		console_print(L"Could not allocate memory\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 
@@ -240,9 +240,9 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			cursor += DevicePathSize(hddp);
 			StrCpy((CHAR16 *)cursor, arguments);
 
-			Print(L"Creating boot entry \"%s\" with label \"%s\" "
-					L"for file \"%s\"\n",
-				varname, label, filename);
+			console_print(L"Creating boot entry \"%s\" with label \"%s\" "
+				      L"for file \"%s\"\n",
+				      varname, label, filename);
 
 			if (!first_new_option) {
 				first_new_option = DuplicateDevicePath(fulldp);
@@ -259,7 +259,8 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			FreePool(data);
 
 			if (EFI_ERROR(efi_status)) {
-				Print(L"Could not create variable: %r\n", efi_status);
+				console_print(L"Could not create variable: %r\n",
+					      efi_status);
 				return efi_status;
 			}
 
@@ -278,10 +279,11 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			bootorder = newbootorder;
 			nbootorder += 1;
 #ifdef DEBUG_FALLBACK
-			Print(L"nbootorder: %d\nBootOrder: ", nbootorder);
+			console_print(L"nbootorder: %d\nBootOrder: ",
+				      nbootorder);
 			for (j = 0 ; j < nbootorder ; j++)
-				Print(L"%04x ", bootorder[j]);
-			Print(L"\n");
+				console_print(L"%04x ", bootorder[j]);
+			console_print(L"\n");
 #endif
 
 			return EFI_SUCCESS;
@@ -496,7 +498,7 @@ update_boot_order(void)
 	UINTN j;
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
-	Print(L"\n");
+	console_print(L"\n");
 	efi_status = gRT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &GV_GUID);
@@ -642,7 +644,8 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 	UINT64 bs;
 	efi_status = read_file(fh, fullpath, &buffer, &bs);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Could not read file \"%s\": %r\n", fullpath, efi_status);
+		console_print(L"Could not read file \"%s\": %r\n",
+			      fullpath, efi_status);
 		FreePool(fullpath);
 		return efi_status;
 	}
@@ -695,8 +698,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	 * then allocate a buffer and ask again to get it filled. */
 	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, NULL);
 	if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL) {
-		Print(L"Could not get directory info for \\EFI\\%s\\: %r\n",
-		      dirname, efi_status);
+		console_print(L"Could not get directory info for \\EFI\\%s\\: %r\n",
+			      dirname, efi_status);
 		return efi_status;
 	}
 	if (bs == 0)
@@ -704,7 +707,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 	buffer = AllocateZeroPool(bs);
 	if (!buffer) {
-		Print(L"Could not allocate memory\n");
+		console_print(L"Could not allocate memory\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 
@@ -713,8 +716,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
 	 * call in *any* case. */
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Could not get info for \"%s\": %r\n", dirname,
-		      efi_status);
+		console_print(L"Could not get info for \"%s\": %r\n", dirname,
+			      efi_status);
 		if (buffer)
 			FreePool(buffer);
 		return efi_status;
@@ -736,8 +739,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		efi_status = fh->Read(fh, &bs, NULL);
 		if (EFI_ERROR(efi_status) &&
 		    efi_status != EFI_BUFFER_TOO_SMALL) {
-			Print(L"Could not read \\EFI\\%s\\: %r\n", dirname,
-			      efi_status);
+			console_print(L"Could not read \\EFI\\%s\\: %r\n",
+				      dirname, efi_status);
 			return efi_status;
 		}
 		/* If there's no data to read, don't try to allocate 0 bytes
@@ -747,14 +750,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 		buffer = AllocateZeroPool(bs);
 		if (!buffer) {
-			Print(L"Could not allocate memory\n");
+			console_print(L"Could not allocate memory\n");
 			return EFI_OUT_OF_RESOURCES;
 		}
 
 		efi_status = fh->Read(fh, &bs, buffer);
 		if (EFI_ERROR(efi_status)) {
-			Print(L"Could not read \\EFI\\%s\\: %r\n", dirname,
-			      efi_status);
+			console_print(L"Could not read \\EFI\\%s\\: %r\n",
+				      dirname, efi_status);
 			FreePool(buffer);
 			return efi_status;
 		}
@@ -781,14 +784,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		efi_status = fh->Open(fh, &fh2, bootarchcsv,
 				      EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(efi_status) || fh2 == NULL) {
-			Print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
-			      dirname, bootarchcsv, efi_status);
+			console_print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
+				      dirname, bootarchcsv, efi_status);
 		} else {
 			efi_status = try_boot_csv(fh2, dirname, bootarchcsv);
 			fh2->Close(fh2);
 			if (EFI_ERROR(efi_status))
-				Print(L"Could not process \\EFI\\%s\\%s: %r\n",
-				      dirname, bootarchcsv, efi_status);
+				console_print(L"Could not process \\EFI\\%s\\%s: %r\n",
+					      dirname, bootarchcsv, efi_status);
 		}
 	}
 	if ((EFI_ERROR(efi_status) || !bootarchcsv) && bootcsv) {
@@ -796,14 +799,14 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		efi_status = fh->Open(fh, &fh2, bootcsv,
 				      EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(efi_status) || fh2 == NULL) {
-			Print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
-			      dirname, bootcsv, efi_status);
+			console_print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
+				      dirname, bootcsv, efi_status);
 		} else {
 			efi_status = try_boot_csv(fh2, dirname, bootcsv);
 			fh2->Close(fh2);
 			if (EFI_ERROR(efi_status))
-				Print(L"Could not process \\EFI\\%s\\%s: %r\n",
-				      dirname, bootarchcsv, efi_status);
+				console_print(L"Could not process \\EFI\\%s\\%s: %r\n",
+					      dirname, bootarchcsv, efi_status);
 		}
 	}
 	return EFI_SUCCESS;
@@ -818,7 +821,7 @@ find_boot_options(EFI_HANDLE device)
 	efi_status = gBS->HandleProtocol(device, &FileSystemProtocol,
 					 (void **) &fio);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Couldn't find file system: %r\n", efi_status);
+		console_print(L"Couldn't find file system: %r\n", efi_status);
 		return efi_status;
 	}
 
@@ -828,20 +831,20 @@ find_boot_options(EFI_HANDLE device)
 	EFI_FILE_HANDLE fh = NULL;
 	efi_status = fio->OpenVolume(fio, &fh);
 	if (EFI_ERROR(efi_status) || fh == NULL) {
-		Print(L"Couldn't open file system: %r\n", efi_status);
+		console_print(L"Couldn't open file system: %r\n", efi_status);
 		return efi_status;
 	}
 
 	EFI_FILE_HANDLE fh2 = NULL;
 	efi_status = fh->Open(fh, &fh2, L"EFI", EFI_FILE_READ_ONLY, 0);
 	if (EFI_ERROR(efi_status) || fh2 == NULL) {
-		Print(L"Couldn't open EFI: %r\n", efi_status);
+		console_print(L"Couldn't open EFI: %r\n", efi_status);
 		fh->Close(fh);
 		return efi_status;
 	}
 	efi_status = fh2->SetPosition(fh2, 0);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Couldn't set file position: %r\n", efi_status);
+		console_print(L"Couldn't set file position: %r\n", efi_status);
 		fh2->Close(fh2);
 		fh->Close(fh);
 		return efi_status;
@@ -853,7 +856,7 @@ find_boot_options(EFI_HANDLE device)
 		bs = 0;
 		efi_status = fh2->Read(fh2, &bs, NULL);
 		if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL) {
-			Print(L"Could not read \\EFI\\: %r\n", efi_status);
+			console_print(L"Could not read \\EFI\\: %r\n", efi_status);
 			return efi_status;
 		}
 		if (bs == 0)
@@ -861,7 +864,7 @@ find_boot_options(EFI_HANDLE device)
 
 		buffer = AllocateZeroPool(bs);
 		if (!buffer) {
-			Print(L"Could not allocate memory\n");
+			console_print(L"Could not allocate memory\n");
 			/* sure, this might work, why not? */
 			fh2->Close(fh2);
 			fh->Close(fh);
@@ -898,7 +901,8 @@ find_boot_options(EFI_HANDLE device)
 		efi_status = fh2->Open(fh2, &fh3, fi->FileName,
 				      EFI_FILE_READ_ONLY, 0);
 		if (EFI_ERROR(efi_status)) {
-			Print(L"%d Couldn't open %s: %r\n", __LINE__, fi->FileName, efi_status);
+			console_print(L"%d Couldn't open %s: %r\n", __LINE__,
+				      fi->FileName, efi_status);
 			FreePool(buffer);
 			buffer = NULL;
 			continue;
@@ -938,13 +942,14 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		UINTN s = DevicePathSize(first_new_option);
 		unsigned int i;
 		UINT8 *dpv = (void *)first_new_option;
-		Print(L"LoadImage failed: %r\nDevice path: \"%s\"\n", efi_status, dps);
+		console_print(L"LoadImage failed: %r\nDevice path: \"%s\"\n",
+			      efi_status, dps);
 		for (i = 0; i < s; i++) {
 			if (i > 0 && i % 16 == 0)
-				Print(L"\n");
-			Print(L"%02x ", dpv[i]);
+				console_print(L"\n");
+			console_print(L"%02x ", dpv[i]);
 		}
-		Print(L"\n");
+		console_print(L"\n");
 
 		msleep(500000000);
 		return efi_status;
@@ -960,7 +965,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 
 	efi_status = gBS->StartImage(image_handle, NULL, NULL);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"StartImage failed: %r\n", efi_status);
+		console_print(L"StartImage failed: %r\n", efi_status);
 		msleep(500000000);
 	}
 	return efi_status;
@@ -989,9 +994,9 @@ debug_hook(void)
 		return;
 
 	x = 1;
-	Print(L"add-symbol-file "DEBUGDIR
-	      L"fb" EFI_ARCH L".efi.debug %p -s .data %p\n", &_etext,
-	      &_edata);
+	console_print(L"add-symbol-file "DEBUGDIR
+		      L"fb" EFI_ARCH L".efi.debug %p -s .data %p\n",
+		      &_etext, &_edata);
 }
 
 EFI_STATUS
@@ -1009,17 +1014,19 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
 					 (void *) &this_image);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Error: could not find loaded image: %r\n", efi_status);
+		console_print(L"Error: could not find loaded image: %r\n",
+			      efi_status);
 		return efi_status;
 	}
 
-	Print(L"System BootOrder not found.  Initializing defaults.\n");
+	console_print(L"System BootOrder not found.  Initializing defaults.\n");
 
 	set_boot_order();
 
 	efi_status = find_boot_options(this_image->DeviceHandle);
 	if (EFI_ERROR(efi_status)) {
-		Print(L"Error: could not find boot options: %r\n", efi_status);
+		console_print(L"Error: could not find boot options: %r\n",
+			      efi_status);
 		return efi_status;
 	}
 
@@ -1031,10 +1038,10 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		VerbosePrint(L"tpm present, resetting system\n");
 	}
 
-	Print(L"Reset System\n");
+	console_print(L"Reset System\n");
 
 	if (get_fallback_verbose()) {
-		Print(L"Verbose enabled, sleeping for half a second\n");
+		console_print(L"Verbose enabled, sleeping for half a second\n");
 		msleep(500000);
 	}
 
