@@ -360,7 +360,7 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 			break;
 		}
 
-	next:		
+	next:
 		if (StrCmp(next->FileName, L"..") == 0) {
 			/* place .. directory first */
 			CHAR16 *tmp = (*result)[(*count) - 1];
