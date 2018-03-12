@@ -234,11 +234,6 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	void *ImageEnd = (char *)orig + size;
 	int n = 0;
 
-	if (image_is_64_bit(context->PEHdr))
-		context->PEHdr->Pe32Plus.OptionalHeader.ImageBase = (UINT64)(unsigned long)data;
-	else
-		context->PEHdr->Pe32.OptionalHeader.ImageBase = (UINT32)(unsigned long)data;
-
 	/* Alright, so here's how this works:
 	 *
 	 * context->RelocDir gives us two things:
