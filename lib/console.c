@@ -46,6 +46,33 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 	return efi_status;
 }
 
+VOID setup_console (int text)
+{
+	EFI_STATUS efi_status;
+	EFI_CONSOLE_CONTROL_PROTOCOL *concon;
+	static EFI_CONSOLE_CONTROL_SCREEN_MODE mode =
+					EfiConsoleControlScreenGraphics;
+	EFI_CONSOLE_CONTROL_SCREEN_MODE new_mode;
+
+	efi_status = LibLocateProtocol(&EFI_CONSOLE_CONTROL_GUID,
+				       (VOID **)&concon);
+	if (EFI_ERROR(efi_status))
+		return;
+
+	if (text) {
+		new_mode = EfiConsoleControlScreenText;
+
+		efi_status = concon->GetMode(concon, &mode, 0, 0);
+		/* If that didn't work, assume it's graphics */
+		if (EFI_ERROR(efi_status))
+			mode = EfiConsoleControlScreenGraphics;
+	} else {
+		new_mode = mode;
+	}
+
+	concon->SetMode(concon, new_mode);
+}
+
 UINTN
 console_print(const CHAR16 *fmt, ...)
 {
@@ -456,33 +483,6 @@ setup_verbosity(VOID)
 	verbose = 0;
 	if (!EFI_ERROR(efi_status))
 		verbose = verbose_check;
-}
-
-VOID setup_console (int text)
-{
-	EFI_STATUS efi_status;
-	EFI_CONSOLE_CONTROL_PROTOCOL *concon;
-	static EFI_CONSOLE_CONTROL_SCREEN_MODE mode =
-					EfiConsoleControlScreenGraphics;
-	EFI_CONSOLE_CONTROL_SCREEN_MODE new_mode;
-
-	efi_status = LibLocateProtocol(&EFI_CONSOLE_CONTROL_GUID,
-				       (VOID **)&concon);
-	if (EFI_ERROR(efi_status))
-		return;
-
-	if (text) {
-		new_mode = EfiConsoleControlScreenText;
-
-		efi_status = concon->GetMode(concon, &mode, 0, 0);
-		/* If that didn't work, assume it's graphics */
-		if (EFI_ERROR(efi_status))
-			mode = EfiConsoleControlScreenGraphics;
-	} else {
-		new_mode = mode;
-	}
-
-	concon->SetMode(concon, new_mode);
 }
 
 /* Included here because they mess up the definition of va_list and friends */
