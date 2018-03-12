@@ -2417,7 +2417,6 @@ uninstall_shim_protocols(void)
 EFI_STATUS
 shim_init(void)
 {
-	setup_console(1);
 	setup_verbosity();
 	dprinta(shim_version);
 
@@ -2464,7 +2463,7 @@ shim_fini(void)
 	if (load_options_size > 0 && second_stage)
 		FreePool(second_stage);
 
-	setup_console(0);
+	console_fini();
 }
 
 extern EFI_STATUS

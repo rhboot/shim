@@ -11,6 +11,8 @@
 
 #include "shim.h"
 
+static UINT8 console_text_mode = 0;
+
 static int
 count_lines(CHAR16 *str_arr[])
 {
@@ -46,7 +48,7 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 	return efi_status;
 }
 
-VOID setup_console (int text)
+static VOID setup_console (int text)
 {
 	EFI_STATUS efi_status;
 	EFI_CONSOLE_CONTROL_PROTOCOL *concon;
@@ -71,6 +73,13 @@ VOID setup_console (int text)
 	}
 
 	concon->SetMode(concon, new_mode);
+	console_text_mode = text;
+}
+
+VOID console_fini(VOID)
+{
+	if (console_text_mode)
+		setup_console(0);
 }
 
 UINTN
@@ -78,6 +87,9 @@ console_print(const CHAR16 *fmt, ...)
 {
        va_list args;
        UINTN ret;
+
+       if (!console_text_mode)
+	       setup_console(1);
 
        va_start(args, fmt);
        ret = VPrint(fmt, args);
@@ -92,6 +104,9 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
        SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
        va_list args;
        UINTN ret;
+
+       if (!console_text_mode)
+	       setup_console(1);
 
        co->SetCursorPosition(co, col, row);
 
@@ -116,6 +131,9 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 
 	if (lines == 0)
 		return;
+
+	if (!console_text_mode)
+	       setup_console(1);
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -219,6 +237,9 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	EFI_INPUT_KEY key;
 
+	if (!console_text_mode)
+	       setup_console(1);
+
 	CopyMem(&SavedConsoleMode, co->Mode, sizeof(SavedConsoleMode));
 	co->EnableCursor(co, FALSE);
 	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
@@ -248,6 +269,9 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 	int offs_col, offs_row, size_cols, size_rows, lines;
 	unsigned int selector_offset;
 	UINTN cols, rows;
+
+	if (!console_text_mode)
+	       setup_console(1);
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -461,6 +485,9 @@ void
 console_reset(void)
 {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+
+	if (!console_text_mode)
+	       setup_console(1);
 
 	co->Reset(co, TRUE);
 	/* set mode 0 - required to be 80x25 */

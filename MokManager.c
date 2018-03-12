@@ -2535,12 +2535,10 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE * systab)
 
 	InitializeLib(image_handle, systab);
 
-	setup_console(1);
-
 	setup_rand();
 
 	efi_status = check_mok_request(image_handle);
 
-	setup_console(0);
+	console_fini();
 	return efi_status;
 }
