@@ -1766,7 +1766,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 #endif
 
 	if (!secure_mode()) {
-		status = EFI_SUCCESS;
+		efi_status = EFI_SUCCESS;
 		goto done;
 	}
 
