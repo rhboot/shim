@@ -85,36 +85,36 @@ VOID console_fini(VOID)
 UINTN
 console_print(const CHAR16 *fmt, ...)
 {
-       va_list args;
-       UINTN ret;
+	va_list args;
+	UINTN ret;
 
-       if (!console_text_mode)
-	       setup_console(1);
+	if (!console_text_mode)
+		setup_console(1);
 
-       va_start(args, fmt);
-       ret = VPrint(fmt, args);
-       va_end(args);
+	va_start(args, fmt);
+	ret = VPrint(fmt, args);
+	va_end(args);
 
-       return ret;
+	return ret;
 }
 
 UINTN
 console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 {
-       SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-       va_list args;
-       UINTN ret;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+	va_list args;
+	UINTN ret;
 
-       if (!console_text_mode)
-	       setup_console(1);
+	if (!console_text_mode)
+		setup_console(1);
 
-       co->SetCursorPosition(co, col, row);
+	co->SetCursorPosition(co, col, row);
 
-       va_start(args, fmt);
-       ret = VPrint(fmt, args);
-       va_end(args);
+	va_start(args, fmt);
+	ret = VPrint(fmt, args);
+	va_end(args);
 
-       return ret;
+	return ret;
 }
 
 
@@ -133,7 +133,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 		return;
 
 	if (!console_text_mode)
-	       setup_console(1);
+		setup_console(1);
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -238,7 +238,7 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 	EFI_INPUT_KEY key;
 
 	if (!console_text_mode)
-	       setup_console(1);
+		setup_console(1);
 
 	CopyMem(&SavedConsoleMode, co->Mode, sizeof(SavedConsoleMode));
 	co->EnableCursor(co, FALSE);
@@ -271,7 +271,7 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 	UINTN cols, rows;
 
 	if (!console_text_mode)
-	       setup_console(1);
+		setup_console(1);
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -487,7 +487,7 @@ console_reset(void)
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 
 	if (!console_text_mode)
-	       setup_console(1);
+		setup_console(1);
 
 	co->Reset(co, TRUE);
 	/* set mode 0 - required to be 80x25 */
