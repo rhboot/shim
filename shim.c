@@ -963,6 +963,35 @@ done:
 }
 
 /*
+ * Check that a trusted certificate signed the binary
+ */
+static BOOLEAN verify_trusted_cert(const WIN_CERTIFICATE_EFI_PKCS *cert,
+				   const UINT8 *sha256hash,
+				   const UINT8 *trusted_cert,
+				   size_t trusted_cert_len)
+{
+	const UINT8 *tmp;
+	ASN1_TYPE *asn1;
+
+	while (trusted_cert_len) {
+		if (AuthenticodeVerify(cert->CertData,
+				       cert->Hdr.dwLength - sizeof(cert->Hdr),
+				       trusted_cert, trusted_cert_len,
+				       sha256hash, SHA256_DIGEST_SIZE))
+			return TRUE;
+		tmp = trusted_cert;
+		asn1 = d2i_ASN1_TYPE(NULL, &tmp, trusted_cert_len);
+		if (!asn1)
+			break;
+		ASN1_TYPE_free(asn1);
+		trusted_cert_len -= (tmp - trusted_cert);
+		trusted_cert = tmp;
+	}
+
+	return FALSE;
+}
+
+/*
  * Check that the signature is valid and matches the binary
  */
 static EFI_STATUS verify_buffer (char *data, int datasize,
@@ -1044,10 +1073,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		 * Check against the shim build key
 		 */
 		if (sizeof(shim_cert) &&
-		    AuthenticodeVerify(cert->CertData,
-			       cert->Hdr.dwLength - sizeof(cert->Hdr),
-			       shim_cert, sizeof(shim_cert), sha256hash,
-			       SHA256_DIGEST_SIZE)) {
+		    verify_trusted_cert(cert, sha256hash,
+					shim_cert, sizeof(shim_cert))) {
 			update_verification_method(VERIFIED_BY_CERT);
 			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
 					     sizeof(shim_cert), shim_cert);
@@ -1063,10 +1090,8 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		 * And finally, check against shim's built-in key
 		 */
 		if (vendor_cert_size &&
-		    AuthenticodeVerify(cert->CertData,
-				       cert->Hdr.dwLength - sizeof(cert->Hdr),
-				       vendor_cert, vendor_cert_size,
-				       sha256hash, SHA256_DIGEST_SIZE)) {
+		    verify_trusted_cert(cert, sha256hash,
+					vendor_cert, vendor_cert_size)) {
 			update_verification_method(VERIFIED_BY_CERT);
 			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
 					     vendor_cert_size, vendor_cert);
