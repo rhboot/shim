@@ -58,4 +58,5 @@ if [[ -n "${remote_repo}" ]] ; then
     git fetch remote
     git checkout -f ${commit_id}
 fi
+git reset --hard "${origin_branch}
 make EFIDIR=test ENABLE_SHIM_CERT=1 ENABLE_HTTBOOT=1 ARCH=x86_64 clean all
