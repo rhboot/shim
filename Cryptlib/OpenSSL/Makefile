@@ -8,14 +8,16 @@ CFLAGS		= -ggdb -O0 -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDI
 		  -ffreestanding -std=gnu89 -I$(shell $(CC) -print-file-name=include) \
 		  -Wall $(EFI_INCLUDES) -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
 
+CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
+
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS) \
 		-m64 -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
 		-UNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -maccumulate-outgoing-args \
-		-m32 -DMDE_CPU_IA32
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
+		$(CLANG_BUGS) -m32 -DMDE_CPU_IA32
 endif
 ifeq ($(ARCH),aarch64)
 	CFLAGS	+= -O2 -DMDE_CPU_AARCH64

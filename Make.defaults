@@ -47,6 +47,8 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 		  $(EFI_INCLUDES)
 
+CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
+
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
@@ -63,7 +65,7 @@ endif
 
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   -maccumulate-outgoing-args -m64 \
+		   $(CLANG_BUGS) -m64 \
 		   -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
 		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64 -DPAGE_SIZE=4096
 	LIBDIR			?= $(prefix)/lib64
@@ -73,7 +75,7 @@ ifeq ($(ARCH),x86_64)
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   -maccumulate-outgoing-args -m32 \
+		   $(CLANG_BUGS) -m32 \
 		   -DMDE_CPU_IA32 -DPAGE_SIZE=4096
 	LIBDIR			?= $(prefix)/lib
 	ARCH_SUFFIX		?= ia32
