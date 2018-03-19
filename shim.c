@@ -108,7 +108,7 @@ static void *ImageAddress (void *image, uint64_t size, uint64_t address)
 		return NULL;
 
 	/* Insure our math won't overflow */
-	if (UINT64_MAX - address < (uint64_t)image)
+	if (UINT64_MAX - address < (uint64_t)(intptr_t)image)
 		return NULL;
 
 	/* return the absolute pointer */
