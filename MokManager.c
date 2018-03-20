@@ -1913,7 +1913,8 @@ static BOOLEAN check_der_suffix(CHAR16 * file_name)
 	if (!file_name || StrLen(file_name) <= 4)
 		return FALSE;
 
-	StrCpy(suffix, file_name + StrLen(file_name) - 4);
+	suffix[0] = '\0';
+	StrnCat(suffix, file_name + StrLen(file_name) - 4, 4);
 
 	StrLwr(suffix);
 	for (i = 0; der_suffix[i] != NULL; i++) {
