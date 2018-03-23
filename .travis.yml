@@ -11,10 +11,10 @@ matrix:
      services: docker
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull vathpela/shim-travis-rawhide:v1 ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull vathpela/shim-travis-rawhide:v2 ; fi
 
 before_script:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo FROM vathpela/shim-travis-rawhide:v1 > Dockerfile ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo FROM vathpela/shim-travis-rawhide:v2 > Dockerfile ; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo ADD . /root >> Dockerfile ; fi
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker build -t withgit . ; fi
 
