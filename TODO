@@ -1,11 +1,16 @@
 - Versioned protocol:
   - Make shim and the bootloaders using it express how enlightened they
-    are to one another, so we can stop earlier without tricks like the one
-    above
-  - Make a LoadImage/CheckImage/StartImage based protocol
+    are to one another, so we can stop earlier without tricks
+  - Make EFI_LOADED_IMAGE_2 protocol and a LOAD_IMAGE protocol with
+    LoadImage/CheckImage/StartImage.
+- Make the openssl code supply the Pkcs7Verify() API, and use the system
+  one (instead) if it is available.
+  - And make building it optional
+- Get meb30's multiple-certs patch merged
 - Hashing of option roms:
   - hash option roms and add them to MokListRT
   - probably belongs in MokManager
+  - And some PCR?
 - Ability to specify second stage as a device path
   - including vendor path that means "parent of this image's path"
   - including vendor path that means "this image"
