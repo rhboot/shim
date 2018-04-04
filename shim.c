@@ -2536,6 +2536,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+	CHAR16 *msgs[] = {
+		L"import_mok_state() failed\n",
+		L"shim_int() failed\n",
+		NULL
+	};
+	int msg = 0;
+
 
 	/*
 	 * Set up the shim lock protocol so that grub and MokManager can
@@ -2567,16 +2574,18 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	efi_status = import_mok_state(image_handle);
 	if (EFI_ERROR(efi_status)) {
 die:
-		console_print(L"Something has gone seriously wrong: %r\n",
-			      efi_status);
+		console_print(L"Something has gone seriously wrong: %s: %r\n",
+			      msgs[msg], efi_status);
 		msleep(5000000);
 		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				 0, NULL);
 	}
 
 	efi_status = shim_init();
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		msg = 1;
 		goto die;
+	}
 
 	/*
 	 * Tell the user that we're in insecure mode if necessary
