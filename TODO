@@ -3,6 +3,8 @@
     are to one another, so we can stop earlier without tricks
   - Make EFI_LOADED_IMAGE_2 protocol and a LOAD_IMAGE protocol with
     LoadImage/CheckImage/StartImage.
+- Implement EFI_CERT_X509_SHA{256,384,512} revocation checks
+  - It doesn't necessarily have to include timestamp checking support
 - Make the openssl code supply the Pkcs7Verify() API, and use the system
   one (instead) if it is available.
   - And make building it optional
