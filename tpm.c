@@ -155,7 +155,15 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 
 	efi_status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
 	if (EFI_ERROR(efi_status)) {
+#ifdef REQUIRE_TPM
+		perror(L"TPM logging failed: %r\n", efi_status);
 		return efi_status;
+#else
+		if (efi_status != EFI_NOT_FOUND) {
+			perror(L"TPM logging failed: %r\n", efi_status);
+			return efi_status;
+		}
+#endif
 	} else if (tpm2) {
 		EFI_TCG2_EVENT *event;
 		EFI_TCG2_EVENT_LOG_BITMAP supported_logs;
