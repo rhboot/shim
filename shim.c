@@ -1209,7 +1209,9 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	if (context->SecDir->VirtualAddress >= datasize) {
+	if (context->SecDir->VirtualAddress > datasize ||
+	    (context->SecDir->VirtualAddress == datasize &&
+	     context->SecDir->Size > 0)) {
 		perror(L"Malformed security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
