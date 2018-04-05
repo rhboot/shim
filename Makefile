@@ -109,9 +109,9 @@ Cryptlib/OpenSSL/libopenssl.a:
 	mkdir -p Cryptlib/OpenSSL/crypto/{x509v3,x509,txt_db,stack,sha,rsa,rc4,rand,pkcs7,pkcs12,pem,ocsp,objects,modes,md5,lhash,kdf,hmac,evp,err,dso,dh,conf,comp,cmac,buffer,bn,bio,async{,/arch},asn1,aes}/
 	$(MAKE) VPATH=$(TOPDIR)/Cryptlib/OpenSSL TOPDIR=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile
 
-lib/lib.a:
+lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	if [ ! -d lib ]; then mkdir lib ; fi
-	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile
+	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile lib.a
 
 buildid : $(TOPDIR)/buildid.c
 	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
