@@ -2427,7 +2427,7 @@ EFI_STATUS
 shim_init(void)
 {
 	setup_verbosity();
-	dprinta(shim_version);
+	dprint(L"%a", shim_version);
 
 	/* Set the second stage loader */
 	set_second_stage (global_image_handle);

@@ -82,18 +82,6 @@ extern UINT8 verbose;
 			__dprint_ret = console_print((fmt), ##__VA_ARGS__);	\
 		__dprint_ret;							\
 	})
-#define dprinta(fmt, ...) ({									\
-		UINTN __dprinta_ret = 0;							\
-		if (verbose) {									\
-			UINTN __dprinta_i;							\
-			CHAR16 *__dprinta_str = AllocateZeroPool((strlena(fmt) + 1) * 2);	\
-			for (__dprinta_i = 0; fmt[__dprinta_i] != '\0'; __dprinta_i++)		\
-				__dprinta_str[__dprinta_i] = fmt[__dprinta_i];			\
-			__dprinta_ret = console_print((__dprinta_str), ##__VA_ARGS__);		\
-			FreePool(__dprinta_str);						\
-		}										\
-		__dprinta_ret;									\
-	})
 
 extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
 #define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)
