@@ -1275,7 +1275,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 			return efi_status;
 		} else {
 			if (verbose)
-				console_notify(L"Verification succeeded");
+				console_print(L"Verification succeeded\n");
 		}
 	}
 
