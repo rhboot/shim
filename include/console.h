@@ -75,7 +75,7 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
 
 extern VOID console_fini(VOID);
 extern VOID setup_verbosity(VOID);
-extern UINT8 verbose;
+extern UINT32 verbose;
 #define dprint(fmt, ...) ({							\
 		UINTN __dprint_ret = 0;						\
 		if (verbose)							\

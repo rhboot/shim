@@ -502,21 +502,23 @@ console_reset(void)
 	co->ClearScreen(co);
 }
 
-UINT8 verbose;
+UINT32 verbose = 0;
 
 VOID
 setup_verbosity(VOID)
 {
 	EFI_STATUS efi_status;
-	UINT8 verbose_check;
+	UINT8 *verbose_check_ptr = NULL;
 	UINTN verbose_check_size;
 
-	verbose_check_size = 1;
-	efi_status = get_variable(L"SHIM_VERBOSE", (void *)&verbose_check,
+	verbose_check_size = sizeof(verbose);
+	efi_status = get_variable(L"SHIM_VERBOSE", &verbose_check_ptr,
 				  &verbose_check_size, SHIM_LOCK_GUID);
-	verbose = 0;
-	if (!EFI_ERROR(efi_status))
-		verbose = verbose_check;
+	if (!EFI_ERROR(efi_status)) {
+		verbose = *(__typeof__(verbose) *)verbose_check_ptr;
+		verbose &= (1ULL << (8 * verbose_check_size)) - 1ULL;
+		FreePool(verbose_check_ptr);
+	}
 
 	setup_console(-1);
 }
