@@ -33,14 +33,16 @@ get_fallback_verbose(void)
 		return state;
 	}
 
+	state = 0;
 	for (i = 0; i < dataSize; i++) {
 		if (data[i]) {
 			state = 1;
-			return state;
+			break;
 		}
 	}
 
-	state = 0;
+	if (data)
+		FreePool(data);
 	return state;
 }
 
@@ -990,6 +992,8 @@ debug_hook(void)
 		return;
 	}
 
+	if (data)
+		FreePool(data);
 	if (x)
 		return;
 

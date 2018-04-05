@@ -2497,6 +2497,8 @@ debug_hook(void)
 		return;
 	}
 
+	FreePool(data);
+
 	console_print(L"add-symbol-file "DEBUGDIR
 		      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
 		      &_text, &_data);

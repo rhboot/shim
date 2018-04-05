@@ -1310,7 +1310,8 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
 				 EFI_VARIABLE_NON_VOLATILE |
 				 EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
-		return EFI_ACCESS_DENIED;
+		efi_status = EFI_ACCESS_DENIED;
+		goto error;
 	}
 
 	/* Nothing to do */
