@@ -68,6 +68,13 @@ static VOID setup_console (int text)
 		/* If that didn't work, assume it's graphics */
 		if (EFI_ERROR(efi_status))
 			mode = EfiConsoleControlScreenGraphics;
+		if (text < 0) {
+			if (mode == EfiConsoleControlScreenGraphics)
+				console_text_mode = 0;
+			else
+				console_text_mode = 1;
+			return;
+		}
 	} else {
 		new_mode = mode;
 	}
@@ -510,6 +517,8 @@ setup_verbosity(VOID)
 	verbose = 0;
 	if (!EFI_ERROR(efi_status))
 		verbose = verbose_check;
+
+	setup_console(-1);
 }
 
 /* Included here because they mess up the definition of va_list and friends */
