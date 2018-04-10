@@ -2087,8 +2087,8 @@ static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path, UINTN len)
 	if (!dppath)
 		return 0;
 
-	console_print(L"dppath: %s\n", dppath);
-	console_print(L"path:   %s\n", path);
+	dprint(L"dppath: %s\n", dppath);
+	dprint(L"path:   %s\n", path);
 	if (StrnCaseCmp(dppath, path, len))
 		ret = 0;
 
