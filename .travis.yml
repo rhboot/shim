@@ -11,13 +11,7 @@ matrix:
      services: docker
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull vathpela/shim-travis-rawhide:v2 ; fi
-
-before_script:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo FROM vathpela/shim-travis-rawhide:v2 > Dockerfile ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then echo ADD . /root >> Dockerfile ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker build -t withgit . ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull vathpela/efi-ci-rawhide:v0 ; fi
 
 script:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker run --volume $HOME/.ccache:/root/.ccache withgit /bin/sh -c "cd /root/shim && git pull && git reset origin/master --hard && ./travis-build.sh --branch $TRAVIS_BRANCH --repo \"$TRAVIS_REPO_SLUG\" --remote \"$TRAVIS_PULL_REQUEST_SLUG\" --pr-sha \"$TRAVIS_PULL_REQUEST_SHA\"" ; fi
-  - ccache -s
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker run vathpela/efi-ci-rawhide:v0 /bin/sh -c "cd /root/ && ./build.sh --branch \"$TRAVIS_BRANCH\" --commit \"$TRAVIS_COMMIT\" --commit-range \"$TRAVIS_COMMIT_RANGE\" --event-type \"$TRAVIS_EVENT_TYPE\" --pull-request \"$TRAVIS_PULL_REQUEST\" --pr-branch \"$TRAVIS_PULL_REQUEST_BRANCH\" --pr-sha \"$TRAVIS_PULL_REQUEST_SHA\" --remote \"$TRAVIS_PULL_REQUEST_SLUG\" --repo \"$TRAVIS_REPO_SLUG\" --test-subject shim" ; fi
