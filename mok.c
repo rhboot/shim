@@ -280,13 +280,17 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			/*
 			 * Measure this into PCR 7 in the Microsoft format
 			 */
-			efi_status = tpm_measure_variable(v->name, *v->guid,
-							  v->data_size,
-							  v->data);
+#ifdef REQUIRE_TPM
+			efi_status =
+#endif
+			tpm_measure_variable(v->name, *v->guid,
+					     v->data_size, v->data);
+#ifdef REQUIRE_TPM
 			if (EFI_ERROR(efi_status)) {
 				if (ret != EFI_SECURITY_VIOLATION)
 					ret = efi_status;
 			}
+#endif
 		}
 
 		if (v->flags & MOK_VARIABLE_LOG && present) {
@@ -295,13 +299,18 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			 * says.
 			 */
 			EFI_PHYSICAL_ADDRESS datap =
-					(EFI_PHYSICAL_ADDRESS)(UINTN)v->data,
-			efi_status = tpm_log_event(datap, v->data_size,
-						   v->pcr, (CHAR8 *)v->name8);
+					(EFI_PHYSICAL_ADDRESS)(UINTN)v->data;
+#ifdef REQUIRE_TPM
+			efi_status =
+#endif
+			tpm_log_event(datap, v->data_size, v->pcr,
+				      (CHAR8 *)v->name8);
+#ifdef REQUIRE_TPM
 			if (EFI_ERROR(efi_status)) {
 				if (ret != EFI_SECURITY_VIOLATION)
 					ret = efi_status;
 			}
+#endif
 		}
 
 		if (v->rtname && present && addend) {
