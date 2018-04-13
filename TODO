@@ -18,11 +18,14 @@
   - including vendor path that means "this image"
   - including path that's like Fv() to embed images.
 - Make all build options be able to be set in 'git config --local shim.OPTION'
+  - Make the build dump those to stdout as well
 - make debuginfo paths configurable
 - make arch dependent names configurable
 - Make it easier to avoid CryptPem
 - Make an easy strip+implant tool for our embedded cert lists
 - Post process full path names out of __FILE__ / __BASE_FILE__ entries in
   the string table :/
+- Make build.log an artifact of building.
+- KEK for Mok.  (koike expressed an interest in working on this.)
 
 # vim:filetype=mail:tw=74
