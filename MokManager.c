@@ -880,14 +880,9 @@ static EFI_STATUS write_db(CHAR16 * db_name, void *MokNew, UINTN MokNewSize)
 	UINTN old_size;
 	UINTN new_size;
 
-	efi_status = gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_NON_VOLATILE |
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-				      EFI_VARIABLE_APPEND_WRITE,
-				      MokNewSize, MokNew);
-	if (!EFI_ERROR(efi_status) || efi_status != EFI_INVALID_PARAMETER) {
-		return efi_status;
-	}
+	/* Do not use EFI_VARIABLE_APPEND_WRITE due to faulty firmwares.
+	 * ref: https://github.com/rhboot/shim/issues/55
+	 *      https://github.com/rhboot/shim/issues/105 */
 
 	efi_status = get_variable_attr(db_name, (UINT8 **)&old_data, &old_size,
 				       SHIM_LOCK_GUID, &attributes);
