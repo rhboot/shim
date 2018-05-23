@@ -43,7 +43,7 @@
 #define EFI_ARCH L"x64"
 #endif
 #ifndef DEBUGDIR
-#define DEBUGDIR L"/usr/lub/debug/usr/share/shim/x64/"
+#define DEBUGDIR L"/usr/lib/debug/usr/share/shim/x64/"
 #endif
 #endif
 
@@ -58,7 +58,7 @@
 #define EFI_ARCH L"ia32"
 #endif
 #ifndef DEBUGDIR
-#define DEBUGDIR L"/usr/lub/debug/usr/share/shim/ia32/"
+#define DEBUGDIR L"/usr/lib/debug/usr/share/shim/ia32/"
 #endif
 #endif
 
@@ -73,7 +73,7 @@
 #define EFI_ARCH L"aa64"
 #endif
 #ifndef DEBUGDIR
-#define DEBUGDIR L"/usr/lub/debug/usr/share/shim/aa64/"
+#define DEBUGDIR L"/usr/lib/debug/usr/share/shim/aa64/"
 #endif
 #endif
 
@@ -88,7 +88,7 @@
 #define EFI_ARCH L"arm"
 #endif
 #ifndef DEBUGDIR
-#define DEBUGDIR L"/usr/lub/debug/usr/share/shim/arm/"
+#define DEBUGDIR L"/usr/lib/debug/usr/share/shim/arm/"
 #endif
 #endif
 
