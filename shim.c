@@ -280,8 +280,14 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	while (RelocBase < RelocBaseEnd) {
 		Reloc = (UINT16 *) ((char *) RelocBase + sizeof (EFI_IMAGE_BASE_RELOCATION));
 
-		if ((RelocBase->SizeOfBlock == 0) || (RelocBase->SizeOfBlock > context->RelocDir->Size)) {
-			perror(L"Reloc %d block size %d is invalid\n", n, RelocBase->SizeOfBlock);
+		if (RelocBase->SizeOfBlock == 0) {
+			perror(L"Reloc %d block size 0 is invalid\n", n);
+			return EFI_UNSUPPORTED;
+		} else if (RelocBase->SizeOfBlock > context->RelocDir->Size) {
+			perror(L"Reloc %d block size %d greater than reloc dir"
+					"size %d, which is invalid\n", n,
+					RelocBase->SizeOfBlock,
+					context->RelocDir->Size);
 			return EFI_UNSUPPORTED;
 		}
 
