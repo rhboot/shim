@@ -9,8 +9,8 @@ will relocate and execute the binary.
 shim will also install a protocol which permits the second-stage bootloader
 to perform similar binary validation. This protocol has a GUID as described
 in the shim.h header file and provides a single entry point. On 64-bit systems
-this entry point expects to be called with SysV ABI rather than MSABI, and
-so calls to it should not be wrapped.
+this entry point expects to be called with SysV ABI rather than MSABI, so calls
+to it should not be wrapped.
 
 On systems with a TPM chip enabled and supported by the system firmware,
 shim will extend various PCRs with the digests of the targets it is
