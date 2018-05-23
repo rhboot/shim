@@ -33,6 +33,12 @@ console_alertbox(CHAR16 **title);
 void
 console_notify(CHAR16 *string);
 void
+console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode);
+void
+console_restore_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode);
+int
+console_countdown(CHAR16* title, const CHAR16* message, int timeout);
+void
 console_reset(void);
 #define NOSEL 0x7fffffff
 

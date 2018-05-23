@@ -409,6 +409,81 @@ console_notify(CHAR16 *string)
 	console_alertbox(str_arr);
 }
 
+void
+console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
+{
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+
+	if (!SavedMode) {
+		console_print(L"Invalid parameter: SavedMode\n");
+		return;
+	}
+
+	CopyMem(SavedMode, co->Mode, sizeof(SIMPLE_TEXT_OUTPUT_MODE));
+	co->EnableCursor(co, FALSE);
+	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
+}
+
+void
+console_restore_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
+{
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+
+	co->EnableCursor(co, SavedMode->CursorVisible);
+	co->SetCursorPosition(co, SavedMode->CursorColumn,
+				SavedMode->CursorRow);
+	co->SetAttribute(co, SavedMode->Attribute);
+}
+
+int
+console_countdown(CHAR16* title, const CHAR16* message, int timeout)
+{
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+	SIMPLE_INPUT_INTERFACE *ci = ST->ConIn;
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	EFI_INPUT_KEY key;
+	EFI_STATUS efi_status;
+	UINTN cols, rows;
+	CHAR16 *titles[2];
+	int wait = 10000000;
+
+	console_save_and_set_mode(&SavedMode);
+
+	titles[0] = title;
+	titles[1] = NULL;
+
+	console_print_box_at(titles, -1, 0, 0, -1, -1, 1, 1);
+
+	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
+
+	console_print_at((cols - StrLen(message)) / 2, rows / 2, message);
+	while (1) {
+		if (timeout > 1)
+			console_print_at(2, rows - 3,
+					 L"Booting in %d seconds  ",
+					 timeout);
+		else if (timeout)
+			console_print_at(2, rows - 3,
+					 L"Booting in %d second   ",
+					 timeout);
+
+		efi_status = WaitForSingleEvent(ci->WaitForKey, wait);
+		if (efi_status != EFI_TIMEOUT) {
+			/* Clear the key in the queue */
+			ci->ReadKeyStroke(ci, &key);
+			break;
+		}
+
+		timeout--;
+		if (!timeout)
+			break;
+	}
+
+	console_restore_mode(&SavedMode);
+
+	return timeout;
+}
+
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 /* Copy of gnu-efi-3.0 with the added secure boot strings */

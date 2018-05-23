@@ -733,30 +733,6 @@ done:
 	return efi_status;
 }
 
-static void console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
-{
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-
-	if (!SavedMode) {
-		console_print(L"Invalid parameter: SavedMode\n");
-		return;
-	}
-
-	CopyMem(SavedMode, co->Mode, sizeof(SIMPLE_TEXT_OUTPUT_MODE));
-	co->EnableCursor(co, FALSE);
-	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
-}
-
-static void console_restore_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
-{
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-
-	co->EnableCursor(co, SavedMode->CursorVisible);
-	co->SetCursorPosition(co, SavedMode->CursorColumn,
-				SavedMode->CursorRow);
-	co->SetAttribute(co, SavedMode->Attribute);
-}
-
 static INTN reset_system()
 {
 	gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
@@ -2032,24 +2008,17 @@ static BOOLEAN verify_pw(BOOLEAN * protected)
 
 static int draw_countdown()
 {
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-	SIMPLE_INPUT_INTERFACE *ci = ST->ConIn;
-	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
-	EFI_INPUT_KEY key;
-	EFI_STATUS efi_status;
-	UINTN cols, rows;
-	CHAR16 *title[2];
 	CHAR16 *message = L"Press any key to perform MOK management";
+	CHAR16 *title;
 	void *MokTimeout = NULL;
 	MokTimeoutvar *var;
 	UINTN MokTimeoutSize = 0;
-	int timeout, wait = 10000000;
+	int timeout = 10;
+	EFI_STATUS efi_status;
 
 	efi_status = get_variable(L"MokTimeout", (UINT8 **) &MokTimeout,
 				  &MokTimeoutSize, SHIM_LOCK_GUID);
-	if (EFI_ERROR(efi_status)) {
-		timeout = 10;
-	} else {
+	if (!EFI_ERROR(efi_status)) {
 		var = MokTimeout;
 		timeout = (int)var->Timeout;
 		FreePool(MokTimeout);
@@ -2059,42 +2028,10 @@ static int draw_countdown()
 	if (timeout < 0)
 		return timeout;
 
-	console_save_and_set_mode(&SavedMode);
+	title = PoolPrint(L"%s UEFI key management", SHIM_VENDOR);
+	timeout = console_countdown(title, message, timeout);
 
-	title[0] = PoolPrint(L"%s UEFI key management", SHIM_VENDOR);
-	title[1] = NULL;
-
-	console_print_box_at(title, -1, 0, 0, -1, -1, 1, 1);
-
-	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
-
-	console_print_at((cols - StrLen(message)) / 2, rows / 2, message);
-	while (1) {
-		if (timeout > 1)
-			console_print_at(2, rows - 3,
-					 L"Booting in %d seconds  ",
-					 timeout);
-		else if (timeout)
-			console_print_at(2, rows - 3,
-					 L"Booting in %d second   ",
-					 timeout);
-
-		efi_status = WaitForSingleEvent(ci->WaitForKey, wait);
-		if (efi_status != EFI_TIMEOUT) {
-			/* Clear the key in the queue */
-			ci->ReadKeyStroke(ci, &key);
-			break;
-		}
-
-		timeout--;
-		if (!timeout)
-			break;
-	}
-
-	FreePool(title[0]);
-
-	console_restore_mode(&SavedMode);
-
+	FreePool(title);
 	return timeout;
 }
 
