@@ -715,6 +715,7 @@ httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 	   also supports the HTTP service binding protocol */
 	nic = get_nic_handle(&mac_addr);
 	if (!nic) {
+		efi_status = EFI_NOT_FOUND;
 		goto error;
 	}
 
