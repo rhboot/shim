@@ -311,6 +311,20 @@ is_unspecified_addr (EFI_IPv6_ADDRESS ip6)
 	return TRUE;
 }
 
+static inline void
+print_ip6_addr(EFI_IPv6_ADDRESS ip6addr)
+{
+	perror(L"%x:%x:%x:%x:%x:%x:%x:%x\n",
+	       ip6addr.Addr[0]  << 8 | ip6addr.Addr[1],
+	       ip6addr.Addr[2]  << 8 | ip6addr.Addr[3],
+	       ip6addr.Addr[4]  << 8 | ip6addr.Addr[5],
+	       ip6addr.Addr[6]  << 8 | ip6addr.Addr[7],
+	       ip6addr.Addr[8]  << 8 | ip6addr.Addr[9],
+	       ip6addr.Addr[10] << 8 | ip6addr.Addr[11],
+	       ip6addr.Addr[12] << 8 | ip6addr.Addr[13],
+	       ip6addr.Addr[14] << 8 | ip6addr.Addr[15]);
+}
+
 static EFI_STATUS
 set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 {
@@ -329,8 +343,12 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	ip6.IsAnycast = FALSE;
 	efi_status = ip6cfg->SetData(ip6cfg, Ip6ConfigDataTypeManualAddress,
 				     sizeof(ip6), &ip6);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to set IPv6 Address:\nIP: ");
+		print_ip6_addr(ip6.Address);
+		perror(L"Prefix Length: %u\n", ip6.PrefixLength);
 		return efi_status;
+	}
 
 	gateway = ip6node->GatewayIpAddress;
 	if (is_unspecified_addr(gateway))
@@ -338,10 +356,21 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 
 	efi_status = ip6cfg->SetData(ip6cfg, Ip6ConfigDataTypeGateway,
 				     sizeof(gateway), &gateway);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to set IPv6 Gateway:\nIP: ");
+		print_ip6_addr(gateway);
 		return efi_status;
+	}
 
 	return EFI_SUCCESS;
+}
+
+static inline void
+print_ip4_addr(EFI_IPv4_ADDRESS ip4addr)
+{
+	perror(L"%u.%u.%u.%u\n",
+	       ip4addr.Addr[0], ip4addr.Addr[1],
+	       ip4addr.Addr[2], ip4addr.Addr[3]);
 }
 
 static EFI_STATUS
@@ -361,14 +390,22 @@ set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 	ip4.SubnetMask = ip4node->SubnetMask;
 	efi_status = ip4cfg2->SetData(ip4cfg2, Ip4Config2DataTypeManualAddress,
 				      sizeof(ip4), &ip4);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to Set IPv4 Address:\nIP: ");
+		print_ip4_addr(ip4.Address);
+		perror(L"Mask: ");
+		print_ip4_addr(ip4.SubnetMask);
 		return efi_status;
+	}
 
 	gateway = ip4node->GatewayIpAddress;
 	efi_status = ip4cfg2->SetData(ip4cfg2, Ip4Config2DataTypeGateway,
 				      sizeof(gateway), &gateway);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to Set IPv4 Gateway:\nGateway: ");
+		print_ip4_addr(gateway);
 		return efi_status;
+	}
 
 	return EFI_SUCCESS;
 }
