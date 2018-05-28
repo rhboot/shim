@@ -299,7 +299,7 @@ out:
 }
 
 static BOOLEAN
-is_unspecified_addr (EFI_IPv6_ADDRESS ip6)
+is_unspecified_ip6addr (EFI_IPv6_ADDRESS ip6)
 {
 	UINT8 i;
 
@@ -351,7 +351,7 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	}
 
 	gateway = ip6node->GatewayIpAddress;
-	if (is_unspecified_addr(gateway))
+	if (is_unspecified_ip6addr(gateway))
 		return EFI_SUCCESS;
 
 	efi_status = ip6cfg->SetData(ip6cfg, Ip6ConfigDataTypeGateway,
@@ -363,6 +363,19 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	}
 
 	return EFI_SUCCESS;
+}
+
+static BOOLEAN
+is_unspecified_ip4addr (EFI_IPv4_ADDRESS ip4)
+{
+	UINT8 i;
+
+	for (i = 0; i<4; i++) {
+		if (ip4.Addr[i] != 0)
+			return FALSE;
+	}
+
+	return TRUE;
 }
 
 static inline void
@@ -399,6 +412,9 @@ set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 	}
 
 	gateway = ip4node->GatewayIpAddress;
+	if (is_unspecified_ip4addr(gateway))
+		return EFI_SUCCESS;
+
 	efi_status = ip4cfg2->SetData(ip4cfg2, Ip4Config2DataTypeGateway,
 				      sizeof(gateway), &gateway);
 	if (EFI_ERROR(efi_status)) {
