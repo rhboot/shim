@@ -696,8 +696,10 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	/* Set the handle to NULL to request a new handle */
 	http_handle = NULL;
 	efi_status = service->CreateChild(service, &http_handle);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to create the ChildHandle\n");
 		return efi_status;
+	}
 
 	/* Get the http protocol */
 	efi_status = gBS->HandleProtocol(http_handle, &EFI_HTTP_PROTOCOL_GUID,
