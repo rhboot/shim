@@ -40,6 +40,10 @@ typedef struct {
 	CHAR16 Password[SB_PASSWORD_LEN];
 } __attribute__ ((packed)) MokDBvar;
 
+typedef struct {
+	INT32 Timeout;
+} __attribute__ ((packed)) MokTimeoutvar;
+
 static EFI_STATUS get_sha1sum(void *Data, int DataSize, UINT8 * hash)
 {
 	EFI_STATUS efi_status;
@@ -2041,7 +2045,24 @@ static int draw_countdown()
 	UINTN cols, rows;
 	CHAR16 *title[2];
 	CHAR16 *message = L"Press any key to perform MOK management";
-	int timeout = 10, wait = 10000000;
+	void *MokTimeout = NULL;
+	MokTimeoutvar *var;
+	UINTN MokTimeoutSize = 0;
+	int timeout, wait = 10000000;
+
+	efi_status = get_variable(L"MokTimeout", (UINT8 **) &MokTimeout,
+				  &MokTimeoutSize, SHIM_LOCK_GUID);
+	if (EFI_ERROR(efi_status)) {
+		timeout = 10;
+	} else {
+		var = MokTimeout;
+		timeout = (int)var->Timeout;
+		FreePool(MokTimeout);
+		LibDeleteVariable(L"MokTimeout", &SHIM_LOCK_GUID);
+	}
+
+	if (timeout < 0)
+		return timeout;
 
 	console_save_and_set_mode(&SavedMode);
 
