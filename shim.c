@@ -66,14 +66,18 @@ static UINT32 load_options_size;
  */
 extern struct {
 	UINT32 vendor_cert_size;
+	UINT32 vendor_esl_size;
 	UINT32 vendor_dbx_size;
 	UINT32 vendor_cert_offset;
+	UINT32 vendor_esl_offset;
 	UINT32 vendor_dbx_offset;
 } cert_table;
 
 UINT32 vendor_cert_size;
+UINT32 vendor_esl_size;
 UINT32 vendor_dbx_size;
 UINT8 *vendor_cert;
+UINT8 *vendor_esl;
 UINT8 *vendor_dbx;
 
 /*
@@ -1064,6 +1068,25 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 			LogError(L"AuthenticodeVerify(shim_cert) failed\n");
 		}
 #endif /* defined(ENABLE_SHIM_CERT) */
+
+		/*
+		 * Check against a built-in EFI Signature List (ESL)
+		 */
+		if (vendor_esl_size &&
+		    check_db_cert_in_ram((EFI_SIGNATURE_LIST*)vendor_esl,
+					 vendor_esl_size,
+					 cert,
+					 sha256hash,
+					 L"Shim",
+					 SHIM_LOCK_GUID) == DATA_FOUND) {
+			update_verification_method(VERIFIED_BY_CERT);
+			// tpm_measurement is done by check_db_cert_in_ram
+			efi_status = EFI_SUCCESS;
+			drain_openssl_errors();
+			return efi_status;
+		} else {
+			LogError(L"check_db_cert_in_ram(vendor_esl) failed\n");
+		}
 
 		/*
 		 * And finally, check against shim's built-in key
@@ -2541,8 +2564,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	verification_method = VERIFIED_BY_NOTHING;
 
 	vendor_cert_size = cert_table.vendor_cert_size;
+	vendor_esl_size = cert_table.vendor_esl_size;
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
+	vendor_esl = (UINT8 *)&cert_table + cert_table.vendor_esl_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
 	CHAR16 *msgs[] = {
 		L"import_mok_state() failed\n",

@@ -62,12 +62,6 @@ struct mok_state_variable {
 	EFI_GUID *guid;
 	UINT8 *data;
 	UINTN data_size;
-	/*
-	 * These two are indirect pointers just to make initialization
-	 * saner...
-	 */
-	UINT8 **addend_source;
-	UINT32 *addend_size;
 	UINT32 yes_attr;
 	UINT32 no_attr;
 	UINT32 flags;
@@ -75,10 +69,11 @@ struct mok_state_variable {
 	UINT8 *state;
 };
 
-#define MOK_MIRROR_KEYDB	0x01
-#define MOK_MIRROR_DELETE_FIRST	0x02
-#define MOK_VARIABLE_MEASURE	0x04
-#define MOK_VARIABLE_LOG	0x08
+#define MOK_MIRROR_KEYDB		0x01
+#define MOK_MIRROR_DELETE_FIRST		0x02
+#define MOK_VARIABLE_MEASURE		0x04
+#define MOK_VARIABLE_LOG		0x08
+#define MOK_VARIABLE_APPEND_CERT	0x10
 
 struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokList",
@@ -88,10 +83,9 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
-	 .addend_source = &vendor_cert,
-	 .addend_size = &vendor_cert_size,
 	 .flags = MOK_MIRROR_KEYDB |
-		  MOK_VARIABLE_LOG,
+		  MOK_VARIABLE_LOG |
+		  MOK_VARIABLE_APPEND_CERT,
 	 .pcr = 14,
 	},
 	{.name = L"MokListX",
@@ -138,40 +132,54 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 	uint8_t *p = NULL;
 
 	if ((v->flags & MOK_MIRROR_KEYDB) &&
-	    v->addend_source && *v->addend_source &&
-	    v->addend_size && *v->addend_size) {
-		EFI_SIGNATURE_LIST *CertList = NULL;
-		EFI_SIGNATURE_DATA *CertData = NULL;
-		FullDataSize = v->data_size
-			     + sizeof (*CertList)
-			     + sizeof (EFI_GUID)
-			     + *v->addend_size;
+	    (v->flags & MOK_VARIABLE_APPEND_CERT)) {
+		FullDataSize = v->data_size;
+
+		if (vendor_esl_size) {
+			FullDataSize += vendor_esl_size;
+		}
+		if (vendor_cert_size) {
+			FullDataSize += sizeof (EFI_SIGNATURE_LIST)
+				     + sizeof (EFI_GUID)
+			             + vendor_cert_size;
+		}
+
 		FullData = AllocatePool(FullDataSize);
 		if (!FullData) {
 			perror(L"Failed to allocate space for MokListRT\n");
 			return EFI_OUT_OF_RESOURCES;
 		}
 		p = FullData;
-
 		if (!EFI_ERROR(efi_status) && v->data_size > 0) {
 			CopyMem(p, v->data, v->data_size);
 			p += v->data_size;
 		}
-		CertList = (EFI_SIGNATURE_LIST *)p;
-		p += sizeof (*CertList);
-		CertData = (EFI_SIGNATURE_DATA *)p;
-		p += sizeof (EFI_GUID);
 
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
-		CertList->SignatureListSize = *v->addend_size
-					      + sizeof (*CertList)
-					      + sizeof (*CertData)
-					      -1;
-		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
+		if (vendor_esl_size) {
+			CopyMem(p, vendor_esl, vendor_esl_size);
+			p += vendor_esl_size;
+		}
 
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
-		CopyMem(p, *v->addend_source, *v->addend_size);
+		if (vendor_cert_size) {
+			EFI_SIGNATURE_LIST *CertList = NULL;
+			EFI_SIGNATURE_DATA *CertData = NULL;
+
+			CertList = (EFI_SIGNATURE_LIST *)p;
+			p += sizeof (*CertList);
+			CertData = (EFI_SIGNATURE_DATA *)p;
+			p += sizeof (EFI_GUID);
+
+			CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
+			CertList->SignatureListSize = vendor_cert_size
+						      + sizeof (*CertList)
+						      + sizeof (*CertData)
+						      -1;
+			CertList->SignatureHeaderSize = 0;
+			CertList->SignatureSize = vendor_cert_size + sizeof (EFI_GUID);
+
+			CertData->SignatureOwner = SHIM_LOCK_GUID;
+			CopyMem(p, vendor_cert, vendor_cert_size);
+		}
 
 		if (v->data && v->data_size)
 			FreePool(v->data);
@@ -223,11 +231,24 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		UINT32 attrs = 0;
 		BOOLEAN delete = FALSE, present, addend;
 
+		addend = (v->flags & MOK_VARIABLE_APPEND_CERT) != 0;
+
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
-		if (efi_status == EFI_NOT_FOUND)
+		if (efi_status == EFI_NOT_FOUND) {
+			if (v->rtname && addend) {
+				efi_status = mirror_one_mok_variable(v);
+				if (EFI_ERROR(efi_status) &&
+				    ret != EFI_SECURITY_VIOLATION)
+					ret = efi_status;
+			}
+			/*
+			 * after possibly adding, we can continue, no
+			 * further checks to be done.
+			 */
 			continue;
+		}
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Could not verify %s: %r\n", v->name,
 			       efi_status);
@@ -272,9 +293,6 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		}
 
 		present = (v->data && v->data_size) ? TRUE : FALSE;
-		addend = (v->addend_source && v->addend_size &&
-			  *v->addend_source && *v->addend_size)
-			? TRUE : FALSE;
 
 		if (v->flags & MOK_VARIABLE_MEASURE && present) {
 			/*

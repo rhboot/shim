@@ -124,6 +124,9 @@ CFLAGS += "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/sha
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
+ifneq ($(origin VENDOR_ESL_FILE), undefined)
+	CFLAGS += -DVENDOR_ESL_FILE=\"$(VENDOR_ESL_FILE)\"
+endif
 ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
