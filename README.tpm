@@ -19,6 +19,15 @@ PCR7:
 - MokSBState will be extended into PCR7 if it is set, logged as
   "MokSBState".
 
+PCR8:
+- If you're using the grub2 TPM patchset we cary in Fedora, the kernel command
+  line and all grub commands (including all of grub.cfg that gets run) are
+  measured into PCR8.
+  
+PCR9:
+- If you're using the grub2 TPM patchset we cary in Fedora, the kernel,
+  initramfs, and any multiboot modules loaded are measured into PCR9.
+
 PCR14:
 - MokList, MokListX, and MokSBState will be extended into PCR14 if they are
   set.
