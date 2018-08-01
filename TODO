@@ -27,5 +27,18 @@
   the string table :/
 - Make build.log an artifact of building.
 - KEK for Mok.  (koike expressed an interest in working on this.)
+- Detection of fallback.efi boot loops
+  - Some tablet devices seem to always boot the fallback path, ignoring
+    boot variables, so we need to detect that.
+  - fallback creates 2 variables, one volatile, one nonvolatile
+  - if shim sees the nonvolatile variable but not the volatile one, it has
+    been booted correctly after fallback has run, so it should remove the
+    nonvolatile variable.
+  - if fallback sees the nonvolatile variable, it is in a fallback boot
+    loop, and should launch the next stage instead of rebooting.
+  - This means the TPM extend chain on machines with broken BDS always
+    looks like: shim -> fallback -> shim -> grub2 -> kernel, *except* on
+    boots from removable media (i.e. install media without fallback),
+    where it looks like shim -> grub2 -> kernel /once/.
 
 # vim:filetype=mail:tw=74
