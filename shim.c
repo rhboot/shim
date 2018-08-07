@@ -1347,6 +1347,11 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	 */
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		/* Don't try to copy discardable sections with zero size */
+		if ((Section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE) &&
+		    !Section->Misc.VirtualSize)
+			continue;
+
 		base = ImageAddress (buffer, context.ImageSize,
 				     Section->VirtualAddress);
 		end = ImageAddress (buffer, context.ImageSize,
