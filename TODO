@@ -22,11 +22,14 @@
 - make debuginfo paths configurable
 - make arch dependent names configurable
 - Make it easier to avoid CryptPem
-- Make an easy strip+implant tool for our embedded cert lists
 - Post process full path names out of __FILE__ / __BASE_FILE__ entries in
   the string table :/
-- Make build.log an artifact of building.
-- KEK for Mok.  (koike expressed an interest in working on this.)
+- Reproducible builds:
+  - Make build.log an artifact of building.
+  - KEK for Mok.  (koike expressed an interest in working on this.)
+  - Reorder builds to take hashes of mm, fb and insert those in shim
+    instead of ephemeral certs
+  - Make an easy strip+implant tool for our embedded cert lists
 - Detection of fallback.efi boot loops
   - Some tablet devices seem to always boot the fallback path, ignoring
     boot variables, so we need to detect that.
