@@ -1610,9 +1610,11 @@ static EFI_STATUS generate_path_from_image_path(EFI_LOADED_IMAGE *li,
 		bootpath[j] = '\0';
 	}
 
-	while (*ImagePath == '\\')
-		ImagePath++;
+	for (i = 0, last = 0; i < StrLen(ImagePath); i++)
+		if (ImagePath[i] == '\\')
+			last = i + 1;
 
+	ImagePath = ImagePath + last;
 	*PathName = AllocatePool(StrSize(bootpath) + StrSize(ImagePath));
 
 	if (!*PathName) {
