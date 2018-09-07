@@ -2086,21 +2086,32 @@ get_load_option_optional_data(UINT8 *data, UINTN data_size,
 	return EFI_SUCCESS;
 }
 
-static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path, UINTN len)
+static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path)
 {
 	CHAR16 *dppath = NULL;
+	CHAR16 *PathName = NULL;
+	EFI_STATUS efi_status;
 	int ret = 1;
 
 	dppath = DevicePathToStr(li->FilePath);
 	if (!dppath)
 		return 0;
 
+	efi_status = generate_path_from_image_path(li, path, &PathName);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Unable to generate path %s: %r\n", path,
+		       efi_status);
+		goto done;
+	}
+
 	dprint(L"dppath: %s\n", dppath);
 	dprint(L"path:   %s\n", path);
-	if (StrnCaseCmp(dppath, path, len))
+	if (StrnCaseCmp(dppath, PathName, strlen(dppath)))
 		ret = 0;
 
+done:
 	FreePool(dppath);
+	FreePool(PathName);
 	return ret;
 }
 
@@ -2289,7 +2300,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 
 	 * which is just cruel... So yeah, just don't use it.
 	 */
-	if (strings == 1 && is_our_path(li, start, loader_len))
+	if (strings == 1 && is_our_path(li, start))
 		return EFI_SUCCESS;
 
 	/*
