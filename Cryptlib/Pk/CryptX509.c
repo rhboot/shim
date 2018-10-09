@@ -306,20 +306,20 @@ _Exit:
                                    If CommonName is NULL then the amount of space needed
                                    in buffer (including the final null) is returned.
 
-  @retval RETURN_SUCCESS           The certificate CommonName retrieved successfully.
-  @retval RETURN_INVALID_PARAMETER If Cert is NULL.
+  @retval EFI_SUCCESS           The certificate CommonName retrieved successfully.
+  @retval EFI_INVALID_PARAMETER If Cert is NULL.
                                    If CommonNameSize is NULL.
                                    If CommonName is not NULL and *CommonNameSize is 0.
                                    If Certificate is invalid.
-  @retval RETURN_NOT_FOUND         If no NID Name entry exists.
-  @retval RETURN_BUFFER_TOO_SMALL  If the CommonName is NULL. The required buffer size
+  @retval EFI_NOT_FOUND         If no NID Name entry exists.
+  @retval EFI_BUFFER_TOO_SMALL  If the CommonName is NULL. The required buffer size
                                    (including the final null) is returned in the
                                    CommonNameSize parameter.
-  @retval RETURN_UNSUPPORTED       The operation is not supported.
+  @retval EFI_UNSUPPORTED       The operation is not supported.
 
 **/
 STATIC
-RETURN_STATUS
+EFI_STATUS
 InternalX509GetNIDName (
   IN      CONST UINT8   *Cert,
   IN      UINTN         CertSize,
@@ -328,7 +328,7 @@ InternalX509GetNIDName (
   IN OUT  UINTN         *CommonNameSize
   )
 {
-  RETURN_STATUS    ReturnStatus;
+  EFI_STATUS    ReturnStatus;
   BOOLEAN          Status;
   X509             *X509Cert;
   X509_NAME        *X509Name;
@@ -338,7 +338,7 @@ InternalX509GetNIDName (
   ASN1_STRING      *EntryData;
   UINT8            *UTF8Name;
 
-  ReturnStatus = RETURN_INVALID_PARAMETER;
+  ReturnStatus = EFI_INVALID_PARAMETER;
   UTF8Name     = NULL;
 
   //
@@ -385,7 +385,7 @@ InternalX509GetNIDName (
     // No Request_NID name entry exists in X509_NAME object
     //
     *CommonNameSize = 0;
-    ReturnStatus    = RETURN_NOT_FOUND;
+    ReturnStatus    = EFI_NOT_FOUND;
     goto _Exit;
   }
 
@@ -395,7 +395,7 @@ InternalX509GetNIDName (
     // Fail to retrieve name entry data
     //
     *CommonNameSize = 0;
-    ReturnStatus    = RETURN_NOT_FOUND;
+    ReturnStatus    = EFI_NOT_FOUND;
     goto _Exit;
   }
 
@@ -407,18 +407,18 @@ InternalX509GetNIDName (
     // Fail to convert the Name string
     //
     *CommonNameSize = 0;
-    ReturnStatus    = RETURN_INVALID_PARAMETER;
+    ReturnStatus    = EFI_INVALID_PARAMETER;
     goto _Exit;
   }
 
   if (CommonName == NULL) {
     *CommonNameSize = Length + 1;
-    ReturnStatus = RETURN_BUFFER_TOO_SMALL;
+    ReturnStatus = EFI_BUFFER_TOO_SMALL;
   } else {
     *CommonNameSize = MIN ((UINTN)Length, *CommonNameSize - 1) + 1;
     CopyMem (CommonName, UTF8Name, *CommonNameSize - 1);
     CommonName[*CommonNameSize - 1] = '\0';
-    ReturnStatus = RETURN_SUCCESS;
+    ReturnStatus = EFI_SUCCESS;
   }
 
 _Exit:
@@ -449,19 +449,19 @@ _Exit:
                                    If CommonName is NULL then the amount of space needed
                                    in buffer (including the final null) is returned.
 
-  @retval RETURN_SUCCESS           The certificate CommonName retrieved successfully.
-  @retval RETURN_INVALID_PARAMETER If Cert is NULL.
+  @retval EFI_SUCCESS           The certificate CommonName retrieved successfully.
+  @retval EFI_INVALID_PARAMETER If Cert is NULL.
                                    If CommonNameSize is NULL.
                                    If CommonName is not NULL and *CommonNameSize is 0.
                                    If Certificate is invalid.
-  @retval RETURN_NOT_FOUND         If no CommonName entry exists.
-  @retval RETURN_BUFFER_TOO_SMALL  If the CommonName is NULL. The required buffer size
+  @retval EFI_NOT_FOUND         If no CommonName entry exists.
+  @retval EFI_BUFFER_TOO_SMALL  If the CommonName is NULL. The required buffer size
                                    (including the final null) is returned in the
                                    CommonNameSize parameter.
-  @retval RETURN_UNSUPPORTED       The operation is not supported.
+  @retval EFI_UNSUPPORTED       The operation is not supported.
 
 **/
-RETURN_STATUS
+EFI_STATUS
 EFIAPI
 X509GetCommonName (
   IN      CONST UINT8  *Cert,
@@ -487,19 +487,19 @@ X509GetCommonName (
                                    If NameBuffer is NULL then the amount of space needed
                                    in buffer (including the final null) is returned.
 
-  @retval RETURN_SUCCESS           The certificate Organization Name retrieved successfully.
-  @retval RETURN_INVALID_PARAMETER If Cert is NULL.
+  @retval EFI_SUCCESS           The certificate Organization Name retrieved successfully.
+  @retval EFI_INVALID_PARAMETER If Cert is NULL.
                                    If NameBufferSize is NULL.
                                    If NameBuffer is not NULL and *CommonNameSize is 0.
                                    If Certificate is invalid.
-  @retval RETURN_NOT_FOUND         If no Organization Name entry exists.
-  @retval RETURN_BUFFER_TOO_SMALL  If the NameBuffer is NULL. The required buffer size
+  @retval EFI_NOT_FOUND         If no Organization Name entry exists.
+  @retval EFI_BUFFER_TOO_SMALL  If the NameBuffer is NULL. The required buffer size
                                    (including the final null) is returned in the
                                    CommonNameSize parameter.
-  @retval RETURN_UNSUPPORTED       The operation is not supported.
+  @retval EFI_UNSUPPORTED       The operation is not supported.
 
 **/
-RETURN_STATUS
+EFI_STATUS
 EFIAPI
 X509GetOrganizationName (
   IN      CONST UINT8   *Cert,
