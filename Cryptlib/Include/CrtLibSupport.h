@@ -343,6 +343,7 @@ uid_t          geteuid     (void);
 gid_t          getgid      (void);
 gid_t          getegid     (void);
 void           qsort       (void *, size_t, size_t, int (*)(const void *, const void *));
+char           *secure_getenv (const char *);
 char           *getenv     (const char *);
 void           exit        (int);
 #if defined(__GNUC__) && (__GNUC__ >= 2)
@@ -383,5 +384,9 @@ extern FILE  *stdout;
 
 void clear_ca_warning();
 BOOLEAN get_ca_warning();
+
+#define SIGNATURE_16(A, B)        ((A) | (B << 8))
+#define SIGNATURE_32(A, B, C, D)  (SIGNATURE_16 (A, B) | (SIGNATURE_16 (C, D) << 16))
+#define MIN(a, b) ({(a) < (b) ? (a) : (b);})
 
 #endif
