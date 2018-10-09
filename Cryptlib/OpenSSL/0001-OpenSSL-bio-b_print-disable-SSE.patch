@@ -1,11 +1,20 @@
+From df6b5abd698dc400c599dccb3656ad23591c65b0 Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Tue, 9 Oct 2018 10:40:06 -0400
+Subject: [PATCH 1/3] OpenSSL: bio/b_print(): disable SSE
+
+---
+ Cryptlib/OpenSSL/crypto/bio/b_print.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
 diff --git a/Cryptlib/OpenSSL/crypto/bio/b_print.c b/Cryptlib/OpenSSL/crypto/bio/b_print.c
-index e91ab6d..f33caa2 100644
+index cdfe05f93ca..6a23c25e168 100644
 --- a/Cryptlib/OpenSSL/crypto/bio/b_print.c
 +++ b/Cryptlib/OpenSSL/crypto/bio/b_print.c
-@@ -51,8 +51,10 @@ static int fmtstr(char **, char **, size_t *, size_t *,
+@@ -31,8 +31,10 @@ static int fmtstr(char **, char **, size_t *, size_t *,
                    const char *, int, int, int);
  static int fmtint(char **, char **, size_t *, size_t *,
-                   LLONG, int, int, int, int);
+                   int64_t, int, int, int, int);
 +#ifndef OPENSSL_SYS_UEFI
  static int fmtfp(char **, char **, size_t *, size_t *,
                   LDOUBLE, int, int, int, int);
@@ -13,17 +22,17 @@ index e91ab6d..f33caa2 100644
  static int doapr_outch(char **, char **, size_t *, size_t *, int);
  static int _dopr(char **sbuffer, char **buffer,
                   size_t *maxlen, size_t *retlen, int *truncated,
-@@ -107,7 +109,9 @@ _dopr(char **sbuffer,
+@@ -87,7 +89,9 @@ _dopr(char **sbuffer,
  {
      char ch;
-     LLONG value;
+     int64_t value;
 +#ifndef OPENSSL_SYS_UEFI
      LDOUBLE fvalue;
 +#endif
      char *strvalue;
      int min;
      int max;
-@@ -210,10 +214,12 @@ _dopr(char **sbuffer,
+@@ -190,10 +194,12 @@ _dopr(char **sbuffer,
                  cflags = DP_C_LLONG;
                  ch = *format++;
                  break;
@@ -36,7 +45,7 @@ index e91ab6d..f33caa2 100644
              default:
                  break;
              }
-@@ -267,6 +273,7 @@ _dopr(char **sbuffer,
+@@ -247,6 +253,7 @@ _dopr(char **sbuffer,
                              min, max, flags))
                      return 0;
                  break;
@@ -44,7 +53,7 @@ index e91ab6d..f33caa2 100644
              case 'f':
                  if (cflags == DP_C_LDOUBLE)
                      fvalue = va_arg(args, LDOUBLE);
-@@ -298,6 +305,7 @@ _dopr(char **sbuffer,
+@@ -280,6 +287,7 @@ _dopr(char **sbuffer,
                             flags, G_FORMAT))
                      return 0;
                  break;
@@ -52,7 +61,7 @@ index e91ab6d..f33caa2 100644
              case 'c':
                  if(!doapr_outch(sbuffer, buffer, &currlen, maxlen,
                              va_arg(args, int)))
-@@ -530,6 +538,7 @@ fmtint(char **sbuffer,
+@@ -512,6 +520,7 @@ fmtint(char **sbuffer,
      return 1;
  }
  
@@ -60,7 +69,7 @@ index e91ab6d..f33caa2 100644
  static LDOUBLE abs_val(LDOUBLE value)
  {
      LDOUBLE result = value;
-@@ -816,6 +825,7 @@ fmtfp(char **sbuffer,
+@@ -798,6 +807,7 @@ fmtfp(char **sbuffer,
      }
      return 1;
  }
@@ -68,3 +77,6 @@ index e91ab6d..f33caa2 100644
  
  #define BUFFER_INC  1024
  
+-- 
+2.17.1
+

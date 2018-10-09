@@ -1,7 +1,30 @@
 #/bin/sh
+
+set -eu
+
+usage() {
+    echo usage: ./update.sh DIRECTORY 1>&2
+    exit 1
+}
+
+[[ $# -eq 1 ]] || usage
+[[ -n "${1}" ]] || usage
+
 DIR=$1
+
+WORK_PATH=$PWD
 OPENSSLLIB_PATH=$DIR/CryptoPkg/Library/OpensslLib
 OPENSSL_PATH=$OPENSSLLIB_PATH/openssl
+
+cd $OPENSSLLIB_PATH
+perl -I. -Iopenssl/ process_files.pl
+cd $DIR
+git add -A CryptoPkg
+git add CryptoPkg/Library/OpensslLib/openssl/include/openssl/opensslconf.h
+git add CryptoPkg/Library/OpensslLib/openssl/configdata.pm
+git add CryptoPkg/Library/OpensslLib/openssl/Makefile
+git commit -m "Update openssl configs"
+cd $WORK_PATH
 
 cp $OPENSSLLIB_PATH/buildinf.h buildinf.h
 cp $OPENSSL_PATH/e_os.h e_os.h
@@ -50,6 +73,7 @@ SUBDIRS="
 	dso
 	err
 	evp
+        fips
 	hmac
 	kdf
 	lhash
@@ -83,5 +107,10 @@ rm -f crypto/x509v3/v3prin.c
 
 find . -name "*.[ch]" -exec chmod -x {} \;
 
-patch -p3 < openssl-bio-b_print-disable-sse.patch
-patch -p3 < openssl-pk7-smime-error-message.patch
+git add -A .
+git commit -m "Update OpenSSL"
+
+git config --local --add am.keepcr true
+git am \
+    0001-OpenSSL-bio-b_print-disable-SSE.patch \
+    0002-OpenSSL-Pk7-smime-add-an-error-message.patch

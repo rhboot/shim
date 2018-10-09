@@ -1,0 +1,101 @@
+From c3edecb4a79fd8ceadf7653e1c9ae38979df2d6d Mon Sep 17 00:00:00 2001
+From: Peter Jones <pjones@redhat.com>
+Date: Tue, 9 Oct 2018 11:18:12 -0400
+Subject: [PATCH 4/4] Cryptlib: Pk/CryptX509.c: Fix RETURN_* to be EFI_*
+
+Signed-off-by: Peter Jones <pjones@redhat.com>
+---
+ Cryptlib/Pk/CryptX509.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
+
+diff --git a/Cryptlib/Pk/CryptX509.c b/Cryptlib/Pk/CryptX509.c
+index 75337ed32bb..bca97630555 100644
+--- a/Cryptlib/Pk/CryptX509.c
++++ b/Cryptlib/Pk/CryptX509.c
+@@ -311,19 +311,19 @@ _Exit:
+                                    If CommonName is NULL then the amount of space needed
+                                    in buffer (including the final null) is returned.
+ 
+-  @retval RETURN_SUCCESS           The certificate CommonName retrieved successfully.
+-  @retval RETURN_INVALID_PARAMETER If Cert is NULL.
++  @retval EFI_SUCCESS           The certificate CommonName retrieved successfully.
++  @retval EFI_INVALID_PARAMETER If Cert is NULL.
+                                    If CommonNameSize is NULL.
+                                    If CommonName is not NULL and *CommonNameSize is 0.
+                                    If Certificate is invalid.
+-  @retval RETURN_NOT_FOUND         If no CommonName entry exists.
+-  @retval RETURN_BUFFER_TOO_SMALL  If the CommonName is NULL. The required buffer size
++  @retval EFI_NOT_FOUND         If no CommonName entry exists.
++  @retval EFI_BUFFER_TOO_SMALL  If the CommonName is NULL. The required buffer size
+                                    (including the final null) is returned in the
+                                    CommonNameSize parameter.
+-  @retval RETURN_UNSUPPORTED       The operation is not supported.
++  @retval EFI_UNSUPPORTED       The operation is not supported.
+ 
+ **/
+-RETURN_STATUS
++EFI_STATUS
+ EFIAPI
+ X509GetCommonName (
+   IN      CONST UINT8  *Cert,
+@@ -332,7 +332,7 @@ X509GetCommonName (
+   IN OUT  UINTN        *CommonNameSize
+   )
+ {
+-  RETURN_STATUS    ReturnStatus;
++  EFI_STATUS    ReturnStatus;
+   BOOLEAN          Status;
+   X509             *X509Cert;
+   X509_NAME        *X509Name;
+@@ -342,7 +342,7 @@ X509GetCommonName (
+   ASN1_STRING      *EntryData;
+   UINT8            *UTF8Name;
+ 
+-  ReturnStatus = RETURN_INVALID_PARAMETER;
++  ReturnStatus = EFI_INVALID_PARAMETER;
+   UTF8Name     = NULL;
+ 
+   //
+@@ -389,7 +389,7 @@ X509GetCommonName (
+     // No CommonName entry exists in X509_NAME object
+     //
+     *CommonNameSize = 0;
+-    ReturnStatus    = RETURN_NOT_FOUND;
++    ReturnStatus    = EFI_NOT_FOUND;
+     goto _Exit;
+   }
+ 
+@@ -399,7 +399,7 @@ X509GetCommonName (
+     // Fail to retrieve name entry data
+     //
+     *CommonNameSize = 0;
+-    ReturnStatus    = RETURN_NOT_FOUND;
++    ReturnStatus    = EFI_NOT_FOUND;
+     goto _Exit;
+   }
+ 
+@@ -411,18 +411,18 @@ X509GetCommonName (
+     // Fail to convert the commonName string
+     //
+     *CommonNameSize = 0;
+-    ReturnStatus    = RETURN_INVALID_PARAMETER;
++    ReturnStatus    = EFI_INVALID_PARAMETER;
+     goto _Exit;
+   }
+ 
+   if (CommonName == NULL) {
+     *CommonNameSize = Length + 1;
+-    ReturnStatus = RETURN_BUFFER_TOO_SMALL;
++    ReturnStatus = EFI_BUFFER_TOO_SMALL;
+   } else {
+     *CommonNameSize = MIN ((UINTN)Length, *CommonNameSize - 1) + 1;
+     CopyMem (CommonName, UTF8Name, *CommonNameSize - 1);
+     CommonName[*CommonNameSize - 1] = '\0';
+-    ReturnStatus = RETURN_SUCCESS;
++    ReturnStatus = EFI_SUCCESS;
+   }
+ 
+ _Exit:
+-- 
+2.17.1
+

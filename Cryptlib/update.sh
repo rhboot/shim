@@ -1,6 +1,36 @@
 #!/bin/bash
 
-DIR=$1
+set -eu
+
+usage() {
+    echo usage: ./update.sh DIRECTORY 1>&2
+    exit 1
+}
+
+test_dir() {
+    if [[ -d "${1}/CryptoPkg/Library/BaseCryptLib/" ]] && \
+       [[ -d "${1}/CryptoPkg/Library/Include/internal/" ]] && \
+       [[ -d "${1}/CryptoPkg/Library/OpensslLib/openssl/" ]] ; then
+        DIR="$(realpath "${1}")"
+        return 0
+    fi
+    return 1
+}
+
+TAG=$(mktemp -p shim -t -u 'shim-tag-XXXXXXXXXX' | cut -d/ -f2)
+git tag "${TAG}"
+
+git list --topo-order --reverse openssl-rebase-helper-start^..openssl-rebase-helper-end | cut -d\  -f1 | xargs git cherry-pick
+
+if [[ $# -eq 1 ]] ; then
+    test_dir "${1}" || usage
+else
+    test_dir .. || usage
+fi
+
+cd OpenSSL
+./update.sh $DIR
+cd ..
 
 cp $DIR/CryptoPkg/Library/BaseCryptLib/InternalCryptLib.h InternalCryptLib.h
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Hash/CryptMd4Null.c Hash/CryptMd4Null.c
@@ -34,6 +64,19 @@ cp $DIR/CryptoPkg/Library/Include/internal/dso_conf.h Include/internal/
 
 cp $DIR/CryptoPkg/Library/Include/openssl/opensslconf.h Include/openssl/
 
-patch -p2 <Cryptlib.diff
-patch -p2 <opensslconf-diff.patch
-patch -p2 <ca-check-workaround.patch
+git add -A .
+git commit -m "Update Cryptlib"
+
+git config --local --add am.keepcr true
+git am \
+    0001-Cryptlib-update-for-efi-build.patch \
+    0002-Cryptlib-work-around-new-CA-rules.patch \
+    0003-Cryptlib-Pk-CryptX509.c-Fix-RETURN_-to-be-EFI_.patch
+
+cd $DIR
+git rm -r CryptoPkg
+git commit -m "Get rid of the vestigial CryptoPkg"
+git reset "${TAG}"
+git add -A Cryptlib/
+git commit -m "Update Cryptlib and OpenSSL"
+git tag -d "${TAG}"

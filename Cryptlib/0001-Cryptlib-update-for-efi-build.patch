@@ -1,0 +1,61 @@
+From ca76f590848a50a7b9f98ba562aabe7919c8b40f Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Tue, 9 Oct 2018 10:40:06 -0400
+Subject: [PATCH 1/4] Cryptlib: update for efi build
+
+---
+ Cryptlib/SysCall/CrtWrapper.c   | 14 --------------
+ Cryptlib/SysCall/TimerWrapper.c |  4 +---
+ 2 files changed, 1 insertion(+), 17 deletions(-)
+
+diff --git a/Cryptlib/SysCall/CrtWrapper.c b/Cryptlib/SysCall/CrtWrapper.c
+index 9510a4a383e..0b9f9e72f76 100644
+--- a/Cryptlib/SysCall/CrtWrapper.c
++++ b/Cryptlib/SysCall/CrtWrapper.c
+@@ -384,20 +384,6 @@ size_t fwrite (const void *buffer, size_t size, size_t count, FILE *stream)
+   return 0;
+ }
+ 
+-//
+-//  -- Dummy OpenSSL Support Routines --
+-//
+-
+-int BIO_printf (void *bio, const char *format, ...)
+-{
+-  return 0;
+-}
+-
+-int BIO_snprintf(char *buf, size_t n, const char *format, ...)
+-{
+-  return 0;
+-}
+-
+ #ifdef __GNUC__
+ 
+ typedef
+diff --git a/Cryptlib/SysCall/TimerWrapper.c b/Cryptlib/SysCall/TimerWrapper.c
+index 5f9b0c20d75..1ef3731faed 100644
+--- a/Cryptlib/SysCall/TimerWrapper.c
++++ b/Cryptlib/SysCall/TimerWrapper.c
+@@ -13,9 +13,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+ 
+ **/
+ 
+-#include <Uefi.h>
+ #include <CrtLibSupport.h>
+-#include <Library/UefiRuntimeServicesTableLib.h>
+ 
+ //
+ // -- Time Management Routines --
+@@ -80,7 +78,7 @@ time_t time (time_t *timer)
+   //
+   // Get the current time and date information
+   //
+-  Status = gRT->GetTime (&Time, NULL);
++  Status = uefi_call_wrapper(gRT->GetTime, 2, &Time, NULL);
+   if (EFI_ERROR (Status) || (Time.Year < 1970)) {
+     return 0;
+   }
+-- 
+2.17.1
+
