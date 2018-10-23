@@ -2543,16 +2543,14 @@ debug_hook(void)
 #if defined(__x86_64__) || defined(__i386__) || defined(__i686__)
 		if (x > 4294967294ULL)
 			break;
-		__asm__ __volatile__("pause");
 #elif defined(__aarch64__)
 		if (x > 1000)
 			break;
-		__asm__ __volatile__("wfi");
 #else
 		if (x > 12000)
 			break;
-		msleep(5000);
 #endif
+		pause();
 	}
 	x = 1;
 }
