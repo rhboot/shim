@@ -97,6 +97,7 @@
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
+#include "include/asm.h"
 #include "include/configtable.h"
 #include "include/console.h"
 #include "include/crypt_blowfish.h"
