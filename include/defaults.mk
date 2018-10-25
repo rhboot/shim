@@ -1,5 +1,6 @@
 COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
+DESTDIR		?=
 LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OPENSSL		?= openssl
@@ -30,11 +31,12 @@ SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
 EFI_INCLUDE	?= /usr/include/efi
 EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
+		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_SUFFIX) \
+		  -I$(EFI_INCLUDE)/protocol \
 		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
 
-EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
-EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
+EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH_SUFFIX).o
+EFI_LDS		= $(TOPDIR)/include/elf_$(ARCH)_efi.lds
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
@@ -133,3 +135,16 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+
+define get-config
+$(shell git config --local --get "shim.$(1)")
+endef
+
+.EXPORT_ALL_VARIABLES:
+unexport KEYS
+unexport FALLBACK_OBJS FALLBACK_SRCS
+unexport MOK_OBJS MOK_SOURCES
+unexport OBJS ORIG_FALLBACK_SRCS ORIG_SOURCES ORIG_MOK_SOURCES
+unexport SOURCES SUBDIRS
+unexport TARGET TARGETS
+unexport VPATH

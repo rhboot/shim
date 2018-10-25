@@ -1,12 +1,19 @@
 
-EFI_INCLUDES	= -I$(TOPDIR)/../Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
-		  -I$(TOPDIR)/crypto/asn1 -I$(TOPDIR)/crypto/evp -I$(TOPDIR)/crypto/modes -I$(TOPDIR)/crypto/include
+OPENSSLDIR = $(TOPDIR)/Cryptlib/OpenSSL
+VPATH = $(OPENSSLDIR)
 
 CFLAGS		= -ggdb -O0 -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDIR)/crypto \
 		  -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc \
 		  -ffreestanding -std=gnu89 -I$(shell $(CC) -print-file-name=include) \
 		  -Wall $(EFI_INCLUDES) -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DNO_SYSLOG -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
+
+CFLAGS += -I$(OPENSSLDIR)/crypto/asn1 \
+	  -I$(OPENSSLDIR)/crypto/evp \
+	  -I$(OPENSSLDIR)/crypto/modes \
+	  -I$(OPENSSLDIR)/crypto/include \
+	  -I$(OPENSSLDIR) \
+	  -iquote $(OPENSSLDIR) \
+	  -iquote $(OPENSSLDIR)/crypto/include
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
