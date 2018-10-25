@@ -28,3 +28,4 @@ shim_cert.h
 version.c
 cov-int/
 scan-results/
+build/

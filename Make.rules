@@ -1,3 +1,0 @@
-define get-config
-$(shell git config --local --get "shim.$(1)")
-endef
