@@ -123,6 +123,7 @@
 #include "include/tpm.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
+#include "include/openssl.h"
 
 #include "version.h"
 
