@@ -17,10 +17,9 @@ endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
 
-include $(TOPDIR)/Make.defaults
-include $(TOPDIR)/Make.rules
-include $(TOPDIR)/Make.coverity
-include $(TOPDIR)/Make.scan-build
+include $(TOPDIR)/include/defaults.mk
+include $(TOPDIR)/include/coverity.mk
+include $(TOPDIR)/include/scan-build.mk
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
@@ -75,6 +74,18 @@ certdb/secmod.db: shim.crt
 	$(PK12UTIL) -d certdb/ -i shim.p12 -W "" -K ""
 	$(CERTUTIL) -d certdb/ -A -i shim.crt -n shim -t u
 
+SHIM_INCLUDES = \
+		-I$(TOPDIR)/include \
+		-I$(TOPDIR)/Cryptlib/Include \
+		-I$(TOPDIR)/Cryptlib \
+		-iquote $(TOPDIR) \
+		-iquote $(TOPDIR)/Cryptlib \
+		-iquote $(OPENSSLDIR) \
+		-iquote $(OPENSSLDIR)/crypto/include
+
+%.o : %.c
+	$(CC) $(CFLAGS) $(SHIM_INCLUDES) -c -o $@ $<
+
 shim.o: $(SOURCES)
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
@@ -103,15 +114,15 @@ $(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a li
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
-	$(MAKE) VPATH=$(TOPDIR)/Cryptlib TOPDIR=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile
+	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile
 
 Cryptlib/OpenSSL/libopenssl.a:
-	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
-	$(MAKE) VPATH=$(TOPDIR)/Cryptlib/OpenSSL TOPDIR=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile
+	for i in fips x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
+	$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	if [ ! -d lib ]; then mkdir lib ; fi
-	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile lib.a
+	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile lib.a
 
 buildid : $(TOPDIR)/buildid.c
 	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
@@ -223,10 +234,11 @@ else
 endif
 
 clean-shim-objs:
-	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
-	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
+	@if [ -d lib ]; then $(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean ; fi
+	@rm -rvf $(TARGETS) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
 	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
+	@if [[ "$(TOPDIR)" = ..* ]] ; then rmdir Cryptlib || :; fi >/dev/null 2>&1
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
 clean: clean-shim-objs
@@ -261,5 +273,3 @@ archive: tag
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
 
 .PHONY : install-deps shim.key
-
-export ARCH CC LD OBJCOPY EFI_INCLUDE
