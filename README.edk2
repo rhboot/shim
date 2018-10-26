@@ -1,0 +1,3 @@
+The Edk2 directory contains files from UDK2018/MdePkg/Include.
+Ia32 needs to be patched with patches/Edk2.patch, so that the right
+cdecl calling convention is used with EFI.

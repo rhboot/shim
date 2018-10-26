@@ -1,0 +1,12 @@
+diff -urN Edk.orig/MdePkg/Include/Ia32/ProcessorBind.h Edk/MdePkg/Include/Ia32/ProcessorBind.h
+--- Edk.orig/MdePkg/Include/Ia32/ProcessorBind.h	2017-06-13 04:26:05.000000000 -0400
++++ Edk/MdePkg/Include/Ia32/ProcessorBind.h	2018-01-23 22:50:41.580006330 -0500
+@@ -281,7 +281,7 @@
+   ///
+   /// GCC specific method for EFIAPI calling convention.
+   /// 
+-  #define EFIAPI __attribute__((cdecl))  
++  #define EFIAPI __attribute__((cdecl, regparm(0)))  
+ #else
+   ///
+   /// The default for a non Microsoft* or GCC compiler is to assume the EFI ABI
