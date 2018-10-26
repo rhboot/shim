@@ -1,6 +1,8 @@
 #ifndef SHIM_LIB_EXECUTE_H
 #define SHIM_LIB_EXECUTE_H
 
+#include <Protocol/LoadedImage.h>
+
 EFI_STATUS
 generate_path(CHAR16* name, EFI_LOADED_IMAGE *li,
 	      EFI_DEVICE_PATH **path, CHAR16 **PathName);

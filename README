@@ -1,3 +1,38 @@
+Native UEFI shim. Forked from https://github.com/rhboot/shim
+
+by Ruslan Nikolaev
+
+Distinctive Features:
+1. Completely standalone, i.e. does not require the gnu-efi library. To access
+   UEFI interfaces, it is using official Edk2/TianoCore headers.
+2. Native UEFI PE/COFF (DLL) compilation using out-of-box clang/llvm
+   (or, potentially, the mingw-gcc cross-compiler) instead of creating
+   internally relocatable ELF objects with PE/COFF wrapper stubs (gnu-efi).
+3. The Edk's FwImage tool (which I ported from Windows to Linux/POSIX)
+   converts DLL to EFI.
+4. Using smarter linking with llvm's PE/COFF lld-link to prune all unused
+   functions/objects in the OpenSSL library.
+5. Added own printf, string, memory, etc implementations to substitute
+   functions previously imported from gnu-efi.
+6. As the result, substantially reduced footprints of EFI files
+   (e.g., 425Kb vs 1Mb for shimx64.efi compiled with -Os).
+7. Fixed some bugs, removed a lot of copy&paste code from TianoCore
+   (official TianoCore headers are now used anyway) and added other
+   improvements to the code.
+
+Requirements:
+clang/llvm/lld 7.0.0+ (needs the -mno-stack-arg-probe flag)
+Official binaries for various Linux distributions are available at
+http://releases.llvm.org/download.html
+
+Note: I have done some preliminary testing, but keep in mind that it is
+an experimental version. The code is provided "AS IS" without any guarantees,
+and I am not responsible/liable for data loss and/or any other damage!
+
+Licensing terms are the same as in the original shim.
+
+------------------------------------------------------------------------------
+
 shim is a trivial EFI application that, when run, attempts to open and
 execute another application. It will initially attempt to do this via the
 standard EFI LoadImage() and StartImage() calls. If these fail (because secure

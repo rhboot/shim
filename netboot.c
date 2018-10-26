@@ -35,6 +35,8 @@
 
 #include "shim.h"
 
+#include <Protocol/PxeBaseCode.h>
+#include <Protocol/Dhcp6.h>
 #include <string.h>
 
 #define ntohs(x) __builtin_bswap16(x)	/* supported both by GCC and clang */
@@ -45,12 +47,6 @@ static EFI_IP_ADDRESS tftp_addr;
 static CHAR8 *full_path;
 
 
-typedef struct {
-	UINT16 OpCode;
-	UINT16 Length;
-	UINT8 Data[1];
-} EFI_DHCP6_PACKET_OPTION;
-
 /*
  * usingNetboot
  * Returns TRUE if we identify a protocol that is enabled and Providing us with
@@ -60,7 +56,7 @@ BOOLEAN findNetboot(EFI_HANDLE device)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = gBS->HandleProtocol(device, &PxeBaseCodeProtocol,
+	efi_status = gBS->HandleProtocol(device, &gEfiPxeBaseCodeProtocolGuid,
 					 (VOID **) &pxe);
 	if (EFI_ERROR(efi_status)) {
 		pxe = NULL;
@@ -103,7 +99,7 @@ static CHAR8 *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
 
 		if (ntohs(option->OpCode) == 59) {
 			/* This is the bootfile url option */
-			urllen = ntohs(option->Length);
+			urllen = ntohs(option->OpLen);
 			if ((void *)(option->Data + urllen) > end)
 				break;
 			url = AllocateZeroPool(urllen + 1);
@@ -112,7 +108,7 @@ static CHAR8 *get_v6_bootfile_url(EFI_PXE_BASE_CODE_DHCPV6_PACKET *pkt)
 			memcpy(url, option->Data, urllen);
 			return url;
 		}
-		optr += 4 + ntohs(option->Length);
+		optr += 4 + ntohs(option->OpLen);
 		if (optr + sizeof(EFI_DHCP6_PACKET_OPTION) > end)
 			break;
 	}
@@ -267,7 +263,7 @@ static EFI_STATUS parseDhcp4()
 			pkt_v4 = &pxe->Mode->ProxyOffer.Dhcpv4;
 	}
 
-	INTN dir_len = strnlena(pkt_v4->BootpBootFile, 127);
+	INTN dir_len = strnlena((CHAR8 *)pkt_v4->BootpBootFile, 127);
 	INTN i;
 	UINT8 *dir = pkt_v4->BootpBootFile;
 
@@ -283,7 +279,7 @@ static EFI_STATUS parseDhcp4()
 		return EFI_OUT_OF_RESOURCES;
 
 	if (dir_len > 0) {
-		strncpya(full_path, dir, dir_len);
+		strncpya(full_path, (CHAR8 *)dir, dir_len);
 		if (full_path[dir_len-1] == '/' && template[0] == '/')
 			full_path[dir_len-1] = '\0';
 	}
@@ -334,7 +330,7 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *buf
 
 try_again:
 	efi_status = pxe->Mtftp(pxe, read, *buffer, overwrite, bufsiz, &blksz,
-			      &tftp_addr, full_path, NULL, nobuffer);
+			      &tftp_addr, (UINT8 *)full_path, NULL, nobuffer);
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		/* try again, doubling buf size */
 		*bufsiz *= 2;

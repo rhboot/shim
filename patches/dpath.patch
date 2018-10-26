@@ -1,0 +1,200 @@
+diff --git a/lib/dpath.c b/lib/dpath.c
+index 7486252..cf733f4 100644
+--- a/lib/dpath.c
++++ b/lib/dpath.c
+@@ -13,6 +13,8 @@ Abstract:
+ 
+ Revision History
+ 
++2018/10 R.Nikolaev - adapted for the shim loader w/o gnu-efi
++
+ 2014/04 B.Burette - updated device path text representation, conforming to
+ 	UEFI specification 2.4 (dec. 2013). More specifically:
+ 	- § 9.3.5: added some media types ie. Sata()
+@@ -22,7 +24,18 @@ Revision History
+ 
+ --*/
+ 
+-#include "lib.h"
++#include <efilib.h>
++#include <dpath.h>
++
++/* Seems to be sizeof(UINTN) except x86-64 */
++#ifdef __x86_64__
++# define MIN_ALIGNMENT_SIZE		4
++#else
++# define MIN_ALIGNMENT_SIZE		(sizeof(UINTN))
++#endif
++
++#define DEBUG(...)
++#define DumpHex(...)
+ 
+ #define ALIGN_SIZE(a)   ((a % MIN_ALIGNMENT_SIZE) ? MIN_ALIGNMENT_SIZE - (a % MIN_ALIGNMENT_SIZE) : 0)
+ 
+@@ -36,7 +49,7 @@ DevicePathFromHandle (
+     EFI_STATUS          Status;
+     EFI_DEVICE_PATH     *DevicePath;
+ 
+-    Status = uefi_call_wrapper(BS->HandleProtocol, 3, Handle, &DevicePathProtocol, (VOID*)&DevicePath);
++    Status = gBS->HandleProtocol(Handle, &gEfiDevicePathProtocolGuid, (VOID*)&DevicePath);
+     if (EFI_ERROR(Status)) {
+         DevicePath = NULL;
+     }
+@@ -134,6 +147,7 @@ AppendDevicePath (
+     UINTN               Src1Size, Src1Inst, Src2Size, Size;
+     EFI_DEVICE_PATH     *Dst, *Inst;
+     UINT8               *DstPos;
++    EFI_DEVICE_PATH     *DstDevicePath;
+ 
+     //
+     // If there's only 1 path, just duplicate it
+@@ -181,13 +195,15 @@ AppendDevicePath (
+             CopyMem(DstPos, Src2, Src2Size);
+             DstPos += Src2Size;
+ 
+-            CopyMem(DstPos, EndInstanceDevicePath, sizeof(EFI_DEVICE_PATH));
++            DstDevicePath = (EFI_DEVICE_PATH *) DstPos;
++            DstDevicePath->Type = END_DEVICE_PATH_TYPE;
++            DstDevicePath->SubType = END_INSTANCE_DEVICE_PATH_SUBTYPE;
++            SetDevicePathNodeLength (DstDevicePath, END_DEVICE_PATH_LENGTH);
+             DstPos += sizeof(EFI_DEVICE_PATH);
+         }
+ 
+         // Change last end marker
+-        DstPos -= sizeof(EFI_DEVICE_PATH);
+-        CopyMem(DstPos, EndDevicePath, sizeof(EFI_DEVICE_PATH));
++        DstDevicePath->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+     }
+ 
+     return Dst;
+@@ -412,7 +428,9 @@ AppendDevicePathInstance (
+     InstanceSize = DevicePathSize(Instance);
+     Ptr = AllocatePool (SrcSize + InstanceSize);
+     DevPath = (EFI_DEVICE_PATH *)Ptr;
+-    ASSERT(DevPath);
++    if (!DevPath) {
++        return NULL;
++    }
+ 
+     CopyMem (Ptr, Src, SrcSize);
+ //    FreePool (Src);
+@@ -442,7 +460,7 @@ LibDevicePathToInterface (
+     EFI_STATUS              Status;
+     EFI_HANDLE              Device;
+ 
+-    Status = uefi_call_wrapper(BS->LocateDevicePath, 3, Protocol, &FilePath, &Device);
++    Status = gBS->LocateDevicePath(Protocol, &FilePath, &Device);
+ 
+     if (!EFI_ERROR(Status)) {
+ 
+@@ -455,7 +473,7 @@ LibDevicePathToInterface (
+             // It was a direct match, lookup the protocol interface
+             //
+ 
+-            Status =uefi_call_wrapper(BS->HandleProtocol, 3, Device, Protocol, Interface);
++            Status = gBS->HandleProtocol(Device, Protocol, Interface);
+         }
+     }
+ 
+@@ -520,7 +538,7 @@ _DevPathController (
+ 
+     Controller = DevPath;
+     CatPrint(Str, L"Ctrl(%d)",
+-        Controller->Controller
++        Controller->ControllerNumber
+         );
+ }
+ 
+@@ -543,7 +561,7 @@ _DevPathVendor (
+     }
+ 
+     CatPrint(Str, L"Ven%s(%g", Type, &Vendor->Guid);
+-    if (CompareGuid (&Vendor->Guid, &UnknownDevice) == 0) {
++    if (CompareGuid (&Vendor->Guid, &gEfiUnknownDeviceGuid) == 0) {
+         //
+         // GUID used by EFI to enumerate an EDD 1.1 device
+         //
+@@ -645,7 +663,7 @@ _DevPathFibre (
+     FIBRECHANNEL_DEVICE_PATH    *Fibre;
+ 
+     Fibre = DevPath;
+-    CatPrint( Str , L"Fibre%s(0x%016lx,0x%016lx)" ,
++    CatPrint( Str , L"Fibre%s(0x%016llx,0x%016llx)" ,
+         DevicePathType( & Fibre-> Header ) == MSG_FIBRECHANNEL_DP ? L"" : L"Ex" ,
+         Fibre-> WWN , Fibre-> Lun ) ;
+ }
+@@ -673,7 +691,7 @@ _DevPathUsb (
+     USB_DEVICE_PATH         *Usb;
+ 
+     Usb = DevPath;
+-    CatPrint( Str , L"Usb(0x%x,0x%x)" , Usb-> Port , Usb-> Endpoint ) ;
++    CatPrint( Str , L"Usb(0x%x,0x%x)" , Usb-> ParentPortNumber , Usb-> InterfaceNumber ) ;
+ }
+ 
+ 
+@@ -828,8 +846,8 @@ _DevPathIPv6 (
+     CatPrintIPv6( Str , & IP-> RemoteIpAddress ) ;
+     CatPrint( Str , L",") ;
+     CatPrintNetworkProtocol( Str, IP-> Protocol ) ;
+-    CatPrint( Str , L",%s," , IP-> IPAddressOrigin ?
+-        ( IP-> IPAddressOrigin == 1 ? L"StatelessAutoConfigure" :
++    CatPrint( Str , L",%s," , IP-> IpAddressOrigin ?
++        ( IP-> IpAddressOrigin == 1 ? L"StatelessAutoConfigure" :
+         L"StatefulAutoConfigure" ) : L"Static" ) ;
+     CatPrintIPv6( Str , & IP-> LocalIpAddress ) ;
+     if ( DevicePathNodeLength( & IP-> Header ) == sizeof( IPv6_DEVICE_PATH ) ) {
+@@ -863,7 +881,7 @@ _DevPathInfiniBand (
+     INFINIBAND_DEVICE_PATH  *InfiniBand;
+ 
+     InfiniBand = DevPath;
+-    CatPrint( Str , L"Infiniband(0x%x,%g,0x%lx,0x%lx,0x%lx)" ,
++    CatPrint( Str , L"Infiniband(0x%x,%g,0x%llx,0x%llx,0x%llx)" ,
+         InfiniBand-> ResourceFlags , InfiniBand-> PortGid , InfiniBand-> ServiceId ,
+         InfiniBand-> TargetPortId , InfiniBand-> DeviceId ) ;
+ }
+@@ -1017,7 +1035,7 @@ _DevPathBssBss (
+ static VOID
+ _DevPathEndInstance (
+     IN OUT POOL_PRINT       *Str,
+-    IN VOID                 *DevPath EFI_UNUSED
++    IN VOID                 *DevPath
+     )
+ {
+     CatPrint(Str, L",");
+@@ -1130,6 +1148,7 @@ DevicePathToStr (
+ --*/
+ {
+     POOL_PRINT          Str;
++    CHAR16              *RetStr;
+     EFI_DEVICE_PATH     *DevPathNode;
+     VOID                (*DumpNode)(POOL_PRINT *, VOID *);
+     UINTN               Index, NewSize;
+@@ -1141,8 +1160,9 @@ DevicePathToStr (
+     //
+ 
+     DevPath = UnpackDevicePath(DevPath);
+-    ASSERT (DevPath);
+-
++    if (!DevPath) {
++        return NULL;
++    }
+ 
+     //
+     // Process each device path node
+@@ -1199,9 +1219,13 @@ DevicePathToStr (
+ 
+     FreePool (DevPath);
+     NewSize = (Str.len + 1) * sizeof(CHAR16);
+-    Str.str = ReallocatePool (Str.str, NewSize, NewSize);
+-    Str.str[Str.len] = 0;
+-    return Str.str;
++    RetStr = (CHAR16 *) ReallocatePool (Str.str, NewSize, NewSize);
++    if (!RetStr) {
++        if (Str.str) FreePool (Str.str);
++        return NULL;
++    }
++    RetStr[Str.len] = 0;
++    return RetStr;
+ }
+ 
+ BOOLEAN

@@ -18,13 +18,13 @@ index fe8e5950f9f..219c2bb1096 100644
 +BOOLEAN ca_warning;
 +
 +void
-+clear_ca_warning()
++clear_ca_warning(void)
 +{
 +  ca_warning = FALSE;
 +}
 +
 +BOOLEAN
-+get_ca_warning()
++get_ca_warning(void)
 +{
 +  return ca_warning;
 +}

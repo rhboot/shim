@@ -23,7 +23,6 @@ include $(TOPDIR)/Make.coverity
 include $(TOPDIR)/Make.scan-build
 
 TARGETS	= $(SHIMNAME)
-TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 TARGETS += $(SHIMHASHNAME)
 endif
@@ -89,17 +88,17 @@ $(MMNAME) : $(MMSONAME)
 $(FBNAME) : $(FBSONAME)
 
 $(SHIMSONAME): $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+	$(LD) /out:$@ /pdb:$(subst .dll,.pdb,$@) $(LDFLAGS) $^ $(EFI_LIBS)
 
 fallback.o: $(FALLBACK_SRCS)
 
 $(FBSONAME): $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+	$(LD) /out:$@ /pdb:$(subst .dll,.pdb,$@) $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(MOK_SOURCES)
 
 $(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
+	$(LD) /out:$@ /pdb:$(subst .dll,.pdb,$@) $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
@@ -113,8 +112,9 @@ lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	if [ ! -d lib ]; then mkdir lib ; fi
 	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile lib.a
 
-buildid : $(TOPDIR)/buildid.c
-	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
+fwimage/fwimage: | $(TOPDIR)/fwimage/Makefile $(wildcard $(TOPDIR)/fwimage/*.[ch])
+	if [ ! -d fwimage ]; then mkdir fwimage ; fi
+	$(MAKE) -C fwimage -f $(TOPDIR)/fwimage/Makefile fwimage
 
 $(BOOTCSVNAME) :
 	@echo Making $@
@@ -129,7 +129,6 @@ ifeq ($(origin EFIDIR),undefined)
 endif
 
 install-deps : $(TARGETS)
-install-deps : $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug buildid
 install-deps : $(BOOTCSVNAME)
 
 install-debugsource : install-deps
@@ -140,20 +139,8 @@ install-debugsource : install-deps
 		$(INSTALL) -m 0644 $${file} $(DESTDIR)/$(DEBUGSOURCE)/$(PKGNAME)-$(VERSION)$(DASHRELEASE)/$${outfile} ; \
 	done
 
-install-debuginfo : install-deps
-	$(INSTALL) -d -m 0755 $(DESTDIR)/
-	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DEBUGINFO)$(TARGETDIR)/
-	@./buildid $(wildcard *.efi.debug) | while read file buildid ; do \
-		first=$$(echo $${buildid} | cut -b -2) ; \
-		rest=$$(echo $${buildid} | cut -b 3-) ; \
-		$(INSTALL) -d -m 0755 $(DESTDIR)/$(DEBUGINFO).build-id/$${first}/ ;\
-		$(INSTALL) -m 0644 $${file} $(DESTDIR)/$(DEBUGINFO)$(TARGETDIR) ; \
-		ln -s ../../../../..$(DEBUGINFO)$(TARGETDIR)$${file} $(DESTDIR)/$(DEBUGINFO).build-id/$${first}/$${rest}.debug ;\
-		ln -s ../../../.build-id/$${first}/$${rest} $(DESTDIR)/$(DEBUGINFO).build-id/$${first}/$${rest} ;\
-	done
-
 install : | install-check
-install : install-deps install-debuginfo install-debugsource
+install : install-deps install-debugsource
 	$(INSTALL) -d -m 0755 $(DESTDIR)/
 	$(INSTALL) -d -m 0700 $(DESTDIR)/$(ESPROOTDIR)
 	$(INSTALL) -d -m 0755 $(DESTDIR)/$(EFIBOOTDIR)
@@ -185,32 +172,14 @@ else
 	$(INSTALL) -m 0644 $(FBNAME) $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
 endif
 
-%.efi: %.so
-ifneq ($(OBJCOPY_GTE224),1)
-	$(error objcopy >= 2.24 is required)
-endif
-	$(OBJCOPY) -j .text -j .sdata -j .data -j .data.ident \
-		-j .dynamic -j .dynsym -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame \
-		-j .vendor_cert \
-		$(FORMAT) $^ $@
+%.efi: %.dll fwimage/fwimage
+	./fwimage/fwimage app $< $@
+	@chmod 755 $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
 	$(PESIGN) -i $< -P -h > $@
 endif
-
-%.efi.debug : %.so
-ifneq ($(OBJCOPY_GTE224),1)
-	$(error objcopy >= 2.24 is required)
-endif
-	$(OBJCOPY) -j .text -j .sdata -j .data \
-		-j .dynamic -j .dynsym -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame \
-		-j .debug_info -j .debug_abbrev -j .debug_aranges \
-		-j .debug_line -j .debug_str -j .debug_ranges \
-		-j .note.gnu.build-id \
-		$^ $@
 
 ifneq ($(origin ENABLE_SBSIGN),undefined)
 %.efi.signed: %.efi shim.key shim.crt
@@ -222,8 +191,9 @@ endif
 
 clean-shim-objs:
 	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
+	$(MAKE) -C fwimage -f $(TOPDIR)/fwimage/Makefile clean
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
-	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
+	@rm -vf *.pdb *.lib *.dll *.efi *.efi.* *.tar.* version.c
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@git clean -f -d -e 'Cryptlib/OpenSSL/*'
 
@@ -260,4 +230,4 @@ archive: tag
 
 .PHONY : install-deps shim.key
 
-export ARCH CC LD OBJCOPY EFI_INCLUDE
+export ARCH CC LD EFI_INCLUDE ARCH_EFI DEBUG DEBUG_CFLAGS

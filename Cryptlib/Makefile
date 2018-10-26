@@ -1,23 +1,29 @@
 
-EFI_INCLUDES	= -I$(TOPDIR)/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
+EFI_INCLUDES	= -I$(TOPDIR)/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_EFI) -I$(TOPDIR)/../include
 
-CFLAGS		= -ggdb -O0 -I$(TOPDIR) -iquote $(TOPDIR) -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall $(EFI_INCLUDES) -std=gnu89 \
-		  -ffreestanding -I$(shell $(CC) -print-file-name=include)
+CFLAGS		= $(DEBUG_CFLAGS)	\
+			  -I$(TOPDIR) -iquote $(TOPDIR) -Wall -fshort-wchar	\
+			  -fno-stack-protector -fno-strict-aliasing $(EFI_INCLUDES)	\
+			  -std=gnu89 -UWIN32 -U_WIN32 -U__CYGWIN_ -ffunction-sections	\
+			  -fdata-sections -ffreestanding -integrated-as \
+			  -I$(shell $(CC) -print-file-name=include)
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS) \
-		   -m64 -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
+	CFLAGS	+= -mno-red-zone -nostdinc $(CLANG_BUGS)	\
+		   -m64 -mno-stack-arg-probe -target x86_64-windows-gnu
 endif
 ifeq ($(ARCH),ia32)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   $(CLANG_BUGS) -m32 -DMDE_CPU_IA32
+		   $(CLANG_BUGS) -m32 -mregparm=3 -mrtd	\
+		   -mno-stack-arg-probe -march=i586 -target i586-windows-gnu
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS	+= -DMDE_CPU_AARCH64
+	CFLAGS	+= -mno-stack-arg-probe -target aarch64-windows-gnu
+endif
+ifeq ($(ARCH),arm)
+	CFLAGS	+= -mno-stack-arg-probe -target arm-windows-gnu
 endif
 LDFLAGS		= -nostdlib -znocombreloc
 
@@ -46,8 +52,7 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    SysCall/CrtWrapper.o \
 		    SysCall/TimerWrapper.o \
 		    SysCall/BaseMemAllocation.o \
-		    SysCall/BaseStrings.o \
-		    SysCall/memset.o
+		    SysCall/BaseStrings.o
 
 all: $(TARGET)
 

@@ -36,7 +36,7 @@ SetMem16(CHAR16 *dst, UINT32 n, CHAR16 c)
 EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key)
 {
-	SIMPLE_INPUT_INTERFACE *ci = ST->ConIn;
+	SIMPLE_INPUT_INTERFACE *ci = gST->ConIn;
 	UINTN EventIndex;
 	EFI_STATUS efi_status;
 
@@ -56,7 +56,7 @@ static VOID setup_console (int text)
 					EfiConsoleControlScreenGraphics;
 	EFI_CONSOLE_CONTROL_SCREEN_MODE new_mode;
 
-	efi_status = LibLocateProtocol(&EFI_CONSOLE_CONTROL_GUID,
+	efi_status = LibLocateProtocol(&gEfiConsoleControlGuid,
 				       (VOID **)&concon);
 	if (EFI_ERROR(efi_status))
 		return;
@@ -92,15 +92,15 @@ VOID console_fini(VOID)
 UINTN
 console_print(const CHAR16 *fmt, ...)
 {
-	va_list args;
+	VA_LIST args;
 	UINTN ret;
 
 	if (!console_text_mode)
 		setup_console(1);
 
-	va_start(args, fmt);
+	VA_START(args, fmt);
 	ret = VPrint(fmt, args);
-	va_end(args);
+	VA_END(args);
 
 	return ret;
 }
@@ -108,8 +108,8 @@ console_print(const CHAR16 *fmt, ...)
 UINTN
 console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 {
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-	va_list args;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = gST->ConOut;
+	VA_LIST args;
 	UINTN ret;
 
 	if (!console_text_mode)
@@ -117,9 +117,9 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 
 	co->SetCursorPosition(co, col, row);
 
-	va_start(args, fmt);
+	VA_START(args, fmt);
 	ret = VPrint(fmt, args);
-	va_end(args);
+	VA_END(args);
 
 	return ret;
 }
@@ -132,7 +132,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 		     int offset, int lines)
 {
 	int i;
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = gST->ConOut;
 	UINTN rows, cols;
 	CHAR16 *Line;
 
@@ -240,8 +240,8 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 void
 console_print_box(CHAR16 *str_arr[], int highlight)
 {
-	SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+	EFI_SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = gST->ConOut;
 	EFI_INPUT_KEY key;
 
 	if (!console_text_mode)
@@ -265,8 +265,8 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 int
 console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 {
-	SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+	EFI_SIMPLE_TEXT_OUTPUT_MODE SavedConsoleMode;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = gST->ConOut;
 	EFI_INPUT_KEY k;
 	EFI_STATUS efi_status;
 	int selector;
@@ -409,12 +409,10 @@ console_notify(CHAR16 *string)
 	console_alertbox(str_arr);
 }
 
-#define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
-
 /* Copy of gnu-efi-3.0 with the added secure boot strings */
 static struct {
     EFI_STATUS      Code;
-    WCHAR	    *Desc;
+    CONST CHAR16    *Desc;
 } error_table[] = {
 	{  EFI_SUCCESS,                L"Success"},
 	{  EFI_LOAD_ERROR,             L"Load Error"},
@@ -442,10 +440,15 @@ static struct {
 	{  EFI_TFTP_ERROR,             L"TFTP Error"},
 	{  EFI_PROTOCOL_ERROR,         L"Protocol Error"},
 	{  EFI_INCOMPATIBLE_VERSION,   L"Incompatible Version"},
-	{  EFI_SECURITY_VIOLATION,     L"Security Violation"},
+	{  EFI_SECURITY_VIOLATION,     L"Security Policy Violation"},
+	{  EFI_CRC_ERROR,              L"CRC Error"},
+	{  EFI_END_OF_MEDIA,           L"End of Media"},
+	{  EFI_END_OF_FILE,            L"End of File"},
+	{  EFI_INVALID_LANGUAGE,       L"Invalid Languages"},
+	{  EFI_COMPROMISED_DATA,       L"Compromised Data"},
 
 	// warnings
-	{  EFI_WARN_UNKOWN_GLYPH,      L"Warning Unknown Glyph"},
+	{  EFI_WARN_UNKNOWN_GLYPH,     L"Warning Unknown Glyph"},
 	{  EFI_WARN_DELETE_FAILURE,    L"Warning Delete Failure"},
 	{  EFI_WARN_WRITE_FAILURE,     L"Warning Write Failure"},
 	{  EFI_WARN_BUFFER_TOO_SMALL,  L"Warning Buffer Too Small"},
@@ -453,8 +456,8 @@ static struct {
 } ;
 
 
-static CHAR16 *
-err_string (
+static CONST CHAR16 *
+console_error_to_str (
     IN EFI_STATUS       efi_status
     )
 {
@@ -462,11 +465,27 @@ err_string (
 
 	for (Index = 0; error_table[Index].Desc; Index +=1) {
 		if (error_table[Index].Code == efi_status) {
-			return error_table[Index].Desc;
+			break;
 		}
 	}
 
-	return L"";
+	return error_table[Index].Desc;
+}
+
+CONST CHAR16 *
+StatusToString (
+	OUT CHAR16	*buffer,
+	IN EFI_STATUS	efi_status
+	)
+{
+	CONST CHAR16 *error_status = console_error_to_str(efi_status);
+
+	if (!error_status) {
+		SPrint(buffer, 0, L"%X", efi_status);
+		return buffer;
+	}
+
+	return error_status;
 }
 
 void
@@ -479,9 +498,10 @@ console_error(CHAR16 *err, EFI_STATUS efi_status)
 		0,
 	};
 	CHAR16 str[512];
+	CONST CHAR16 *error_status = console_error_to_str(efi_status);
 
 	SPrint(str, sizeof(str), L"%s: (0x%x) %s", err, efi_status,
-	       err_string(efi_status));
+	       error_status ? error_status : L"");
 
 	err_arr[2] = str;
 
@@ -491,7 +511,7 @@ console_error(CHAR16 *err, EFI_STATUS efi_status)
 void
 console_reset(void)
 {
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = gST->ConOut;
 
 	if (!console_text_mode)
 		setup_console(1);
@@ -513,7 +533,7 @@ setup_verbosity(VOID)
 
 	verbose_check_size = sizeof(verbose);
 	efi_status = get_variable(L"SHIM_VERBOSE", &verbose_check_ptr,
-				  &verbose_check_size, SHIM_LOCK_GUID);
+				  &verbose_check_size, &gShimLockGuid);
 	if (!EFI_ERROR(efi_status)) {
 		verbose = *(__typeof__(verbose) *)verbose_check_ptr;
 		verbose &= (1ULL << (8 * verbose_check_size)) - 1ULL;
@@ -523,7 +543,7 @@ setup_verbosity(VOID)
 	setup_console(-1);
 }
 
-/* Included here because they mess up the definition of va_list and friends */
+/* Included here because they mess up the definition of VA_LIST and friends */
 #include <Library/BaseCryptLib.h>
 #include <openssl/err.h>
 #include <openssl/crypto.h>
@@ -551,7 +571,7 @@ print_crypto_errors(EFI_STATUS efi_status,
 }
 
 VOID
-msleep(unsigned long msecs)
+msleep(UINTN msecs)
 {
 	gBS->Stall(msecs);
 }

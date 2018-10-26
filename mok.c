@@ -17,7 +17,7 @@ static BOOLEAN check_var(CHAR16 *varname)
 	UINT32 MokVar;
 	UINT32 attributes;
 
-	efi_status = gRT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
+	efi_status = gRT->GetVariable(varname, &gShimLockGuid, &attributes,
 				      &size, (void *)&MokVar);
 	if (!EFI_ERROR(efi_status) || efi_status == EFI_BUFFER_TOO_SMALL)
 		return TRUE;
@@ -66,7 +66,7 @@ struct mok_state_variable {
 	 * These two are indirect pointers just to make initialization
 	 * saner...
 	 */
-	UINT8 **addend_source;
+	CONST UINT8 **addend_source;
 	UINT32 *addend_size;
 	UINT32 yes_attr;
 	UINT32 no_attr;
@@ -84,7 +84,7 @@ struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokList",
 	 .name8 = "MokList",
 	 .rtname = L"MokListRT",
-	 .guid = &SHIM_LOCK_GUID,
+	 .guid = &gShimLockGuid,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
@@ -97,7 +97,7 @@ struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokListX",
 	 .name8 = "MokListX",
 	 .rtname = L"MokListXRT",
-	 .guid = &SHIM_LOCK_GUID,
+	 .guid = &gShimLockGuid,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
@@ -108,7 +108,7 @@ struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokSBState",
 	 .name8 = "MokSBState",
 	 .rtname = L"MokSBStateRT",
-	 .guid = &SHIM_LOCK_GUID,
+	 .guid = &gShimLockGuid,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
@@ -121,7 +121,7 @@ struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokDBState",
 	 .name8 = "MokDBState",
 	 .rtname = L"MokIgnoreDB",
-	 .guid = &SHIM_LOCK_GUID,
+	 .guid = &gShimLockGuid,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
@@ -135,7 +135,7 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	void *FullData = NULL;
 	UINTN FullDataSize = 0;
-	uint8_t *p = NULL;
+	UINT8 *p = NULL;
 
 	if ((v->flags & MOK_MIRROR_KEYDB) &&
 	    v->addend_source && *v->addend_source &&
@@ -162,7 +162,7 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 		CertData = (EFI_SIGNATURE_DATA *)p;
 		p += sizeof (EFI_GUID);
 
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
+		CertList->SignatureType = gEfiCertX509Guid;
 		CertList->SignatureListSize = *v->addend_size
 					      + sizeof (*CertList)
 					      + sizeof (*CertData)
@@ -170,7 +170,7 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 		CertList->SignatureHeaderSize = 0;
 		CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
 
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
+		CertData->SignatureOwner = gShimLockGuid;
 		CopyMem(p, *v->addend_source, *v->addend_size);
 
 		if (v->data && v->data_size)
@@ -225,7 +225,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
-					       *v->guid, &attrs);
+					       v->guid, &attrs);
 		if (efi_status == EFI_NOT_FOUND)
 			continue;
 		if (EFI_ERROR(efi_status)) {
@@ -256,7 +256,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		}
 		if (delete == TRUE) {
 			perror(L"Deleting bad variable %s\n", v->name);
-			efi_status = LibDeleteVariable(v->name, v->guid);
+			efi_status = delete_variable(v->name, v->guid);
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Failed to erase %s\n", v->name);
 				ret = EFI_SECURITY_VIOLATION;
@@ -280,7 +280,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			/*
 			 * Measure this into PCR 7 in the Microsoft format
 			 */
-			efi_status = tpm_measure_variable(v->name, *v->guid,
+			efi_status = tpm_measure_variable(v->name, v->guid,
 							  v->data_size,
 							  v->data);
 			if (EFI_ERROR(efi_status)) {
@@ -306,7 +306,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 		if (v->rtname && present && addend) {
 			if (v->flags & MOK_MIRROR_DELETE_FIRST)
-				LibDeleteVariable(v->rtname, v->guid);
+				delete_variable(v->rtname, v->guid);
 
 			efi_status = mirror_one_mok_variable(v);
 			if (EFI_ERROR(efi_status) &&

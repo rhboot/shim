@@ -15,9 +15,6 @@
 #endif
 
 #if defined(__x86_64__)
-#if !defined(GNU_EFI_USE_MS_ABI)
-#error On x86_64 you must use ms_abi (GNU_EFI_USE_MS_ABI) in gnu-efi and shim.
-#endif
 /* gcc 4.5.4 is the first documented release with -mabi=ms */
 #if !GNUC_PREREQ(4, 7) && !CLANG_PREREQ(3, 4)
 #error On x86_64 you must have a compiler new enough to support __attribute__((__ms_abi__))
@@ -25,12 +22,41 @@
 #endif
 
 #include <efi.h>
-#include <efilib.h>
-#undef uefi_call_wrapper
+#include <IndustryStandard/PeImage.h>
+
+typedef struct {
+	WIN_CERTIFICATE	Hdr;
+	UINT8			CertData[1];
+} WIN_CERTIFICATE_EFI_PKCS;
+
+typedef struct {
+	UINT64 ImageAddress;
+	UINT64 ImageSize;
+	UINT64 EntryPoint;
+	UINTN SizeOfHeaders;
+	UINT16 ImageType;
+	UINT16 NumberOfSections;
+	UINT32 SectionAlignment;
+	EFI_IMAGE_SECTION_HEADER *FirstSection;
+	EFI_IMAGE_DATA_DIRECTORY *RelocDir;
+	EFI_IMAGE_DATA_DIRECTORY *SecDir;
+	UINT64 NumberOfRvaAndSizes;
+	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
+} PE_COFF_LOADER_IMAGE_CONTEXT;
+
+extern EFI_GUID gEfiBdsGuid;
+extern EFI_GUID gShimLockGuid;
 
 #include <stddef.h>
 
 #define min(a, b) ({(a) < (b) ? (a) : (b);})
+
+/* x86-64 uses SysV, x86 uses cdecl */
+#ifdef __x86_64__
+# define SHIMAPI	__attribute__((sysv_abi))
+#else
+# define SHIMAPI	EFIAPI
+#endif
 
 #ifdef __x86_64__
 #ifndef DEFAULT_LOADER
@@ -95,20 +121,12 @@
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
-#include "include/configtable.h"
 #include "include/console.h"
 #include "include/crypt_blowfish.h"
-#include "include/efiauthenticated.h"
-#include "include/errors.h"
 #include "include/execute.h"
-#include "include/guid.h"
-#include "include/Http.h"
 #include "include/httpboot.h"
-#include "include/Ip4Config2.h"
-#include "include/Ip6Config.h"
 #include "include/netboot.h"
 #include "include/PasswordCrypt.h"
-#include "include/PeImage.h"
 #include "include/replacements.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
@@ -124,18 +142,16 @@
 #include "shim_cert.h"
 #endif
 
-INTERFACE_DECL(_SHIM_LOCK);
-
 typedef
 EFI_STATUS
-(*EFI_SHIM_LOCK_VERIFY) (
+(SHIMAPI *EFI_SHIM_LOCK_VERIFY) (
 	IN VOID *buffer,
 	IN UINT32 size
 	);
 
 typedef
 EFI_STATUS
-(*EFI_SHIM_LOCK_HASH) (
+(SHIMAPI *EFI_SHIM_LOCK_HASH) (
 	IN char *data,
 	IN int datasize,
 	PE_COFF_LOADER_IMAGE_CONTEXT *context,
@@ -145,7 +161,7 @@ EFI_STATUS
 
 typedef
 EFI_STATUS
-(*EFI_SHIM_LOCK_CONTEXT) (
+(SHIMAPI *EFI_SHIM_LOCK_CONTEXT) (
 	IN VOID *data,
 	IN unsigned int datasize,
 	PE_COFF_LOADER_IMAGE_CONTEXT *context
@@ -160,7 +176,7 @@ typedef struct _SHIM_LOCK {
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
 extern EFI_STATUS LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...);
-extern EFI_STATUS VLogError(const char *file, int line, const char *func, CHAR16 *fmt, va_list args);
+extern EFI_STATUS VLogError(const char *file, int line, const char *func, CHAR16 *fmt, VA_LIST args);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
@@ -168,8 +184,8 @@ extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
 extern UINT32 vendor_cert_size;
 extern UINT32 vendor_dbx_size;
-extern UINT8 *vendor_cert;
-extern UINT8 *vendor_dbx;
+extern CONST UINT8 *vendor_cert;
+extern CONST UINT8 *vendor_dbx;
 
 extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;

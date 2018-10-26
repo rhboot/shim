@@ -8,6 +8,8 @@
 #include <efi.h>
 #include <efilib.h>
 
+#include <Protocol/LoadedImage.h>
+
 #include "shim.h"
 
 EFI_STATUS
@@ -20,7 +22,7 @@ argsplit(EFI_HANDLE image, int *argc, CHAR16*** ARGV)
 
 	*argc = 0;
 
-	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
+	efi_status = gBS->HandleProtocol(image, &gEfiLoadedImageProtocolGuid,
 					 (VOID **) &info);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Failed to get arguments\n");

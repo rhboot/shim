@@ -7,6 +7,7 @@
  */
 #include <efi.h>
 #include <efilib.h>
+#include <dpath.h>
 
 #include "shim.h"
 
@@ -15,8 +16,8 @@ configtable_get_table(EFI_GUID *guid)
 {
 	unsigned int i;
 
-	for (i = 0; i < ST->NumberOfTableEntries; i++) {
-		EFI_CONFIGURATION_TABLE *CT = &ST->ConfigurationTable[i];
+	for (i = 0; i < gST->NumberOfTableEntries; i++) {
+		EFI_CONFIGURATION_TABLE *CT = &gST->ConfigurationTable[i];
 
 		if (CompareGuid(guid, &CT->VendorGuid) == 0) {
 			return CT->VendorTable;
@@ -28,7 +29,7 @@ configtable_get_table(EFI_GUID *guid)
 EFI_IMAGE_EXECUTION_INFO_TABLE *
 configtable_get_image_table(void)
 {
-	return configtable_get_table(&SIG_DB);
+	return configtable_get_table(&gEfiImageSecurityDatabaseGuid);
 }
 
 EFI_IMAGE_EXECUTION_INFO *
@@ -39,10 +40,10 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath)
 	if (!t)
 		return NULL;
 
-	int entries = t->NumberOfImages;
-	EFI_IMAGE_EXECUTION_INFO *e = t->InformationInfo;
+	UINTN entries = t->NumberOfImages;
+	EFI_IMAGE_EXECUTION_INFO *e = (EFI_IMAGE_EXECUTION_INFO *)(t + 1);
 
-	int i;
+	UINTN i;
 	for (i = 0; i < entries; i++) {
 #ifdef DEBUG_CONFIG
 		console_print(L"InfoSize = %d  Action = %d\n", e->InfoSize, e->Action);
@@ -67,19 +68,20 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath)
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
 #endif
-		CHAR16 *name = (CHAR16 *)(e->Data);
-		int skip = 0;
+		UINT8 *data = (UINT8 *)(e + 1);
+		CHAR16 *name = (CHAR16 *)data;
+		UINTN skip = 0;
 
 		/* There's a bug in a lot of EFI platforms and they forget to
 		 * put the name here.  The only real way of detecting it is to
 		 * look for either a UC16 NULL or ASCII as UC16 */
-		if (name[0] == '\0' || (e->Data[1] == 0 && e->Data[3] == 0)) {
+		if (name[0] == '\0' || (data[1] == 0 && data[3] == 0)) {
 			skip = StrSize(name);
 #ifdef DEBUG_CONFIG
-			console_print(L"FOUND NAME %s (%d)\n", name, skip);
+			console_print(L"FOUND NAME %s (%zu)\n", name, skip);
 #endif
 		}
-		EFI_DEVICE_PATH *dp = (EFI_DEVICE_PATH *)(e->Data + skip), *dpn = dp;
+		EFI_DEVICE_PATH *dp = (EFI_DEVICE_PATH *)(data + skip), *dpn = dp;
 		if (dp->Type == 0 || dp->Type > 6 || dp->SubType == 0
 		    || ((unsigned)((dp->Length[1] << 8) + dp->Length[0]) > e->InfoSize)) {
 			/* Parse error, table corrupt, bail */

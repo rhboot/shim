@@ -48,7 +48,6 @@
  */
 
 #include <efi.h>
-#include <efiapi.h>
 #include <efilib.h>
 
 #include "shim.h"
@@ -60,7 +59,7 @@ get_active_systab(void)
 {
 	if (systab)
 		return systab;
-	return ST;
+	return gST;
 }
 
 static typeof(systab->BootServices->LoadImage) system_load_image;

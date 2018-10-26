@@ -47,15 +47,6 @@ index 5f9b0c20d75..1ef3731faed 100644
  
  //
  // -- Time Management Routines --
-@@ -80,7 +78,7 @@ time_t time (time_t *timer)
-   //
-   // Get the current time and date information
-   //
--  Status = gRT->GetTime (&Time, NULL);
-+  Status = uefi_call_wrapper(gRT->GetTime, 2, &Time, NULL);
-   if (EFI_ERROR (Status) || (Time.Year < 1970)) {
-     return 0;
-   }
 -- 
 2.17.1
 

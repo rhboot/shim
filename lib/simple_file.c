@@ -6,6 +6,11 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <dpath.h>
+
+#include <Guid/FileInfo.h>
+#include <Guid/FileSystemInfo.h>
+#include <Protocol/SimpleFileSystem.h>
 
 #include "shim.h"
 
@@ -16,7 +21,8 @@ simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UIN
 	EFI_FILE_IO_INTERFACE *drive;
 	EFI_FILE *root;
 
-	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+	efi_status = gBS->HandleProtocol(device,
+					 &gEfiSimpleFileSystemProtocolGuid,
 					 (void **)&drive);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Unable to find simple file protocol (%d)\n",
@@ -45,7 +51,7 @@ simple_file_open(EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 	EFI_DEVICE_PATH *loadpath = NULL;
 	CHAR16 *PathName = NULL;
 
-	efi_status = gBS->HandleProtocol(image, &IMAGE_PROTOCOL,
+	efi_status = gBS->HandleProtocol(image, &gEfiLoadedImageProtocolGuid,
 					 (void **) &li);
 	if (EFI_ERROR(efi_status))
 		return simple_file_open_by_handle(image, name, file, mode);
@@ -75,7 +81,7 @@ simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EF
 	UINTN size = sizeof(buf);
 	EFI_FILE_INFO *fi = (void *)buf;
 
-	efi_status = file->GetInfo(file, &EFI_FILE_INFO_GUID, &size, fi);
+	efi_status = file->GetInfo(file, &gEfiFileInfoGuid, &size, fi);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Failed to get file info\n");
 		goto out;
@@ -144,7 +150,7 @@ simple_file_read_all(EFI_FILE *file, UINTN *size, void **buffer)
 	*size = sizeof(buf);
 	fi = (void *)buf;
 
-	efi_status = file->GetInfo(file, &EFI_FILE_INFO_GUID, size, fi);
+	efi_status = file->GetInfo(file, &gEfiFileInfoGuid, size, fi);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Failed to get file info\n");
 		return efi_status;
@@ -182,7 +188,7 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	int val;
 
 	efi_status = gBS->LocateHandleBuffer(ByProtocol,
-					     &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					     &gEfiSimpleFileSystemProtocolGuid,
 					     NULL, &count, &vol_handles);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
@@ -202,7 +208,7 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 		EFI_FILE_IO_INTERFACE *drive;
 
 		efi_status = gBS->HandleProtocol(vol_handles[i],
-					       &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					&gEfiSimpleFileSystemProtocolGuid,
 						 (void **) &drive);
 		if (EFI_ERROR(efi_status) || !drive)
 			continue;
@@ -211,7 +217,7 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 		if (EFI_ERROR(efi_status))
 			continue;
 
-		efi_status = root->GetInfo(root, &EFI_FILE_SYSTEM_INFO_GUID,
+		efi_status = root->GetInfo(root, &gEfiFileSystemInfoGuid,
 					   &size, fi);
 		if (EFI_ERROR(efi_status))
 			continue;

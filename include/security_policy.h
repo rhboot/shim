@@ -2,14 +2,14 @@
 #define SHIM_SECURITY_POLICY_H
 
 #if defined(OVERRIDE_SECURITY_POLICY)
-typedef EFI_STATUS (*SecurityHook) (void *data, UINT32 len);
+typedef EFI_STATUS (SHIMAPI *SecurityHook) (void *data, UINT32 len);
 
 EFI_STATUS
 security_policy_install(SecurityHook authentication);
 EFI_STATUS
 security_policy_uninstall(void);
 void
-security_protocol_set_hashes(unsigned char *esl, int len);
+security_protocol_set_hashes(UINT8 *esl, UINTN len);
 #endif /* OVERRIDE_SECURITY_POLICY */
 
 #endif /* SHIM_SECURITY_POLICY_H */

@@ -40,6 +40,7 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <dpath.h>
 
 #include "shim.h"
 
@@ -101,7 +102,7 @@ execute(EFI_HANDLE image, CHAR16 *name)
 	EFI_DEVICE_PATH *devpath;
 	CHAR16 *PathName;
 
-	efi_status = gBS->HandleProtocol(image, &IMAGE_PROTOCOL,
+	efi_status = gBS->HandleProtocol(image, &gEfiLoadedImageProtocolGuid,
 					 (void **) &li);
 	if (EFI_ERROR(efi_status))
 		return efi_status;

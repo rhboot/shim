@@ -1,6 +1,9 @@
 #ifndef SHIM_SIMPLE_FILE_H
 #define SHIM_SIMPLE_FILE_H
 
+#include <Guid/FileInfo.h>
+#include <Protocol/SimpleFileSystem.h>
+
 EFI_STATUS
 simple_file_open (EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode);
 EFI_STATUS

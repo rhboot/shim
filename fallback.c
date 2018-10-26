@@ -9,6 +9,10 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <dpath.h>
+
+#include <Guid/FileInfo.h>
+#include <Protocol/SimpleFileSystem.h>
 
 #include "shim.h"
 
@@ -27,7 +31,7 @@ get_fallback_verbose(void)
 		return state;
 
 	efi_status = get_variable(L"FALLBACK_VERBOSE",
-				  &data, &dataSize, SHIM_LOCK_GUID);
+				  &data, &dataSize, &gShimLockGuid);
 	if (EFI_ERROR(efi_status)) {
 		state = 0;
 		return state;
@@ -80,8 +84,8 @@ FindSubDevicePath(EFI_DEVICE_PATH *In, UINT8 Type, UINT8 SubType,
 		if (DevicePathType(dp) == Type &&
 				DevicePathSubType(dp) == SubType) {
 			dps = DevicePathToStr(dp);
-			VerbosePrint(L"sub-path (%hhd,%hhd): \"%s\"\n",
-				     Type, SubType, dps);
+			VerbosePrint(L"sub-path (%u,%u): \"%s\"\n",
+				     (unsigned) Type, (unsigned) SubType, dps);
 			FreePool(dps);
 
 			*Out = DuplicateDevicePath(dp);
@@ -103,7 +107,7 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
-	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, NULL);
+	efi_status = fh->GetInfo(fh, &gEfiFileInfoGuid, &bs, NULL);
 	if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL)
 		return efi_status;
 	if (bs == 0)
@@ -114,7 +118,7 @@ get_file_size(EFI_FILE_HANDLE fh, UINTN *retsize)
 		console_print(L"Could not allocate memory\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
-	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, buffer);
+	efi_status = fh->GetInfo(fh, &gEfiFileInfoGuid, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
 	 * call in *any* case. */
@@ -224,8 +228,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 		varname[6] = hexmap[(i & 0x00f0) >> 4];
 		varname[7] = hexmap[(i & 0x000f) >> 0];
 
-		void *var = LibGetVariable(varname, &GV_GUID);
-		if (!var) {
+		if (!check_variable(varname, &gEfiGlobalVariableGuid)) {
 			int size = sizeof(UINT32) + sizeof (UINT16) +
 				StrLen(label)*2 + 2 + DevicePathSize(hddp) +
 				StrLen(arguments) * 2;
@@ -252,7 +255,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 			}
 
-			efi_status = gRT->SetVariable(varname, &GV_GUID,
+			efi_status = gRT->SetVariable(varname, &gEfiGlobalVariableGuid,
 						EFI_VARIABLE_NON_VOLATILE |
 						EFI_VARIABLE_BOOTSERVICE_ACCESS |
 						EFI_VARIABLE_RUNTIME_ACCESS,
@@ -435,7 +438,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		varname[7] = hexmap[(bootorder[i] & 0x000f) >> 0];
 
 		UINTN candidate_size = max_candidate_size;
-		efi_status = gRT->GetVariable(varname, &GV_GUID, NULL,
+		efi_status = gRT->GetVariable(varname, &gEfiGlobalVariableGuid, NULL,
 					      &candidate_size, candidate);
 		if (EFI_ERROR(efi_status))
 			continue;
@@ -473,8 +476,8 @@ set_boot_order(void)
 	CHAR16 *oldbootorder;
 	UINTN size;
 
-	oldbootorder = LibGetVariableAndSize(L"BootOrder", &GV_GUID, &size);
-	if (oldbootorder) {
+	if (!EFI_ERROR(get_variable(L"BootOrder", (UINT8 **) &oldbootorder,
+				    &size, &gEfiGlobalVariableGuid))) {
 		nbootorder = size / sizeof (CHAR16);
 		bootorder = oldbootorder;
 	}
@@ -501,11 +504,11 @@ update_boot_order(void)
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
 	console_print(L"\n");
-	efi_status = gRT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
+	efi_status = gRT->GetVariable(L"BootOrder", &gEfiGlobalVariableGuid, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
-		LibDeleteVariable(L"BootOrder", &GV_GUID);
+		delete_variable(L"BootOrder", &gEfiGlobalVariableGuid);
 
-	efi_status = gRT->SetVariable(L"BootOrder", &GV_GUID,
+	efi_status = gRT->SetVariable(L"BootOrder", &gEfiGlobalVariableGuid,
 				      EFI_VARIABLE_NON_VOLATILE |
 				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
 				      EFI_VARIABLE_RUNTIME_ACCESS,
@@ -698,7 +701,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 
 	/* The API here is "Call it once with bs=0, it fills in bs,
 	 * then allocate a buffer and ask again to get it filled. */
-	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, NULL);
+	efi_status = fh->GetInfo(fh, &gEfiFileInfoGuid, &bs, NULL);
 	if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL) {
 		console_print(L"Could not get directory info for \\EFI\\%s\\: %r\n",
 			      dirname, efi_status);
@@ -713,7 +716,7 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	efi_status = fh->GetInfo(fh, &EFI_FILE_INFO_GUID, &bs, buffer);
+	efi_status = fh->GetInfo(fh, &gEfiFileInfoGuid, &bs, buffer);
 	/* This checks *either* the error from the first GetInfo, if it isn't
 	 * the EFI_BUFFER_TOO_SMALL we're expecting, or the second GetInfo
 	 * call in *any* case. */
@@ -820,7 +823,8 @@ find_boot_options(EFI_HANDLE device)
 	EFI_STATUS efi_status;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
 
-	efi_status = gBS->HandleProtocol(device, &FileSystemProtocol,
+	efi_status = gBS->HandleProtocol(device,
+					 &gEfiSimpleFileSystemProtocolGuid,
 					 (void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Couldn't find file system: %r\n", efi_status);
@@ -958,7 +962,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	}
 
 	EFI_LOADED_IMAGE *image;
-	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
+	efi_status = gBS->HandleProtocol(image_handle, &gEfiLoadedImageProtocolGuid,
 					 (void *) &image);
 	if (!EFI_ERROR(efi_status)) {
 		image->LoadOptions = first_new_option_args;
@@ -973,21 +977,21 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	return efi_status;
 }
 
-extern EFI_STATUS
+extern EFI_STATUS EFIAPI
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab);
 
 static void
-__attribute__((__optimize__("0")))
+__attribute__((optnone))
 debug_hook(void)
 {
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
 	volatile register int x = 0;
-	extern char _etext, _edata;
+	/* extern char _etext, _edata; */
 
 	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
-				  SHIM_LOCK_GUID);
+				  &gShimLockGuid);
 	if (EFI_ERROR(efi_status)) {
 		return;
 	}
@@ -998,12 +1002,13 @@ debug_hook(void)
 		return;
 
 	x = 1;
-	console_print(L"add-symbol-file "DEBUGDIR
+	console_print(L"add-symbol-file "DEBUGDIR"\n");
+	/* FIXME: what should we do with _etext and _edata?
 		      L"fb" EFI_ARCH L".efi.debug %p -s .data %p\n",
-		      &_etext, &_edata);
+		      &_etext, &_edata); */
 }
 
-EFI_STATUS
+EFI_STATUS EFIAPI
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 {
 	EFI_STATUS efi_status;
@@ -1015,7 +1020,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	 */
 	debug_hook();
 
-	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
+	efi_status = gBS->HandleProtocol(image, &gEfiLoadedImageProtocolGuid,
 					 (void *) &this_image);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Error: could not find loaded image: %r\n",

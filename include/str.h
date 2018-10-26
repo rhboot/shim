@@ -3,9 +3,9 @@
 
 static inline
 __attribute__((unused))
-unsigned long strnlena(const CHAR8 *s, unsigned long n)
+UINTN strnlena(const CHAR8 *s, UINTN n)
 {
-	unsigned long i;
+	UINTN i;
 	for (i = 0; i <= n; i++)
 		if (s[i] == '\0')
 			break;
@@ -15,9 +15,9 @@ unsigned long strnlena(const CHAR8 *s, unsigned long n)
 static inline
 __attribute__((unused))
 CHAR8 *
-strncpya(CHAR8 *dest, const CHAR8 *src, unsigned long n)
+strncpya(CHAR8 *dest, const CHAR8 *src, UINTN n)
 {
-	unsigned long i;
+	UINTN i;
 
 	for (i = 0; i < n && src[i] != '\0'; i++)
 		dest[i] = src[i];
@@ -32,8 +32,8 @@ __attribute__((unused))
 CHAR8 *
 strcata(CHAR8 *dest, const CHAR8 *src)
 {
-	unsigned long dest_len = strlena(dest);
-	unsigned long i;
+	UINTN dest_len = strlena(dest);
+	UINTN i;
 
 	for (i = 0; src[i] != '\0'; i++)
 		dest[dest_len + i] = src[i];
@@ -47,8 +47,8 @@ __attribute__((unused))
 CHAR8 *
 translate_slashes(char *str)
 {
-	int i;
-	int j;
+	UINTN i;
+	UINTN j;
 	if (str == NULL)
 		return (CHAR8 *)str;
 

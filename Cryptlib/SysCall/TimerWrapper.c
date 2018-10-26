@@ -77,7 +77,7 @@ time_t time (time_t *timer)
   //
   // Get the current time and date information
   //
-  uefi_call_wrapper(RT->GetTime, 2, &Time, NULL);
+  gRT->GetTime (&Time, NULL);
 
   //
   // Years Handling

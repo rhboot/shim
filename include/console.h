@@ -73,6 +73,8 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
   EFI_CONSOLE_CONTROL_PROTOCOL_LOCK_STD_IN        LockStdIn;
 };
 
+extern EFI_GUID gEfiConsoleControlGuid;
+
 extern VOID console_fini(VOID);
 extern VOID setup_verbosity(VOID);
 extern UINT32 verbose;
@@ -86,7 +88,7 @@ extern UINT32 verbose;
 extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
 #define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)
 
-extern VOID msleep(unsigned long msecs);
+extern VOID msleep(UINTN msecs);
 
 /* This is used in various things to determine if we should print to the
  * console */

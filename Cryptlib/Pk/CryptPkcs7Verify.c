@@ -33,13 +33,13 @@ UINT8 mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
 BOOLEAN ca_warning;
 
 void
-clear_ca_warning()
+clear_ca_warning(void)
 {
   ca_warning = FALSE;
 }
 
 BOOLEAN
-get_ca_warning()
+get_ca_warning(void)
 {
   return ca_warning;
 }

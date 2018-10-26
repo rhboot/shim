@@ -20,7 +20,8 @@ shim_cert.h
 *.o
 *.pem
 *.p12
-*.so
+*.dll
+*.pdb
 *.srl
 *.srl.old
 *.tar.*

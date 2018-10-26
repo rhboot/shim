@@ -33,6 +33,12 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <dpath.h>
+
+#include <Protocol/ServiceBinding.h>
+#include <Protocol/Ip4Config2.h>
+#include <Protocol/Ip6Config.h>
+#include <Protocol/Http.h>
 
 #include "shim.h"
 
@@ -67,11 +73,11 @@ convert_http_status_code (EFI_HTTP_STATUS_CODE status_code)
 	    status_code <  HTTP_STATUS_200_OK) {
 		return (status_code - HTTP_STATUS_100_CONTINUE + 100);
 	} else if (status_code >= HTTP_STATUS_200_OK &&
-		   status_code <  HTTP_STATUS_300_MULTIPLE_CHIOCES) {
+		   status_code <  HTTP_STATUS_300_MULTIPLE_CHOICES) {
 		return (status_code - HTTP_STATUS_200_OK + 200);
-	} else if (status_code >= HTTP_STATUS_300_MULTIPLE_CHIOCES &&
+	} else if (status_code >= HTTP_STATUS_300_MULTIPLE_CHOICES &&
 		   status_code <  HTTP_STATUS_400_BAD_REQUEST) {
-		return (status_code - HTTP_STATUS_300_MULTIPLE_CHIOCES + 300);
+		return (status_code - HTTP_STATUS_300_MULTIPLE_CHOICES + 300);
 	} else if (status_code >= HTTP_STATUS_400_BAD_REQUEST &&
 		   status_code <  HTTP_STATUS_500_INTERNAL_SERVER_ERROR) {
 		return (status_code - HTTP_STATUS_400_BAD_REQUEST + 400);
@@ -260,7 +266,7 @@ get_nic_handle (EFI_MAC_ADDRESS *mac)
 	/* Get the list of handles that support the HTTP service binding
 	   protocol */
 	efi_status = gBS->LocateHandleBuffer(ByProtocol,
-					     &EFI_HTTP_BINDING_GUID,
+					&gEfiHttpServiceBindingProtocolGuid,
 					     NULL, &NoHandles, &buffer);
 	if (EFI_ERROR(efi_status))
 		return NULL;
@@ -333,7 +339,7 @@ set_ip6(EFI_HANDLE *nic, IPv6_DEVICE_PATH *ip6node)
 	EFI_IPv6_ADDRESS gateway;
 	EFI_STATUS efi_status;
 
-	efi_status = gBS->HandleProtocol(nic, &EFI_IP6_CONFIG_GUID,
+	efi_status = gBS->HandleProtocol(nic, &gEfiIp6ConfigProtocolGuid,
 					 (VOID **)&ip6cfg);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
@@ -394,7 +400,7 @@ set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 	EFI_IPv4_ADDRESS gateway;
 	EFI_STATUS efi_status;
 
-	efi_status = gBS->HandleProtocol(nic, &EFI_IP4_CONFIG2_GUID,
+	efi_status = gBS->HandleProtocol(nic, &gEfiIp4Config2ProtocolGuid,
 					 (VOID **)&ip4cfg2);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
@@ -676,7 +682,7 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	    CHAR8 *hostname, CHAR8 *uri, BOOLEAN is_ip6,
 	    VOID **buffer, UINT64 *buf_size)
 {
-	EFI_SERVICE_BINDING *service;
+	EFI_SERVICE_BINDING_PROTOCOL *service;
 	EFI_HANDLE http_handle;
 	EFI_HTTP_PROTOCOL *http;
 	EFI_STATUS efi_status;
@@ -686,7 +692,8 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	*buf_size = 0;
 
 	/* Open HTTP Service Binding Protocol */
-	efi_status = gBS->OpenProtocol(device, &EFI_HTTP_BINDING_GUID,
+	efi_status = gBS->OpenProtocol(device,
+				       &gEfiHttpServiceBindingProtocolGuid,
 				       (VOID **) &service, image, NULL,
 				       EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (EFI_ERROR(efi_status))
@@ -702,7 +709,7 @@ http_fetch (EFI_HANDLE image, EFI_HANDLE device,
 	}
 
 	/* Get the http protocol */
-	efi_status = gBS->HandleProtocol(http_handle, &EFI_HTTP_PROTOCOL_GUID,
+	efi_status = gBS->HandleProtocol(http_handle, &gEfiHttpProtocolGuid,
 					 (VOID **) &http);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to get http\n");

@@ -34,6 +34,7 @@
  */
 
 #include "shim.h"
+#include <dpath.h>
 
 #include <stdarg.h>
 
@@ -50,9 +51,12 @@
 #include <openssl/rsa.h>
 #include <internal/dso.h>
 
-#include <Library/BaseCryptLib.h>
+#include <Guid/FileInfo.h>
+#include <Guid/ImageAuthentication.h>
+#include <Protocol/LoadedImage.h>
+#include <Protocol/SimpleFileSystem.h>
 
-#include <stdint.h>
+#include <Library/BaseCryptLib.h>
 
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
@@ -75,16 +79,14 @@ extern struct {
 
 UINT32 vendor_cert_size;
 UINT32 vendor_dbx_size;
-UINT8 *vendor_cert;
-UINT8 *vendor_dbx;
+CONST UINT8 *vendor_cert;
+CONST UINT8 *vendor_dbx;
 
 /*
  * indicator of how an image has been verified
  */
 verification_method_t verification_method;
 int loader_is_participating;
-
-#define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
 UINT8 user_insecure_mode;
 UINT8 ignore_db;
@@ -103,14 +105,14 @@ typedef struct {
 /*
  * Perform basic bounds checking of the intra-image pointers
  */
-static void *ImageAddress (void *image, uint64_t size, uint64_t address)
+static void *ImageAddress (void *image, UINT64 size, UINT64 address)
 {
 	/* ensure our local pointer isn't bigger than our size */
 	if (address > size)
 		return NULL;
 
 	/* Insure our math won't overflow */
-	if (UINT64_MAX - address < (uint64_t)(intptr_t)image)
+	if (((UINT64)-1LL) - address < (UINTN)image)
 		return NULL;
 
 	/* return the absolute pointer */
@@ -428,14 +430,14 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
 					 UINT8 *hash, CHAR16 *dbname,
-					 EFI_GUID guid)
+					 EFI_GUID *guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
 	BOOLEAN IsFound = FALSE;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
+		if (CompareGuid (&CertList->SignatureType, &gEfiCertX509Guid) == 0) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
@@ -469,7 +471,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
+static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID *guid,
 				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
 {
 	CHECK_STATUS rc;
@@ -496,8 +498,8 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
  */
 static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize, UINT8 *data,
-					 int SignatureSize, EFI_GUID CertType,
-					 CHAR16 *dbname, EFI_GUID guid)
+					 int SignatureSize, EFI_GUID *CertType,
+					 CHAR16 *dbname, EFI_GUID *guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertCount, Index;
@@ -506,7 +508,7 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize -sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
-		if (CompareGuid(&CertList->SignatureType, &CertType) == 0) {
+		if (CompareGuid(&CertList->SignatureType, CertType) == 0) {
 			for (Index = 0; Index < CertCount; Index++) {
 				if (CompareMem (Cert->SignatureData, data, SignatureSize) == 0) {
 					//
@@ -537,8 +539,8 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 /*
  * Check a hash against an EFI_SIGNATURE_LIST in a UEFI variable
  */
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
-				  int SignatureSize, EFI_GUID CertType)
+static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID *guid, UINT8 *data,
+				  int SignatureSize, EFI_GUID *CertType)
 {
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
@@ -570,46 +572,46 @@ static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
-			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
-			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+			SHA256_DIGEST_SIZE, &gEfiCertSha256Guid, L"dbx",
+			&gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
-				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
-				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+				 SHA1_DIGEST_SIZE, &gEfiCertSha1Guid, L"dbx",
+				 &gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
 	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
-				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+				 &gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha256hash,
-			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"dbx", &gEfiImageSecurityDatabaseGuid, sha256hash,
+			  SHA256_DIGEST_SIZE, &gEfiCertSha256Guid) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha1hash,
-			  SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"dbx", &gEfiImageSecurityDatabaseGuid, sha1hash,
+			  SHA1_DIGEST_SIZE, &gEfiCertSha1Guid) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
-	    check_db_cert(L"dbx", EFI_SECURE_BOOT_DB_GUID,
+	    check_db_cert(L"dbx", &gEfiImageSecurityDatabaseGuid,
 			  cert, sha256hash) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha256hash,
-			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_db_hash(L"MokListX", &gShimLockGuid, sha256hash,
+			  SHA256_DIGEST_SIZE, &gEfiCertSha256Guid) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
-	    check_db_cert(L"MokListX", SHIM_LOCK_GUID,
+	    check_db_cert(L"MokListX", &gShimLockGuid,
 			  cert, sha256hash) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
@@ -632,23 +634,25 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	if (!ignore_db) {
-		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha256hash, SHA256_DIGEST_SIZE,
-					EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+		if (check_db_hash(L"db", &gEfiImageSecurityDatabaseGuid,
+				  sha256hash, SHA256_DIGEST_SIZE,
+				  &gEfiCertSha256Guid) == DATA_FOUND) {
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		} else {
 			LogError(L"check_db_hash(db, sha256hash) != DATA_FOUND\n");
 		}
-		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha1hash, SHA1_DIGEST_SIZE,
-					EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+		if (check_db_hash(L"db", &gEfiImageSecurityDatabaseGuid,
+				  sha1hash, SHA1_DIGEST_SIZE,
+				  &gEfiCertSha1Guid) == DATA_FOUND) {
 			verification_method = VERIFIED_BY_HASH;
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		} else {
 			LogError(L"check_db_hash(db, sha1hash) != DATA_FOUND\n");
 		}
-		if (cert && check_db_cert(L"db", EFI_SECURE_BOOT_DB_GUID, cert, sha256hash)
-					== DATA_FOUND) {
+		if (cert && check_db_cert(L"db", &gEfiImageSecurityDatabaseGuid,
+					  cert, sha256hash) == DATA_FOUND) {
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
 			return EFI_SUCCESS;
@@ -657,8 +661,8 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		}
 	}
 
-	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
-			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
+	if (check_db_hash(L"MokList", &gShimLockGuid, sha256hash,
+			  SHA256_DIGEST_SIZE, &gEfiCertSha256Guid)
 				== DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
@@ -666,7 +670,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	} else {
 		LogError(L"check_db_hash(MokList, sha256hash) != DATA_FOUND\n");
 	}
-	if (cert && check_db_cert(L"MokList", SHIM_LOCK_GUID, cert, sha256hash)
+	if (cert && check_db_cert(L"MokList", &gShimLockGuid, cert, sha256hash)
 			== DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
@@ -714,15 +718,15 @@ static BOOLEAN secure_mode (void)
 }
 
 #define check_size_line(data, datasize_in, hashbase, hashsize, l) ({	\
-	if ((unsigned long)hashbase >					\
-			(unsigned long)data + datasize_in) {		\
+	if ((UINTN)hashbase >						\
+			(UINTN)data + datasize_in) {			\
 		efi_status = EFI_INVALID_PARAMETER;			\
-		perror(L"shim.c:%d Invalid hash base 0x%016x\n", l,	\
+		perror(L"shim.c:%d Invalid hash base %018p\n", l,	\
 			hashbase);					\
 		goto done;						\
 	}								\
-	if ((unsigned long)hashbase + hashsize >			\
-			(unsigned long)data + datasize_in) {		\
+	if ((UINTN)hashbase + hashsize >				\
+			(UINTN)data + datasize_in) {			\
 		efi_status = EFI_INVALID_PARAMETER;			\
 		perror(L"shim.c:%d Invalid hash size 0x%016x\n", l,	\
 			hashsize);					\
@@ -809,7 +813,7 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	/* Hash end of certificate table to end of image header */
 	EFI_IMAGE_DATA_DIRECTORY *dd = context->SecDir + 1;
 	hashbase = (char *)dd;
-	hashsize = context->SizeOfHeaders - (unsigned long)((char *)dd - data);
+	hashsize = context->SizeOfHeaders - (UINTN)((char *)dd - data);
 	if (hashsize > datasize_in) {
 		perror(L"Data Directory size %d is invalid\n", hashsize);
 		efi_status = EFI_INVALID_PARAMETER;
@@ -869,13 +873,13 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 	/* But check it again just for better error messaging, and so
 	 * clang-analyzer doesn't get confused. */
 	if (Section == NULL) {
-		uint64_t addr;
+		UINT64 addr;
 
 		addr = PEHdr_offset + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER)
 			+ context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader;
 		perror(L"Malformed file header.\n");
 		perror(L"Image address for Section 0 is 0x%016llx\n", addr);
-		perror(L"File size is 0x%016llx\n", datasize);
+		perror(L"File size is 0x%016x\n", datasize);
 		efi_status = EFI_INVALID_PARAMETER;
 		goto done;
 	}
@@ -932,9 +936,9 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
 		    (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress)) {
 			perror(L"Malformed binary after Attribute Certificate Table\n");
-			console_print(L"datasize: %u SumOfBytesHashed: %u SecDir->Size: %lu\n",
+			console_print(L"datasize: %u SumOfBytesHashed: %u SecDir->Size: %u\n",
 				      datasize, SumOfBytesHashed, context->SecDir->Size);
-			console_print(L"hashsize: %u SecDir->VirtualAddress: 0x%08lx\n",
+			console_print(L"hashsize: %u SecDir->VirtualAddress: 0x%08x\n",
 				      hashsize, context->SecDir->VirtualAddress);
 			efi_status = EFI_INVALID_PARAMETER;
 			goto done;
@@ -1081,7 +1085,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				show_ca_warning();
 			}
 			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
+			tpm_measure_variable(L"Shim", &gShimLockGuid,
 					     sizeof(shim_cert), shim_cert);
 			efi_status = EFI_SUCCESS;
 			drain_openssl_errors();
@@ -1104,7 +1108,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				show_ca_warning();
 			}
 			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
+			tpm_measure_variable(L"Shim", &gShimLockGuid,
 					     vendor_cert_size, vendor_cert);
 			efi_status = EFI_SUCCESS;
 			drain_openssl_errors();
@@ -1129,8 +1133,8 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
-	unsigned long HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
-	unsigned long FileAlignment = 0;
+	UINTN HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
+	UINT32 FileAlignment = 0;
 
 	if (datasize < sizeof (PEHdr->Pe32)) {
 		perror(L"Invalid image\n");
@@ -1162,7 +1166,7 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	}
 
 	if (FileAlignment % 2 != 0) {
-		perror(L"File Alignment is invalid (%d)\n", FileAlignment);
+		perror(L"File Alignment is invalid (%u)\n", FileAlignment);
 		return EFI_UNSUPPORTED;
 	}
 	if (FileAlignment == 0)
@@ -1239,7 +1243,7 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	if ((unsigned long)((UINT8 *)context->SecDir - (UINT8 *)data) >
+	if ((UINTN)((UINT8 *)context->SecDir - (UINT8 *)data) >
 	    (datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
@@ -1344,7 +1348,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	buffer = (void *)ALIGN_VALUE((unsigned long)*alloc_address, alignment);
+	buffer = (void *)ALIGN_VALUE((UINTN)*alloc_address, alignment);
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
@@ -1513,7 +1517,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	int ret = 0;
 
-	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+	efi_status = gBS->HandleProtocol(image_handle, &gEfiLoadedImageProtocolGuid,
 					 (void **)&li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get image for bootx64.efi: %r\n",
@@ -1538,7 +1542,8 @@ should_use_fallback(EFI_HANDLE image_handle)
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
 		goto error;
 
-	efi_status = gBS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
+	efi_status = gBS->HandleProtocol(li->DeviceHandle,
+					 &gEfiSimpleFileSystemProtocolGuid,
 					 (void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get fio for li->DeviceHandle: %r\n",
@@ -1687,7 +1692,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	/*
 	 * Open the device
 	 */
-	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+	efi_status = gBS->HandleProtocol(device,
+					 &gEfiSimpleFileSystemProtocolGuid,
 					 (void **) &drive);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to find fs: %r\n", efi_status);
@@ -1721,7 +1727,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	 * Find out how big the file is in order to allocate the storage
 	 * buffer
 	 */
-	efi_status = grub->GetInfo(grub, &EFI_FILE_INFO_GUID, &buffersize,
+	efi_status = grub->GetInfo(grub, &gEfiFileInfoGuid, &buffersize,
 				   fileinfo);
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		FreePool(fileinfo);
@@ -1731,7 +1737,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 			efi_status = EFI_OUT_OF_RESOURCES;
 			goto error;
 		}
-		efi_status = grub->GetInfo(grub, &EFI_FILE_INFO_GUID,
+		efi_status = grub->GetInfo(grub, &gEfiFileInfoGuid,
 					   &buffersize, fileinfo);
 	}
 
@@ -1783,7 +1789,7 @@ error:
  * Protocol entry point. If secure boot is enabled, verify that the provided
  * buffer is signed with a trusted key.
  */
-EFI_STATUS shim_verify (void *buffer, UINT32 size)
+static EFI_STATUS SHIMAPI shim_verify (void *buffer, UINT32 size)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
@@ -1827,7 +1833,7 @@ done:
 	return efi_status;
 }
 
-static EFI_STATUS shim_hash (char *data, int datasize,
+static EFI_STATUS SHIMAPI shim_hash (char *data, int datasize,
 			     PE_COFF_LOADER_IMAGE_CONTEXT *context,
 			     UINT8 *sha256hash, UINT8 *sha1hash)
 {
@@ -1844,7 +1850,7 @@ static EFI_STATUS shim_hash (char *data, int datasize,
 	return efi_status;
 }
 
-static EFI_STATUS shim_read_header(void *data, unsigned int datasize,
+static EFI_STATUS SHIMAPI shim_read_header(void *data, unsigned int datasize,
 				   PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {
 	EFI_STATUS efi_status;
@@ -1876,7 +1882,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * We need to refer to the loaded image protocol on the running
 	 * binary in order to find our path
 	 */
-	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+	efi_status = gBS->HandleProtocol(image_handle, &gEfiLoadedImageProtocolGuid,
 					 (void **)&li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to init protocol\n");
@@ -2167,7 +2173,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	load_options = NULL;
 	load_options_size = 0;
 
-	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
+	efi_status = gBS->HandleProtocol(image_handle, &gEfiLoadedImageProtocolGuid,
 					 (void **) &li);
 	if (EFI_ERROR(efi_status)) {
 		perror (L"Failed to get load options: %r\n", efi_status);
@@ -2241,7 +2247,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	if (li->LoadOptionsSize > 16) {
 		if (CompareGuid((EFI_GUID *)(li->LoadOptions
 					     + (li->LoadOptionsSize - 16)),
-				&BDS_GUID) == 0)
+				&gEfiBdsGuid) == 0)
 			li->LoadOptionsSize -= 16;
 	}
 
@@ -2427,7 +2433,7 @@ install_shim_protocols(void)
 	 * replacements.  So even though it will participate and verify
 	 * the kernel, the systab never finds out.
 	 */
-	efi_status = LibLocateProtocol(&SHIM_LOCK_GUID, (VOID **)&shim_lock);
+	efi_status = LibLocateProtocol(&gShimLockGuid, (VOID **)&shim_lock);
 	if (!EFI_ERROR(efi_status))
 		uninstall_shim_protocols();
 
@@ -2435,7 +2441,7 @@ install_shim_protocols(void)
 	 * Install the protocol
 	 */
 	efi_status = gBS->InstallProtocolInterface(&shim_lock_handle,
-						   &SHIM_LOCK_GUID,
+						   &gShimLockGuid,
 						   EFI_NATIVE_INTERFACE,
 						   &shim_lock_interface);
 	if (EFI_ERROR(efi_status)) {
@@ -2463,7 +2469,7 @@ uninstall_shim_protocols(void)
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
-	gBS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
+	gBS->UninstallProtocolInterface(shim_lock_handle, &gShimLockGuid,
 					&shim_lock_interface);
 
 	if (!secure_mode())
@@ -2529,37 +2535,39 @@ shim_fini(void)
 	console_fini();
 }
 
-extern EFI_STATUS
+extern EFI_STATUS EFIAPI
 efi_main(EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab);
 
 static void
-__attribute__((__optimize__("0")))
+__attribute__((optnone))
 debug_hook(void)
 {
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
 	volatile register UINTN x = 0;
-	extern char _text, _data;
+	/* extern char _text, _data; */
 
 	if (x)
 		return;
 
 	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
-				  SHIM_LOCK_GUID);
+				  &gShimLockGuid);
 	if (EFI_ERROR(efi_status)) {
 		return;
 	}
 
 	FreePool(data);
 
-	console_print(L"add-symbol-file "DEBUGDIR
-		      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
+	console_print(L"add-symbol-file "DEBUGDIR"\n");
+	/* FIXME: what should we do with _text and _data?
+		      L"shim" EFI_ARCH L".efi.debug %010p -s .data %010p\n",
 		      &_text, &_data);
+	*/
 
 	console_print(L"Pausing for debugger attachment.\n");
 	console_print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
-		      &SHIM_LOCK_GUID);
+		      &gShimLockGuid);
 	x = 1;
 	while (x++) {
 		/* Make this so it can't /totally/ DoS us. */
@@ -2580,11 +2588,16 @@ debug_hook(void)
 	x = 1;
 }
 
-EFI_STATUS
+EFI_STATUS EFIAPI
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE image_handle;
+
+	systab = passed_systab;
+	image_handle = global_image_handle = passed_image_handle;
+
+	InitializeLib(image_handle, systab);
 
 	verification_method = VERIFIED_BY_NOTHING;
 
@@ -2592,7 +2605,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
-	CHAR16 *msgs[] = {
+	STATIC CONST CHAR16 *msgs[] = {
 		L"import_mok_state() failed\n",
 		L"shim_int() failed\n",
 		NULL
@@ -2607,14 +2620,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Verify = shim_verify;
 	shim_lock_interface.Hash = shim_hash;
 	shim_lock_interface.Context = shim_read_header;
-
-	systab = passed_systab;
-	image_handle = global_image_handle = passed_image_handle;
-
-	/*
-	 * Ensure that gnu-efi functions are available
-	 */
-	InitializeLib(image_handle, systab);
 
 	init_openssl();
 

@@ -71,7 +71,9 @@ git config --local --add am.keepcr true
 git am \
     0001-Cryptlib-update-for-efi-build.patch \
     0002-Cryptlib-work-around-new-CA-rules.patch \
-    0003-Cryptlib-Pk-CryptX509.c-Fix-RETURN_-to-be-EFI_.patch
+    0003-Cryptlib-Pk-CryptX509.c-Fix-RETURN_-to-be-EFI_.patch \
+    0004-CrtLibSupport.h-changes.patch \
+    0005-Pk-CryptTs.c-fix-SetMem.patch
 
 cd $DIR
 git rm -r CryptoPkg

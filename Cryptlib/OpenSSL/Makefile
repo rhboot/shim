@@ -1,29 +1,34 @@
 
 EFI_INCLUDES	= -I$(TOPDIR)/../Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
+		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_EFI) -I$(TOPDIR)/../../include \
 		  -I$(TOPDIR)/crypto/asn1 -I$(TOPDIR)/crypto/evp -I$(TOPDIR)/crypto/modes -I$(TOPDIR)/crypto/include
 
-CFLAGS		= -ggdb -O0 -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDIR)/crypto \
-		  -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc \
-		  -ffreestanding -std=gnu89 -I$(shell $(CC) -print-file-name=include) \
-		  -Wall $(EFI_INCLUDES) -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DNO_SYSLOG -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
+CFLAGS		= $(DEBUG_CFLAGS)	\
+			  -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/	\
+			  -I$(TOPDIR)/crypto -fno-stack-protector -fno-strict-aliasing	\
+			  -fshort-wchar -nostdinc -ffreestanding -integrated-as	\
+			  -std=gnu89 -I$(shell $(CC) -print-file-name=include)	\
+			  -UWIN32 -U_WIN32 -U__CYGWIN__ -ffunction-sections	\
+			  -fdata-sections -Wall $(EFI_INCLUDES) -DL_ENDIAN	\
+			  -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE	\
+			  -DNO_SYSLOG -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS) \
-		-m64 -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		-UNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
+	CFLAGS	+= -mno-red-zone -mno-stack-arg-probe $(CLANG_BUGS) \
+		-m64 -target x86_64-windows-gnu
 endif
 ifeq ($(ARCH),ia32)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		$(CLANG_BUGS) -m32 -DMDE_CPU_IA32
+	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -mno-stack-arg-probe	\
+		   -nostdinc $(CLANG_BUGS) -m32 -mregparm=3 -mrtd	\
+		   -march=i586 -target i586-windows-gnu
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS	+= -O2 -DMDE_CPU_AARCH64
+	CFLAGS	+= -mno-stack-arg-probe -target aarch64-windows-gnu
 endif
 ifeq ($(ARCH),arm)
-	CFLAGS	+= -O2 -DMDE_CPU_ARM
+	CFLAGS	+= -mno-stack-arg-probe -target arm-windows-gnu
 endif
 LDFLAGS		= -nostdlib -znocombreloc
 
