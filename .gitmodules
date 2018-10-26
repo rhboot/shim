@@ -1,0 +1,3 @@
+[submodule "fwimage"]
+	path = fwimage
+	url = https://github.com/rusnikola/fwimage
