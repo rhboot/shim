@@ -15,6 +15,7 @@ shim_cert.h
 *.efi
 *.efi.debug
 *.efi.signed
+*.hash
 *.key
 *.key
 *.o
