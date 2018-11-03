@@ -21,6 +21,7 @@ shim_cert.h
 *.pem
 *.p12
 *.dll
+*.lib
 *.pdb
 *.srl
 *.srl.old

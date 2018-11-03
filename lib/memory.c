@@ -41,11 +41,12 @@ void *memset(void *dst, int ch, UINTN len)
 {
 	UINT8 *cur = (UINT8 *) dst;
 	UINT8 *end = cur + len;
-	UINTN val = (UINT8) ch * (UINTN) 0x0101010101010101ULL; /* truncate */
+	UINTN val = (UINT8) ch;
 
 	if (len > SMALL_SIZE) {
 		UINT8 *ptr = (UINT8 *) (((UINTN) cur + (sizeof(UINTN) - 1)) &
 							  ~(sizeof(UINTN) - 1));
+		val *= (UINTN) 0x0101010101010101ULL; /* truncate to bitwidth */
 		for (; cur != ptr; cur++)
 			*cur = (UINT8) val;
 		ptr = (UINT8 *) ((UINTN) end & ~(sizeof(UINTN) - 1));
