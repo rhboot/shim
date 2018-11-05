@@ -223,11 +223,26 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		UINT32 attrs = 0;
 		BOOLEAN delete = FALSE, present, addend;
 
+		addend = (v->addend_source && v->addend_size &&
+			  *v->addend_source && *v->addend_size)
+			? TRUE : FALSE;
+
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
-		if (efi_status == EFI_NOT_FOUND)
+		if (efi_status == EFI_NOT_FOUND) {
+			if (v->rtname && addend) {
+				efi_status = mirror_one_mok_variable(v);
+				if (EFI_ERROR(efi_status) &&
+				    ret != EFI_SECURITY_VIOLATION)
+					ret = efi_status;
+			}
+			/*
+			 * after possibly adding, we can continue, no
+			 * further checks to be done.
+			 */
 			continue;
+		}
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Could not verify %s: %r\n", v->name,
 			       efi_status);
@@ -272,9 +287,6 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		}
 
 		present = (v->data && v->data_size) ? TRUE : FALSE;
-		addend = (v->addend_source && v->addend_size &&
-			  *v->addend_source && *v->addend_size)
-			? TRUE : FALSE;
 
 		if (v->flags & MOK_VARIABLE_MEASURE && present) {
 			/*
