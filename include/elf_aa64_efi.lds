@@ -3,7 +3,8 @@ OUTPUT_ARCH(aarch64)
 ENTRY(_start)
 SECTIONS
 {
-  .text 0x0 : {
+  .text 0x0 : ALIGN(1024)
+  {
     _text = .;
     *(.text.head)
     *(.text)
@@ -16,20 +17,7 @@ SECTIONS
   }
 
   . = ALIGN(4096);
-  .dynamic  : { *(.dynamic) }
-
-  . = ALIGN(4096);
-  .note.gnu.build-id : {
-    *(.note.gnu.build-id)
-  }
-
-  . = ALIGN(4096);
-  .data.ident : {
-    *(.data.ident)
-  }
-
-  . = ALIGN(4096);
-  .data :
+  .data : ALIGN(512)
   {
    _data = .;
    *(.sdata)
@@ -53,14 +41,17 @@ SECTIONS
   }
 
   . = ALIGN(4096);
-  .vendor_cert :
-  {
-    *(.vendor_cert)
-  }
-  . = ALIGN(4096);
+  .vendor_cert : ALIGN(4096) { *(.vendor_cert) }
+  _edata = .;
+  _data_size = . - _data;
+
+  /*
+   * That's everything we need at runtime *after* _relocate() has been called.
+   */
 
   . = ALIGN(4096);
-  .rela :
+  .eh_frame : ALIGN(512) { *(.eh_frame) }
+  .rela : ALIGN(512)
   {
     *(.rela.dyn)
     *(.rela.plt)
@@ -68,19 +59,36 @@ SECTIONS
     *(.rela.data)
     *(.rela.data*)
   }
-  _edata = .;
-  _data_size = . - _data;
 
   . = ALIGN(4096);
-  .dynsym   : { *(.dynsym) }
+  .note.gnu.build-id : ALIGN(512) { *(.note.gnu.build-id)  }
+  .data.ident : ALIGN(512) { *(.data.ident) }
   . = ALIGN(4096);
-  .dynstr   : { *(.dynstr) }
-  . = ALIGN(4096);
+  .dynamic : ALIGN(512) { *(.dynamic) }
+  .dynsym : ALIGN(512) { *(.dynsym) }
+
+  /*
+   * All our debuginfo stuff
+   */
+  .debug : ALIGN(512) { *(.debug) }
+  .debug_info : ALIGN(512) { *(.debug_info) }
+  .debug_abbrev : ALIGN(512) { *(.debug_abbrev) }
+  .debug_aranges : ALIGN(512) { *(.debug_aranges) }
+  .debug_line : ALIGN(512) { *(.debug_line) }
+  .debug_str : ALIGN(512) { *(.debug_str) }
+  .debug_ranges : ALIGN(512) { *(.debug_ranges) }
+
+  /*
+   * Everything after here is stuff we're stripping from the .efi binary
+   */
+
+  .hash : ALIGN(512) { *(.hash) }
+  .comment : ALIGN(512) { *(.comment) }
+  .dynstr : ALIGN(512) { *(.dynstr) }
+
   /DISCARD/ :
   {
     *(.rel.reloc)
-    *(.eh_frame)
     *(.note.GNU-stack)
   }
-  .comment 0 : { *(.comment) }
 }

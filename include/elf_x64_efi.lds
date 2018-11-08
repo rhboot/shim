@@ -6,81 +6,85 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  .hash : { *(.hash) }	/* this MUST come first! */
-  . = ALIGN(4096);
-  .eh_frame : 
-  { 
-    *(.eh_frame)
-  }
-  . = ALIGN(4096);
-  .text :
+
+  /*
+   * The first entry here MUST be above the end of the PE OptHeader and the
+   * section table, or else ld will clobber the OptHeader.
+   */
+  .text 0x1000 : ALIGN(1024)
   {
-   _text = .;
-   *(.text)
-   _etext = .;
-  }
-  . = ALIGN(4096);
-  .reloc :
-  {
-   *(.reloc)
-  }
-  . = ALIGN(4096);
-  .note.gnu.build-id : {
-    *(.note.gnu.build-id)
+    _text = .;
+    *(.text)
+    _etext = .;
   }
 
   . = ALIGN(4096);
-  .data.ident : {
-    *(.data.ident)
+  .data : ALIGN(512)
+  {
+    _data = .;
+    *(.rodata*)
+    *(.got.plt)
+    *(.got)
+    *(.data*)
+    *(.sdata)
+    /* the EFI loader doesn't seem to like a .bss section, so we stick
+       it all into .data: */
+    *(.sbss)
+    *(.scommon)
+    *(.dynbss)
+    *(.bss)
+    *(COMMON)
+    *(.rel.local)
   }
 
   . = ALIGN(4096);
-  .data :
-  {
-   _data = .;
-   *(.rodata*)
-   *(.got.plt)
-   *(.got)
-   *(.data*)
-   *(.sdata)
-   /* the EFI loader doesn't seem to like a .bss section, so we stick
-      it all into .data: */
-   *(.sbss)
-   *(.scommon)
-   *(.dynbss)
-   *(.bss)
-   *(COMMON)
-   *(.rel.local)
-  }
+  .vendor_cert : ALIGN(4096) { *(.vendor_cert) }
+  _edata = .;
+  _data_size = . - _data;
+
+  /*
+   * That's everything we need at runtime *after* _relocate() has been called.
+   */
 
   . = ALIGN(4096);
-  .vendor_cert :
-  {
-   *(.vendor_cert)
-  }
-  . = ALIGN(4096);
-  .dynamic  : { *(.dynamic) }
-  . = ALIGN(4096);
-  .rela :
+  .reloc : ALIGN(512) { *(.reloc) }
+  .eh_frame : ALIGN(512) { *(.eh_frame) }
+  .rela : ALIGN(512)
   {
     *(.rela.data*)
     *(.rela.got*)
     *(.rela.stab*)
   }
-  _edata = .;
-  _data_size = . - _data;
 
   . = ALIGN(4096);
-  .dynsym   : { *(.dynsym) }
+  .note.gnu.build-id : ALIGN(512) { *(.note.gnu.build-id)  }
+  .data.ident : ALIGN(512) { *(.data.ident) }
   . = ALIGN(4096);
-  .dynstr   : { *(.dynstr) }
-  . = ALIGN(4096);
-  .ignored.reloc :
+  .dynamic : ALIGN(512) { *(.dynamic) }
+  .dynsym : ALIGN(512) { *(.dynsym) }
+
+  /*
+   * All our debuginfo stuff
+   */
+  .debug : ALIGN(512) { *(.debug) }
+  .debug_info : ALIGN(512) { *(.debug_info) }
+  .debug_abbrev : ALIGN(512) { *(.debug_abbrev) }
+  .debug_aranges : ALIGN(512) { *(.debug_aranges) }
+  .debug_line : ALIGN(512) { *(.debug_line) }
+  .debug_str : ALIGN(512) { *(.debug_str) }
+  .debug_ranges : ALIGN(512) { *(.debug_ranges) }
+
+  /*
+   * Everything after here is stuff we're stripping from the .efi binary
+   */
+
+  .hash : ALIGN(512) { *(.hash) }
+  .comment : ALIGN(512) { *(.comment) }
+  .dynstr : ALIGN(512) { *(.dynstr) }
+
+  /DISCARD/ :
   {
     *(.rela.reloc)
-    *(.eh_frame)
     *(.note.GNU-stack)
   }
-  .comment 0 : { *(.comment) }
-  .note.gnu.build-id : { *(.note.gnu.build-id) }
 }
