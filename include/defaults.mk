@@ -1,3 +1,11 @@
+ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed \
+			-e s,aarch64,aa64, \
+			-e 's,arm.*,arm,' \
+			-e s,i[3456789]86,ia32, \
+			-e s,x86_64,x64, \
+			)
+include $(TOPDIR)/include/arch-$(ARCH).mk
+
 COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
 DESTDIR		?=
@@ -17,75 +25,26 @@ PKGNAME		?= shim
 ESPROOTDIR	?= boot/efi/
 EFIBOOTDIR	?= $(ESPROOTDIR)EFI/BOOT/
 TARGETDIR	?= $(ESPROOTDIR)EFI/$(EFIDIR)/
-DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(ARCH_SUFFIX)/
+DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(ARCH)/
 DEBUGINFO	?= $(prefix)/lib/debug/
 DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
-DEFAULT_LOADER	?= \\\\grub$(ARCH_SUFFIX).efi
+DEFAULT_LOADER	?= \\\\grub$(ARCH).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
-
-ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
 EFI_INCLUDE	?= /usr/include/efi
 EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_SUFFIX) \
+		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) \
 		  -I$(EFI_INCLUDE)/protocol \
 		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
 
-EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH_SUFFIX).o
+EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(TOPDIR)/include/elf_$(ARCH)_efi.lds
 
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
-
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
-
-ifeq ($(ARCH),x86_64)
-	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-				   $(CLANG_BUGS) -m64 \
-				   -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-				   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64 \
-				   -DPAGE_SIZE=4096
-	LIBDIR			?= $(prefix)/lib64
-	ARCH_SUFFIX		?= x64
-	ARCH_SUFFIX_UPPER	?= X64
-	ARCH_LDFLAGS		?=
-	TIMESTAMP_LOCATION	:= 136
-endif
-ifeq ($(ARCH),ia32)
-	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-				   $(CLANG_BUGS) -m32 \
-				   -DMDE_CPU_IA32 -DPAGE_SIZE=4096
-	LIBDIR			?= $(prefix)/lib
-	ARCH_SUFFIX		?= ia32
-	ARCH_SUFFIX_UPPER	?= IA32
-	ARCH_LDFLAGS		?=
-	ARCH_CFLAGS		?= -m32
-	TIMESTAMP_LOCATION	:= 136
-endif
-ifeq ($(ARCH),aarch64)
-	ARCH_CFLAGS		?= -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096 -mstrict-align
-	LIBDIR			?= $(prefix)/lib64
-	ARCH_SUFFIX		?= aa64
-	ARCH_SUFFIX_UPPER	?= AA64
-	FORMAT			:= -O binary
-	SUBSYSTEM		:= 0xa
-	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-	ARCH_CFLAGS		?=
-	TIMESTAMP_LOCATION	:= 72
-endif
-ifeq ($(ARCH),arm)
-	ARCH_CFLAGS		?= -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mno-unaligned-access
-	LIBDIR			?= $(prefix)/lib
-	ARCH_SUFFIX		?= arm
-	ARCH_SUFFIX_UPPER	?= ARM
-	FORMAT			:= -O binary
-	SUBSYSTEM		:= 0xa
-	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
-	TIMESTAMP_LOCATION	:= 72
-endif
 
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
@@ -109,23 +68,23 @@ endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
-FORMAT		?= --target efi-app-$(ARCH)
+FORMAT		?= --target efi-app-$(LDARCH)
 EFI_PATH	?= $(LIBDIR)/gnuefi
 
-MMSTEM		?= mm$(ARCH_SUFFIX)
+MMSTEM		?= mm$(ARCH)
 MMNAME		= $(MMSTEM).efi
 MMSONAME	= $(MMSTEM).so
-FBSTEM		?= fb$(ARCH_SUFFIX)
+FBSTEM		?= fb$(ARCH)
 FBNAME		= $(FBSTEM).efi
 FBSONAME	= $(FBSTEM).so
-SHIMSTEM	?= shim$(ARCH_SUFFIX)
+SHIMSTEM	?= shim$(ARCH)
 SHIMNAME	= $(SHIMSTEM).efi
 SHIMSONAME	= $(SHIMSTEM).so
 SHIMHASHNAME	= $(SHIMSTEM).hash
-BOOTEFINAME	?= BOOT$(ARCH_SUFFIX_UPPER).EFI
-BOOTCSVNAME	?= BOOT$(ARCH_SUFFIX_UPPER).CSV
+BOOTEFINAME	?= BOOT$(ARCH_UPPER).EFI
+BOOTCSVNAME	?= BOOT$(ARCH_UPPER).CSV
 
-CFLAGS += "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
+CFLAGS += "-DEFI_ARCH=L\"$(ARCH)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH)-$(VERSION)$(DASHRELEASE)/\""
 
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
