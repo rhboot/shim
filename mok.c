@@ -231,12 +231,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
 		if (efi_status == EFI_NOT_FOUND) {
-			if (v->rtname && addend) {
-				efi_status = mirror_one_mok_variable(v);
-				if (EFI_ERROR(efi_status) &&
-				    ret != EFI_SECURITY_VIOLATION)
-					ret = efi_status;
-			}
+			if (addend)
+				goto mirror_addend;
 			/*
 			 * after possibly adding, we can continue, no
 			 * further checks to be done.
@@ -316,7 +312,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			}
 		}
 
-		if (v->rtname && present && addend) {
+mirror_addend:
+		if (v->rtname && (present || addend)) {
 			if (v->flags & MOK_MIRROR_DELETE_FIRST)
 				LibDeleteVariable(v->rtname, v->guid);
 
