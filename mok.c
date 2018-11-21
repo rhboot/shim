@@ -223,11 +223,18 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		UINT32 attrs = 0;
 		BOOLEAN delete = FALSE, present, addend;
 
+		addend = (v->addend_source && v->addend_size &&
+			  *v->addend_source && *v->addend_size)
+			? TRUE : FALSE;
+
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
-		if (efi_status == EFI_NOT_FOUND)
+		if (efi_status == EFI_NOT_FOUND) {
+			if (addend)
+				goto mirror_addend;
 			continue;
+		}
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Could not verify %s: %r\n", v->name,
 			       efi_status);
@@ -272,9 +279,6 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		}
 
 		present = (v->data && v->data_size) ? TRUE : FALSE;
-		addend = (v->addend_source && v->addend_size &&
-			  *v->addend_source && *v->addend_size)
-			? TRUE : FALSE;
 
 		if (v->flags & MOK_VARIABLE_MEASURE && present) {
 			/*
@@ -304,7 +308,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			}
 		}
 
-		if (v->rtname && present && addend) {
+mirror_addend:
+		if (v->rtname && (present || addend)) {
 			if (v->flags & MOK_MIRROR_DELETE_FIRST)
 				LibDeleteVariable(v->rtname, v->guid);
 
