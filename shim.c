@@ -1257,11 +1257,11 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
-static EFI_STATUS handle_image (void *data, unsigned int datasize,
-				EFI_LOADED_IMAGE *li,
-				EFI_IMAGE_ENTRY_POINT *entry_point,
-				EFI_PHYSICAL_ADDRESS *alloc_address,
-				UINTN *alloc_pages)
+EFI_STATUS handle_image (void *data, unsigned int datasize,
+			 EFI_LOADED_IMAGE *li,
+			 EFI_IMAGE_ENTRY_POINT *entry_point,
+			 EFI_PHYSICAL_ADDRESS *alloc_address,
+			 UINTN *alloc_pages)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
