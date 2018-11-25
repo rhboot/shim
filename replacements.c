@@ -93,6 +93,13 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	efi_status = gBS->LoadImage(BootPolicy, ParentImageHandle, DevicePath,
 				    SourceBuffer, SourceSize, ImageHandle);
 	hook_system_services(systab);
+	if (proxy_loader_size && SourceBuffer && SourceSize &&
+	    ((efi_status == EFI_SECURITY_VIOLATION) ||
+	     (efi_status == EFI_ACCESS_DENIED))) {
+		efi_status = proxyload(BootPolicy, ParentImageHandle,
+				       DevicePath, SourceBuffer, SourceSize,
+				       ImageHandle);
+	}
 	if (EFI_ERROR(efi_status))
 		last_loaded_image = NULL;
 	else
