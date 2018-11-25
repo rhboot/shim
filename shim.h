@@ -109,6 +109,7 @@
 #include "include/netboot.h"
 #include "include/PasswordCrypt.h"
 #include "include/PeImage.h"
+#include "include/ProxyLoader.h"
 #include "include/replacements.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
