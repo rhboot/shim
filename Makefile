@@ -33,7 +33,7 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
-OBJS	= shim.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o
+OBJS	= shim.o mok.o netboot.o cert.o proxyloader.o replacements.o tpm.o version.o errlog.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c mok.c netboot.c replacements.c tpm.c errlog.c shim.h version.h $(wildcard include/*.h)
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o
@@ -82,6 +82,9 @@ endif
 shim.o: $(wildcard $(TOPDIR)/*.h)
 
 cert.o : $(TOPDIR)/cert.S
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+proxyloader.o : $(TOPDIR)/proxyloader.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(SHIMNAME) : $(SHIMSONAME)
@@ -192,7 +195,7 @@ endif
 	$(OBJCOPY) -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .dynsym -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
-		-j .vendor_cert \
+		-j .vendor_cert -j .proxy_loader \
 		$(FORMAT) $^ $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)

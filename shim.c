@@ -79,6 +79,17 @@ UINT8 *vendor_cert;
 UINT8 *vendor_dbx;
 
 /*
+ * The proxy loader executable
+ */
+extern struct {
+	UINT32 size;
+	UINT32 offset;
+} proxy_loader_table;
+
+UINT32 proxy_loader_size;
+UINT8 *proxy_loader;
+
+/*
  * indicator of how an image has been verified
  */
 verification_method_t verification_method;
@@ -2592,6 +2603,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+	proxy_loader_size = proxy_loader_table.size;
+	proxy_loader = (UINT8 *)&proxy_loader_table + proxy_loader_table.offset;
 	CHAR16 *msgs[] = {
 		L"import_mok_state() failed\n",
 		L"shim_int() failed\n",

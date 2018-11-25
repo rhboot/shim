@@ -177,6 +177,9 @@ extern UINT32 vendor_dbx_size;
 extern UINT8 *vendor_cert;
 extern UINT8 *vendor_dbx;
 
+extern UINT32 proxy_loader_size;
+extern UINT8 *proxy_loader;
+
 extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;
 extern UINT8 in_protocol;

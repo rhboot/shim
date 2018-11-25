@@ -55,7 +55,12 @@ SECTIONS
   {
     *(.vendor_cert)
   }
+
   . = ALIGN(4096);
+  .proxy_loader :
+  {
+    *(.proxy_loader)
+  }
 
   . = ALIGN(4096);
   .rel :
