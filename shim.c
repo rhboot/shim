@@ -2609,7 +2609,17 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * boot-services-only state variables are what we think they are.
 	 */
 	efi_status = import_mok_state(image_handle);
-	if (EFI_ERROR(efi_status)) {
+	if (!secure_mode() && efi_status == EFI_INVALID_PARAMETER) {
+		/*
+		 * Make copy failures fatal only if secure_mode is enabled, or
+		 * the error was anything else than EFI_INVALID_PARAMETER.
+		 * There are non-secureboot firmware implementations that don't
+		 * reserve enough EFI variable memory to fit the variable.
+		 */
+		console_print(L"Importing MOK states has failed: %s: %r\n",
+			      msgs[msg], efi_status);
+		console_print(L"Continuing boot since secure mode is disabled");
+	} else if (EFI_ERROR(efi_status)) {
 die:
 		console_print(L"Something has gone seriously wrong: %s: %r\n",
 			      msgs[msg], efi_status);
