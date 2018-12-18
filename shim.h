@@ -120,9 +120,6 @@
 #include "include/variables.h"
 
 #include "version.h"
-#ifdef ENABLE_SHIM_CERT
-#include "shim_cert.h"
-#endif
 
 INTERFACE_DECL(_SHIM_LOCK);
 

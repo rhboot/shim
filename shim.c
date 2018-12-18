@@ -35,6 +35,10 @@
 
 #include "shim.h"
 
+#ifdef ENABLE_SHIM_CERT
+#include "shim_cert.h"
+#endif
+
 #include <stdarg.h>
 
 #include <openssl/err.h>
