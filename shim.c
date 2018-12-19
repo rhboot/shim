@@ -34,6 +34,9 @@
  */
 
 #include "shim.h"
+#if defined(ENABLE_SHIM_CERT)
+#include "shim_cert.h"
+#endif /* defined(ENABLE_SHIM_CERT) */
 
 #include <openssl/err.h>
 #include <openssl/bn.h>
@@ -75,6 +78,10 @@ UINT32 vendor_cert_size;
 UINT32 vendor_dbx_size;
 UINT8 *vendor_cert;
 UINT8 *vendor_dbx;
+#if defined(ENABLE_SHIM_CERT)
+UINT32 build_cert_size;
+UINT8 *build_cert;
+#endif /* defined(ENABLE_SHIM_CERT) */
 
 /*
  * indicator of how an image has been verified
@@ -2562,6 +2569,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+#if defined(ENABLE_SHIM_CERT)
+	build_cert_size = sizeof(shim_cert);
+	build_cert = shim_cert;
+#endif /* defined(ENABLE_SHIM_CERT) */
 	CHAR16 *msgs[] = {
 		L"import_mok_state() failed\n",
 		L"shim_int() failed\n",
