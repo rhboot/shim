@@ -120,9 +120,6 @@
 #include "include/variables.h"
 
 #include "version.h"
-#ifdef ENABLE_SHIM_CERT
-#include "shim_cert.h"
-#endif
 
 INTERFACE_DECL(_SHIM_LOCK);
 
@@ -170,6 +167,10 @@ extern UINT32 vendor_cert_size;
 extern UINT32 vendor_dbx_size;
 extern UINT8 *vendor_cert;
 extern UINT8 *vendor_dbx;
+#if defined(ENABLE_SHIM_CERT)
+extern UINT32 build_cert_size;
+extern UINT8 *build_cert;
+#endif /* defined(ENABLE_SHIM_CERT) */
 
 extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;
