@@ -72,7 +72,7 @@ ifeq ($(ARCH),aarch64)
 	ARCH_CFLAGS		?=
 endif
 ifeq ($(ARCH),arm)
-	ARCH_CFLAGS		?= -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mstrict-align
+	ARCH_CFLAGS		?= -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mno-unaligned-access
 	LIBDIR			?= $(prefix)/lib
 	ARCH_SUFFIX		?= arm
 	ARCH_SUFFIX_UPPER	?= ARM
