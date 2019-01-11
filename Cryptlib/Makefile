@@ -19,6 +19,9 @@ endif
 ifeq ($(ARCH),aarch64)
 	CFLAGS	+= -DMDE_CPU_AARCH64
 endif
+ifeq ($(ARCH),arm)
+	CFLAGS	+= -DMDE_CPU_ARM
+endif
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libcryptlib.a
