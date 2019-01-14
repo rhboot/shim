@@ -150,7 +150,7 @@ allow_32_bit(void)
 #endif
 #elif defined(__i386__) || defined(__i686__)
 	return 1;
-#elif defined(__arch64__)
+#elif defined(__aarch64__)
 	return 0;
 #else /* assuming everything else is 32-bit... */
 	return 1;
