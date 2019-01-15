@@ -388,7 +388,9 @@ static BOOLEAN verify_eku(UINT8 *Cert, UINTN CertSize)
 	EXTENDED_KEY_USAGE *eku;
 	ASN1_OBJECT *module_signing;
 
-	module_signing = OBJ_nid2obj(OBJ_create(OID_EKU_MODSIGN, NULL, NULL));
+        module_signing = OBJ_nid2obj(OBJ_create(OID_EKU_MODSIGN,
+                                                "modsign-eku",
+                                                "modsign-eku"));
 
 	x509 = d2i_X509 (NULL, &Temp, (long) CertSize);
 	if (x509 != NULL) {
