@@ -87,6 +87,11 @@ SHIM_INCLUDES = \
 %.o : %.c
 	$(CC) $(CFLAGS) $(SHIM_INCLUDES) -c -o $@ $<
 
+OPENSSL_LDFLAGS = -Wl,--start-group,Cryptlib/libcryptlib.a,Cryptlib/OpenSSL/libopenssl.a,--end-group
+
+%.so :
+	$(CCLD) $(CFLAGS) $(CCLDFLAGS) -o $@ $^ $(OPENSSL_LDFLAGS) $(EFI_LIBS)
+
 shim.o: $(SOURCES)
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
@@ -100,18 +105,18 @@ $(SHIMNAME) : $(SHIMSONAME)
 $(MMNAME) : $(MMSONAME)
 $(FBNAME) : $(FBSONAME)
 
-$(SHIMSONAME): $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+$(SHIMSONAME): | Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
+$(SHIMSONAME): $(OBJS) lib/lib.a
 
 fallback.o: $(FALLBACK_SRCS)
 
-$(FBSONAME): $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+$(FBSONAME): | Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
+$(FBSONAME): $(FALLBACK_OBJS) lib/lib.a
 
 MokManager.o: $(MOK_SOURCES)
 
-$(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
+$(MMSONAME): | Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a
+$(MMSONAME): $(MOK_OBJS) lib/lib.a
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
