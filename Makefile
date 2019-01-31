@@ -97,6 +97,24 @@ ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
 endif
 shim.o: $(wildcard $(TOPDIR)/*.h)
+cert.o shim.o shim.h: $(TOPDIR)/config.h
+
+.ONESHELL: $(TOPDIR)/config.h
+$(TOPDIR)/config.h :
+	@echo making config.h
+	(
+	echo "#define EFI_ARCH L\"$(ARCH)\""
+	echo "#define DEBUGDIR L\"/usr/lib/debug/usr/share/shim/$(ARCH)-$(VERSION)$(DASHRELEASE)/\""
+	echo "#define DEFAULT_LOADER L\"$(DEFAULT_LOADER)\""
+	echo "#define DEFAULT_LOADER_CHAR \"$(DEFAULT_LOADER)\""
+	echo $(CONFIG_VENDOR_CERT)
+	echo $(CONFIG_VENDOR_DB)
+	echo $(CONFIG_VENDOR_DBX)
+	echo $(CONFIG_ENABLE_SHIM_CERT)
+	echo $(CONFIG_OVERRIDE_SECURITY_POLICY)
+	echo $(CONFIG_ENABLE_HTTPBOOT)
+	echo $(CONFIG_REQUIRE_TPM)
+	) > $@
 
 cert.o : $(TOPDIR)/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -242,7 +260,7 @@ endif
 clean-shim-objs:
 	@if [ -d lib ]; then $(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean ; fi
 	@rm -rvf $(TARGETS) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
-	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
+	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c config.h buildid
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [[ "$(TOPDIR)" = ..* ]] ; then rmdir Cryptlib || :; fi >/dev/null 2>&1
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi

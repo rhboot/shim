@@ -1,3 +1,4 @@
+#include "config.h"
 
 #if defined(VENDOR_DB_FILE) && defined(VENDOR_CERT_FILE)
 # error both VENDOR_DB_FILE and VENDOR_CERT_FILE have been configured
