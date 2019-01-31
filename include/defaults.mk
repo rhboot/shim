@@ -1,3 +1,8 @@
+.SUFFIXES:
+
+COMPILER	?= gcc
+CC		= $(CROSS_COMPILE)$(COMPILER)
+
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed \
 			-e s,aarch64,aa64, \
 			-e 's,arm.*,arm,' \
@@ -8,8 +13,10 @@ include $(TOPDIR)/include/arch-$(ARCH).mk
 
 COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
+CCLD		?= $(CC)
 DESTDIR		?=
 LD		= $(CROSS_COMPILE)ld
+AR		= $(CROSS_COMPILE)gcc-ar
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OPENSSL		?= openssl
 HEXDUMP		?= hexdump
@@ -35,6 +42,8 @@ OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed '
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 OPENSSLDIR	= $(TOPDIR)/Cryptlib/OpenSSL
+
+CC_LTO_PLUGIN = -flto=$(shell grep -c '^processor\s\+:' /proc/cpuinfo) -fuse-linker-plugin -ffat-lto-objects
 
 EFI_INCLUDE	?= /usr/include/efi
 EFI_INCLUDES	= \
@@ -70,7 +79,8 @@ CFLAGS = -ggdb -O0 \
 	 $(EFI_INCLUDES) \
 	 "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 	 "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
-	 $(OPENSSL_DEFINES)
+	 $(OPENSSL_DEFINES) \
+	 $(CC_LTO_PLUGIN)
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
@@ -85,7 +95,7 @@ ifneq ($(origin REQUIRE_TPM), undefined)
 endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
-EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
+EFI_LIBS	= -lefi -lgnuefi
 FORMAT		?= --target efi-app-$(LDARCH)
 EFI_PATH	?= $(LIBDIR)/gnuefi
 
@@ -114,7 +124,16 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+CCLDFLAGS	= -Wl,--hash-style=sysv \
+		  -Wl,-nostdlib,-znocombreloc,--no-undefined \
+		  -Wl,-T,$(EFI_LDS) \
+		  -Wl,-shared -Wl,-Bsymbolic \
+		  -Wl,-L$(EFI_PATH),-L$(LIBDIR) \
+		  -Wl,-LCryptlib,-LCryptlib/OpenSSL \
+		  -Wl,--build-id=sha1 \
+		  -nostdlib \
+		  $(EFI_CRT_OBJS) \
+		  $(ARCH_CCLDFLAGS)
 
 define get-config
 $(shell git config --local --get "shim.$(1)")
@@ -124,7 +143,6 @@ endef
 unexport KEYS
 unexport FALLBACK_OBJS FALLBACK_SRCS
 unexport MOK_OBJS MOK_SOURCES
-unexport OBJS ORIG_FALLBACK_SRCS ORIG_SOURCES ORIG_MOK_SOURCES
+unexport OBJS
 unexport SOURCES SUBDIRS
 unexport TARGET TARGETS
-unexport VPATH
