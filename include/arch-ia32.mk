@@ -4,6 +4,7 @@
 #
 ifeq ($(ARCH),ia32)
 
+ARCH_CCLDFLAGS ?=
 ARCH_CFLAGS ?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 	       $(CLANG_BUGS) -m32 \
 	       -DMDE_CPU_IA32 \

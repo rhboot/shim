@@ -4,6 +4,7 @@
 #
 ifeq ($(ARCH),arm)
 
+ARCH_CCLDFLAGS += -Wl,--defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 ARCH_CFLAGS ?= -DMDE_CPU_ARM -DPAGE_SIZE=4096 -DPAGE_SHIFT=12 \
 	       -mno-unaligned-access
 ARCH_LDFLAGS += --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
