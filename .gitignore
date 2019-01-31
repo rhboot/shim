@@ -1,7 +1,5 @@
 .sw?
 .*.sw?
-certdb
-shim_cert.h
 *.a
 *.CSV
 *.cer
@@ -26,8 +24,11 @@ shim_cert.h
 *.srl.old
 *.tar.*
 *.hash
-version.c
 build/
+certdb
+config.h
 cov-int/
+shim_cert.h
 scan-results/
 [Ss]creenlog*
+version.c

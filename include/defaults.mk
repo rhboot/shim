@@ -77,22 +77,8 @@ CFLAGS = -ggdb -O0 \
 	 $(ARCH_CFLAGS) \
 	 -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 	 $(EFI_INCLUDES) \
-	 "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
-	 "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 	 $(OPENSSL_DEFINES) \
 	 $(CC_LTO_PLUGIN)
-
-ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
-	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
-endif
-
-ifneq ($(origin ENABLE_HTTPBOOT), undefined)
-	CFLAGS	+= -DENABLE_HTTPBOOT
-endif
-
-ifneq ($(origin REQUIRE_TPM), undefined)
-	CFLAGS  += -DREQUIRE_TPM
-endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi
@@ -113,17 +99,6 @@ BOOTEFINAME	?= BOOT$(ARCH_UPPER).EFI
 BOOTCSVNAME	?= BOOT$(ARCH_UPPER).CSV
 
 CFLAGS += "-DEFI_ARCH=L\"$(ARCH)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH)-$(VERSION)$(DASHRELEASE)/\""
-
-ifneq ($(origin VENDOR_DB_FILE), undefined)
-	CFLAGS += -DVENDOR_DB_FILE=\"$(VENDOR_DB_FILE)\"
-endif
-ifneq ($(origin VENDOR_CERT_FILE), undefined)
-	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
-endif
-ifneq ($(origin VENDOR_DBX_FILE), undefined)
-	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
-endif
-
 CCLDFLAGS	= -Wl,--hash-style=sysv \
 		  -Wl,-nostdlib,-znocombreloc,--no-undefined \
 		  -Wl,-T,$(EFI_LDS) \
@@ -134,6 +109,34 @@ CCLDFLAGS	= -Wl,--hash-style=sysv \
 		  -nostdlib \
 		  $(EFI_CRT_OBJS) \
 		  $(ARCH_CCLDFLAGS)
+
+ifneq ($(origin VENDOR_CERT_FILE), undefined)
+	CONFIG_VENDOR_CERT="\#define VENDOR_CERT_FILE \"$(VENDOR_CERT_FILE)\""
+endif
+
+ifneq ($(origin VENDOR_DB_FILE), undefined)
+	CONFIG_VENDOR_DB="\#define VENDOR_DB_FILE \"$(VENDOR_DB_FILE)\""
+endif
+
+ifneq ($(origin VENDOR_DBX_FILE), undefined)
+	CONFIG_VENDOR_DBX="\#define VENDOR_DBX_FILE \"$(VENDOR_DBX_FILE)\""
+endif
+
+ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
+	CONFIG_OVERRIDE_SECURITY_POLICY="\#define OVERRIDE_SECURITY_POLICY"
+endif
+
+ifneq ($(origin ENABLE_HTTPBOOT), undefined)
+	CONFIG_ENABLE_HTTPBOOT="\#define ENABLE_HTTPBOOT"
+endif
+
+ifneq ($(origin REQUIRE_TPM), undefined)
+	CONFIG_REQUIRE_TPM="\#define REQUIRE_TPM"
+endif
+
+ifneq ($(origin ENABLE_SHIM_CERT),undefined)
+	CONFIG_ENABLE_SHIM_CERT="\#define ENABLE_SHIM_CERT"
+endif
 
 define get-config
 $(shell git config --local --get "shim.$(1)")

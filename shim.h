@@ -32,6 +32,8 @@
 
 #define nonnull(...) __attribute__((__nonnull__(__VA_ARGS__)))
 
+#include "config.h"
+
 #ifdef __x86_64__
 #ifndef DEFAULT_LOADER
 #define DEFAULT_LOADER L"\\grubx64.efi"
