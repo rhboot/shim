@@ -138,13 +138,16 @@ struct mok_state_variable mok_state_variables[] = {
 	{ NULL, }
 };
 
-inline BOOLEAN check_vendor_cert(struct mok_state_variable *v)
+static inline BOOLEAN nonnull(1)
+check_vendor_cert(struct mok_state_variable *v)
 {
 	return (v->addend_source && v->addend_size &&
 		*v->addend_source && *v->addend_size) ? TRUE : FALSE;
 }
+
 #if defined(ENABLE_SHIM_CERT)
-inline BOOLEAN check_build_cert(struct mok_state_variable *v)
+static inline BOOLEAN nonnull(1)
+check_build_cert(struct mok_state_variable *v)
 {
 	return (v->build_cert && v->build_cert_size &&
 		*v->build_cert && *v->build_cert_size) ? TRUE : FALSE;
