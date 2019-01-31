@@ -130,7 +130,8 @@ struct mok_state_variable mok_state_variables[] = {
 	{ NULL, }
 };
 
-static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
+static EFI_STATUS nonnull(1)
+mirror_one_mok_variable(struct mok_state_variable *v)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	void *FullData = NULL;
@@ -197,6 +198,29 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 }
 
 /*
+ * Mirror a variable if it has an rtname, and preserve any
+ * EFI_SECURITY_VIOLATION status at the same time.
+ */
+static EFI_STATUS nonnull(1)
+maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
+{
+	EFI_STATUS efi_status;
+	if (v->rtname) {
+		if (v->flags & MOK_MIRROR_DELETE_FIRST)
+			LibDeleteVariable(v->rtname, v->guid);
+
+		efi_status = mirror_one_mok_variable(v);
+		if (EFI_ERROR(efi_status)) {
+			if (ret != EFI_SECURITY_VIOLATION)
+				ret = efi_status;
+			perror(L"Could not create %s: %r\n", v->rtname,
+			       efi_status);
+		}
+	}
+	return ret;
+}
+
+/*
  * Verify our non-volatile MoK state.  This checks the variables above
  * accessable and have valid attributes.  If they don't, it removes
  * them.  If any of them can't be removed, our ability to do this is
@@ -232,7 +256,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 					       *v->guid, &attrs);
 		if (efi_status == EFI_NOT_FOUND) {
 			if (addend)
-				goto mirror_addend;
+				ret = maybe_mirror_one_mok_variable(v, ret);
 			/*
 			 * after possibly adding, we can continue, no
 			 * further checks to be done.
@@ -312,16 +336,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			}
 		}
 
-mirror_addend:
-		if (v->rtname && (present || addend)) {
-			if (v->flags & MOK_MIRROR_DELETE_FIRST)
-				LibDeleteVariable(v->rtname, v->guid);
-
-			efi_status = mirror_one_mok_variable(v);
-			if (EFI_ERROR(efi_status) &&
-			    ret != EFI_SECURITY_VIOLATION)
-				ret = efi_status;
-		}
+		if (present)
+			ret = maybe_mirror_one_mok_variable(v, ret);
 	}
 
 	/*
@@ -340,4 +356,4 @@ mirror_addend:
 	return ret;
 }
 
-// vim:fenc=utf-8:tw=75
+// vim:fenc=utf-8:tw=75:noet

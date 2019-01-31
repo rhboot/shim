@@ -30,6 +30,8 @@
 
 #include <stddef.h>
 
+#define nonnull(...) __attribute__((__nonnull__(__VA_ARGS__)))
+
 #define min(a, b) ({(a) < (b) ? (a) : (b);})
 
 #ifdef __x86_64__
