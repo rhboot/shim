@@ -1,3 +1,4 @@
+#include "config.h"
 	.globl cert_table
 	.type	cert_table, %object
 	.size	cert_table, 4

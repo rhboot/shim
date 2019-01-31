@@ -34,6 +34,8 @@
 
 #define min(a, b) ({(a) < (b) ? (a) : (b);})
 
+#include "config.h"
+
 #ifdef __x86_64__
 #ifndef DEFAULT_LOADER
 #define DEFAULT_LOADER L"\\grubx64.efi"

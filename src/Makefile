@@ -30,7 +30,7 @@ SHIM_CLEAN_PREFIXES = $(MMNAME) $(FBNAME) $(SHIMNAME)
 SHIM_CLEAN_SUFFIXES = .signed .debug .hash
 SHIM_CLEAN_FILENAMES = $(foreach x,$(SHIM_CLEAN_PREFIXES),$(foreach y,$(SHIM_CLEAN_SUFFIXES),$(x)$(y)) $(x))
 SHIM_CLEAN_FILES = $(foreach x,$(SHIM_CLEAN_FILENAMES),$(BUILDDIR)/$(x))
-SHIM_CLEAN_FILES += $(BUILDDIR)/src/shim_cert.h
+SHIM_CLEAN_FILES += $(BUILDDIR)/src/config.h $(BUILDDIR)/src/shim_cert.h
 clean-shim-objs :
 	@rm -f $(BUILDDIR)/src/*.{a,o,so}
 	@rm -f $(SHIM_CLEAN_FILES)
@@ -42,6 +42,25 @@ src/cert.o : src/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 src/shim.o: | src/shim.h
+src/shim.h: | src/config.h
+
+vpath src/config.h $(BUILDDIR)
+
+.ONESHELL: src/config.h
+src/config.h:
+	@echo making config.h
+	(
+	echo "#define EFI_ARCH L\"$(ARCH)\""
+	echo "#define DEBUGDIR L\"/usr/lib/debug/usr/share/shim/$(ARCH)-$(VERSION)$(DASHRELEASE)/\""
+	echo "#define DEFAULT_LOADER L\"$(DEFAULT_LOADER)\""
+	echo "#define DEFAULT_LOADER_CHAR \"$(DEFAULT_LOADER)\""
+	echo $(CONFIG_VENDOR_CERT)
+	echo $(CONFIG_VENDOR_DBX)
+	echo $(CONFIG_ENABLE_SHIM_CERT)
+	echo $(CONFIG_OVERRIDE_SECURITY_POLICY)
+	echo $(CONFIG_ENABLE_HTTPBOOT)
+	echo $(CONFIG_REQUIRE_TPM)
+	) > $@
 
 vpath version.c.in $(TOPDIR)/src/
 vpath version.c $(BUILDDIR)/src/

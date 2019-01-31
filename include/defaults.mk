@@ -80,25 +80,30 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
 		  -Werror=sign-compare -ffreestanding -std=gnu89 \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
-		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
-		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
 		  $(EFI_INCLUDES) $(ARCH_CFLAGS) $(OPENSSL_CFLAGS) \
 		  $(CC_LTO_PLUGIN)
 
+ifneq ($(origin VENDOR_CERT_FILE), undefined)
+	CONFIG_VENDOR_CERT="\#define VENDOR_CERT_FILE \"$(VENDOR_CERT_FILE)\""
+endif
+ifneq ($(origin VENDOR_DBX_FILE), undefined)
+	CONFIG_VENDOR_DBX="\#define VENDOR_DBX_FILE \"$(VENDOR_DBX_FILE)\""
+endif
+
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
-	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
+	CONFIG_OVERRIDE_SECURITY_POLICY="\#define OVERRIDE_SECURITY_POLICY"
 endif
 
 ifneq ($(origin ENABLE_HTTPBOOT), undefined)
-	CFLAGS	+= -DENABLE_HTTPBOOT
+	CONFIG_ENABLE_HTTPBOOT="\#define ENABLE_HTTPBOOT"
 endif
 
 ifneq ($(origin REQUIRE_TPM), undefined)
-	CFLAGS  += -DREQUIRE_TPM
+	CONFIG_REQUIRE_TPM="\#define REQUIRE_TPM"
 endif
 
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
-	CFLAGS += -DENABLE_SHIM_CERT
+	CONFIG_ENABLE_SHIM_CERT="\#define ENABLE_SHIM_CERT"
 endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
