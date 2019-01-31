@@ -4,6 +4,7 @@
 #
 ifeq ($(ARCH),x64)
 
+ARCH_CCLDFLAGS ?= -ffreestanding
 ARCH_CFLAGS ?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 	       $(CLANG_BUGS) -m64 \
 	       -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \

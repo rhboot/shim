@@ -1,3 +1,8 @@
+.SUFFIXES:
+
+COMPILER	?= gcc
+CC		= $(CROSS_COMPILE)$(COMPILER)
+
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed \
 			-e s,aarch64,aa64, \
 			-e 's,arm.*,arm,' \
@@ -11,6 +16,7 @@ CC		= $(CROSS_COMPILE)$(COMPILER)
 BUILDDIR	?= $(TOPDIR)
 DESTDIR		?=
 LD		= $(CROSS_COMPILE)ld
+AR		= $(CROSS_COMPILE)gcc-ar
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OPENSSL		?= openssl
 HEXDUMP		?= hexdump
@@ -35,6 +41,8 @@ DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
 OPENSSLDIR	= $(TOPDIR)/Cryptlib/OpenSSL
+
+CC_LTO_PLUGIN = -flto=$(shell grep -c '^processor\s\+:' /proc/cpuinfo) -fuse-linker-plugin -ffat-lto-objects
 
 EFI_INCLUDE	?= /usr/include/efi
 EFI_INCLUDES	= -nostdinc \
@@ -74,7 +82,8 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
-		  $(EFI_INCLUDES) $(ARCH_CFLAGS) $(OPENSSL_CFLAGS)
+		  $(EFI_INCLUDES) $(ARCH_CFLAGS) $(OPENSSL_CFLAGS) \
+		  $(CC_LTO_PLUGIN)
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
@@ -93,7 +102,6 @@ ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
-EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --target efi-app-$(LDARCH)
 EFI_PATH	?= $(LIBDIR)/gnuefi
 
@@ -110,16 +118,15 @@ SHIMHASHNAME	= $(SHIMSTEM).hash
 BOOTEFINAME	?= BOOT$(ARCH_UPPER).EFI
 BOOTCSVNAME	?= BOOT$(ARCH_UPPER).CSV
 
-CFLAGS += "-DEFI_ARCH=L\"$(ARCH)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH)-$(VERSION)$(DASHRELEASE)/\""
-
-ifneq ($(origin VENDOR_CERT_FILE), undefined)
-	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
-endif
-ifneq ($(origin VENDOR_DBX_FILE), undefined)
-	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
-endif
-
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+CCLDFLAGS	= -Wl,--hash-style=sysv \
+		  -Wl,-nostdlib,-znocombreloc,--no-undefined \
+		  -Wl,-T,$(EFI_LDS) \
+		  -Wl,-shared -Wl,-Bsymbolic \
+		  -Wl,-L$(EFI_PATH),-L$(LIBDIR) \
+		  -Wl,--build-id=sha1 \
+		  -nostdlib \
+		  $(EFI_CRT_OBJS) \
+		  $(ARCH_CCLDFLAGS)
 
 define get-config
 $(shell git config --local --get "shim.$(1)")
@@ -189,7 +196,6 @@ endif
 unexport KEYS
 unexport FALLBACK_OBJS FALLBACK_SRCS
 unexport MOK_OBJS MOK_SOURCES
-unexport OBJS ORIG_FALLBACK_SRCS ORIG_SOURCES ORIG_MOK_SOURCES
+unexport OBJS
 unexport SOURCES SUBDIRS
 unexport TARGET TARGETS
-unexport VPATH

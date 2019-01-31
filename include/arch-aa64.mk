@@ -4,6 +4,7 @@
 #
 ifeq ($(ARCH),aa64)
 
+ARCH_CCLDFLAGS += -Wl,--defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
 ARCH_CFLAGS ?= -mstrict-align \
 	       -DMDE_CPU_AARCH64 \
 	       -DPAGE_SIZE=4096 -DPAGE_SHIFT=12
