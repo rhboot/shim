@@ -1,48 +1,48 @@
+CRYPTLIB_SOURCES = \
+		   Cryptlib/Hash/CryptMd4Null.c \
+		   Cryptlib/Hash/CryptMd5.c \
+		   Cryptlib/Hash/CryptSha1.c \
+		   Cryptlib/Hash/CryptSha256.c \
+		   Cryptlib/Hash/CryptSha512.c \
+		   Cryptlib/Hmac/CryptHmacMd5Null.c \
+		   Cryptlib/Hmac/CryptHmacSha1Null.c \
+		   Cryptlib/Hmac/CryptHmacSha256Null.c \
+		   Cryptlib/Cipher/CryptAesNull.c \
+		   Cryptlib/Cipher/CryptTdesNull.c \
+		   Cryptlib/Cipher/CryptArc4Null.c \
+		   Cryptlib/Rand/CryptRand.c \
+		   Cryptlib/Pk/CryptRsaBasic.c \
+		   Cryptlib/Pk/CryptRsaExtNull.c \
+		   Cryptlib/Pk/CryptPkcs7SignNull.c \
+		   Cryptlib/Pk/CryptPkcs7Verify.c \
+		   Cryptlib/Pk/CryptDhNull.c \
+		   Cryptlib/Pk/CryptTs.c \
+		   Cryptlib/Pk/CryptX509.c \
+		   Cryptlib/Pk/CryptAuthenticode.c \
+		   Cryptlib/Pem/CryptPemNull.c \
+		   Cryptlib/SysCall/CrtWrapper.c \
+		   Cryptlib/SysCall/TimerWrapper.c \
+		   Cryptlib/SysCall/BaseMemAllocation.c \
+		   Cryptlib/SysCall/BaseStrings.c \
+		   Cryptlib/SysCall/memset.c
 
-OPENSSLDIR = $(TOPDIR)/Cryptlib/OpenSSL
-VPATH = $(TOPDIR)/Cryptlib
+CRYPTLIB_INCLUDES = \
+		    -I$(TOPDIR)/Cryptlib \
+		    -I$(TOPDIR)/Cryptlib/Include \
+		    -I$(TOPDIR)/Cryptlib/Include/openssl
 
-CFLAGS += -I$(OPENSSLDIR)/crypto/asn1 \
-	  -I$(OPENSSLDIR)/crypto/evp \
-	  -I$(OPENSSLDIR)/crypto/modes \
-	  -I$(OPENSSLDIR)/crypto/include \
-	  -I$(OPENSSLDIR) \
-	  -iquote $(OPENSSLDIR) \
-	  -iquote $(OPENSSLDIR)/crypto/include
+CRYPTLIB_OBJECTS = $(foreach x,$(CRYPTLIB_SOURCES),$(patsubst %.c,%.o,$(x)))
 
-TARGET = libcryptlib.a
-OBJS = Hash/CryptMd4Null.o \
-       Hash/CryptMd5.o \
-       Hash/CryptSha1.o \
-       Hash/CryptSha256.o \
-       Hash/CryptSha512.o \
-       Hmac/CryptHmacMd5Null.o \
-       Hmac/CryptHmacSha1Null.o \
-       Hmac/CryptHmacSha256Null.o \
-       Cipher/CryptAesNull.o \
-       Cipher/CryptTdesNull.o \
-       Cipher/CryptArc4Null.o \
-       Rand/CryptRand.o \
-       Pk/CryptRsaBasic.o \
-       Pk/CryptRsaExtNull.o \
-       Pk/CryptPkcs7SignNull.o \
-       Pk/CryptPkcs7Verify.o \
-       Pk/CryptDhNull.o \
-       Pk/CryptTs.o \
-       Pk/CryptX509.o \
-       Pk/CryptAuthenticode.o \
-       Pem/CryptPemNull.o \
-       SysCall/CrtWrapper.o \
-       SysCall/TimerWrapper.o \
-       SysCall/BaseMemAllocation.o \
-       SysCall/BaseStrings.o \
-       SysCall/memset.o
+$(foreach x,$(CRYPTLIB_SOURCES),$(eval vpath $(x) $(TOPDIR)))
+$(foreach x,$(CRYPTLIB_OBJECTS),$(eval vpath $(x) $(BUILDDIR)))
 
-%.o : $(TOPDIR)/%.c
+$(foreach x,$(CRYPTLIB_SOURCES),$(eval $(call object-template,,$(x),$$(CRYPTLIB_INCLUDES))))
 
-all: $(TARGET)
+clean-cryptlib-objs :
+	@rm -rf "$(BUILDDIR)/Cryptlib"
 
-libcryptlib.a: $(OBJS)
-	ar rcs libcryptlib.a $(OBJS)
-clean:
-	rm -f $(TARGET) $(OBJS)
+clean : | clean-cryptlib-objs
+
+vpath libcryptlib.a $(BUILDDIR)
+libcryptlib.a : $(CRYPTLIB_OBJECTS)
+	$(AR) rcsD $@ $^

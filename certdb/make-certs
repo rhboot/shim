@@ -381,7 +381,7 @@ if ! test -s ca.crt ; then
 	sed -i -e 's,^\[req_ca\]$,\[req\],g' `pwd`/openssl.cnf
 	openssl req -config `pwd`/openssl.cnf -new -key ca.key > ca.csr 2> /dev/null -passin pass:shim
 	sed -i -e 's,^\[req\]$,\[req_ca\],g' `pwd`/openssl.cnf
-	openssl x509 -extfile `pwd`/openssl.cnf -CAserial ca.srl -signkey ca.key -extensions v3_ca -req -in ca.csr -days $DAYS -out ca.crt ; : 2> /dev/null
+	openssl x509 -extfile `pwd`/openssl.cnf -CAserial ca.srl -signkey ca.key -extensions v3_ca -req -in ca.csr -days $DAYS -out ca.crt >/dev/null 2>&1
 	openssl x509 -noout -text -in ca.crt > ca.txt
 	cat ca.crt >> ca.txt
 	cat ca.txt > ca.crt
@@ -408,7 +408,7 @@ if ! test -s ocsp.crt ; then
 	sed -i -e 's,^\[req_ocsp\]$,\[req\],g' `pwd`/openssl.cnf
 	openssl req -config `pwd`/openssl.cnf -new -key ocsp.key > ocsp.csr 2> /dev/null
 	sed -i -e 's,^\[req\]$,\[req_ocsp\],g' `pwd`/openssl.cnf
-	openssl ca -batch -config `pwd`/openssl.cnf -extensions v3_ocsp -preserveDN -in ocsp.csr -days $DAYS -out ocsp.crt 2> /dev/null
+	openssl ca -batch -config `pwd`/openssl.cnf -extensions v3_ocsp -preserveDN -in ocsp.csr -days $DAYS -out ocsp.crt >/dev/null 2>&1
 	openssl x509 -noout -text -in ocsp.crt > ocsp.txt
 	cat ocsp.crt >> ocsp.txt
 	cat ocsp.txt >  ocsp.crt
@@ -421,11 +421,11 @@ fi
 # If we were told to revoke the certificate with the specified common name,
 # do so.
 if $revoke_cert ; then
-	openssl ca -config `pwd`/openssl.cnf -revoke "$commonname".crt
+	openssl ca -config `pwd`/openssl.cnf -revoke "$commonname".crt >/dev/null 2>&1
 fi
 
 # Always refresh the CRL.
-openssl ca -config `pwd`/openssl.cnf -gencrl ${CRLHOURS:+-crlhours ${CRLHOURS}} ${CRLDAYS:+-crldays ${CRLDAYS}} -out ca.crl.pem
+openssl ca -config `pwd`/openssl.cnf -gencrl ${CRLHOURS:+-crlhours ${CRLHOURS}} ${CRLDAYS:+-crldays ${CRLDAYS}} -out ca.crl.pem >/dev/null 2>&1
 openssl crl -in ca.crl.pem -outform der -out ca.crl
 openssl crl -in ca.crl -inform der -noout -text > ca.crl.pem
 openssl crl -in ca.crl -inform der >> ca.crl.pem
@@ -528,7 +528,7 @@ else
 fi
 if ! test -s "$pfx" ; then
 	#openssl pkcs12 -export -inkey "$key" -in "$cert" -name "$commonname" -out "$pfx" -nodes -passout pass:qweqwe
-	openssl pkcs12 -export -inkey "$key" -in "$cert" -name "$commonname" -out "$pfx" -nodes -passout pass:
+	openssl pkcs12 -export -inkey "$key" -in "$cert" -name "$commonname" -out "$pfx" -nodes -passout pass: >/dev/null 2>&1
 else
 	echo "You already have a $pfx file; not replacing."
 	done=echo
@@ -546,7 +546,7 @@ openssl x509 -noout -subject -in "$cert" | sed s,=\ ,\ ,g
 openssl x509 -noout -serial  -in "$cert" | sed s,=,\ ,g
 echo
 echo PKCS12 bag:
-openssl pkcs12 -in "$pfx" -nodes -nokeys -nocerts -info -passin pass:
+openssl pkcs12 -in "$pfx" -nodes -nokeys -nocerts -info -passin pass: >/dev/null 2>&1
 #openssl pkcs12 -in "$pfx" -nodes -nokeys -nocerts -info -passin pass:qweqwe
 echo
 echo Verifying:

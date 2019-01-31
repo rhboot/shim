@@ -1,0 +1,4 @@
+shim_cert.h
+*.db
+*.key
+*.crt

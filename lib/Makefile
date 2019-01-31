@@ -1,17 +1,16 @@
 
-VPATH=$(TOPDIR)/lib
+LIB_SOURCES = $(foreach x,$(wildcard $(TOPDIR)/lib/*.c),$(subst $(TOPDIR)/,,$(x)))
+LIB_OBJECTS = $(foreach x,$(LIB_SOURCES),$(patsubst %.c,%.o,$(x)))
 
-TARGET = lib.a
+$(foreach x,$(LIB_SOURCES),$(eval vpath $(x) $(TOPDIR)))
+$(foreach x,$(LIB_OBJECTS),$(eval vpath $(x) $(BUILDDIR)))
+$(foreach x,$(LIB_SOURCES),$(eval $(call object-template,lib/,$(x),$$(LIB_INCLUDES))))
 
-LIBFILES = $(patsubst $(VPATH)/%.c,%.o,$(wildcard $(VPATH)/*.c))
+clean-lib-objs :
+	@rm -rf $(BUILDDIR)/lib
 
-EFI_INCLUDES += -I$(TOPDIR)/CryptLib/Include/openssl/
+clean : | clean-lib-objs
 
-lib.a: $(LIBFILES)
-	$(AR) rcs lib.a $(LIBFILES)
-
-all: $(TARGET)
-
-clean:
-	rm -f lib.a
-	rm -f $(LIBFILES)
+vpath lib.a $(BUILDDIR)/lib
+lib.a : $(LIB_OBJECTS)
+	$(AR) rcsD $@ $^

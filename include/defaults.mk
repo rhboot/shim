@@ -8,6 +8,7 @@ include $(TOPDIR)/include/arch-$(ARCH).mk
 
 COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
+BUILDDIR	?= $(TOPDIR)
 DESTDIR		?=
 LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
@@ -33,7 +34,6 @@ DEFAULT_LOADER	?= \\\\grub$(ARCH).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
-SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 OPENSSLDIR	= $(TOPDIR)/Cryptlib/OpenSSL
 
 EFI_INCLUDE	?= /usr/include/efi
@@ -53,7 +53,8 @@ EFI_INCLUDES	= -nostdinc \
 		  -iquote $(TOPDIR) \
 		  -iquote $(TOPDIR)/src \
 		  -iquote $(OPENSSLDIR) \
-		  -iquote $(OPENSSLDIR)/crypto/include
+		  -iquote $(OPENSSLDIR)/crypto/include \
+		  -iquote $(BUILDDIR)/src
 
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(TOPDIR)/include/elf_$(ARCH)_efi.lds
@@ -85,6 +86,10 @@ endif
 
 ifneq ($(origin REQUIRE_TPM), undefined)
 	CFLAGS  += -DREQUIRE_TPM
+endif
+
+ifneq ($(origin ENABLE_SHIM_CERT),undefined)
+	CFLAGS += -DENABLE_SHIM_CERT
 endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
@@ -119,6 +124,66 @@ LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsym
 define get-config
 $(shell git config --local --get "shim.$(1)")
 endef
+
+define object-template
+$(subst $(TOPDIR),$(BUILDDIR),$(patsubst %.c,%.o,$(2))): $(2)
+	$$(CC) $$(CFLAGS) $(3) -c -o $$@ $$<
+endef
+
+%.efi : $(BUILDDIR)/%.efi
+
+src/%.o : $(BUILDDIR)/src/%.o
+
+%.crt : $(BUILDDIR)/certdb/%.crt
+%.cer : $(BUILDDIR)/certdb/%.cer
+
+%.efi : %.so
+ifneq ($(OBJCOPY_GTE224),1)
+	$(error objcopy >= 2.24 is required)
+endif
+	$(OBJCOPY) --file-alignment 512 -D \
+		-j .text -j .sdata -j .data -j .data.ident \
+		-j .dynamic -j .dynsym -j .rel* \
+		-j .rela* -j .reloc -j .eh_frame \
+		-j .vendor_cert \
+		-j .note.gnu.build-id \
+		$(FORMAT) $^ $@
+	# I am tired of wasting my time fighting binutils timestamp code.
+	dd conv=notrunc bs=1 count=4 seek=$(TIMESTAMP_LOCATION) if=/dev/zero of=$@
+
+%.efi.debug: %.so
+ifneq ($(OBJCOPY_GTE224),1)
+	$(error objcopy >= 2.24 is required)
+endif
+	$(OBJCOPY) --file-alignment 512 -D \
+		-j .text -j .sdata -j .data -j .data.ident \
+		-j .dynamic -j .dynsym -j .rel* \
+		-j .rela* -j .reloc -j .eh_frame \
+		-j .debug_info -j .debug_abbrev -j .debug_aranges \
+		-j .debug_line -j .debug_str -j .debug_ranges \
+		-j .note.gnu.build-id \
+		$< $@
+
+ifneq ($(origin ENABLE_SBSIGN),undefined)
+%.efi.signed: %.efi shim.key shim.crt
+	@$(SBSIGN) \
+		--key $(BUILDDIR)/certdb/shim.key \
+		--cert $(BUILDDIR)/certdb/shim.crt \
+		--output $(BUILDDIR)/$@ $(BUILDDIR)/$^
+else
+.ONESHELL: $(MMNAME).signed $(FBNAME).signed
+%.efi.signed: %.efi certdb/secmod.db
+	@cd $(BUILDDIR)
+	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
+endif
+
+.ONESHELL: %.hash
+%.hash : | $(BUILDDIR)
+%.hash : %.efi
+	@cd $(BUILDDIR)
+	$(PESIGN) -i $< -P -h > $@
+
+%.efi %.efi.signed %.efi.debug %.so : | $(BUILDDIR)
 
 .EXPORT_ALL_VARIABLES:
 unexport KEYS
