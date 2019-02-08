@@ -2504,9 +2504,9 @@ shim_init(void)
 			loader_is_participating = 0;
 		}
 
-		hook_exit(systab);
 	}
 
+	hook_exit(systab);
 	return install_shim_protocols();
 }
 
@@ -2524,8 +2524,9 @@ shim_fini(void)
 		 * Remove our hooks from system services.
 		 */
 		unhook_system_services();
-		unhook_exit();
 	}
+
+	unhook_exit();
 
 	/*
 	 * Free the space allocated for the alternative 2nd stage loader
