@@ -20,6 +20,12 @@ ifneq ($(origin ENABLE_HTTPBOOT), undefined)
 	ORIG_SHIM_SOURCES += httpboot.c
 endif
 
+ifeq ($(SOURCE_DATE_EPOCH),)
+	UNAME=$(shell uname -s -m -p -i -o)
+else
+	UNAME=buildhost
+endif
+
 SHIM_SOURCES := $(foreach x,$(ORIG_SHIM_SOURCES),src/$(x))
 SHIM_OBJECTS := $(foreach x,$(SHIM_SOURCES),$(patsubst %.c,%.efi.o,$(x)))
 MOK_SOURCES := $(foreach x,$(ORIG_MOK_SOURCES),src/$(x))
@@ -82,7 +88,7 @@ vpath version.efi.o $(BUILDDIR)/src/
 src/version.efi.o : src/version.c | version.c.in
 src/version.c : version.c.in
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
-		-e "s,@@UNAME@@,$(shell uname -s -m -p -i -o)," \
+		-e "s,@@UNAME@@,$(UNAME)," \
 		-e "s,@@COMMIT@@,$(COMMIT_ID)," \
 		< $< > $@
 
