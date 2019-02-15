@@ -46,6 +46,12 @@ ifneq ($(origin ENABLE_HTTPBOOT), undefined)
 	SOURCES += httpboot.c include/httpboot.h
 endif
 
+ifeq ($(SOURCE_DATE_EPOCH),)
+	UNAME=$(shell uname -s -m -p -i -o)
+else
+	UNAME=buildhost
+endif
+
 SOURCES = $(foreach source,$(ORIG_SOURCES),$(TOPDIR)/$(source)) version.c
 MOK_SOURCES = $(foreach source,$(ORIG_MOK_SOURCES),$(TOPDIR)/$(source))
 FALLBACK_SRCS = $(foreach source,$(ORIG_FALLBACK_SRCS),$(TOPDIR)/$(source))
@@ -66,7 +72,7 @@ shim_cert.h: shim.cer
 
 version.c : $(TOPDIR)/version.c.in
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
-		-e "s,@@UNAME@@,$(shell uname -s -m -p -i -o)," \
+		-e "s,@@UNAME@@,$(UNAME)," \
 		-e "s,@@COMMIT@@,$(COMMIT_ID)," \
 		< $< > $@
 
