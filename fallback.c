@@ -431,8 +431,26 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		UINTN varname_size = sizeof(varname);
 		efi_status = gRT->GetNextVariableName(&varname_size, varname,
 						      &vendor_guid);
-		if (EFI_ERROR(efi_status))
+		if (EFI_ERROR(efi_status)) {
+			if (efi_status == EFI_BUFFER_TOO_SMALL)
+				VerbosePrint(L"Buffer too small for next var "
+					     L"name\n");
+
+			if (efi_status == EFI_DEVICE_ERROR)
+				VerbosePrint(L"The next variable name could "
+					     L"not be retrieved due to a "
+					     L"hardware error\n");
+
+			if (efi_status == EFI_INVALID_PARAMETER)
+				VerbosePrint(L"Invalid parameter to "
+					     L"GetNextVariableName: "
+					     L"varname_size=%d, varname=%s\n",
+					     varname_size, varname);
+
+			/* EFI_NOT_FOUND means we listed all variables */
+			VerbosePrint(L"Checked all boot entries\n");
 			break;
+		}
 
 		if (StrLen(varname) != 8 || StrnCmp(varname, L"Boot", 4) ||
 		    !isxdigit(varname[4]) || !isxdigit(varname[5]) ||
@@ -469,7 +487,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	}
 	FreePool(candidate);
 	FreePool(data);
-	return EFI_NOT_FOUND;
+	return efi_status;
 }
 
 EFI_STATUS
