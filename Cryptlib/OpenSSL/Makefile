@@ -2,11 +2,6 @@
 OPENSSLDIR = $(TOPDIR)/Cryptlib/OpenSSL
 VPATH = $(OPENSSLDIR)
 
-CFLAGS		= -ggdb -O0 -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDIR)/crypto \
-		  -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar -nostdinc \
-		  -ffreestanding -std=gnu89 -I$(shell $(CC) -print-file-name=include) \
-		  -Wall $(EFI_INCLUDES) -DL_ENDIAN -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -DNO_SYSLOG -DOPENSSL_SMALL_FOOTPRINT -DPEDANTIC
-
 CFLAGS += -I$(OPENSSLDIR)/crypto/asn1 \
 	  -I$(OPENSSLDIR)/crypto/evp \
 	  -I$(OPENSSLDIR)/crypto/modes \
@@ -14,25 +9,6 @@ CFLAGS += -I$(OPENSSLDIR)/crypto/asn1 \
 	  -I$(OPENSSLDIR) \
 	  -iquote $(OPENSSLDIR) \
 	  -iquote $(OPENSSLDIR)/crypto/include
-
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
-
-ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS) \
-		-m64 -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		-UNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
-endif
-ifeq ($(ARCH),ia32)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		$(CLANG_BUGS) -m32 -DMDE_CPU_IA32
-endif
-ifeq ($(ARCH),aarch64)
-	CFLAGS	+= -O2 -DMDE_CPU_AARCH64
-endif
-ifeq ($(ARCH),arm)
-	CFLAGS	+= -O2 -DMDE_CPU_ARM
-endif
-LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libopenssl.a
 OBJS		= crypto/bio/b_print.o \

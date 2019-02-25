@@ -34,17 +34,38 @@ DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
+OPENSSLDIR	= $(TOPDIR)/Cryptlib/OpenSSL
 
 EFI_INCLUDE	?= /usr/include/efi
-EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) \
+EFI_INCLUDES	= -nostdinc \
+		  -I$(TOPDIR)/Cryptlib \
+		  -I$(TOPDIR)/Cryptlib/Include \
+		  -I$(TOPDIR)/Cryptlib/Include/openssl \
+		  -I$(EFI_INCLUDE) \
+		  -I$(EFI_INCLUDE)/$(ARCH) \
 		  -I$(EFI_INCLUDE)/protocol \
-		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
+		  -I$(TOPDIR)/include \
+		  -I$(OPENSSLDIR) \
+		  -I$(OPENSSLDIR)/crypto/asn1 \
+		  -I$(OPENSSLDIR)/crypto/evp \
+		  -I$(OPENSSLDIR)/crypto/modes \
+		  -I$(OPENSSLDIR)/crypto/include \
+		  -iquote $(TOPDIR) \
+		  -iquote $(TOPDIR)/src \
+		  -iquote $(OPENSSLDIR) \
+		  -iquote $(OPENSSLDIR)/crypto/include
 
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(TOPDIR)/include/elf_$(ARCH)_efi.lds
 
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
+
+OPENSSL_CFLAGS = -D_CRT_SECURE_NO_DEPRECATE \
+		 -D_CRT_NONSTDC_NO_DEPRECATE \
+		 -DL_ENDIAN \
+		 -DOPENSSL_SMALL_FOOTPRINT \
+		 -DOPENSSL_FIPS \
+		 -DPEDANTIC
 
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
@@ -52,7 +73,7 @@ CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
-		  $(EFI_INCLUDES) $(ARCH_CFLAGS)
+		  $(EFI_INCLUDES) $(ARCH_CFLAGS) $(OPENSSL_CFLAGS)
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY

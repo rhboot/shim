@@ -2,9 +2,6 @@
 OPENSSLDIR = $(TOPDIR)/Cryptlib/OpenSSL
 VPATH = $(TOPDIR)/Cryptlib
 
-CFLAGS		= -ggdb -O0 -I$(TOPDIR) -iquote $(TOPDIR) -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall $(EFI_INCLUDES) -std=gnu89 \
-		  -ffreestanding -I$(shell $(CC) -print-file-name=include)
 CFLAGS += -I$(OPENSSLDIR)/crypto/asn1 \
 	  -I$(OPENSSLDIR)/crypto/evp \
 	  -I$(OPENSSLDIR)/crypto/modes \
