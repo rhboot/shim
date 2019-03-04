@@ -2010,6 +2010,16 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 					 use_fb ? FALLBACK : second_stage);
 	}
 
+	/*
+	 * When load options specify the second stage loader, but the file
+         * doesn't exist, try to boot from default loader.
+	 */
+	if (efi_status == EFI_NOT_FOUND && !use_fb) {
+		console_print(L"Boot from default loader: %s\n", DEFAULT_LOADER);
+		msleep(2000000);
+		efi_status = start_image(image_handle, DEFAULT_LOADER);
+	}
+
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"start_image() returned %r\n", efi_status);
 		msleep(2000000);
