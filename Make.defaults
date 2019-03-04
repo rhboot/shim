@@ -80,7 +80,7 @@ ifeq ($(ARCH),aarch64)
 endif
 ifeq ($(ARCH),arm)
 	ARCH_EFI		?= Arm
-	ARCH_CFLAGS		?= -DPAGE_SIZE=4096 -mstrict-align	\
+	ARCH_CFLAGS		?= -DPAGE_SIZE=4096 -mno-unaligned-access	\
 				   -mno-stack-arg-probe \
 				   -target arm-windows-gnu
 	LIBDIR			?= $(prefix)/lib

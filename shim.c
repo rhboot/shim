@@ -34,8 +34,11 @@
  */
 
 #include "shim.h"
-#include <dpath.h>
+#if defined(ENABLE_SHIM_CERT)
+#include "shim_cert.h"
+#endif /* defined(ENABLE_SHIM_CERT) */
 
+#include <dpath.h>
 #include <stdarg.h>
 
 #include <openssl/err.h>
@@ -81,6 +84,10 @@ UINT32 vendor_cert_size;
 UINT32 vendor_dbx_size;
 CONST UINT8 *vendor_cert;
 CONST UINT8 *vendor_dbx;
+#if defined(ENABLE_SHIM_CERT)
+UINT32 build_cert_size;
+UINT8 *build_cert;
+#endif /* defined(ENABLE_SHIM_CERT) */
 
 /*
  * indicator of how an image has been verified
@@ -154,7 +161,7 @@ allow_32_bit(void)
 #endif
 #elif defined(__i386__) || defined(__i686__)
 	return 1;
-#elif defined(__arch64__)
+#elif defined(__aarch64__)
 	return 0;
 #else /* assuming everything else is 32-bit... */
 	return 1;
@@ -2605,6 +2612,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	vendor_dbx_size = cert_table.vendor_dbx_size;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+#if defined(ENABLE_SHIM_CERT)
+	build_cert_size = sizeof(shim_cert);
+	build_cert = shim_cert;
+#endif /* defined(ENABLE_SHIM_CERT) */
 	STATIC CONST CHAR16 *msgs[] = {
 		L"import_mok_state() failed\n",
 		L"shim_int() failed\n",
@@ -2633,7 +2644,17 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * boot-services-only state variables are what we think they are.
 	 */
 	efi_status = import_mok_state(image_handle);
-	if (EFI_ERROR(efi_status)) {
+	if (!secure_mode() && efi_status == EFI_INVALID_PARAMETER) {
+		/*
+		 * Make copy failures fatal only if secure_mode is enabled, or
+		 * the error was anything else than EFI_INVALID_PARAMETER.
+		 * There are non-secureboot firmware implementations that don't
+		 * reserve enough EFI variable memory to fit the variable.
+		 */
+		console_print(L"Importing MOK states has failed: %s: %r\n",
+			      msgs[msg], efi_status);
+		console_print(L"Continuing boot since secure mode is disabled");
+	} else if (EFI_ERROR(efi_status)) {
 die:
 		console_print(L"Something has gone seriously wrong: %s: %r\n",
 			      msgs[msg], efi_status);

@@ -68,6 +68,10 @@ struct mok_state_variable {
 	 */
 	CONST UINT8 **addend_source;
 	UINT32 *addend_size;
+#if defined(ENABLE_SHIM_CERT)
+	UINT8 **build_cert;
+	UINT32 *build_cert_size;
+#endif /* defined(ENABLE_SHIM_CERT) */
 	UINT32 yes_attr;
 	UINT32 no_attr;
 	UINT32 flags;
@@ -90,6 +94,10 @@ struct mok_state_variable mok_state_variables[] = {
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
 	 .addend_source = &vendor_cert,
 	 .addend_size = &vendor_cert_size,
+#if defined(ENABLE_SHIM_CERT)
+	 .build_cert = &build_cert,
+	 .build_cert_size = &build_cert_size,
+#endif /* defined(ENABLE_SHIM_CERT) */
 	 .flags = MOK_MIRROR_KEYDB |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
@@ -130,22 +138,54 @@ struct mok_state_variable mok_state_variables[] = {
 	{ NULL, }
 };
 
-static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
+static inline BOOLEAN nonnull(1)
+check_vendor_cert(struct mok_state_variable *v)
+{
+	return (v->addend_source && v->addend_size &&
+		*v->addend_source && *v->addend_size) ? TRUE : FALSE;
+}
+
+#if defined(ENABLE_SHIM_CERT)
+static inline BOOLEAN nonnull(1)
+check_build_cert(struct mok_state_variable *v)
+{
+	return (v->build_cert && v->build_cert_size &&
+		*v->build_cert && *v->build_cert_size) ? TRUE : FALSE;
+}
+#define check_addend(v) (check_vendor_cert(v) || check_build_cert(v))
+#else
+#define check_addend(v) check_vendor_cert(v)
+#endif /* defined(ENABLE_SHIM_CERT) */
+
+static EFI_STATUS nonnull(1)
+mirror_one_mok_variable(struct mok_state_variable *v)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	void *FullData = NULL;
 	UINTN FullDataSize = 0;
 	UINT8 *p = NULL;
 
-	if ((v->flags & MOK_MIRROR_KEYDB) &&
-	    v->addend_source && *v->addend_source &&
-	    v->addend_size && *v->addend_size) {
+	if ((v->flags & MOK_MIRROR_KEYDB) && check_addend(v)) {
 		EFI_SIGNATURE_LIST *CertList = NULL;
 		EFI_SIGNATURE_DATA *CertData = NULL;
+#if defined(ENABLE_SHIM_CERT)
+		FullDataSize = v->data_size;
+		if (check_build_cert(v)) {
+			FullDataSize += sizeof (*CertList)
+					+ sizeof (EFI_GUID)
+					+ *v->build_cert_size;
+		}
+		if (check_vendor_cert(v)) {
+			FullDataSize += sizeof (*CertList)
+					+ sizeof (EFI_GUID)
+					+ *v->addend_size;
+		}
+#else
 		FullDataSize = v->data_size
 			     + sizeof (*CertList)
 			     + sizeof (EFI_GUID)
 			     + *v->addend_size;
+#endif /* defined(ENABLE_SHIM_CERT) */
 		FullData = AllocatePool(FullDataSize);
 		if (!FullData) {
 			perror(L"Failed to allocate space for MokListRT\n");
@@ -157,6 +197,35 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 			CopyMem(p, v->data, v->data_size);
 			p += v->data_size;
 		}
+
+#if defined(ENABLE_SHIM_CERT)
+		if (check_build_cert(v) == FALSE)
+			goto skip_build_cert;
+
+		CertList = (EFI_SIGNATURE_LIST *)p;
+		p += sizeof (*CertList);
+		CertData = (EFI_SIGNATURE_DATA *)p;
+		p += sizeof (EFI_GUID);
+
+		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
+		CertList->SignatureListSize = *v->build_cert_size
+					      + sizeof (*CertList)
+					      + sizeof (*CertData)
+					      -1;
+		CertList->SignatureHeaderSize = 0;
+		CertList->SignatureSize = *v->build_cert_size +
+					  sizeof (EFI_GUID);
+
+		CertData->SignatureOwner = SHIM_LOCK_GUID;
+		CopyMem(p, *v->build_cert, *v->build_cert_size);
+
+		p += *v->build_cert_size;
+
+		if (check_vendor_cert(v) == FALSE)
+			goto skip_vendor_cert;
+skip_build_cert:
+#endif /* defined(ENABLE_SHIM_CERT) */
+
 		CertList = (EFI_SIGNATURE_LIST *)p;
 		p += sizeof (*CertList);
 		CertData = (EFI_SIGNATURE_DATA *)p;
@@ -173,6 +242,9 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 		CertData->SignatureOwner = gShimLockGuid;
 		CopyMem(p, *v->addend_source, *v->addend_size);
 
+#if defined(ENABLE_SHIM_CERT)
+skip_vendor_cert:
+#endif /* defined(ENABLE_SHIM_CERT) */
 		if (v->data && v->data_size)
 			FreePool(v->data);
 		v->data = FullData;
@@ -194,6 +266,29 @@ static EFI_STATUS mirror_one_mok_variable(struct mok_state_variable *v)
 	}
 
 	return efi_status;
+}
+
+/*
+ * Mirror a variable if it has an rtname, and preserve any
+ * EFI_SECURITY_VIOLATION status at the same time.
+ */
+static EFI_STATUS nonnull(1)
+maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
+{
+	EFI_STATUS efi_status;
+	if (v->rtname) {
+		if (v->flags & MOK_MIRROR_DELETE_FIRST)
+			delete_variable(v->rtname, v->guid);
+
+		efi_status = mirror_one_mok_variable(v);
+		if (EFI_ERROR(efi_status)) {
+			if (ret != EFI_SECURITY_VIOLATION)
+				ret = efi_status;
+			perror(L"Could not create %s: %r\n", v->rtname,
+			       efi_status);
+		}
+	}
+	return ret;
 }
 
 /*
@@ -223,11 +318,20 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		UINT32 attrs = 0;
 		BOOLEAN delete = FALSE, present, addend;
 
+		addend = check_addend(v);
+
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       v->guid, &attrs);
-		if (efi_status == EFI_NOT_FOUND)
+		if (efi_status == EFI_NOT_FOUND) {
+			if (addend)
+				ret = maybe_mirror_one_mok_variable(v, ret);
+			/*
+			 * after possibly adding, we can continue, no
+			 * further checks to be done.
+			 */
 			continue;
+		}
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Could not verify %s: %r\n", v->name,
 			       efi_status);
@@ -272,9 +376,6 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		}
 
 		present = (v->data && v->data_size) ? TRUE : FALSE;
-		addend = (v->addend_source && v->addend_size &&
-			  *v->addend_source && *v->addend_size)
-			? TRUE : FALSE;
 
 		if (v->flags & MOK_VARIABLE_MEASURE && present) {
 			/*
@@ -304,15 +405,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			}
 		}
 
-		if (v->rtname && present && addend) {
-			if (v->flags & MOK_MIRROR_DELETE_FIRST)
-				delete_variable(v->rtname, v->guid);
-
-			efi_status = mirror_one_mok_variable(v);
-			if (EFI_ERROR(efi_status) &&
-			    ret != EFI_SECURITY_VIOLATION)
-				ret = efi_status;
-		}
+		if (present)
+			ret = maybe_mirror_one_mok_variable(v, ret);
 	}
 
 	/*
@@ -331,4 +425,4 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 	return ret;
 }
 
-// vim:fenc=utf-8:tw=75
+// vim:fenc=utf-8:tw=75:noet

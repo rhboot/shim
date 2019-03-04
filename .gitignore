@@ -26,6 +26,7 @@ shim_cert.h
 *.srl
 *.srl.old
 *.tar.*
+*.hash
 version.c
 cov-int/
 scan-results/

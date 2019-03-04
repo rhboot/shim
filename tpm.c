@@ -73,41 +73,6 @@ static BOOLEAN tpm2_present(EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
 	return FALSE;
 }
 
-static inline EFI_TCG2_EVENT_LOG_BITMAP
-tpm2_get_supported_logs(EFI_TCG2_PROTOCOL *tpm,
-			EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
-			BOOLEAN old_caps)
-{
-	if (old_caps)
-		return ((TREE_BOOT_SERVICE_CAPABILITY *)caps)->SupportedEventLogs;
-
-	return caps->SupportedEventLogs;
-}
-
-/*
- * According to TCG EFI Protocol Specification for TPM 2.0 family,
- * all events generated after the invocation of EFI_TCG2_GET_EVENT_LOG
- * shall be stored in an instance of an EFI_CONFIGURATION_TABLE aka
- * EFI TCG 2.0 final events table. Hence, it is necessary to trigger the
- * internal switch through calling get_event_log() in order to allow
- * to retrieve the logs from OS runtime.
- */
-static EFI_STATUS trigger_tcg2_final_events_table(EFI_TCG2_PROTOCOL *tpm2,
-						  EFI_TCG2_EVENT_LOG_BITMAP supported_logs)
-{
-	EFI_TCG2_EVENT_LOG_FORMAT log_fmt;
-	EFI_PHYSICAL_ADDRESS start;
-	EFI_PHYSICAL_ADDRESS end;
-	BOOLEAN truncated;
-
-	if (supported_logs & EFI_TCG2_EVENT_LOG_FORMAT_TCG_2)
-		log_fmt = EFI_TCG2_EVENT_LOG_FORMAT_TCG_2;
-	else
-		log_fmt = EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2;
-
-	return tpm2->GetEventLog(tpm2, log_fmt, &start, &end, &truncated);
-}
-
 static EFI_STATUS tpm_locate_protocol(EFI_TCG_PROTOCOL **tpm,
 				      EFI_TCG2_PROTOCOL **tpm2,
 				      BOOLEAN *old_caps_p,
@@ -170,17 +135,6 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 #endif
 	} else if (tpm2) {
 		EFI_TCG2_EVENT *event;
-		EFI_TCG2_EVENT_LOG_BITMAP supported_logs;
-
-		supported_logs = tpm2_get_supported_logs(tpm2, &caps, old_caps);
-
-		efi_status = trigger_tcg2_final_events_table(tpm2,
-							     supported_logs);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Unable to trigger tcg2 final events table: %r\n",
-			       efi_status);
-			return efi_status;
-		}
 
 		event = AllocatePool(sizeof(*event) + logsize);
 		if (!event) {
