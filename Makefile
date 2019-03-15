@@ -189,11 +189,13 @@ endif
 ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
-	$(OBJCOPY) -j .text -j .sdata -j .data -j .data.ident \
+	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .dynsym -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .vendor_cert \
 		$(FORMAT) $^ $@
+	# I am tired of wasting my time fighting binutils timestamp code.
+	dd conv=notrunc bs=1 count=4 seek=$(TIMESTAMP_LOCATION) if=/dev/zero of=$@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
@@ -204,7 +206,7 @@ endif
 ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
-	$(OBJCOPY) -j .text -j .sdata -j .data \
+	$(OBJCOPY) -D -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
