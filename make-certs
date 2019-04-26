@@ -1,9 +1,11 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
 #
 #  Generate a root CA cert for signing, and then a subject cert.
 #  Usage: make-certs.sh hostname [user[@domain]] [more ...]
 #  For testing only, probably still has some bugs in it.
 #
+
+set -e
 
 DOMAIN=xn--u4h.net
 DAYS=365
