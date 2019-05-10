@@ -34,6 +34,8 @@ void
 console_notify(CHAR16 *string);
 void
 console_reset(void);
+void
+console_mode_handle(void);
 #define NOSEL 0x7fffffff
 
 typedef struct _EFI_CONSOLE_CONTROL_PROTOCOL   EFI_CONSOLE_CONTROL_PROTOCOL;

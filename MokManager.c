@@ -2560,6 +2560,8 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE * systab)
 
 	setup_rand();
 
+	console_mode_handle();
+
 	efi_status = check_mok_request(image_handle);
 
 	console_fini();
