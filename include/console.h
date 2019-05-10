@@ -40,6 +40,8 @@ int
 console_countdown(CHAR16* title, const CHAR16* message, int timeout);
 void
 console_reset(void);
+void
+console_mode_handle(void);
 #define NOSEL 0x7fffffff
 
 typedef struct _EFI_CONSOLE_CONTROL_PROTOCOL   EFI_CONSOLE_CONTROL_PROTOCOL;
