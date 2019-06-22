@@ -131,8 +131,10 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 #endif
 	} else if (tpm2) {
 		EFI_TCG2_EVENT *event;
+		UINTN event_size = sizeof(*event) - sizeof(event->Event) +
+			logsize;
 
-		event = AllocatePool(sizeof(*event) + logsize);
+		event = AllocatePool(event_size);
 		if (!event) {
 			perror(L"Unable to allocate event structure\n");
 			return EFI_OUT_OF_RESOURCES;
@@ -142,7 +144,7 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 		event->Header.HeaderVersion = 1;
 		event->Header.PCRIndex = pcr;
 		event->Header.EventType = type;
-		event->Size = sizeof(*event) - sizeof(event->Event) + logsize + 1;
+		event->Size = event_size;
 		CopyMem(event->Event, (VOID *)log, logsize);
 		if (hash) {
 			/* TPM 2 systems will generate the appropriate hash
