@@ -233,7 +233,7 @@ typedef struct {
 	UINT64 VariableDataLength;
 	CHAR16 UnicodeName[1];
 	INT8 VariableData[1];
-} EFI_VARIABLE_DATA_TREE;
+} __attribute__ ((packed)) EFI_VARIABLE_DATA_TREE;
 
 static BOOLEAN tpm_data_measured(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
 {
