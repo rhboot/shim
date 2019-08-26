@@ -1,30 +1,4 @@
-CRYPTLIB_SOURCES = \
-		   Cryptlib/Hash/CryptMd4Null.c \
-		   Cryptlib/Hash/CryptMd5.c \
-		   Cryptlib/Hash/CryptSha1.c \
-		   Cryptlib/Hash/CryptSha256.c \
-		   Cryptlib/Hash/CryptSha512.c \
-		   Cryptlib/Hmac/CryptHmacMd5Null.c \
-		   Cryptlib/Hmac/CryptHmacSha1Null.c \
-		   Cryptlib/Hmac/CryptHmacSha256Null.c \
-		   Cryptlib/Cipher/CryptAesNull.c \
-		   Cryptlib/Cipher/CryptTdesNull.c \
-		   Cryptlib/Cipher/CryptArc4Null.c \
-		   Cryptlib/Rand/CryptRand.c \
-		   Cryptlib/Pk/CryptRsaBasic.c \
-		   Cryptlib/Pk/CryptRsaExtNull.c \
-		   Cryptlib/Pk/CryptPkcs7SignNull.c \
-		   Cryptlib/Pk/CryptPkcs7Verify.c \
-		   Cryptlib/Pk/CryptDhNull.c \
-		   Cryptlib/Pk/CryptTs.c \
-		   Cryptlib/Pk/CryptX509.c \
-		   Cryptlib/Pk/CryptAuthenticode.c \
-		   Cryptlib/Pem/CryptPemNull.c \
-		   Cryptlib/SysCall/CrtWrapper.c \
-		   Cryptlib/SysCall/TimerWrapper.c \
-		   Cryptlib/SysCall/BaseMemAllocation.c \
-		   Cryptlib/SysCall/BaseStrings.c \
-		   Cryptlib/SysCall/memset.c
+CRYPTLIB_SOURCES = $(shell cd $(TOPDIR) ; cat edk2/CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf | dos2unix | grep '.*\.c$$' | sed 's,^ \+,Cryptlib/,' | git check-ignore --stdin -n -v | grep :: | cut -d: -f3- | sort -u)
 
 CRYPTLIB_INCLUDES = \
 		    -I$(TOPDIR)/Cryptlib \
