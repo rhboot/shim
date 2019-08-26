@@ -1,0 +1,4 @@
+[submodule "edk2"]
+	path = edk2
+	url = git@github.com:rhboot/edk2.git
+	branch = shim

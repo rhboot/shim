@@ -123,3 +123,6 @@ $(BOOTCSVNAME) :
 
 install-deps : $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug buildid
 install-deps : $(BOOTCSVNAME)
+
+setup:
+	@git submodule update --init --recursive
