@@ -9,6 +9,12 @@
 #define PrintAt(fmt, ...) \
 	({"Do not directly call PrintAt() use console_print_at() instead" = 1;});
 
+#if !defined(EFI_WARN_UNKNOWN_GLYPH) && defined(EFI_WARN_UNKOWN_GLYPH)
+#define EFI_WARN_UNKNOWN_GLYPH EFI_WARN_UNKOWN_GLYPH
+#elif !defined(EFI_WARN_UNKNOWN_GLYPH)
+#define EFI_WARN_UNKNOWN_GLYPH EFIWARN(1)
+#endif
+
 EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key);
 UINTN
