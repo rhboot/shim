@@ -1,7 +1,7 @@
 #include <CrtLibSupport.h>
 
 char *
-AsciiStrCat(char *Destination, char *Source)
+AsciiStrCat(char *Destination, const char *Source)
 {
 	UINTN dest_len = strlena((CHAR8 *)Destination);
 	UINTN i;
@@ -14,7 +14,7 @@ AsciiStrCat(char *Destination, char *Source)
 }
 
 CHAR8 *
-AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
+AsciiStrCpy(CHAR8 *Destination, const CHAR8 *Source)
 {
 	UINTN i;
 
@@ -26,7 +26,7 @@ AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
 }
 
 char *
-AsciiStrnCpy(char *Destination, char *Source, UINTN count)
+AsciiStrnCpy(char *Destination, const char *Source, UINTN count)
 {
 	UINTN i;
 
@@ -39,13 +39,13 @@ AsciiStrnCpy(char *Destination, char *Source, UINTN count)
 }
 
 CHAR8 *
-ScanMem8(CHAR8 *str, UINTN count, CHAR8 ch)
+ScanMem8(const CHAR8 *str, UINTN count, CHAR8 ch)
 {
 	UINTN i;
 
 	for (i = 0; i < count; i++) {
 		if (str[i] == ch)
-			return str + i;
+			return (char *)str + i;
 	}
 	return NULL;
 }
@@ -59,7 +59,7 @@ WriteUnaligned32(UINT32 *Buffer, UINT32 Value)
 }
 
 UINTN
-AsciiStrSize(CHAR8 *string)
+AsciiStrSize(const CHAR8 *string)
 {
 	return strlena(string) + 1;
 }
