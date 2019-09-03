@@ -39,13 +39,13 @@ AsciiStrnCpy(char *Destination, const char *Source, UINTN count)
 }
 
 CHAR8 *
-ScanMem8(CHAR8 *str, UINTN count, CHAR8 ch)
+ScanMem8(const CHAR8 *str, UINTN count, CHAR8 ch)
 {
 	UINTN i;
 
 	for (i = 0; i < count; i++) {
 		if (str[i] == ch)
-			return str + i;
+			return (char *)str + i;
 	}
 	return NULL;
 }
