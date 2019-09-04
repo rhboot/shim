@@ -110,7 +110,7 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 
 static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
-				    UINT32 type, CHAR8 *hash)
+				    UINT32 type, UINT8 *hash)
 {
 	EFI_STATUS efi_status;
 	efi_tpm_protocol_t *tpm;
@@ -239,7 +239,7 @@ EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	efi_status = tpm_log_event_raw(buf, size, pcr, (CHAR8 *)ImageLoad,
 				       sizeof(*ImageLoad) + path_size,
 				       EV_EFI_BOOT_SERVICES_APPLICATION,
-				       (CHAR8 *)sha1hash);
+				       (UINT8 *)sha1hash);
 	FreePool(ImageLoad);
 
 	return efi_status;
