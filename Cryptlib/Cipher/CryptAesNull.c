@@ -1,14 +1,8 @@
 /** @file
-  AES Wrapper Implementation which does not provide real capabilities.  
-  
-Copyright (c) 2012, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
+  AES Wrapper Implementation which does not provide real capabilities.
 
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2012 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -60,12 +54,12 @@ AesInit (
   Performs AES encryption on a data buffer of the specified size in ECB mode.
 
   Return FALSE to indicate this interface is not supported.
-  
+
   @param[in]   AesContext  Pointer to the AES context.
   @param[in]   Input       Pointer to the buffer containing the data to be encrypted.
   @param[in]   InputSize   Size of the Input buffer in bytes.
   @param[out]  Output      Pointer to a buffer that receives the AES encryption output.
-  
+
   @retval FALSE  This interface is not supported.
 
 **/
@@ -159,7 +153,7 @@ AesCbcDecrypt (
   IN   CONST UINT8  *Ivec,
   OUT  UINT8        *Output
   )
-{  
+{
   ASSERT (FALSE);
   return FALSE;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2017 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -10,48 +10,75 @@
 #include <stdio.h>
 #include <openssl/crypto.h>
 #include "internal/cryptlib.h"
-#include <openssl/lhash.h>
 #include "internal/bn_int.h"
 #include <openssl/rand.h>
 #include "rsa_locl.h"
 
 int RSA_bits(const RSA *r)
 {
-    return (BN_num_bits(r->n));
+    return BN_num_bits(r->n);
 }
 
 int RSA_size(const RSA *r)
 {
-    return (BN_num_bytes(r->n));
+    return BN_num_bytes(r->n);
 }
 
 int RSA_public_encrypt(int flen, const unsigned char *from, unsigned char *to,
                        RSA *rsa, int padding)
 {
-    return (rsa->meth->rsa_pub_enc(flen, from, to, rsa, padding));
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(rsa->meth->flags & RSA_FLAG_FIPS_METHOD)
+        && !(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)) {
+        RSAerr(RSA_F_RSA_PUBLIC_ENCRYPT, RSA_R_NON_FIPS_RSA_METHOD);
+        return -1;
+    }
+#endif
+    return rsa->meth->rsa_pub_enc(flen, from, to, rsa, padding);
 }
 
 int RSA_private_encrypt(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding)
 {
-    return (rsa->meth->rsa_priv_enc(flen, from, to, rsa, padding));
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)) {
+        RSAerr(RSA_F_RSA_PRIVATE_ENCRYPT,
+               RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
+        return -1;
+    }
+#endif
+    return rsa->meth->rsa_priv_enc(flen, from, to, rsa, padding);
 }
 
 int RSA_private_decrypt(int flen, const unsigned char *from,
                         unsigned char *to, RSA *rsa, int padding)
 {
-    return (rsa->meth->rsa_priv_dec(flen, from, to, rsa, padding));
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(rsa->meth->flags & RSA_FLAG_FIPS_METHOD)
+        && !(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)) {
+        RSAerr(RSA_F_RSA_PRIVATE_DECRYPT, RSA_R_NON_FIPS_RSA_METHOD);
+        return -1;
+    }
+#endif
+    return rsa->meth->rsa_priv_dec(flen, from, to, rsa, padding);
 }
 
 int RSA_public_decrypt(int flen, const unsigned char *from, unsigned char *to,
                        RSA *rsa, int padding)
 {
-    return (rsa->meth->rsa_pub_dec(flen, from, to, rsa, padding));
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)) {
+        RSAerr(RSA_F_RSA_PUBLIC_DECRYPT,
+               RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
+        return -1;
+    }
+#endif
+    return rsa->meth->rsa_pub_dec(flen, from, to, rsa, padding);
 }
 
 int RSA_flags(const RSA *r)
 {
-    return ((r == NULL) ? 0 : r->meth->flags);
+    return r == NULL ? 0 : r->meth->flags;
 }
 
 void RSA_blinding_off(RSA *rsa)
@@ -77,7 +104,7 @@ int RSA_blinding_on(RSA *rsa, BN_CTX *ctx)
     rsa->flags &= ~RSA_FLAG_NO_BLINDING;
     ret = 1;
  err:
-    return (ret);
+    return ret;
 }
 
 static BIGNUM *rsa_get_public_exp(const BIGNUM *d, const BIGNUM *p,
@@ -117,8 +144,9 @@ BN_BLINDING *RSA_setup_blinding(RSA *rsa, BN_CTX *in_ctx)
     if (in_ctx == NULL) {
         if ((ctx = BN_CTX_new()) == NULL)
             return 0;
-    } else
+    } else {
         ctx = in_ctx;
+    }
 
     BN_CTX_start(ctx);
     e = BN_CTX_get(ctx);
@@ -133,17 +161,8 @@ BN_BLINDING *RSA_setup_blinding(RSA *rsa, BN_CTX *in_ctx)
             RSAerr(RSA_F_RSA_SETUP_BLINDING, RSA_R_NO_PUBLIC_EXPONENT);
             goto err;
         }
-    } else
+    } else {
         e = rsa->e;
-
-    if ((RAND_status() == 0) && rsa->d != NULL
-        && bn_get_words(rsa->d) != NULL) {
-        /*
-         * if PRNG is not properly seeded, resort to secret exponent as
-         * unpredictable seed
-         */
-        RAND_add(bn_get_words(rsa->d), bn_get_dmax(rsa->d) * sizeof(BN_ULONG),
-                 0.0);
     }
 
     {

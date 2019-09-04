@@ -8,15 +8,14 @@
  */
 
 #include "internal/cryptlib.h"
-#ifdef OPENSSL_FIPS
-# include <openssl/fips.h>
-#endif
+#include "internal/fips_int.h"
 
 int FIPS_mode(void)
 {
 #ifdef OPENSSL_FIPS
     return FIPS_module_mode();
 #else
+    /* This version of the library does not support FIPS mode. */
     return 0;
 #endif
 }
@@ -24,6 +23,8 @@ int FIPS_mode(void)
 int FIPS_mode_set(int r)
 {
 #ifdef OPENSSL_FIPS
+    if (r && FIPS_module_mode()) /* can be implicitly initialized by OPENSSL_init() */
+        return 1;
     return FIPS_module_mode_set(r);
 #else
     if (r == 0)

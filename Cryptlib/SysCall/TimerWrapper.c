@@ -2,18 +2,18 @@
   C Run-Time Libraries (CRT) Time Management Routines Wrapper Implementation
   for OpenSSL-based Cryptographic Library (used in DXE & RUNTIME).
 
-Copyright (c) 2010 - 2017, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2010 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
+#if defined(OPENSSL_SYS_UEFI) || defined(OPENSSL_SYS_UEFI_APP)
 #include <CrtLibSupport.h>
+#else
+#include <Uefi.h>
+#include <CrtLibSupport.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
+#endif
 
 //
 // -- Time Management Routines --
@@ -60,7 +60,7 @@ UINTN CumulativeDays[2][14] = {
     31 + 29 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
     31 + 29 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
     31 + 29 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
-    31 + 29 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31 
+    31 + 29 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31
   }
 };
 
@@ -70,14 +70,18 @@ UINTN CumulativeDays[2][14] = {
 //  )
 time_t time (time_t *timer)
 {
-  EFI_TIME  Time;
-  time_t    CalTime;
-  UINTN     Year;
+  EFI_STATUS  Status;
+  EFI_TIME    Time;
+  time_t      CalTime;
+  UINTN       Year;
 
   //
   // Get the current time and date information
   //
-  uefi_call_wrapper(RT->GetTime, 2, &Time, NULL);
+  Status = gRT->GetTime (&Time, NULL);
+  if (EFI_ERROR (Status) || (Time.Year < 1970)) {
+    return 0;
+  }
 
   //
   // Years Handling
@@ -90,12 +94,12 @@ time_t time (time_t *timer)
   //
   // Add in number of seconds for current Month, Day, Hour, Minute, Seconds, and TimeZone adjustment
   //
-  CalTime = CalTime + 
+  CalTime = CalTime +
             (time_t)((Time.TimeZone != EFI_UNSPECIFIED_TIMEZONE) ? (Time.TimeZone * 60) : 0) +
-            (time_t)(CumulativeDays[IsLeap(Time.Year)][Time.Month] * SECSPERDAY) + 
-            (time_t)(((Time.Day > 0) ? Time.Day - 1 : 0) * SECSPERDAY) + 
-            (time_t)(Time.Hour * SECSPERHOUR) + 
-            (time_t)(Time.Minute * 60) + 
+            (time_t)(CumulativeDays[IsLeap(Time.Year)][Time.Month] * SECSPERDAY) +
+            (time_t)(((Time.Day > 0) ? Time.Day - 1 : 0) * SECSPERDAY) +
+            (time_t)(Time.Hour * SECSPERHOUR) +
+            (time_t)(Time.Minute * 60) +
             (time_t)Time.Second;
 
   if (timer != NULL) {

@@ -1,14 +1,8 @@
 /** @file
   HMAC-MD5 Wrapper Implementation which does not provide real capabilities.
 
-Copyright (c) 2012 - 2017, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2012 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -72,9 +66,9 @@ HmacMd5Free (
 
 /**
   Initializes user-supplied memory pointed by HmacMd5Context as HMAC-MD5 context for
-  subsequent use. 
+  subsequent use.
 
-  Return FALSE to indicate this interface is not supported.  
+  Return FALSE to indicate this interface is not supported.
 
   @param[out]  HmacMd5Context  Pointer to HMAC-MD5 context being initialized.
   @param[in]   Key             Pointer to the user-supplied key.

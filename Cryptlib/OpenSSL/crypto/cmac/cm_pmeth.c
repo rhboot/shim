@@ -129,7 +129,7 @@ static int pkey_cmac_ctrl_str(EVP_PKEY_CTX *ctx,
 
 const EVP_PKEY_METHOD cmac_pkey_meth = {
     EVP_PKEY_CMAC,
-    EVP_PKEY_FLAG_SIGCTX_CUSTOM,
+    EVP_PKEY_FLAG_SIGCTX_CUSTOM | EVP_PKEY_FLAG_FIPS,
     pkey_cmac_init,
     pkey_cmac_copy,
     pkey_cmac_cleanup,

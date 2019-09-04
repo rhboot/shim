@@ -52,6 +52,9 @@ void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 
 int HASH_INIT(SHA_CTX *c)
 {
+#if defined(OPENSSL_FIPS)
+    FIPS_selftest_check();
+#endif
     memset(c, 0, sizeof(*c));
     c->h0 = INIT_DATA_h0;
     c->h1 = INIT_DATA_h1;
@@ -67,11 +70,12 @@ int HASH_INIT(SHA_CTX *c)
 #define K_60_79 0xca62c1d6UL
 
 /*
- * As pointed out by Wei Dai <weidai@eskimo.com>, F() below can be simplified
- * to the code in F_00_19.  Wei attributes these optimisations to Peter
- * Gutmann's SHS code, and he attributes it to Rich Schroeppel. #define
- * F(x,y,z) (((x) & (y)) | ((~(x)) & (z))) I've just become aware of another
- * tweak to be made, again from Wei Dai, in F_40_59, (x&a)|(y&a) -> (x|y)&a
+ * As pointed out by Wei Dai, F() below can be simplified to the code in
+ * F_00_19.  Wei attributes these optimizations to Peter Gutmann's SHS code,
+ * and he attributes it to Rich Schroeppel.
+ *      #define F(x,y,z) (((x) & (y)) | ((~(x)) & (z)))
+ * I've just become aware of another tweak to be made, again from Wei Dai,
+ * in F_40_59, (x&a)|(y&a) -> (x|y)&a
  */
 #define F_00_19(b,c,d)  ((((c) ^ (d)) & (b)) ^ (d))
 #define F_20_39(b,c,d)  ((b) ^ (c) ^ (d))
@@ -120,7 +124,6 @@ int HASH_INIT(SHA_CTX *c)
    * "find" this expectation reasonable:-( On order to make such
    * compilers generate better code I replace X[] with a bunch of
    * X0, X1, etc. See the function body below...
-   *                                    <appro@fy.chalmers.se>
    */
 #  define X(i)   XX##i
 # else

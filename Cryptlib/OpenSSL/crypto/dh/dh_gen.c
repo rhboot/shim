@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2019 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -16,6 +16,9 @@
 #include "internal/cryptlib.h"
 #include <openssl/bn.h>
 #include "dh_locl.h"
+#ifdef OPENSSL_FIPS
+# include <openssl/fips.h>
+#endif
 
 static int dh_builtin_genparams(DH *ret, int prime_len, int generator,
                                 BN_GENCB *cb);
@@ -23,6 +26,13 @@ static int dh_builtin_genparams(DH *ret, int prime_len, int generator,
 int DH_generate_parameters_ex(DH *ret, int prime_len, int generator,
                               BN_GENCB *cb)
 {
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(ret->meth->flags & DH_FLAG_FIPS_METHOD)
+        && !(ret->flags & DH_FLAG_NON_FIPS_ALLOW)) {
+        DHerr(DH_F_DH_GENERATE_PARAMETERS_EX, DH_R_NON_FIPS_METHOD);
+        return 0;
+    }
+#endif
     if (ret->meth->generate_params)
         return ret->meth->generate_params(ret, prime_len, generator, cb);
     return dh_builtin_genparams(ret, prime_len, generator, cb);
@@ -43,7 +53,7 @@ int DH_generate_parameters_ex(DH *ret, int prime_len, int generator,
  * for 3, p mod 12 == 5  <<<<< does not work for safe primes.
  * for 5, p mod 10 == 3 or 7
  *
- * Thanks to Phil Karn <karn@qualcomm.com> for the pointers about the
+ * Thanks to Phil Karn for the pointers about the
  * special generators and for answering some of my questions.
  *
  * I've implemented the second simple method :-).
@@ -62,13 +72,25 @@ static int dh_builtin_genparams(DH *ret, int prime_len, int generator,
     int g, ok = -1;
     BN_CTX *ctx = NULL;
 
+#ifdef OPENSSL_FIPS
+    if (FIPS_selftest_failed()) {
+        FIPSerr(FIPS_F_DH_BUILTIN_GENPARAMS, FIPS_R_FIPS_SELFTEST_FAILED);
+        return 0;
+    }
+
+    if (FIPS_mode() && (prime_len < OPENSSL_DH_FIPS_MIN_MODULUS_BITS_GEN)) {
+        DHerr(DH_F_DH_BUILTIN_GENPARAMS, DH_R_KEY_SIZE_TOO_SMALL);
+        goto err;
+    }
+#endif
+
     ctx = BN_CTX_new();
     if (ctx == NULL)
         goto err;
     BN_CTX_start(ctx);
     t1 = BN_CTX_get(ctx);
     t2 = BN_CTX_get(ctx);
-    if (t1 == NULL || t2 == NULL)
+    if (t2 == NULL)
         goto err;
 
     /* Make sure 'ret' has the necessary elements */
@@ -122,9 +144,7 @@ static int dh_builtin_genparams(DH *ret, int prime_len, int generator,
         ok = 0;
     }
 
-    if (ctx != NULL) {
-        BN_CTX_end(ctx);
-        BN_CTX_free(ctx);
-    }
+    BN_CTX_end(ctx);
+    BN_CTX_free(ctx);
     return ok;
 }
