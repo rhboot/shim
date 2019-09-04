@@ -50,16 +50,6 @@ git add buildinf.h e_os.h
 mkdir -p crypto
 rsync -avSHP --delete-during "${OPENSSL_PATH}"/crypto/ crypto/
 
-mkdir -p crypto/store/ crypto/rand/
-
-rsync -avSHP "${OPENSSLLIB_PATH}/"ossl_store.c crypto/store/ossl_store.c
-git add -f crypto/store/ossl_store.c
-
-for x in "${OPENSSLLIB_PATH}/"rand*.[ch] ; do
-    rsync -avSHP "${x}" "crypto/rand/${x##*/}"
-    git add -f "crypto/rand/${x##*/}"
-done
-
 git clean -f -d -X -- crypto/
 
 git add crypto/

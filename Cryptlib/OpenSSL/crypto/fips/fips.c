@@ -63,7 +63,7 @@
 #include <errno.h>
 #include "fips_locl.h"
 
-#if !defined(OPENSSL_SYS_UEFI) && !defined(OPENSSL_SYS_UEFI_APP)
+#if !defined(OPENSSL_SYS_UEFI)
 #include <dlfcn.h>
 #endif
 
@@ -168,7 +168,7 @@ int fips_in_post(void)
     return fips_post;
 }
 
-#if !defined(OPENSSL_SYS_UEFI) && !defined(OPENSSL_SYS_UEFI_APP)
+#if !defined(OPENSSL_SYS_UEFI)
 /* we implement what libfipscheck does ourselves */
 
 static int
@@ -470,7 +470,7 @@ int FIPS_module_mode_set(int onoff)
             goto end;
         }
 
-# if !defined(OPENSSL_SYS_UEFI) && !defined(OPENSSL_SYS_UEFI_APP)
+# if !defined(OPENSSL_SYS_UEFI)
         if (!verify_checksums()) {
             FIPSerr(FIPS_F_FIPS_MODULE_MODE_SET,
                     FIPS_R_FINGERPRINT_DOES_NOT_MATCH);

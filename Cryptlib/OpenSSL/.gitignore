@@ -44,7 +44,6 @@ crypto/mdc2/
 crypto/perlasm
 crypto/poly1305/
 crypto/rand/randfile.c
-!crypto/rand/rand_lib.c
 crypto/rc2/
 crypto/rc5/
 crypto/ripemd/
@@ -54,7 +53,13 @@ crypto/sm2/
 crypto/sm3/
 crypto/sm4/
 crypto/srp/
-crypto/store/
+crypto/store/loader_file.c
+crypto/store/store_err.c
+crypto/store/store_init.c
+crypto/store/store_lib.c
+crypto/store/store_locl.h
+crypto/store/store_register.c
+crypto/store/store_strings.c
 crypto/ts/
 crypto/ui/
 crypto/whrlpool/

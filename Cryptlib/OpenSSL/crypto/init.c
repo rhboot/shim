@@ -601,7 +601,9 @@ void OPENSSL_cleanup(void)
     engine_cleanup_int();
 #endif
     ossl_store_cleanup_int();
+#if !defined(OPENSSL_SYS_UEFI)
     crypto_cleanup_all_ex_data_int();
+#endif
     bio_cleanup();
     evp_cleanup_int();
     obj_cleanup_int();

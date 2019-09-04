@@ -404,7 +404,7 @@ void OPENSSL_showfatal(const char *fmta, ...)
     va_start(ap, fmta);
     vfprintf(stderr, fmta, ap);
     va_end(ap);
-#elif defined(OPENSSL_SYS_UEFI_APP)
+#elif defined(OPENSSL_UEFI_APP)
     CHAR16 *fmt;
     int i, nl = 0;
 
@@ -437,7 +437,7 @@ int OPENSSL_isservice(void)
 }
 #endif
 
-#if defined(OPENSSL_SYS_UEFI_APP)
+#if defined(OPENSSL_UEFI_APP)
 static int uefi_print_errors_cb(const char *str, size_t len, void *u)
 {
     Print(L"%a", str);
@@ -459,7 +459,7 @@ static void uefi_show_errors(void)
 #endif
 void OPENSSL_die(const char *message, const char *file, int line)
 {
-#if defined(OPENSSL_SYS_UEFI_APP)
+#if defined(OPENSSL_UEFI_APP)
     uefi_show_errors();
 #endif
     OPENSSL_showfatal("%s:%d: OpenSSL internal error: %s\n",
