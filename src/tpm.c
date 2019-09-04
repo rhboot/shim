@@ -110,7 +110,7 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 
 static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
-				    UINT32 type, CHAR8 *hash)
+				    UINT32 type, UINT8 *hash)
 {
 	EFI_STATUS efi_status;
 	efi_tpm_protocol_t *tpm;
