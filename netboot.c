@@ -284,7 +284,7 @@ static EFI_STATUS parseDhcp4()
 
 	INTN dir_len = strnlena((CHAR8 *)pkt_v4->BootpBootFile, 127);
 	INTN i;
-	UINT8 *dir = pkt_v4->BootpBootFile;
+	CHAR8 *dir = (CHAR8 *)pkt_v4->BootpBootFile;
 
 	for (i = dir_len; i >= 0; i--) {
 		if (dir[i] == '/')
