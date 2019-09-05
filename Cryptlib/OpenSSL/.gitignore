@@ -23,6 +23,7 @@ crypto/aes/aes_x86core.c
 crypto/aria/
 crypto/bf/
 crypto/blake2/
+crypto/bio/b_print.c
 crypto/camellia/
 crypto/cast/
 crypto/chacha/
@@ -32,6 +33,7 @@ crypto/des/
 crypto/dsa/
 crypto/ec/
 crypto/engine/
+crypto/err/err_all.c
 crypto/evp/e_des.c
 crypto/evp/e_des3.c
 crypto/fips/fips_standalone_hmac.c
@@ -52,7 +54,7 @@ crypto/sm2/
 crypto/sm3/
 crypto/sm4/
 crypto/srp/
-crypto/store/loader_file.c
+crypto/store/
 crypto/ts/
 crypto/ui/
 crypto/whrlpool/
