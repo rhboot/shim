@@ -1038,6 +1038,7 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
 	EFI_SIGNATURE_DATA *CertData;
+	EFI_GUID type;
 	void *Data = NULL, *ptr;
 	INTN DataSize = 0;
 	int i;
@@ -1053,7 +1054,8 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 			continue;
 
 		DataSize += sizeof(EFI_SIGNATURE_LIST);
-		if (CompareGuid(&(list[i].Type), &X509_GUID) == 0)
+		type = list[i].Type; /* avoid -Werror=address-of-packed-member */
+		if (CompareGuid(&type, &X509_GUID) == 0)
 			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
@@ -1075,7 +1077,7 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 		CertList->SignatureType = list[i].Type;
 		CertList->SignatureHeaderSize = 0;
 
-		if (CompareGuid(&(list[i].Type), &X509_GUID) == 0) {
+		if (CompareGuid(&(CertList->SignatureType), &X509_GUID) == 0) {
 			CertList->SignatureListSize = list[i].MokSize +
 			    sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID);
 			CertList->SignatureSize =
@@ -1113,10 +1115,12 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 static void delete_cert(void *key, UINT32 key_size,
 			MokListNode * mok, INTN mok_num)
 {
+	EFI_GUID type;
 	int i;
 
 	for (i = 0; i < mok_num; i++) {
-		if (CompareGuid(&(mok[i].Type), &X509_GUID) != 0)
+		type = mok[i].Type; /* avoid -Werror=address-of-packed-member */
+		if (CompareGuid(&type, &X509_GUID) != 0)
 			continue;
 
 		if (mok[i].MokSize == key_size &&
@@ -1158,6 +1162,7 @@ static void mem_move(void *dest, void *src, UINTN size)
 static void delete_hash_in_list(EFI_GUID Type, UINT8 * hash, UINT32 hash_size,
 				MokListNode * mok, INTN mok_num)
 {
+	EFI_GUID type;
 	UINT32 sig_size;
 	UINT32 list_num;
 	int i, del_ind;
@@ -1167,7 +1172,8 @@ static void delete_hash_in_list(EFI_GUID Type, UINT8 * hash, UINT32 hash_size,
 	sig_size = hash_size + sizeof(EFI_GUID);
 
 	for (i = 0; i < mok_num; i++) {
-		if ((CompareGuid(&(mok[i].Type), &Type) != 0) ||
+		type = mok[i].Type; /* avoid -Werror=address-of-packed-member */
+		if ((CompareGuid(&type, &Type) != 0) ||
 		    (mok[i].MokSize < sig_size))
 			continue;
 
@@ -1223,6 +1229,7 @@ static void delete_hash_list(EFI_GUID Type, void *hash_list, UINT32 list_size,
 static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 {
 	EFI_STATUS efi_status;
+	EFI_GUID type;
 	CHAR16 *db_name;
 	CHAR16 *auth_name;
 	CHAR16 *err_strs[] = { NULL, NULL, NULL };
@@ -1331,7 +1338,8 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 
 	/* Search and destroy */
 	for (i = 0; i < del_num; i++) {
-		if (CompareGuid(&(del_key[i].Type), &X509_GUID) == 0) {
+		type = del_key[i].Type; /* avoid -Werror=address-of-packed-member */
+		if (CompareGuid(&type, &X509_GUID) == 0) {
 			delete_cert(del_key[i].Mok, del_key[i].MokSize,
 				    mok, mok_num);
 		} else if (is_sha2_hash(del_key[i].Type)) {
