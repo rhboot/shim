@@ -2053,7 +2053,7 @@ static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path)
 
 	dprint(L"dppath: %s\n", dppath);
 	dprint(L"path:   %s\n", path);
-	if (StrnCaseCmp(dppath, PathName, strlen(dppath)))
+	if (StrnCaseCmp(dppath, PathName, StrLen(dppath)))
 		ret = 0;
 
 done:
