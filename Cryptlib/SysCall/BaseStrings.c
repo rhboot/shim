@@ -100,7 +100,6 @@ InternalSafeStringNoAsciiStrOverlap (
 
 **/
 UINTN
-EFIAPI
 AsciiStrnLenS (
   IN CONST CHAR8               *String,
   IN UINTN                     MaxSize
@@ -151,7 +150,6 @@ AsciiStrnLenS (
 
 **/
 UINTN
-EFIAPI
 AsciiStrnSizeS (
   IN CONST CHAR8               *String,
   IN UINTN                     MaxSize
@@ -201,7 +199,6 @@ AsciiStrnSizeS (
   @retval RETURN_ACCESS_DENIED     If Source and Destination overlap.
 **/
 RETURN_STATUS
-EFIAPI
 AsciiStrCpyS (
   OUT CHAR8        *Destination,
   IN  UINTN        DestMax,
@@ -280,7 +277,6 @@ AsciiStrCpyS (
   @retval RETURN_ACCESS_DENIED     If Source and Destination overlap.
 **/
 RETURN_STATUS
-EFIAPI
 AsciiStrnCpyS (
   OUT CHAR8        *Destination,
   IN  UINTN        DestMax,
@@ -369,7 +365,6 @@ AsciiStrnCpyS (
   @retval RETURN_ACCESS_DENIED     If Source and Destination overlap.
 **/
 RETURN_STATUS
-EFIAPI
 AsciiStrCatS (
   IN OUT CHAR8        *Destination,
   IN     UINTN        DestMax,
@@ -466,7 +461,6 @@ AsciiStrCatS (
   @retval RETURN_ACCESS_DENIED     If Source and Destination overlap.
 **/
 RETURN_STATUS
-EFIAPI
 AsciiStrnCatS (
   IN OUT CHAR8        *Destination,
   IN     UINTN        DestMax,
