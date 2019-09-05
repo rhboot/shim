@@ -1,8 +1,7 @@
 #ifndef __BASE_LIB_H__
 #define __BASE_LIB_H__
 
-#include <efi.h>
-#include <efilib.h>
+#include "Base.h"
 
 UINT32 WriteUnaligned32 (UINT32 *Buffer, UINT32 Value);
 UINTN AsciiStrSize (CONST CHAR8 *string);

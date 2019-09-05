@@ -10,8 +10,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #ifndef __CRT_LIB_SUPPORT_H__
 #define __CRT_LIB_SUPPORT_H__
 
-#include <efi.h>
-#include <efilib.h>
 #include "Base.h"
 #include "Library/BaseLib.h"
 #include "Library/BaseMemoryLib.h"
@@ -73,115 +71,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 typedef VOID  *FILE;
 
 //
-// Map all va_xxxx elements to VA_xxx defined in MdePkg/Include/Base.h
-//
-#if !defined(__CC_ARM) || defined(_STDARG_H) // if va_list is not already defined
-/*
- * These are now unconditionally #defined by GNU_EFI's efistdarg.h,
- * so we should #undef them here before providing a new definition.
- */
-#undef va_arg
-#undef va_start
-#undef va_end
-
-#define va_list   VA_LIST
-#define va_arg    VA_ARG
-#define va_start  VA_START
-#define va_end    VA_END
-
-#define _STDARG_H
-
-# if !defined(NO_BUILTIN_VA_FUNCS)
-
-typedef __builtin_va_list VA_LIST;
-
-#define VA_START(Marker, Parameter)  __builtin_va_start (Marker, Parameter)
-
-#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
-
-#define VA_END(Marker)               __builtin_va_end (Marker)
-
-#define VA_COPY(Dest, Start)         __builtin_va_copy (Dest, Start)
-
-# else
-
-#define _INT_SIZE_OF(n) ((sizeof (n) + sizeof (UINTN) - 1) &~(sizeof (UINTN) - 1))
-///
-/// Variable used to traverse the list of arguments. This type can vary by
-/// implementation and could be an array or structure.
-///
-typedef CHAR8 *VA_LIST;
-
-/**
-  Retrieves a pointer to the beginning of a variable argument list, based on
-  the name of the parameter that immediately precedes the variable argument list.
-
-  This function initializes Marker to point to the beginning of the variable
-  argument list that immediately follows Parameter.  The method for computing the
-  pointer to the next argument in the argument list is CPU-specific following the
-  EFIAPI ABI.
-
-  @param   Marker       The VA_LIST used to traverse the list of arguments.
-  @param   Parameter    The name of the parameter that immediately precedes
-                        the variable argument list.
-
-  @return  A pointer to the beginning of a variable argument list.
-
-**/
-#define VA_START(Marker, Parameter) (Marker = (VA_LIST) ((UINTN) & (Parameter) + _INT_SIZE_OF (Parameter)))
-
-/**
-  Returns an argument of a specified type from a variable argument list and updates
-  the pointer to the variable argument list to point to the next argument.
-
-  This function returns an argument of the type specified by TYPE from the beginning
-  of the variable argument list specified by Marker.  Marker is then updated to point
-  to the next argument in the variable argument list.  The method for computing the
-  pointer to the next argument in the argument list is CPU-specific following the EFIAPI ABI.
-
-  @param   Marker   VA_LIST used to traverse the list of arguments.
-  @param   TYPE     The type of argument to retrieve from the beginning
-                    of the variable argument list.
-
-  @return  An argument of the type specified by TYPE.
-
-**/
-#define VA_ARG(Marker, TYPE)   (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE)) - _INT_SIZE_OF (TYPE)))
-
-/**
-  Terminates the use of a variable argument list.
-
-  This function initializes Marker so it can no longer be used with VA_ARG().
-  After this macro is used, the only way to access the variable argument list is
-  by using VA_START() again.
-
-  @param   Marker   VA_LIST used to traverse the list of arguments.
-
-**/
-#define VA_END(Marker)      (Marker = (VA_LIST) 0)
-
-/**
-  Initializes a VA_LIST as a copy of an existing VA_LIST.
-
-  This macro initializes Dest as a copy of Start, as if the VA_START macro had been applied to Dest
-  followed by the same sequence of uses of the VA_ARG macro as had previously been used to reach
-  the present state of Start.
-
-  @param   Dest   VA_LIST used to traverse the list of arguments.
-  @param   Start  VA_LIST used to traverse the list of arguments.
-
-**/
-#define VA_COPY(Dest, Start)  ((void)((Dest) = (Start)))
-
-# endif
-
-#else // __CC_ARM
-#define va_start(Marker, Parameter)   __va_start(Marker, Parameter)
-#define va_arg(Marker, TYPE)          __va_arg(Marker, TYPE)
-#define va_end(Marker)                ((void)0)
-#endif
-
-//
 // Definitions for global constants used by CRT library routines
 //
 #define EINVAL       22               /* Invalid argument */
@@ -202,11 +91,6 @@ typedef CHAR8 *VA_LIST;
 #ifndef offsetof
 #define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
 #endif
-
-#define MIN(a, b)                       \
-  (((a) < (b)) ? (a) : (b))
-#define ABS(a)                          \
-  (((a) < 0) ? (-(a)) : (a))
 
 typedef UINTN RETURN_STATUS;
 

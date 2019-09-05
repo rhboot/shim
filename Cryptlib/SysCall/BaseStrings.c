@@ -1,3 +1,4 @@
+#include <Base.h>
 #include <CrtLibSupport.h>
 
 #define ASCII_RSIZE_MAX  1000000ul

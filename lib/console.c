@@ -484,8 +484,6 @@ console_countdown(CHAR16* title, const CHAR16* message, int timeout)
 	return timeout;
 }
 
-#define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
-
 /* Copy of gnu-efi-3.0 with the added secure boot strings */
 static struct {
     EFI_STATUS      Code;
