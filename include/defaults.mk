@@ -69,12 +69,7 @@ EFI_LDS		= $(TOPDIR)/include/elf_$(ARCH)_efi.lds
 
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
 
-OPENSSL_CFLAGS = -D_CRT_SECURE_NO_DEPRECATE \
-		 -D_CRT_NONSTDC_NO_DEPRECATE \
-		 -DL_ENDIAN \
-		 -DOPENSSL_SMALL_FOOTPRINT \
-		 -DOPENSSL_FIPS \
-		 -DPEDANTIC
+OPENSSL_CFLAGS ?=
 
 CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
