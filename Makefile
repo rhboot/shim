@@ -4,9 +4,17 @@
 #
 default: all
 
+EFI_ARCH ?= $(shell $(CC) -dumpmachine | cut -f1 -d- | \
+	    sed \
+		-e s,aarch64,aa64, \
+		-e 's,arm.*,arm,' \
+		-e s,i[3456789]86,ia32, \
+		-e s,x86_64,x64, \
+		)
+
 ifeq ($(MAKELEVEL),0)
 TOPDIR != if [ "$$(git rev-parse --is-inside-work-tree)" = true ]; then echo ./$$(git rev-parse --show-cdup) ; else echo .. ; fi
-BUILDDIR ?= $(TOPDIR)/build-$(ARCH)
+BUILDDIR ?= $(TOPDIR)/build-$(EFI_ARCH)
 endif
 
 include $(TOPDIR)include/version.mk
@@ -44,5 +52,6 @@ update :
 		./update.sh
 
 .PHONY: mkbuilddir update
+.NOTPARALLEL:
 # vim:ft=make
 #

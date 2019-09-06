@@ -9,15 +9,17 @@ ifeq ($(origin TOPDIR),undefined)
 	$(error TOPDIR is not set)
 endif
 
+include efi.mk
+
 include $(TOPDIR)/include/defaults.mk
 include $(TOPDIR)/include/coverity.mk
 include $(TOPDIR)/include/scan-build.mk
 
 include $(TOPDIR)/Cryptlib/Makefile
 include $(TOPDIR)/Cryptlib/OpenSSL/Makefile
+include $(TOPDIR)/src/Makefile
 include $(TOPDIR)/lib/Makefile
 include $(TOPDIR)/certdb/Makefile
-include $(TOPDIR)/src/Makefile
 
 SUBDIRS	= certdb lib src Cryptlib Cryptlib/OpenSSL
 
@@ -31,7 +33,6 @@ $(BUILDDIRS) : builddirs
 builddirs:
 	@mkdir -p $(BUILDDIRS)
 
-
 $(foreach x,$(TARGETS),$(eval vpath $(x) $(BUILDDIR)))
 $(foreach x,$(CRYPTLIB_SOURCES),$(eval vpath $(x) $(TOPDIR)/$(x)))
 $(foreach x,$(CRYPTLIB_OBJECTS),$(eval vpath $(x) $(BUILDDIR)/$(x)))
@@ -40,7 +41,7 @@ all: $(TARGETS)
 
 install-check :
 ifeq ($(origin LIBDIR),undefined)
-	$(error Architecture $(ARCH) is not a supported build target.)
+	$(error Architecture $(EFI_ARCH) is not a supported build target.)
 endif
 ifeq ($(origin EFIDIR),undefined)
 	$(error EFIDIR must be set to your reserved EFI System Partition subdirectory name)
@@ -137,3 +138,8 @@ archive: tag
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
 
 .PHONY : install-deps all default
+.EXPORT_ALL_VARIABLES:
+unexport SUBDIRS
+unexport BUILDDIR_STEMS
+unexport BUILDDIRS
+unexport TARGETS

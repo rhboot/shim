@@ -1,4 +1,17 @@
 
+MMSTEM		?= mm$(EFI_ARCH_SUFFIX)
+MMNAME		= $(MMSTEM).efi
+MMSONAME	= $(MMSTEM).efi.so
+FBSTEM		?= fb$(EFI_ARCH_SUFFIX)
+FBNAME		= $(FBSTEM).efi
+FBSONAME	= $(FBSTEM).efi.so
+SHIMSTEM	?= shim$(EFI_ARCH_SUFFIX)
+SHIMNAME	= $(SHIMSTEM).efi
+SHIMSONAME	= $(SHIMSTEM).efi.so
+SHIMHASHNAME	= $(SHIMSTEM).hash
+BOOTEFINAME	?= BOOT$(ARCH_UPPER).EFI
+BOOTCSVNAME	?= BOOT$(ARCH_UPPER).CSV
+
 ORIG_SHIM_SOURCES = shim.c mok.c netboot.c replacements.c tpm.c errlog.c version.c
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c
 ORIG_FALLBACK_SOURCES = fallback.c
@@ -8,23 +21,23 @@ ifneq ($(origin ENABLE_HTTPBOOT), undefined)
 endif
 
 SHIM_SOURCES := $(foreach x,$(ORIG_SHIM_SOURCES),src/$(x))
-SHIM_OBJECTS := $(foreach x,$(SHIM_SOURCES),$(patsubst %.c,%.o,$(x)))
+SHIM_OBJECTS := $(foreach x,$(SHIM_SOURCES),$(patsubst %.c,%.efi.o,$(x)))
 MOK_SOURCES := $(foreach x,$(ORIG_MOK_SOURCES),src/$(x))
-MOK_OBJECTS := $(foreach x,$(MOK_SOURCES),$(patsubst %.c,%.o,$(x)))
+MOK_OBJECTS := $(foreach x,$(MOK_SOURCES),$(patsubst %.c,%.efi.o,$(x)))
 FALLBACK_SOURCES := $(foreach x,$(ORIG_FALLBACK_SOURCES),src/$(x))
-FALLBACK_OBJECTS := $(foreach x,$(FALLBACK_SOURCES),$(patsubst %.c,%.o,$(x)))
+FALLBACK_OBJECTS := $(foreach x,$(FALLBACK_SOURCES),$(patsubst %.c,%.efi.o,$(x)))
 
-$(foreach x,$(SHIM_SOURCES),$(eval $(call object-template,src/,$(x),$$(SHIM_INCLUDES))))
-$(foreach x,$(MOK_SOURCES),$(eval $(call object-template,src/,$(x),$$(MOK_INCLUDES))))
-$(foreach x,$(FALLBACK_SOURCES),$(eval $(call object-template,src/,$(x),$$(FALLBACK_INCLUDES))))
+$(foreach x,$(SHIM_SOURCES),$(eval $(call object-template,src/,$(x),$$(CRYPTLIB_INCLUDES))))
+$(foreach x,$(MOK_SOURCES),$(eval $(call object-template,src/,$(x),$$(CRYPTLIB_INCLUDES))))
+$(foreach x,$(FALLBACK_SOURCES),$(eval $(call object-template,src/,$(x),)))
 
 SHIM_SOURCES += src/cert.S
-SHIM_OBJECTS += src/cert.o
-FALLBACK_OBJECTS += src/tpm.o src/errlog.o
+SHIM_OBJECTS += src/cert.efi.o
+FALLBACK_OBJECTS += src/tpm.efi.o src/errlog.efi.o
 
 $(foreach x,$(SHIM_SOURCES) $(MOK_SOURCES) $(FALLBACK_SOURCES),$(eval vpath $(x) $(TOPDIR)))
 $(foreach x,$(SHIM_OBJECTS) $(MOK_OBJECTS) $(FALLBACK_OBJECTS),$(eval vpath $(x) $(BUILDDIR)))
-vpath %.so $(BUILDDIR)/src
+vpath %.efi.so $(BUILDDIR)/src
 
 SHIM_CLEAN_PREFIXES = $(MMNAME) $(FBNAME) $(SHIMNAME)
 SHIM_CLEAN_SUFFIXES = .signed .debug .hash
@@ -38,20 +51,20 @@ clean-shim-objs :
 
 clean : | clean-shim-objs
 
-src/cert.o : src/cert.S
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-src/shim.o: | src/shim.h
-src/shim.h: | src/config.h
+src/cert.efi.o : src/cert.S
+src/shim.efi.o : | src/shim.h
+src/shim.h : | src/config.h
 
 vpath src/config.h $(BUILDDIR)
+
+EFI_BIN_SECTIONS += .data.ident .vendor_cert
 
 .ONESHELL: src/config.h
 src/config.h:
 	@echo making config.h
 	(
-	echo "#define EFI_ARCH L\"$(ARCH)\""
-	echo "#define DEBUGDIR L\"/usr/lib/debug/usr/share/shim/$(ARCH)-$(VERSION)$(DASHRELEASE)/\""
+	echo "#define EFI_ARCH L\"$(EFI_ARCH)\""
+	echo "#define DEBUGDIR L\"/usr/lib/debug/usr/share/shim/$(EFI_ARCH)-$(VERSION)$(DASHRELEASE)/\""
 	echo "#define DEFAULT_LOADER L\"$(DEFAULT_LOADER)\""
 	echo "#define DEFAULT_LOADER_CHAR \"$(DEFAULT_LOADER)\""
 	echo $(CONFIG_VENDOR_CERT)
@@ -64,9 +77,9 @@ src/config.h:
 
 vpath version.c.in $(TOPDIR)/src/
 vpath version.c $(BUILDDIR)/src/
-vpath version.o $(BUILDDIR)/src/
+vpath version.efi.o $(BUILDDIR)/src/
 
-src/version.o : src/version.c | version.c.in
+src/version.efi.o : src/version.c | version.c.in
 src/version.c : version.c.in
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
 		-e "s,@@UNAME@@,$(shell uname -s -m -p -i -o)," \
@@ -99,18 +112,17 @@ src/shim_cert.h: certdb/shim.cer
 	echo "};"
 	) > $@
 
-OPENSSL_GROUP=-Wl,--start-group,libcryptlib.a,libopenssl.a,--end-group
+OPENSSL_GROUP=-Wl,--start-group,libcryptlib.efi.a,libopenssl.efi.a,--end-group
 
-$(SHIMSONAME): | libcryptlib.a libopenssl.a src/shim_cert.h
-$(SHIMSONAME): $(SHIM_OBJECTS) lib.a
-	$(CC) -o $@ $(CFLAGS) $(CCLDFLAGS) $^ -lefi -lgnuefi $(OPENSSL_GROUP) $(LIB_GCC)
+$(SHIMSONAME): | src/config.h libcryptlib.efi.a libopenssl.efi.a src/shim_cert.h
+$(SHIMSONAME): EFI_CCLDLIBS+=$(OPENSSL_GROUP) $(LIB_GCC)
+$(SHIMSONAME): $(SHIM_OBJECTS) lib.efi.a
 
-$(FBSONAME): $(FALLBACK_OBJECTS) lib.a
-	$(CC) -o $@ $(CFLAGS) $(CCLDFLAGS) $^ -lefi -lgnuefi
+$(FBSONAME): $(FALLBACK_OBJECTS) lib.efi.a
 
-$(MMSONAME): | libcryptlib.a libopenssl.a
-$(MMSONAME): $(MOK_OBJECTS) lib.a
-	$(CC) -o $@ $(CFLAGS) $(CCLDFLAGS) $^ -lefi -lgnuefi $(OPENSSL_GROUP)
+$(MMSONAME): | libcryptlib.efi.a libopenssl.efi.a
+$(MMSONAME): EFI_CCLDLIBS+=$(OPENSSL_GROUP) $(LIB_GCC)
+$(MMSONAME): $(MOK_OBJECTS) lib.efi.a
 
 vpath buildid $(BUILDDIR)/src
 vpath buildid.c $(TOPDIR)/src
@@ -126,3 +138,5 @@ install-deps : $(BOOTCSVNAME)
 
 setup:
 	@git submodule update --init --recursive
+
+.EXPORT_ALL_VARIABLES:
