@@ -15,4 +15,23 @@ RETURN_STATUS AsciiStrCatS(CHAR8 *Destination, UINTN DestMax, CONST CHAR8 *Sourc
 CHAR8 *AsciiStrCpy(CHAR8 *Destination, CONST CHAR8 *Source);
 UINTN AsciiStrDecimalToUintn(CONST CHAR8 *String);
 
+UINT64 EFIAPI AsmReadTsc (VOID);
+UINT64 EFIAPI AsmReadMsr64 (UINT32 Index);
+VOID EFIAPI CpuPause (VOID);
+UINT64 EFIAPI MultU64x64 (UINT64 Multiplicand, UINT64 Multiplier);
+
+#pragma pack (1)
+typedef struct {
+  UINT16  Limit;
+  UINTN   Base;
+} IA32_DESCRIPTOR;
+#pragma pack ()
+
+///
+/// Byte packed structure for an FP/SSE/SSE2 context.
+///
+typedef struct {
+  UINT8  Buffer[512];
+} IA32_FX_BUFFER;
+
 #endif /* __BASE_LIB_H__ */

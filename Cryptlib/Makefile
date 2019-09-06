@@ -1,4 +1,12 @@
-CRYPTLIB_SOURCES = $(shell cd $(TOPDIR) ; cat edk2/CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf | dos2unix | grep '.*\.c$$' | sed 's,^ \+,Cryptlib/,' | git check-ignore --stdin -n -v | grep :: | cut -d: -f3- | sort -u)
+CRYPTLIB_SOURCES = $(shell cd $(TOPDIR) ; cat edk2/CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf | dos2unix | grep '.*\.c$$' | sed 's,^ \+,Cryptlib/,' | git check-ignore --stdin -n -v | grep :: | cut -d: -f3- | sort -u) \
+	Cryptlib/Library/TimerLib.c
+
+ifeq ($(ARCH),ia32)
+	CRYPTLIB_SOURCES+=Cryptlib/Library/Ia32/GccInline.c
+endif
+ifeq ($(ARCH),x64)
+	CRYPTLIB_SOURCES+=Cryptlib/Library/X64/GccInline.c
+endif
 
 CRYPTLIB_INCLUDES = \
 		    -I$(TOPDIR)/Cryptlib \
