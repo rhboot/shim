@@ -241,7 +241,7 @@ static BOOLEAN tpm_data_measured(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN Var
 
 	for (i=0; i<measuredcount; i++) {
 		if ((StrCmp (VarName, measureddata[i].VariableName) == 0) &&
-		    (CompareGuid (&VendorGuid, measureddata[i].VendorGuid)) &&
+		    (CompareGuid (&VendorGuid, measureddata[i].VendorGuid) == 0) &&
 		    (VarSize == measureddata[i].Size) &&
 		    (CompareMem (VarData, measureddata[i].Data, VarSize) == 0)) {
 			return TRUE;
