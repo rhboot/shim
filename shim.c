@@ -2141,8 +2141,15 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	CHAR16 *loader_str = NULL;
 	UINTN loader_len = 0;
 	unsigned int i;
+	UINTN second_stage_len;
 
-	second_stage = DEFAULT_LOADER;
+	second_stage_len = StrLen(DEFAULT_LOADER) + 1;
+	second_stage = AllocatePool(second_stage_len);
+	if (!second_stage) {
+		perror(L"Could not allocate %lu bytes\n", second_stage_len);
+		return EFI_OUT_OF_RESOURCES;
+	}
+	StrCpy(second_stage, DEFAULT_LOADER);
 	load_options = NULL;
 	load_options_size = 0;
 
@@ -2198,6 +2205,12 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	* We also sometimes find a guid or partial guid at the end, because
 	* BDS will add that, but we ignore that here.
 	*/
+
+	/*
+	 * Maybe there just aren't any options...
+	 */
+	if (li->LoadOptionsSize == 0)
+		return EFI_SUCCESS;
 
 	/*
 	 * In either case, we've got to have at least a UCS2 NUL...
@@ -2465,7 +2478,11 @@ shim_init(void)
 	dprint(L"%a", shim_version);
 
 	/* Set the second stage loader */
-	set_second_stage (global_image_handle);
+	efi_status = set_second_stage(global_image_handle);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"set_second_stage() failed: %r\n", efi_status);
+		return efi_status;
+	}
 
 	if (secure_mode()) {
 		if (vendor_cert_size || vendor_dbx_size) {
