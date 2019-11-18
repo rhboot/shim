@@ -29,3 +29,4 @@ version.c
 cov-int/
 scan-results/
 /sbat.*.csv
+[Ss]creenlog*
