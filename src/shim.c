@@ -2429,51 +2429,6 @@ shim_fini(void)
 extern EFI_STATUS
 efi_main(EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab);
 
-static void
-__attribute__((__optimize__("0")))
-debug_hook(void)
-{
-	UINT8 *data = NULL;
-	UINTN dataSize = 0;
-	EFI_STATUS efi_status;
-	volatile register UINTN x = 0;
-	extern char _text, _data;
-
-	if (x)
-		return;
-
-	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
-				  SHIM_LOCK_GUID);
-	if (EFI_ERROR(efi_status)) {
-		return;
-	}
-
-	FreePool(data);
-
-	console_print(L"add-symbol-file "DEBUGDIR
-		      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
-		      &_text, &_data);
-
-	console_print(L"Pausing for debugger attachment.\n");
-	console_print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
-		      &SHIM_LOCK_GUID);
-	x = 1;
-	while (x++) {
-		/* Make this so it can't /totally/ DoS us. */
-#if defined(__x86_64__) || defined(__i386__) || defined(__i686__)
-		if (x > 4294967294ULL)
-			break;
-#elif defined(__aarch64__)
-		if (x > 1000)
-			break;
-#else
-		if (x > 12000)
-			break;
-#endif
-		pause();
-	}
-	x = 1;
-}
 
 EFI_STATUS
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
@@ -2513,11 +2468,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
-
-	/*
-	 * if SHIM_DEBUG is set, wait for a debugger to attach.
-	 */
-	debug_hook();
 
 	/*
 	 * Before we do anything else, validate our non-volatile,
