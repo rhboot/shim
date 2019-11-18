@@ -2514,8 +2514,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	InitializeLib(image_handle, systab);
 
-	init_openssl();
-
 	/*
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
 	 */

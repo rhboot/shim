@@ -100,6 +100,7 @@
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
 #include "include/asm.h"
+#include "include/compiler.h"
 #include "include/configtable.h"
 #include "include/console.h"
 #include "include/crypt_blowfish.h"

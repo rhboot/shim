@@ -121,7 +121,7 @@ ossl_free(void *addr, const char *file, int line)
         FreePool(addr);
 }
 
-void
+void CONSTRUCTOR
 init_openssl(void)
 {
         CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
