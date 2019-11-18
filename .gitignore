@@ -27,6 +27,7 @@ shim_cert.h
 *.tar.*
 *.hash
 version.c
+build/
 cov-int/
 scan-results/
-build/
+[Ss]creenlog*
