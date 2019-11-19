@@ -5,4 +5,6 @@ CHAR8 shim_version[] __attribute__((section (".data.ident"))) =
 	"UEFI SHIM\n"
 	"$Version: @@VERSION@@ $\n"
 	"$BuildMachine: @@UNAME@@ $\n"
-	"$Commit: @@COMMIT@@ $\n";
+	"$Commit: @@COMMIT@@ $\n"
+	"$ConfiguredFeatures: @@CONFIG@@ $\n"
+	;

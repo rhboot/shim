@@ -79,9 +79,11 @@ vpath version.efi.o $(BUILDDIR)/src/
 
 src/version.efi.o : src/version.c | version.c.in
 src/version.c : version.c.in
+	@echo making version.c
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
 		-e "s,@@UNAME@@,$(UNAME)," \
 		-e "s,@@COMMIT@@,$(COMMIT_ID)," \
+		-e "s,@@CONFIG@@,$(sort $(CONFIG_ITEMS))," \
 		< $< > $@
 
 $(SHIMNAME) : $(SHIMSONAME)
@@ -107,6 +109,10 @@ src/shim_cert.h: certdb/shim.cer
 	$(HEXDUMP) -v -e '1/1 "0x%02x, "' $<
 	echo "};"
 	) > $@
+
+# This gives us an ordering dep on everything in src/ and lib/ on the generated
+# header files.
+$(subst ../,,$(wildcard ../src/*.[chS] ../lib/*.[chS])) : | src/config.h src/shim_cert.h
 
 $(SHIMSONAME): | lib.efi.a libcryptlib.efi.a libopenssl.efi.a
 $(SHIMSONAME): EFI_LDLIBS+=lib.efi.a libcryptlib.efi.a libopenssl.efi.a

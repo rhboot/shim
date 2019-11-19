@@ -11,6 +11,7 @@ endif
 
 include efi.mk
 
+include $(TOPDIR)/include/config.mk
 include $(TOPDIR)/include/defaults.mk
 include $(TOPDIR)/include/coverity.mk
 include $(TOPDIR)/include/scan-build.mk
