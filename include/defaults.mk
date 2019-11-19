@@ -110,34 +110,6 @@ CCLDFLAGS	= -Wl,--hash-style=sysv \
 		  $(EFI_CRT_OBJS) \
 		  $(ARCH_CCLDFLAGS)
 
-ifneq ($(origin VENDOR_CERT_FILE), undefined)
-	CONFIG_VENDOR_CERT="\#define VENDOR_CERT_FILE \"$(VENDOR_CERT_FILE)\""
-endif
-
-ifneq ($(origin VENDOR_DB_FILE), undefined)
-	CONFIG_VENDOR_DB="\#define VENDOR_DB_FILE \"$(VENDOR_DB_FILE)\""
-endif
-
-ifneq ($(origin VENDOR_DBX_FILE), undefined)
-	CONFIG_VENDOR_DBX="\#define VENDOR_DBX_FILE \"$(VENDOR_DBX_FILE)\""
-endif
-
-ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
-	CONFIG_OVERRIDE_SECURITY_POLICY="\#define OVERRIDE_SECURITY_POLICY"
-endif
-
-ifneq ($(origin ENABLE_HTTPBOOT), undefined)
-	CONFIG_ENABLE_HTTPBOOT="\#define ENABLE_HTTPBOOT"
-endif
-
-ifneq ($(origin REQUIRE_TPM), undefined)
-	CONFIG_REQUIRE_TPM="\#define REQUIRE_TPM"
-endif
-
-ifneq ($(origin ENABLE_SHIM_CERT),undefined)
-	CONFIG_ENABLE_SHIM_CERT="\#define ENABLE_SHIM_CERT"
-endif
-
 define get-config
 $(shell git config --local --get "shim.$(1)")
 endef

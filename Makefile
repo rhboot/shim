@@ -17,6 +17,7 @@ endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
 
+include $(TOPDIR)/include/config.mk
 include $(TOPDIR)/include/defaults.mk
 include $(TOPDIR)/include/coverity.mk
 include $(TOPDIR)/include/scan-build.mk
@@ -65,9 +66,11 @@ $(TOPDIR)/shim_cert.h: shim.cer
 	echo "};" >> $@
 
 version.c : $(TOPDIR)/version.c.in
+	@echo making version.c
 	sed	-e "s,@@VERSION@@,$(VERSION)," \
 		-e "s,@@UNAME@@,$(UNAME)," \
 		-e "s,@@COMMIT@@,$(COMMIT_ID)," \
+		-e "s,@@CONFIG@@,$(sort $(CONFIG_ITEMS))," \
 		< $< > $@
 
 certdb/secmod.db: shim.crt
@@ -115,6 +118,10 @@ $(TOPDIR)/config.h :
 	echo $(CONFIG_ENABLE_HTTPBOOT)
 	echo $(CONFIG_REQUIRE_TPM)
 	) > $@
+
+# This gives us an ordering dep on everything in src/ and lib/ on the generated
+# header files.
+$(wildcard *.[chS] lib/*.[chS]) : | config.h shim_cert.h
 
 cert.o : $(TOPDIR)/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
