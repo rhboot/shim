@@ -20,7 +20,7 @@ test_dir() {
 TAG=$(mktemp -p shim -t -u 'shim-tag-XXXXXXXXXX' | cut -d/ -f2)
 git tag "${TAG}"
 
-git list --topo-order --reverse openssl-rebase-helper-start^..openssl-rebase-helper-end | cut -d\  -f1 | xargs git cherry-pick
+git log --oneline --topo-order --reverse openssl-rebase-helper-start^..openssl-rebase-helper-end | cut -d\  -f1 | xargs git cherry-pick
 
 if [[ $# -eq 1 ]] ; then
     test_dir "${1}" || usage
