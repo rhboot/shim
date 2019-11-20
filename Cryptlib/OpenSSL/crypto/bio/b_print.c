@@ -31,8 +31,10 @@ static int fmtstr(char **, char **, size_t *, size_t *,
                   const char *, int, int, int);
 static int fmtint(char **, char **, size_t *, size_t *,
                   int64_t, int, int, int, int);
+#ifndef OPENSSL_SYS_UEFI
 static int fmtfp(char **, char **, size_t *, size_t *,
                  LDOUBLE, int, int, int, int);
+#endif
 static int doapr_outch(char **, char **, size_t *, size_t *, int);
 static int _dopr(char **sbuffer, char **buffer,
                  size_t *maxlen, size_t *retlen, int *truncated,
@@ -88,7 +90,9 @@ _dopr(char **sbuffer,
 {
     char ch;
     int64_t value;
+#ifndef OPENSSL_SYS_UEFI
     LDOUBLE fvalue;
+#endif
     char *strvalue;
     int min;
     int max;
@@ -192,10 +196,12 @@ _dopr(char **sbuffer,
                 cflags = DP_C_LLONG;
                 ch = *format++;
                 break;
+#ifndef OPENSSL_SYS_UEFI
             case 'L':
                 cflags = DP_C_LDOUBLE;
                 ch = *format++;
                 break;
+#endif
             case 'z':
                 cflags = DP_C_SIZE;
                 ch = *format++;
@@ -259,6 +265,7 @@ _dopr(char **sbuffer,
                             min, max, flags))
                     return 0;
                 break;
+#ifndef OPENSSL_SYS_UEFI
             case 'f':
                 if (cflags == DP_C_LDOUBLE)
                     fvalue = va_arg(args, LDOUBLE);
@@ -292,6 +299,7 @@ _dopr(char **sbuffer,
                            flags, G_FORMAT))
                     return 0;
                 break;
+#endif
             case 'c':
                 if (!doapr_outch(sbuffer, buffer, &currlen, maxlen,
                                  va_arg(args, int)))
@@ -512,6 +520,7 @@ fmtint(char **sbuffer,
     return 1;
 }
 
+#ifndef OPENSSL_SYS_UEFI
 static LDOUBLE abs_val(LDOUBLE value)
 {
     LDOUBLE result = value;
@@ -798,6 +807,7 @@ fmtfp(char **sbuffer,
     }
     return 1;
 }
+#endif
 
 #define BUFFER_INC  1024
 
