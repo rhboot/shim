@@ -31,12 +31,13 @@ cp $OPENSSL_PATH/e_os.h e_os.h
 
 mkdir -p crypto
 C_FILES="
-	LPdir_nyi.c
 	cpt_err.c
 	cryptlib.c
+	ctype.c
 	cversion.c
 	ebcdic.c
 	ex_data.c
+	getenv.c
 	init.c
 	mem.c
 	mem_clr.c
@@ -49,8 +50,7 @@ C_FILES="
 	o_str.c
 	o_time.c
 	threads_none.c
-	threads_pthread.c
-	threads_win.c uid.c
+	uid.c
 "
 for file in $C_FILES
 do
@@ -73,7 +73,6 @@ SUBDIRS="
 	dso
 	err
 	evp
-        fips
 	hmac
 	kdf
 	lhash
@@ -87,9 +86,9 @@ SUBDIRS="
 	rand
 	rc4
 	rsa
+	siphash
 	sha
 	stack
-	txt_db
 	x509
 	x509v3
 "
