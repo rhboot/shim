@@ -48,7 +48,8 @@ cp $DIR/CryptoPkg/Library/BaseCryptLib/Rand/CryptRand.c Rand/CryptRand.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptRsaBasic.c Pk/CryptRsaBasic.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptRsaExtNull.c Pk/CryptRsaExtNull.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptPkcs7SignNull.c Pk/CryptPkcs7SignNull.c
-cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptPkcs7Verify.c Pk/CryptPkcs7Verify.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptPkcs7VerifyBase.c Pk/CryptPkcs7VerifyBase.c
+cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptPkcs7VerifyCommon.c Pk/CryptPkcs7VerifyCommon.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptDhNull.c Pk/CryptDhNull.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptTs.c Pk/CryptTs.c
 cp $DIR/CryptoPkg/Library/BaseCryptLib/Pk/CryptX509.c Pk/CryptX509.c
