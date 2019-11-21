@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1999-2018 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -47,79 +47,14 @@ DECLARE_OBJ_BSEARCH_CMP_FN(const X509V3_EXT_METHOD *,
 IMPLEMENT_OBJ_BSEARCH_CMP_FN(const X509V3_EXT_METHOD *,
                              const X509V3_EXT_METHOD *, ext);
 
-/*
- * This table will be searched using OBJ_bsearch so it *must* kept in order
- * of the ext_nid values.
- */
-
-static const X509V3_EXT_METHOD *standard_exts[] = {
-    &v3_nscert,
-    &v3_ns_ia5_list[0],
-    &v3_ns_ia5_list[1],
-    &v3_ns_ia5_list[2],
-    &v3_ns_ia5_list[3],
-    &v3_ns_ia5_list[4],
-    &v3_ns_ia5_list[5],
-    &v3_ns_ia5_list[6],
-    &v3_skey_id,
-    &v3_key_usage,
-    &v3_pkey_usage_period,
-    &v3_alt[0],
-    &v3_alt[1],
-    &v3_bcons,
-    &v3_crl_num,
-    &v3_cpols,
-    &v3_akey_id,
-    &v3_crld,
-    &v3_ext_ku,
-    &v3_delta_crl,
-    &v3_crl_reason,
-#ifndef OPENSSL_NO_OCSP
-    &v3_crl_invdate,
-#endif
-    &v3_sxnet,
-    &v3_info,
-#ifndef OPENSSL_NO_RFC3779
-    &v3_addr,
-    &v3_asid,
-#endif
-#ifndef OPENSSL_NO_OCSP
-    &v3_ocsp_nonce,
-    &v3_ocsp_crlid,
-    &v3_ocsp_accresp,
-    &v3_ocsp_nocheck,
-    &v3_ocsp_acutoff,
-    &v3_ocsp_serviceloc,
-#endif
-    &v3_sinfo,
-    &v3_policy_constraints,
-#ifndef OPENSSL_NO_OCSP
-    &v3_crl_hold,
-#endif
-    &v3_pci,
-    &v3_name_constraints,
-    &v3_policy_mappings,
-    &v3_inhibit_anyp,
-    &v3_idp,
-    &v3_alt[2],
-    &v3_freshest_crl,
-#ifndef OPENSSL_NO_CT
-    &v3_ct_scts[0],
-    &v3_ct_scts[1],
-    &v3_ct_scts[2],
-#endif
-    &v3_tls_feature,
-};
-
-/* Number of standard extensions */
-
-#define STANDARD_EXTENSION_COUNT OSSL_NELEM(standard_exts)
+#include "standard_exts.h"
 
 const X509V3_EXT_METHOD *X509V3_EXT_get_nid(int nid)
 {
     X509V3_EXT_METHOD tmp;
     const X509V3_EXT_METHOD *t = &tmp, *const *ret;
     int idx;
+
     if (nid < 0)
         return NULL;
     tmp.ext_nid = nid;
@@ -129,8 +64,6 @@ const X509V3_EXT_METHOD *X509V3_EXT_get_nid(int nid)
     if (!ext_list)
         return NULL;
     idx = sk_X509V3_EXT_METHOD_find(ext_list, &tmp);
-    if (idx == -1)
-        return NULL;
     return sk_X509V3_EXT_METHOD_value(ext_list, idx);
 }
 
@@ -231,6 +164,7 @@ void *X509V3_get_d2i(const STACK_OF(X509_EXTENSION) *x, int nid, int *crit,
 {
     int lastpos, i;
     X509_EXTENSION *ex, *found_ex = NULL;
+
     if (!x) {
         if (idx)
             *idx = -1;
@@ -284,9 +218,9 @@ void *X509V3_get_d2i(const STACK_OF(X509_EXTENSION) *x, int nid, int *crit,
 int X509V3_add1_i2d(STACK_OF(X509_EXTENSION) **x, int nid, void *value,
                     int crit, unsigned long flags)
 {
-    int extidx = -1;
-    int errcode;
-    X509_EXTENSION *ext, *extmp;
+    int errcode, extidx = -1;
+    X509_EXTENSION *ext = NULL, *extmp;
+    STACK_OF(X509_EXTENSION) *ret = NULL;
     unsigned long ext_op = flags & X509V3_ADD_OP_MASK;
 
     /*
@@ -345,13 +279,22 @@ int X509V3_add1_i2d(STACK_OF(X509_EXTENSION) **x, int nid, void *value,
         return 1;
     }
 
+    ret = *x;
     if (*x == NULL
-        && (*x = sk_X509_EXTENSION_new_null()) == NULL)
-        return -1;
-    if (!sk_X509_EXTENSION_push(*x, ext))
-        return -1;
+        && (ret = sk_X509_EXTENSION_new_null()) == NULL)
+        goto m_fail;
+    if (!sk_X509_EXTENSION_push(ret, ext))
+        goto m_fail;
 
+    *x = ret;
     return 1;
+
+ m_fail:
+    /* X509V3err(X509V3_F_X509V3_ADD1_I2D, ERR_R_MALLOC_FAILURE); */
+    if (ret != *x)
+        sk_X509_EXTENSION_free(ret);
+    X509_EXTENSION_free(ext);
+    return -1;
 
  err:
     if (!(flags & X509V3_ADD_SILENT))

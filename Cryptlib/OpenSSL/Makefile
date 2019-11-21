@@ -378,9 +378,6 @@ OBJS		= crypto/bio/b_print.o \
 		  crypto/sha/sha512.o \
 		  crypto/stack/stack.o \
 		  crypto/threads_none.o \
-		  crypto/threads_pthread.o \
-		  crypto/threads_win.o \
-		  crypto/txt_db/txt_db.o \
 		  crypto/uid.o \
 		  crypto/x509/by_dir.o \
 		  crypto/x509/by_file.o \
