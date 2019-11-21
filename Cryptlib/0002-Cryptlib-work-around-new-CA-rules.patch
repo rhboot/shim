@@ -1,17 +1,27 @@
-From 18f2f93416a3c35111225edb55ac40ffc1181a52 Mon Sep 17 00:00:00 2001
-From: "dunno@dunno" <dunno@dunno>
-Date: Tue, 9 Oct 2018 10:40:06 -0400
-Subject: [PATCH 3/4] Cryptlib: work around new CA rules
+From 14d67b94256031db5c768591fea59a67a3a60d06 Mon Sep 17 00:00:00 2001
+From: Gary Lin <glin@suse.com>
+Date: Thu, 21 Nov 2019 17:05:53 +0800
+Subject: [PATCH] Cryptlib: work around new CA rules
 
+Since openssl < 1.1.0 didn't check the x509 v3 extension strictly, a CA
+certificate without the CA flag in the basic constraints or KeyCertSign
+in the key usage was still loaded to verify EFI images.
+
+We relax the check for now. In the future, the workaround should be
+removed.
+
+NOTE: This patch is a part of cce5e4ce2f94e07730ac246ba9b47387da8d2016
+
+Signed-off-by: Gary Lin <glin@suse.com>
 ---
- Cryptlib/Pk/CryptPkcs7Verify.c | 39 ++++++++++++++++++++++++++++++++++
+ Cryptlib/Pk/CryptPkcs7VerifyCommon.c | 39 ++++++++++++++++++++++++++++
  1 file changed, 39 insertions(+)
 
-diff --git a/Cryptlib/Pk/CryptPkcs7Verify.c b/Cryptlib/Pk/CryptPkcs7Verify.c
-index fe8e5950f9f..219c2bb1096 100644
---- a/Cryptlib/Pk/CryptPkcs7Verify.c
-+++ b/Cryptlib/Pk/CryptPkcs7Verify.c
-@@ -30,6 +30,43 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+diff --git a/Cryptlib/Pk/CryptPkcs7VerifyCommon.c b/Cryptlib/Pk/CryptPkcs7VerifyCommon.c
+index d99597d..1e4e216 100644
+--- a/Cryptlib/Pk/CryptPkcs7VerifyCommon.c
++++ b/Cryptlib/Pk/CryptPkcs7VerifyCommon.c
+@@ -24,6 +24,43 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
  
  UINT8 mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
  
@@ -55,7 +65,7 @@ index fe8e5950f9f..219c2bb1096 100644
  /**
    Check input P7Data is a wrapped ContentInfo structure or not. If not construct
    a new structure to wrap P7Data.
-@@ -866,6 +903,8 @@ Pkcs7Verify (
+@@ -860,6 +897,8 @@ Pkcs7Verify (
      goto _Exit;
    }
  
@@ -65,5 +75,5 @@ index fe8e5950f9f..219c2bb1096 100644
    // For generic PKCS#7 handling, InData may be NULL if the content is present
    // in PKCS#7 structure. So ignore NULL checking here.
 -- 
-2.17.1
+2.24.0
 
