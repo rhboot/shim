@@ -58,7 +58,7 @@ OPENSSL_CPPFLAGS ?=
 
 EFI_CPPFLAGS += $(OPENSSL_CPPFLAGS) \
 		-Werror=sign-compare -std=gnu11
-EFI_CFLAGS += -ggdb3 -O0 -Wall -Wsign-compare -Werror $(CC_LTO_PLUGIN) \
+EFI_CFLAGS += -ggdb3 -Os -Wall -Wsign-compare -Werror $(CC_LTO_PLUGIN) \
 	      $(OPENSSL_CFLAGS)
 
 define get-config
