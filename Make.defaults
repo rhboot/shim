@@ -27,6 +27,7 @@ DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
+OPTIMIZATIONS	?= -Os
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
@@ -87,7 +88,7 @@ ifeq ($(ARCH),arm)
 	TIMESTAMP_LOCATION	:= 72
 endif
 
-CFLAGS		= -ggdb -O0 -fno-stack-protector -fno-strict-aliasing -fpic \
+CFLAGS		= -ggdb $(OPTIMIZATIONS) -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
 		  -Werror=sign-compare -ffreestanding -std=gnu89 \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
