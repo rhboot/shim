@@ -2,14 +2,8 @@
   Root include file of C runtime library to support building the third-party
   cryptographic library.
 
-Copyright (c) 2010 - 2017, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2010 - 2019, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -33,6 +27,17 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #define ENGINESDIR ""
 
 #define CONST const
+
+//
+// We already have "no-ui" in out Configure invocation.
+// but the code still fails to compile.
+// Ref:  https://github.com/openssl/openssl/issues/8904
+//
+// This is defined in CRT library(stdio.h).
+//
+#ifndef BUFSIZ
+#define BUFSIZ  8192
+#endif
 
 //
 // OpenSSL relies on explicit configuration for word size in crypto/bn,
