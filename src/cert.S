@@ -1,7 +1,7 @@
 #include "config.h"
 	.globl cert_table
 	.type	cert_table, %object
-	.size	cert_table, 4
+	.size	cert_table, 16
 	.section .vendor_cert, "a", %progbits
 cert_table:
 #if defined(VENDOR_CERT_FILE)
@@ -35,8 +35,8 @@ vendor_cert_priv:
 
 	.data
 	.align 4
-	.type	vendor_cert_size_priv, %object
-	.size	vendor_cert_size_priv, 4
+	.type	vendor_cert_priv_end, %object
+	.size	vendor_cert_priv_end, 4
 	.section .vendor_cert, "a", %progbits
 vendor_cert_priv_end:
 #endif
@@ -59,8 +59,8 @@ vendor_dbx_priv:
 
 	.data
 	.align 4
-	.type	vendor_dbx_size_priv, %object
-	.size	vendor_dbx_size_priv, 4
+	.type	vendor_dbx_priv_end, %object
+	.size	vendor_dbx_priv_end, 4
 	.section .vendor_cert, "a", %progbits
 vendor_dbx_priv_end:
 #endif
