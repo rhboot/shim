@@ -452,7 +452,22 @@ OBJS		= crypto/bio/b_print.o \
 		  crypto/x509v3/v3_sxnet.o \
 		  crypto/x509v3/v3_tlsf.o \
 		  crypto/x509v3/v3_utl.o \
-		  crypto/x509v3/v3err.o
+		  crypto/x509v3/v3err.o \
+		  ossl_store.o \
+		  rand_pool.o
+
+ifeq ($(ARCH),x86_64)
+	OBJS += rand_pool_noise_x86.o
+endif
+ifeq ($(ARCH),ia32)
+	OBJS += rand_pool_noise_x86.o
+endif
+ifeq ($(ARCH),aarch64)
+	OBJS += rand_pool_noise_arm.o
+endif
+ifeq ($(ARCH),arm)
+	OBJS += rand_pool_noise_arm.o
+endif
 
 all: $(TARGET)
 
