@@ -206,7 +206,14 @@ extern "C" {
 # endif
 
 # if defined(OPENSSL_SYS_UEFI) && !defined(ossl_ssize_t)
+#  include <efi.h>
+#  if !defined(INTN)
+#   define INTN long
+#  endif
 #  define ossl_ssize_t INTN
+#  if !defined(MAX_INTN)
+#   define MAX_INTN __LONG_MAX__
+#  endif
 #  define OSSL_SSIZE_MAX MAX_INTN
 # endif
 
@@ -216,6 +223,8 @@ extern "C" {
 #   define OSSL_SSIZE_MAX SSIZE_MAX
 #  elif defined(_POSIX_SSIZE_MAX)
 #   define OSSL_SSIZE_MAX _POSIX_SSIZE_MAX
+#  elif defined(__SIZE_MAX__)
+#   define OSSL_SSIZE_MAX ((__SIZE_MAX__) & (~(1ULL << ((sizeof(ssize_t)<<3) - 1))))
 #  else
 #   define OSSL_SSIZE_MAX ((ssize_t)(SIZE_MAX>>1))
 #  endif
@@ -229,14 +238,6 @@ extern "C" {
 
 /* Standard integer types */
 # if defined(OPENSSL_SYS_UEFI)
-typedef INT8 int8_t;
-typedef UINT8 uint8_t;
-typedef INT16 int16_t;
-typedef UINT16 uint16_t;
-typedef INT32 int32_t;
-typedef UINT32 uint32_t;
-typedef INT64 int64_t;
-typedef UINT64 uint64_t;
 # elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L) || \
      defined(__osf__) || defined(__sgi) || defined(__hpux) || \
      defined(OPENSSL_SYS_VMS) || defined (__OpenBSD__)
