@@ -62,7 +62,7 @@ OPENSSL_DEFINES = -D_CRT_SECURE_NO_DEPRECATE \
 		 -DOPENSSL_SMALL_FOOTPRINT \
 		 -DPEDANTIC
 
-CFLAGS = -ggdb -O0 \
+CFLAGS = -ggdb -Os \
 	 -ffreestanding \
 	 -fno-builtin \
 	 -fno-stack-protector \
