@@ -12,13 +12,9 @@ SHIMHASHNAME	= $(SHIMSTEM).hash
 BOOTEFINAME	?= BOOT$(ARCH_UPPER).EFI
 BOOTCSVNAME	?= BOOT$(ARCH_UPPER).CSV
 
-ORIG_SHIM_SOURCES = shim.c mok.c netboot.c replacements.c tpm.c errlog.c version.c
+ORIG_SHIM_SOURCES = shim.c mok.c netboot.c replacements.c tpm.c errlog.c version.c httpboot.c
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c
 ORIG_FALLBACK_SOURCES = fallback.c
-
-ifneq ($(origin ENABLE_HTTPBOOT), undefined)
-	ORIG_SHIM_SOURCES += httpboot.c
-endif
 
 ifeq ($(SOURCE_DATE_EPOCH),)
 	UNAME=$(shell uname -s -m -p -i -o)
