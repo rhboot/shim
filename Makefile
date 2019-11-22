@@ -279,4 +279,4 @@ archive: tag
 
 .PHONY : install-deps shim.key
 
-export ARCH CC LD OBJCOPY EFI_INCLUDE
+export ARCH CC LD OBJCOPY EFI_INCLUDE OPTIMIZATIONS

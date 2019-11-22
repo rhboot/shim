@@ -1,7 +1,7 @@
 
 EFI_INCLUDES	= -I$(TOPDIR)/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
 
-CFLAGS		= -ggdb -O0 -I$(TOPDIR) -iquote $(TOPDIR) -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
+CFLAGS		= -ggdb $(OPTIMIZATIONS) -I$(TOPDIR) -iquote $(TOPDIR) -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
 		  -Wall $(EFI_INCLUDES) -std=gnu89 \
 		  -ffreestanding -I$(shell $(CC) -print-file-name=include)
 
