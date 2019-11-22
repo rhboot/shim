@@ -99,10 +99,6 @@ ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
 endif
 
-ifneq ($(origin ENABLE_HTTPBOOT), undefined)
-	CFLAGS	+= -DENABLE_HTTPBOOT
-endif
-
 ifneq ($(origin REQUIRE_TPM), undefined)
 	CFLAGS  += -DREQUIRE_TPM
 endif

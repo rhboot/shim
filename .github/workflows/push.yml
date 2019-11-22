@@ -16,10 +16,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
         id: install
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
@@ -35,10 +35,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
         id: install
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
@@ -54,10 +54,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
         id: install
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
@@ -73,10 +73,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
         id: install
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
