@@ -1118,7 +1118,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 		data = sourcebuffer;
 		datasize = sourcesize;
-#if  defined(ENABLE_HTTPBOOT)
 	} else if (find_httpboot(li->DeviceHandle)) {
 		efi_status = httpboot_fetch_buffer (image_handle,
 						    &sourcebuffer,
@@ -1130,7 +1129,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 		data = sourcebuffer;
 		datasize = sourcesize;
-#endif
 	} else {
 		/*
 		 * Read the new executable off disk
