@@ -53,10 +53,6 @@ clean-shim-objs :
 
 clean : | clean-shim-objs
 
-src/cert.efi.o : src/cert.S
-src/shim.efi.o : | src/shim.h
-src/shim.h : | src/config.h
-
 vpath src/config.h $(BUILDDIR)
 
 EFI_BIN_SECTIONS += .data.ident .vendor_cert
@@ -99,8 +95,6 @@ ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 TARGETS += $(SHIMHASHNAME)
 endif
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
-.NOTPARALLEL: src/shim_cert.h
-src/shim.h: | src/shim_cert.h
 TARGETS	+= $(MMNAME).signed $(FBNAME).signed
 endif
 
@@ -114,17 +108,17 @@ src/shim_cert.h: certdb/shim.cer
 	echo "};"
 	) > $@
 
-OPENSSL_GROUP=-Wl,--start-group,libcryptlib.efi.a,libopenssl.efi.a,--end-group
+$(SHIMSONAME): | lib.efi.a libcryptlib.efi.a libopenssl.efi.a
+$(SHIMSONAME): EFI_LDLIBS+=lib.efi.a libcryptlib.efi.a libopenssl.efi.a
+$(SHIMSONAME): $(SHIM_OBJECTS)
 
-$(SHIMSONAME): | src/config.h libcryptlib.efi.a libopenssl.efi.a src/shim_cert.h
-$(SHIMSONAME): EFI_CCLDLIBS+=$(OPENSSL_GROUP) $(LIB_GCC)
-$(SHIMSONAME): $(SHIM_OBJECTS) lib.efi.a
+$(FBSONAME): | lib.efi.a
+$(FBSONAME): EFI_LDLIBS+=lib.efi.a
+$(FBSONAME): $(FALLBACK_OBJECTS)
 
-$(FBSONAME): $(FALLBACK_OBJECTS) lib.efi.a
-
-$(MMSONAME): | libcryptlib.efi.a libopenssl.efi.a
-$(MMSONAME): EFI_CCLDLIBS+=$(OPENSSL_GROUP) $(LIB_GCC)
-$(MMSONAME): $(MOK_OBJECTS) lib.efi.a
+$(MMSONAME): | lib.efi.a libcryptlib.efi.a libopenssl.efi.a
+$(MMSONAME): EFI_LDLIBS+=lib.efi.a libcryptlib.efi.a libopenssl.efi.a
+$(MMSONAME): $(MOK_OBJECTS)
 
 vpath buildid $(BUILDDIR)/src
 vpath buildid.c $(TOPDIR)/src
