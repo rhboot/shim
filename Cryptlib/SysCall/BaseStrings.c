@@ -1,7 +1,7 @@
 #include <CrtLibSupport.h>
 
 char *
-AsciiStrCat(char *Destination, char *Source)
+AsciiStrCat(char *Destination, const char *Source)
 {
 	UINTN dest_len = strlena((CHAR8 *)Destination);
 	UINTN i;
@@ -13,8 +13,8 @@ AsciiStrCat(char *Destination, char *Source)
 	return Destination;
 }
 
-CHAR8 *
-AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
+char *
+AsciiStrCpy(char *Destination, const char *Source)
 {
 	UINTN i;
 
@@ -26,7 +26,7 @@ AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
 }
 
 char *
-AsciiStrnCpy(char *Destination, char *Source, UINTN count)
+AsciiStrnCpy(char *Destination, const char *Source, UINTN count)
 {
 	UINTN i;
 
@@ -38,15 +38,20 @@ AsciiStrnCpy(char *Destination, char *Source, UINTN count)
 	return Destination;
 }
 
-CHAR8 *
-ScanMem8(CHAR8 *str, UINTN count, CHAR8 ch)
+VOID *
+ScanMem8(CONST VOID *Buffer, UINTN Length, UINT8 Value)
 {
-	UINTN i;
+	CONST UINT8 *Pointer;
 
-	for (i = 0; i < count; i++) {
-		if (str[i] == ch)
-			return str + i;
-	}
+	if (Buffer == NULL || Length == 0)
+		return NULL;
+
+	Pointer = (CONST UINT8*)Buffer;
+	do {
+		if (*(Pointer++) == Value) {
+			return (VOID *)--Pointer;
+		}
+	} while (--Length != 0);
 	return NULL;
 }
 
@@ -59,9 +64,9 @@ WriteUnaligned32(UINT32 *Buffer, UINT32 Value)
 }
 
 UINTN
-AsciiStrSize(CHAR8 *string)
+AsciiStrSize(const char *string)
 {
-	return strlena(string) + 1;
+	return strlena((CONST CHAR8 *)string) + 1;
 }
 
 int

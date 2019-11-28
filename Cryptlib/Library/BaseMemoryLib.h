@@ -1,1 +1,1 @@
-CHAR8 *ScanMem8(CHAR8 *str, UINTN count, CHAR8 ch);
+VOID *ScanMem8(CONST VOID *Buffer, UINTN Length, UINT8 Value);
