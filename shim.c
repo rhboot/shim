@@ -693,6 +693,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 static BOOLEAN secure_mode (void)
 {
 	static int first = 1;
+
 	if (user_insecure_mode)
 		return FALSE;
 
@@ -2368,24 +2369,10 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
-static void *
-ossl_malloc(size_t num, const char *file, int line)
-{
-	return AllocatePool(num);
-}
-
-static void
-ossl_free(void *addr, const char *file, int line)
-{
-	FreePool(addr);
-}
-
 static void
 init_openssl(void)
 {
-	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
 	OPENSSL_init();
-	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
 	ERR_load_ERR_strings();
 	ERR_load_BN_strings();
 	ERR_load_RSA_strings();
