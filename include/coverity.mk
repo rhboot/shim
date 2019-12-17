@@ -43,3 +43,4 @@ COV_BUILD ?= $(shell x=$$(which --skip-alias --skip-functions cov-build 2>/dev/n
 cov-test : ; $(if $(findstring /,$(COV_BUILD)),,$(error cov-build not found))
 
 .PHONY : coverity cov-upload cov-clean cov-file cov-test
+unexport COV_BUILD
