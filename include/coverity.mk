@@ -46,3 +46,4 @@ endif
 cov-test : ; $(COV_BUILD_ERROR)
 
 .PHONY : coverity cov-upload cov-clean cov-file cov-test
+unexport COV_BUILD COV_BUILD_ERROR
