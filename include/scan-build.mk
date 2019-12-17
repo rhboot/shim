@@ -15,3 +15,4 @@ scan-build-all : clean
 	scan-build -o scan-results make $(DASHJ) CC=clang all
 
 .PHONY : scan-build scan-clean
+unexport SCAN_BUILD
