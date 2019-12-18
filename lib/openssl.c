@@ -109,24 +109,10 @@ void show_ca_warning(void)
         console_print_box(text, -1);
 }
 
-static void *
-ossl_malloc(size_t num, const char *file, int line)
-{
-        return AllocatePool(num);
-}
-
-static void
-ossl_free(void *addr, const char *file, int line)
-{
-        FreePool(addr);
-}
-
 void CONSTRUCTOR
 init_openssl(void)
 {
-        CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
         OPENSSL_init();
-        CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
         ERR_load_ERR_strings();
         ERR_load_BN_strings();
         ERR_load_RSA_strings();
