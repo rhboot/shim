@@ -39,6 +39,7 @@ OSLABEL		?= $(EFIDIR)
 DEFAULT_LOADER	?= \\\\grub$(ARCH).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
+OPTIMIZATIONS	?= -Os
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 OPENSSLDIR	= $(TOPDIR)/Cryptlib/OpenSSL
@@ -62,7 +63,7 @@ OPENSSL_DEFINES = -D_CRT_SECURE_NO_DEPRECATE \
 		 -DOPENSSL_SMALL_FOOTPRINT \
 		 -DPEDANTIC
 
-CFLAGS = -ggdb -Os \
+CFLAGS = -ggdb $(OPTIMZATIONS) \
 	 -ffreestanding \
 	 -fno-builtin \
 	 -fno-stack-protector \
