@@ -36,6 +36,7 @@ DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
 DEFAULT_LOADER	?= \\\\grub$(EFI_ARCH_SUFFIX).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
+OPTIMIZATIONS	?= -Os
 
 OPENSSLDIR	= $(TOPDIR)/Cryptlib/OpenSSL
 
@@ -58,7 +59,7 @@ OPENSSL_CPPFLAGS ?=
 
 EFI_CPPFLAGS += $(OPENSSL_CPPFLAGS) \
 		-Werror=sign-compare -std=gnu11
-EFI_CFLAGS += -ggdb3 -Os -Wall -Wsign-compare -Werror $(CC_LTO_PLUGIN) \
+EFI_CFLAGS += -ggdb3 $(OPTIMIZATIONS) -Wall -Wsign-compare -Werror $(CC_LTO_PLUGIN) \
 	      $(OPENSSL_CFLAGS)
 
 define get-config
