@@ -743,14 +743,14 @@ httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE nic;
-	CHAR8 *next_loader = NULL;
+	CHAR8 next_loader[sizeof DEFAULT_LOADER_CHAR];
 	CHAR8 *next_uri = NULL;
 	CHAR8 *hostname = NULL;
 
 	if (!uri)
 		return EFI_NOT_READY;
 
-	next_loader = translate_slashes(DEFAULT_LOADER_CHAR);
+	translate_slashes(next_loader, DEFAULT_LOADER_CHAR);
 
 	/* Create the URI for the next loader based on the original URI */
 	efi_status = generate_next_uri(uri, next_loader, &next_uri);
