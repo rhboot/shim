@@ -45,21 +45,23 @@ strcata(CHAR8 *dest, const CHAR8 *src)
 static inline
 __attribute__((unused))
 CHAR8 *
-translate_slashes(char *str)
+translate_slashes(CHAR8 *out, const char *str)
 {
 	int i;
 	int j;
-	if (str == NULL)
-		return (CHAR8 *)str;
+	if (str == NULL || out == NULL)
+		return NULL;
 
 	for (i = 0, j = 0; str[i] != '\0'; i++, j++) {
 		if (str[i] == '\\') {
-			str[j] = '/';
+			out[j] = '/';
 			if (str[i+1] == '\\')
 				i++;
-		}
+		} else
+			out[j] = str[i];
 	}
-	return (CHAR8 *)str;
+	out[j] = '\0';
+	return out;
 }
 
 #endif /* SHIM_STR_H */
