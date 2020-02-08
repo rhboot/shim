@@ -824,7 +824,7 @@ static EFI_STATUS generate_path_from_image_path(EFI_LOADED_IMAGE *li,
 	/*
 	 * Suuuuper lazy technique here, but check and see if this is a full
 	 * path to something on the ESP.  Backwards compatibility demands
-	 * that we don't just use \\, becuase we (not particularly brightly)
+	 * that we don't just use \\, because we (not particularly brightly)
 	 * used to require that the relative file path started with that.
 	 *
 	 * If it is a full path, don't try to merge it with the directory
