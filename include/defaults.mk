@@ -54,7 +54,7 @@ EFI_INCLUDES	+= \
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
 
 EFI_LDSCRIPT = $(TOPDIR)/include/elf_$(EFI_ARCH)_efi.lds
-OPENSSL_CFLAGS ?=
+OPENSSL_CFLAGS ?= -Wno-error=pointer-sign
 OPENSSL_CPPFLAGS ?=
 
 EFI_CPPFLAGS += $(OPENSSL_CPPFLAGS) \
