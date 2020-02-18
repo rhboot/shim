@@ -210,21 +210,39 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 				 strlen(description) + 1, 0xd, NULL);
 }
 
-EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 *sha1hash,
-		      UINT8 pcr)
+EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
+		      EFI_PHYSICAL_ADDRESS addr, EFI_DEVICE_PATH *path,
+		      UINT8 *sha1hash, UINT8 pcr)
 {
-	EFI_IMAGE_LOAD_EVENT ImageLoad;
+	EFI_IMAGE_LOAD_EVENT *ImageLoad = NULL;
+	EFI_STATUS efi_status;
+	UINTN path_size = 0;
 
-	// All of this is informational and forces us to do more parsing before
-	// we can generate it, so let's just leave it out for now
-	ImageLoad.ImageLocationInMemory = 0;
-	ImageLoad.ImageLengthInMemory = 0;
-	ImageLoad.ImageLinkTimeAddress = 0;
-	ImageLoad.LengthOfDevicePath = 0;
+	if (path)
+		path_size = DevicePathSize(path);
 
-	return tpm_log_event_raw(buf, size, pcr, (CHAR8 *)&ImageLoad,
-				 sizeof(ImageLoad),
-				 EV_EFI_BOOT_SERVICES_APPLICATION, sha1hash);
+	ImageLoad = AllocateZeroPool(sizeof(*ImageLoad) + path_size);
+	if (!ImageLoad) {
+		perror(L"Unable to allocate image load event structure\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	ImageLoad->ImageLocationInMemory = buf;
+	ImageLoad->ImageLengthInMemory = size;
+	ImageLoad->ImageLinkTimeAddress = addr;
+
+	if (path_size > 0) {
+		CopyMem(ImageLoad->DevicePath, path, path_size);
+		ImageLoad->LengthOfDevicePath = path_size;
+	}
+
+	efi_status = tpm_log_event_raw(buf, size, pcr, (CHAR8 *)ImageLoad,
+				       sizeof(*ImageLoad) + path_size,
+				       EV_EFI_BOOT_SERVICES_APPLICATION,
+				       sha1hash);
+	FreePool(ImageLoad);
+
+	return efi_status;
 }
 
 typedef struct {
