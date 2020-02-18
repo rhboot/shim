@@ -1859,6 +1859,16 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	CopyMem(&li_bak, li, sizeof(li_bak));
 
 	/*
+	 * Update the loaded image with the second stage loader file path
+	 */
+	li->FilePath = FileDevicePath(NULL, PathName);
+	if (!li->FilePath) {
+		perror(L"Unable to update loaded image file path\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto restore;
+	}
+
+	/*
 	 * Verify and, if appropriate, relocate and execute the executable
 	 */
 	efi_status = handle_image(data, datasize, li, &entry_point,
@@ -1867,8 +1877,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		perror(L"Failed to load image: %r\n", efi_status);
 		PrintErrors();
 		ClearErrors();
-		CopyMem(li, &li_bak, sizeof(li_bak));
-		goto done;
+		goto restore;
 	}
 
 	loader_is_participating = 0;
@@ -1877,6 +1886,10 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * The binary is trusted and relocated. Run it
 	 */
 	efi_status = entry_point(image_handle, systab);
+
+restore:
+	if (li->FilePath)
+		FreePool(li->FilePath);
 
 	/*
 	 * Restore our original loaded image values
