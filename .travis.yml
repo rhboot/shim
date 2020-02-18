@@ -7,7 +7,7 @@ branches:
 matrix:
  include:
    - os: linux
-     dist: trusty
+     dist: bionic
      services: docker
 
 before_install:

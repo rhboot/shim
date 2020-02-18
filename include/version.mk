@@ -3,7 +3,7 @@
 # Peter Jones, 2019-09-04 16:35
 #
 
-VERSION		= 15
+VERSION		?= 15
 ifneq ($(origin RELEASE),undefined)
 DASHRELEASE	?= -$(RELEASE)
 else
