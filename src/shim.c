@@ -1207,7 +1207,9 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 #ifdef REQUIRE_TPM
 	efi_status =
 #endif
-	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)data, datasize, sha1hash, 4);
+	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)data, datasize,
+		   (EFI_PHYSICAL_ADDRESS)(UINTN)context.ImageAddress,
+		   li->FilePath, sha1hash, 4);
 #ifdef REQUIRE_TPM
 	if (efi_status != EFI_SUCCESS) {
 		return efi_status;
@@ -1721,7 +1723,8 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 #ifdef REQUIRE_TPM
 	efi_status =
 #endif
-	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)buffer, size, sha1hash, 4);
+	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)buffer, size, 0, NULL,
+		   sha1hash, 4);
 #ifdef REQUIRE_TPM
 	if (EFI_ERROR(efi_status))
 		goto done;
