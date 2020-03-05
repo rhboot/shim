@@ -25,7 +25,7 @@ PCR8:
   measured into PCR8.
   
 PCR9:
-- If you're using the grub2 TPM patchset we cary in Fedora, the kernel,
+- If you're using the grub2 TPM patchset we carry in Fedora, the kernel,
   initramfs, and any multiboot modules loaded are measured into PCR9.
 
 PCR14:
