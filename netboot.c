@@ -273,7 +273,16 @@ static EFI_STATUS parseDhcp4()
 			pkt_v4 = &pxe->Mode->ProxyOffer.Dhcpv4;
 	}
 
-	INTN dir_len = strnlena(pkt_v4->BootpBootFile, 127);
+	if(pxe->Mode->PxeReplyReceived) {
+		/*
+		 * If we have no bootinfo yet search for it in the PxeReply.
+		 * Some mainboards run into this when the server uses boot menus
+		 */
+		if(pkt_v4->BootpBootFile[0] == '\0' && pxe->Mode->PxeReply.Dhcpv4.BootpBootFile[0] != '\0')
+			pkt_v4 = &pxe->Mode->PxeReply.Dhcpv4;
+	}
+
+	INTN dir_len = strnlena((CHAR8 *)pkt_v4->BootpBootFile, 127);
 	INTN i;
 	UINT8 *dir = pkt_v4->BootpBootFile;
 
@@ -289,7 +298,7 @@ static EFI_STATUS parseDhcp4()
 		return EFI_OUT_OF_RESOURCES;
 
 	if (dir_len > 0) {
-		strncpya(full_path, dir, dir_len);
+		strncpya(full_path, (CHAR8 *)dir, dir_len);
 		if (full_path[dir_len-1] == '/' && template[0] == '/')
 			full_path[dir_len-1] = '\0';
 	}
@@ -340,7 +349,7 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *buf
 
 try_again:
 	efi_status = pxe->Mtftp(pxe, read, *buffer, overwrite, bufsiz, &blksz,
-			      &tftp_addr, full_path, NULL, nobuffer);
+			      &tftp_addr, (UINT8 *)full_path, NULL, nobuffer);
 	if (efi_status == EFI_BUFFER_TOO_SMALL) {
 		/* try again, doubling buf size */
 		*bufsiz *= 2;
