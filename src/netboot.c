@@ -273,6 +273,15 @@ static EFI_STATUS parseDhcp4()
 			pkt_v4 = &pxe->Mode->ProxyOffer.Dhcpv4;
 	}
 
+	if(pxe->Mode->PxeReplyReceived) {
+		/*
+		 * If we have no bootinfo yet search for it in the PxeReply.
+		 * Some mainboards run into this when the server uses boot menus
+		 */
+		if(pkt_v4->BootpBootFile[0] == '\0' && pxe->Mode->PxeReply.Dhcpv4.BootpBootFile[0] != '\0')
+			pkt_v4 = &pxe->Mode->PxeReply.Dhcpv4;
+	}
+
 	INTN dir_len = strnlena((CHAR8 *)pkt_v4->BootpBootFile, 127);
 	INTN i;
 	CHAR8 *dir = (CHAR8 *)pkt_v4->BootpBootFile;
