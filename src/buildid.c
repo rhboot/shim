@@ -1,8 +1,6 @@
 /*
  * Walk a list of input files, printing the name and buildid of any file
  * that has one.
- *
- * This program is licensed under the GNU Public License version 2.
  */
 
 #include <err.h>
