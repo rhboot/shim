@@ -112,7 +112,7 @@ CCLDFLAGS	= -Wl,--hash-style=sysv \
 		  $(ARCH_CCLDFLAGS)
 
 define get-config
-$(shell git config --local --get "shim.$(1)")
+$(shell if [ -e .git ] ; then git config --local --get "shim.$(1)"; fi)
 endef
 
 .EXPORT_ALL_VARIABLES:
