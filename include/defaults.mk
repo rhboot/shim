@@ -63,7 +63,7 @@ EFI_CFLAGS += -ggdb3 $(OPTIMIZATIONS) -Wall -Wsign-compare -Werror $(CC_LTO_PLUG
 	      $(OPENSSL_CFLAGS)
 
 define get-config
-$(shell git config --local --get "shim.$(1)")
+$(shell if [ -e .git ] ; then git config --local --get "shim.$(1)"; fi)
 endef
 
 define object-template
