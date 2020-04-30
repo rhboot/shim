@@ -1793,25 +1793,20 @@ static EFI_STATUS shim_read_header(void *data, unsigned int datasize,
 /*
  * Load and run an EFI executable
  */
-EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
+EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
+		      EFI_LOADED_IMAGE **li, CHAR16 *PathName, void **data,
+		      int *datasize)
 {
 	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE *li, li_bak;
-	EFI_IMAGE_ENTRY_POINT entry_point;
-	EFI_PHYSICAL_ADDRESS alloc_address;
-	UINTN alloc_pages;
-	CHAR16 *PathName = NULL;
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
-	void *data = NULL;
-	int datasize;
 
 	/*
 	 * We need to refer to the loaded image protocol on the running
 	 * binary in order to find our path
 	 */
 	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-					 (void **)&li);
+					 (void **)li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to init protocol\n");
 		return efi_status;
@@ -1820,14 +1815,14 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	/*
 	 * Build a new path from the existing one plus the executable name
 	 */
-	efi_status = generate_path_from_image_path(li, ImagePath, &PathName);
+	efi_status = generate_path_from_image_path(*li, ImagePath, &PathName);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to generate path %s: %r\n", ImagePath,
 		       efi_status);
 		goto done;
 	}
 
-	if (findNetboot(li->DeviceHandle)) {
+	if (findNetboot((*li)->DeviceHandle)) {
 		efi_status = parseNetbootinfo(image_handle);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Netboot parsing failed: %r\n", efi_status);
@@ -1840,10 +1835,10 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 			       efi_status);
 			return efi_status;
 		}
-		data = sourcebuffer;
-		datasize = sourcesize;
+		*data = sourcebuffer;
+		*datasize = sourcesize;
 #if  defined(ENABLE_HTTPBOOT)
-	} else if (find_httpboot(li->DeviceHandle)) {
+	} else if (find_httpboot(*li->DeviceHandle)) {
 		efi_status = httpboot_fetch_buffer (image_handle,
 						    &sourcebuffer,
 						    &sourcesize);
@@ -1852,14 +1847,14 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 			       efi_status);
 			return efi_status;
 		}
-		data = sourcebuffer;
-		datasize = sourcesize;
+		*data = sourcebuffer;
+		*datasize = sourcesize;
 #endif
 	} else {
 		/*
 		 * Read the new executable off disk
 		 */
-		efi_status = load_image(li, &data, &datasize, PathName);
+		efi_status = load_image(*li, data, datasize, PathName);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to load image %s: %r\n",
 			       PathName, efi_status);
@@ -1869,11 +1864,32 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		}
 	}
 
-	if (datasize < 0) {
+	if (*datasize < 0)
 		efi_status = EFI_INVALID_PARAMETER;
-		goto done;
-	}
 
+done:
+	return efi_status;
+}
+
+/*
+ * Load and run an EFI executable
+ */
+EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE *li = NULL, li_bak;
+	EFI_IMAGE_ENTRY_POINT entry_point;
+	EFI_PHYSICAL_ADDRESS alloc_address;
+	UINTN alloc_pages;
+	CHAR16 *PathName = NULL;
+	void *data = NULL;
+	int datasize;
+
+	efi_status = read_image(image_handle, ImagePath, &li, PathName, &data,
+				&datasize);
+
+	if (EFI_ERROR(efi_status))
+		goto done;
 	/*
 	 * We need to modify the loaded image protocol entry before running
 	 * the new binary, so back it up
