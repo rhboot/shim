@@ -70,6 +70,11 @@ UINT32 build_cert_size;
 UINT8 *build_cert;
 #endif /* defined(ENABLE_SHIM_CERT) */
 
+UINT32 shim_db_size;
+UINT32 shim_dbx_size;
+UINT8 *shim_db;
+UINT8 *shim_dbx;
+
 /*
  * indicator of how an image has been verified
  */
@@ -477,6 +482,33 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 
 }
 
+static EFI_STATUS check_dbx (WIN_CERTIFICATE_EFI_PKCS *cert,
+			     UINT8 *sha256hash, UINT8 *sha1hash,
+			     EFI_SIGNATURE_LIST *dbx, int dbx_size,
+                             CHAR16 *dbxname)
+{
+	if (check_db_hash_in_ram(dbx, dbx_size, sha256hash,
+			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
+                                 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		LogError(L"binary sha256hash found in %s dbx\n", dbxname);
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash_in_ram(dbx, dbx_size, sha1hash,
+				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		LogError(L"binary sha1hash found in %s dbx\n", dbxname);
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (cert &&
+	    check_db_cert_in_ram(dbx, dbx_size, cert, sha256hash, L"dbx",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		LogError(L"cert sha256hash found in %s dbx\n", dbxname);
+		return EFI_SECURITY_VIOLATION;
+	}
+
+	return EFI_SUCCESS;
+}
+
 /*
  * Check whether the binary signature or hash are present in dbx or the
  * built-in blacklist
@@ -484,26 +516,14 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
-
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
-			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
-			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
-		LogError(L"binary sha256hash found in vendor dbx\n");
+	if (EFI_ERROR(check_dbx(cert, sha256hash, sha1hash,
+				(EFI_SIGNATURE_LIST *)vendor_dbx,
+				vendor_dbx_size, L"vendor")))
 		return EFI_SECURITY_VIOLATION;
-	}
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
-				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
-				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
-		LogError(L"binary sha1hash found in vendor dbx\n");
+	if (shim_dbx_size && EFI_ERROR(check_dbx(cert, sha256hash, sha1hash,
+						(EFI_SIGNATURE_LIST *)shim_dbx,
+						 shim_dbx_size, L"loaded")))
 		return EFI_SECURITY_VIOLATION;
-	}
-	if (cert &&
-	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
-				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in vendor dbx\n");
-		return EFI_SECURITY_VIOLATION;
-	}
 	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in system dbx\n");
@@ -590,6 +610,26 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		return EFI_SUCCESS;
 	} else {
 		LogError(L"check_db_cert(MokList, sha256hash) != DATA_FOUND\n");
+	}
+
+	if (check_db_hash_in_ram((EFI_SIGNATURE_LIST *)shim_db, shim_db_size,
+				 sha256hash, SHA256_DIGEST_SIZE,
+				 EFI_CERT_SHA256_GUID, L"shim_db",
+				 SHIM_LOCK_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(shim_db, sha256hash) != DATA_FOUND\n");
+	}
+	if (cert && shim_db_size &&
+	    check_db_cert_in_ram((EFI_SIGNATURE_LIST *)shim_db, shim_db_size,
+	         cert, sha256hash, L"shim_db", SHIM_LOCK_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_CERT;
+		update_verification_method(VERIFIED_BY_CERT);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_cert_in_ram(shim_db, sha256hash) != DATA_FOUND\n");
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
@@ -1838,7 +1878,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		*data = sourcebuffer;
 		*datasize = sourcesize;
 #if  defined(ENABLE_HTTPBOOT)
-	} else if (find_httpboot(*li->DeviceHandle)) {
+	} else if (find_httpboot((*li)->DeviceHandle)) {
 		efi_status = httpboot_fetch_buffer (image_handle,
 						    &sourcebuffer,
 						    &sourcesize);
@@ -2414,6 +2454,142 @@ uninstall_shim_protocols(void)
 }
 
 EFI_STATUS
+load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE *li = NULL;
+	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	EFI_IMAGE_SECTION_HEADER *Section;
+	EFI_SIGNATURE_LIST *certlist;
+	CHAR16 *PathName = NULL;
+	void *pointer;
+	UINT32 original;
+	int datasize;
+	void *data;
+	int i;
+
+	efi_status = read_image(image_handle, filename, &li, PathName,
+				&data, &datasize);
+
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = verify_image(data, datasize, li, &context);
+
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	Section = context.FirstSection;
+	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		if (CompareMem(Section->Name, ".shimdb\0", 8) == 0) {
+			original = shim_db_size;
+			if (Section->SizeOfRawData < sizeof(EFI_SIGNATURE_LIST)) {
+				continue;
+			}
+			pointer = ImageAddress(data, datasize,
+					       Section->PointerToRawData);
+			if (!pointer) {
+				continue;
+			}
+			certlist = pointer;
+			shim_db_size += certlist->SignatureListSize;;
+			shim_db = ReallocatePool(shim_db, original,
+						 shim_db_size);
+			memcpy(shim_db + original, pointer, certlist->SignatureListSize);
+		} else if (CompareMem(Section->Name, ".shimdbx\0", 9) == 0) {
+			original = shim_dbx_size;
+			if (Section->SizeOfRawData < sizeof(EFI_SIGNATURE_LIST)) {
+				continue;
+			}
+			pointer = ImageAddress(data, datasize,
+					       Section->PointerToRawData);
+			if (!pointer) {
+				continue;
+			}
+			certlist = pointer;
+			shim_dbx_size += certlist->SignatureListSize;;
+			shim_dbx = ReallocatePool(shim_dbx, original,
+						  shim_dbx_size);
+			memcpy(shim_dbx + original, pointer, certlist->SignatureListSize);
+		}
+	}
+	FreePool(data);
+	return EFI_SUCCESS;
+}
+
+/* Read additional certificates from files (after verifying signatures) */
+EFI_STATUS
+load_certs(EFI_HANDLE image_handle)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE *li = NULL;
+	CHAR16 *PathName = NULL;
+	EFI_FILE *root, *dir;
+	EFI_FILE_INFO *info;
+	EFI_HANDLE device;
+	EFI_FILE_IO_INTERFACE *drive;
+	UINTN buffersize = 0;
+	void *buffer = NULL;
+
+	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					 (void **)&li);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Unable to init protocol\n");
+		return efi_status;
+	}
+
+	efi_status = generate_path_from_image_path(li, L"", &PathName);
+
+	if (EFI_ERROR(efi_status))
+		goto done;
+
+	device = li->DeviceHandle;
+	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					 (void **) &drive);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to find fs: %r\n", efi_status);
+		goto done;
+	}
+
+	efi_status = drive->OpenVolume(drive, &root);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to open fs: %r\n", efi_status);
+		goto done;
+	}
+
+	efi_status = root->Open(root, &dir, PathName, EFI_FILE_MODE_READ, 0);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to open %s - %r\n", PathName, efi_status);
+		goto done;
+	}
+
+	while (1) {
+		int old = buffersize;
+		efi_status = dir->Read(dir, &buffersize, buffer);
+		if (efi_status == EFI_BUFFER_TOO_SMALL) {
+			buffer = ReallocatePool(buffer, old, buffersize);
+			continue;
+		} else if (EFI_ERROR(efi_status)) {
+			perror(L"Failed to read directory %s - %r\n", PathName,
+			       efi_status);
+			goto done;
+		}
+
+		if (buffersize == 0)
+			goto done;
+
+		info = (EFI_FILE_INFO *)buffer;
+		if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
+			load_cert_file(image_handle, info->FileName);
+		}
+	}
+done:
+	FreePool(buffer);
+	FreePool(PathName);
+	return efi_status;
+}
+
+EFI_STATUS
 shim_init(void)
 {
 	EFI_STATUS efi_status;
@@ -2429,6 +2605,10 @@ shim_init(void)
 	}
 
 	if (secure_mode()) {
+		efi_status = load_certs(global_image_handle);
+		if (EFI_ERROR(efi_status))
+			LogError(L"Failed to load addon certificates\n");
+
 		if (vendor_cert_size || vendor_dbx_size) {
 			/*
 			 * If shim includes its own certificates then ensure
