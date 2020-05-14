@@ -47,6 +47,16 @@ rsync -avSHP "${DIR}"/CryptoPkg/Library/Include/internal/dso_conf.h Include/inte
 
 rsync -avSHP "${DIR}"/CryptoPkg/Library/Include/openssl/opensslconf.h Include/openssl/
 
+CRYPTLIB_INC="${CRYPTLIB}/cryptlib.mk"
+echo 'CRYPTLIB_SOURCES = \' > ${CRYPTLIB_INC}
+cd ${TOPDIR}
+cat ${TOPDIR}/edk2/CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf | \
+	dos2unix | grep '.*\.c$' | sed 's,^ \+,Cryptlib/,' | \
+	git check-ignore --stdin -n -v | grep :: | cut -d: -f3- | \
+	sort -u | sed 's,$, \\,' >> ${CRYPTLIB_INC}
+cd "${CRYPTLIB}"
+echo '	Cryptlib/Library/TimerLib.c Cryptlib/Library/Console.c' >> ${CRYPTLIB_INC}
+
 git clean -f -d -X -- .
 git add .
 
