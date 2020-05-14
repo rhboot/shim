@@ -1,5 +1,4 @@
-OPENSSL_CRYPTO_SOURCES=$(shell cat $(TOPDIR)/edk2/CryptoPkg/Library/OpensslLib/OpensslLibCrypto.inf | dos2unix | grep '$(OPENSSL_PATH)/.*\.c$$' | cut -d/ -f2-)
-OPENSSL_SOURCES = $(shell cd $(TOPDIR) ; ( $(foreach x,$(OPENSSL_CRYPTO_SOURCES),echo Cryptlib/OpenSSL/${x} ; ) :; ) | git check-ignore --stdin -n -v  | grep :: | cut -d: -f3- | sort -u)
+include $(TOPDIR)/Cryptlib/OpenSSL/openssl.mk
 
 OPENSSL_OBJECTS = $(foreach x,$(OPENSSL_SOURCES),$(patsubst %.c,%.efi.o,$(x)))
 OPENSSL_CPPFLAGS += \

@@ -15,6 +15,7 @@ DIR="${1}"
 WORK_PATH="${PWD}"
 OPENSSLLIB_PATH="${DIR}/CryptoPkg/Library/OpensslLib"
 OPENSSL_PATH="${OPENSSLLIB_PATH}/openssl"
+TOPDIR=$(realpath ${OPENSSLLIB_PATH}/../..)
 
 needcommit() {(
     pwd
@@ -53,5 +54,17 @@ rsync -avSHP --delete-during "${OPENSSL_PATH}"/crypto/ crypto/
 git clean -f -d -X -- crypto/
 
 git add crypto/
+
+OPENSSL_INC="${OPENSSLLIB_PATH}/openssl.mk"
+echo 'OPENSSL_SOURCES = \' > ${OPENSSL_INC}
+cd ${TOPDIR}
+cat ${TOPDIR}/edk2/CryptoPkg/Library/OpensslLib/OpensslLibCrypto.inf \
+	| dos2unix | grep '$(OPENSSL_PATH)/.*\.c$' | cut -d/ -f2- \
+	| sed 's,^,Cryptlib/OpenSSL/,' \
+	| git check-ignore --stdin -n -v | grep :: | cut -d: -f3- \
+	| sort -u | sed 's,$, \\,'>> ${OPENSSL_INC}
+cd ${OPENSSLLIB_PATH}
+echo '	$(_efi_empty)' >> ${OPENSSL_INC}
+git add ${OPENSSL_INC}
 
 needcommit git commit -a -m "Update OpenSSL"
