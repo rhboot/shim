@@ -13,7 +13,11 @@ EFI_ARCH ?= $(shell $(CC) -dumpmachine | cut -f1 -d- | \
 		)
 
 ifeq ($(MAKELEVEL),0)
+ifneq (, $(shell which git))
 TOPDIR != if [ "$$(git rev-parse --is-inside-work-tree)" = true ]; then echo $$(realpath ./$$(git rev-parse --show-cdup)) ; else echo $(PWD) ; fi
+else
+TOPDIR != echo $(PWD)
+endif
 BUILDDIR ?= $(TOPDIR)/build-$(EFI_ARCH)
 endif
 
