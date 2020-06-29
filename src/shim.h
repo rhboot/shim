@@ -172,8 +172,10 @@ extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
 extern UINT32 vendor_cert_size;
 extern UINT32 vendor_dbx_size;
+extern UINT32 vendor_db_size;
 extern UINT8 *vendor_cert;
 extern UINT8 *vendor_dbx;
+extern UINT8 *vendor_db;
 #if defined(ENABLE_SHIM_CERT)
 extern UINT32 build_cert_size;
 extern UINT8 *build_cert;
