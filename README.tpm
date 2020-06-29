@@ -13,6 +13,7 @@ PCR7:
   - MokListX - the Mok blacklist, logged as "MokListX"
   - vendor_dbx - shim's built-in vendor blacklist, logged as "dbx"
   - DB - the system whitelist, logged as "db"
+  - vendor_db - shim's built-in vendor whitelist, logged as "db"
   - MokList the Mok whitelist, logged as "MokList"
   - vendor_cert - shim's built-in vendor whitelist, logged as "Shim"
   - shim_cert - shim's build-time generated whitelist, logged as "Shim"
