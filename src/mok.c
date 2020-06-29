@@ -92,8 +92,8 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
-	 .addend_source = &vendor_cert,
-	 .addend_size = &vendor_cert_size,
+	 .addend_source = &vendor_authorized,
+	 .addend_size = &vendor_authorized_size,
 #if defined(ENABLE_SHIM_CERT)
 	 .build_cert = &build_cert,
 	 .build_cert_size = &build_cert_size,
@@ -138,11 +138,20 @@ struct mok_state_variable mok_state_variables[] = {
 	{ NULL, }
 };
 
-static inline BOOLEAN nonnull(1)
-check_vendor_cert(struct mok_state_variable *v)
+typedef enum {
+	VENDOR_CERT_DB,
+	VENDOR_CERT_X509,
+	VENDOR_CERT_NONE,
+} vendor_cert_category_t;
+
+static vendor_cert_category_t
+categorize_vendor_cert(struct mok_state_variable *v)
 {
-	return (v->addend_source && v->addend_size &&
-		*v->addend_source && *v->addend_size) ? TRUE : FALSE;
+	if (!(v->addend_source && v->addend_size &&
+	      *v->addend_source && *v->addend_size))
+		return VENDOR_CERT_NONE;
+
+	return vendor_authorized_category;
 }
 
 #if defined(ENABLE_SHIM_CERT)
@@ -152,9 +161,9 @@ check_build_cert(struct mok_state_variable *v)
 	return (v->build_cert && v->build_cert_size &&
 		*v->build_cert && *v->build_cert_size) ? TRUE : FALSE;
 }
-#define check_addend(v) (check_vendor_cert(v) || check_build_cert(v))
+#define check_addend(v) ((categorize_vendor_cert(v) != VENDOR_CERT_NONE) || check_build_cert(v))
 #else
-#define check_addend(v) check_vendor_cert(v)
+#define check_addend(v) (categorize_vendor_cert(v) != VENDOR_CERT_NONE)
 #endif /* defined(ENABLE_SHIM_CERT) */
 
 static EFI_STATUS nonnull(1)
@@ -175,17 +184,19 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 					+ sizeof (EFI_GUID)
 					+ *v->build_cert_size;
 		}
-		if (check_vendor_cert(v)) {
+#endif /* defined(ENABLE_SHIM_CERT) */
+		switch (categorize_vendor_cert(v)) {
+		case VENDOR_CERT_DB:
+			FullDataSize += *v->addend_size;
+			break;
+		case VENDOR_CERT_X509:
 			FullDataSize += sizeof (*CertList)
 					+ sizeof (EFI_GUID)
 					+ *v->addend_size;
+			break;
+		case VENDOR_CERT_NONE:
+			break;
 		}
-#else
-		FullDataSize = v->data_size
-			     + sizeof (*CertList)
-			     + sizeof (EFI_GUID)
-			     + *v->addend_size;
-#endif /* defined(ENABLE_SHIM_CERT) */
 		FullData = AllocatePool(FullDataSize);
 		if (!FullData) {
 			perror(L"Failed to allocate space for MokListRT\n");
@@ -221,34 +232,37 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 
 		p += *v->build_cert_size;
 
-		if (check_vendor_cert(v) == FALSE)
-			goto skip_vendor_cert;
-skip_build_cert:
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-		CertList = (EFI_SIGNATURE_LIST *)p;
-		p += sizeof (*CertList);
-		CertData = (EFI_SIGNATURE_DATA *)p;
-		p += sizeof (EFI_GUID);
-
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
-		CertList->SignatureListSize = *v->addend_size
-					      + sizeof (*CertList)
-					      + sizeof (*CertData)
-					      -1;
-		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
-
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
-		CopyMem(p, *v->addend_source, *v->addend_size);
-
-#if defined(ENABLE_SHIM_CERT)
-skip_vendor_cert:
 #endif /* defined(ENABLE_SHIM_CERT) */
 		if (v->data && v->data_size)
 			FreePool(v->data);
 		v->data = FullData;
 		v->data_size = FullDataSize;
+
+		switch (categorize_vendor_cert(v)) {
+		case VENDOR_CERT_DB:
+			CopyMem(p, *v->addend_source, *v->addend_size);
+			break;
+		case VENDOR_CERT_X509:
+			CertList = (EFI_SIGNATURE_LIST *)p;
+			p += sizeof (*CertList);
+			CertData = (EFI_SIGNATURE_DATA *)p;
+			p += sizeof (EFI_GUID);
+
+			CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
+			CertList->SignatureListSize = *v->addend_size
+						      + sizeof (*CertList)
+						      + sizeof (*CertData)
+						      -1;
+			CertList->SignatureHeaderSize = 0;
+			CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
+
+			CertData->SignatureOwner = SHIM_LOCK_GUID;
+			CopyMem(p, *v->addend_source, *v->addend_size);
+			break;
+		case VENDOR_CERT_NONE:
+			break;
+		}
+
 	} else {
 		FullDataSize = v->data_size;
 		FullData = v->data;
