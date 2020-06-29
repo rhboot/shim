@@ -54,42 +54,19 @@ static UINT32 load_options_size;
 /*
  * The vendor certificate used for validating the second stage loader
  */
-#if defined(VENDOR_DB_FILE)
+
 extern struct {
-	UINT32 vendor_db_size;
-	UINT32 vendor_dbx_size;
-	UINT32 vendor_db_offset;
-	UINT32 vendor_dbx_offset;
+	UINT32 vendor_authorized_size;
+	UINT32 vendor_deauthorized_size;
+	UINT32 vendor_authorized_offset;
+	UINT32 vendor_deauthorized_offset;
 } cert_table;
-#elif defined(VENDOR_CERT_FILE)
-extern struct {
-	UINT32 vendor_cert_size;
-	UINT32 vendor_dbx_size;
-	UINT32 vendor_cert_offset;
-	UINT32 vendor_dbx_offset;
-} cert_table;
-#else
-extern struct {
-	UINT32 reserved0;
-	UINT32 vendor_dbx_size;
-	UINT32 reserved1;
-	UINT32 vendor_dbx_offset;
-} cert_table;
-#endif
 
-UINT32 vendor_db_size = 0;
-UINT8 *vendor_db = NULL;
+UINT32 vendor_authorized_size = 0;
+UINT8 *vendor_authorized = NULL;
 
-UINT32 vendor_cert_size = 0;
-UINT8 *vendor_cert = NULL;
-
-UINT32 vendor_dbx_size = 0;
-UINT8 *vendor_dbx = NULL;
-
-#if defined(ENABLE_SHIM_CERT)
-UINT32 build_cert_size = 0;
-UINT8 *build_cert = NULL;
-#endif /* defined(ENABLE_SHIM_CERT) */
+UINT32 vendor_deauthorized_size = 0;
+UINT8 *vendor_deauthorized = NULL;
 
 /*
  * indicator of how an image has been verified
@@ -505,22 +482,22 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
+	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_deauthorized;
 
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha256hash,
 			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
 			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha1hash,
 				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
-	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
+	    check_db_cert_in_ram(dbx, vendor_deauthorized_size, cert, sha256hash, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
@@ -595,7 +572,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		}
 	}
 
-#if defined(ENABLE_VENDOR_DB)
+#if defined(VENDOR_DB_FILE)
 	EFI_SIGNATURE_LIST *db = (EFI_SIGNATURE_LIST *)vendor_db;
 
 	if (check_db_hash_in_ram(db, vendor_db_size,
@@ -2446,7 +2423,7 @@ shim_init(void)
 	}
 
 	if (secure_mode()) {
-		if (vendor_db_size || vendor_cert_size || vendor_dbx_size) {
+		if (vendor_authorized_size || vendor_deauthorized_size) {
 			/*
 			 * If shim includes its own certificates then ensure
 			 * that anything it boots has performed some
@@ -2506,15 +2483,12 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	verification_method = VERIFIED_BY_NOTHING;
 
-#if defined(VENDOR_DB_FILE)
-	vendor_db_size = cert_table.vendor_db_size;
-	vendor_db = (UINT8 *)&cert_table + cert_table.vendor_db_offset;
-#elif defined(VENDOR_CERT_FILE)
-	vendor_cert_size = cert_table.vendor_cert_size;
-	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
-#endif
-	vendor_dbx_size = cert_table.vendor_dbx_size;
-	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+	vendor_authorized_size = cert_table.vendor_authorized_size;
+	vendor_authorized = (UINT8 *)&cert_table + cert_table.vendor_authorized_offset;
+
+	vendor_deauthorized_size = cert_table.vendor_deauthorized_size;
+	vendor_deauthorized = (UINT8 *)&cert_table + cert_table.vendor_deauthorized_offset;
+
 #if defined(ENABLE_SHIM_CERT)
 	build_cert_size = sizeof(shim_cert);
 	build_cert = shim_cert;

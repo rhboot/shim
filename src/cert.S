@@ -2,99 +2,53 @@
 
 #if defined(VENDOR_DB_FILE) && defined(VENDOR_CERT_FILE)
 # error both VENDOR_DB_FILE and VENDOR_CERT_FILE have been configured
+#elif defined(VENDOR_DB_FILE)
+# define vendor_authorized vendor_db
+# define vendor_authorized_end vendor_db_end
+# define vendor_authorized_size vendor_db_size
+# define vendor_authorized_size_end vendor_db_size_end
+#elif defined(VENDOR_CERT_FILE)
+# define vendor_authorized vendor_cert
+# define vendor_authorized_end vendor_cert_end
+# define vendor_authorized_size vendor_cert_size
+# define vendor_authorized_size_end vendor_cert_size_end
+#endif
+
+#if defined(VENDOR_DBX_FILE)
+# define vendor_deauthorized vendor_dbx
+# define vendor_deauthorized_end vendor_dbx_end
+# define vendor_deauthorized_size vendor_dbx_size
+# define vendor_deauthorized_size_end vendor_dbx_size_end
 #endif
 
 	.globl cert_table
 	.type	cert_table, %object
-	.size	cert_table, 16
+	.size	cert_table, .Lcert_table_end - cert_table
 	.section .vendor_cert, "a", %progbits
+	.balignl 4, 0
 cert_table:
-#if defined(VENDOR_DB_FILE)
-	.long	vendor_db_priv_end - vendor_db_priv
-#elif defined(VENDOR_CERT_FILE)
-	.long	vendor_cert_priv_end - vendor_cert_priv
-#else
-	.long	0
-#endif
-#if defined(VENDOR_DBX_FILE)
-	.long	vendor_dbx_priv_end - vendor_dbx_priv
-#else
-	.long	0
-#endif
-#if defined(VENDOR_DB_FILE)
-	.long	vendor_db_priv - cert_table
-#elif defined(VENDOR_CERT_FILE)
-	.long	vendor_cert_priv - cert_table
-#else
-	.long	0
-#endif
-	.long	vendor_dbx_priv - cert_table
-#if defined(VENDOR_DB_FILE)
-	.data
-	.align	1
-	.type	vendor_db_priv, %object
-	.size	vendor_db_priv, vendor_db_priv_end-vendor_db_priv
+	.4byte	.Lvendor_authorized_end - vendor_authorized
+	.4byte	.Lvendor_deauthorized_end - vendor_deauthorized
+	.4byte	vendor_authorized - cert_table
+	.4byte	vendor_deauthorized - cert_table
+	.balign	1, 0
+	.type	vendor_authorized, %object
+	.size	vendor_authorized, .Lvendor_authorized_end - vendor_authorized
 	.section .vendor_cert, "a", %progbits
-vendor_db_priv:
+vendor_authorized:
+#if defined(VENDOR_DB_FILE)
 .incbin VENDOR_DB_FILE
-
-	.data
-	.align 4
-	.type	vendor_db_priv_end, %object
-	.size	vendor_db_priv_end, 4
-	.section .vendor_cert, "a", %progbits
-vendor_db_priv_end:
 #elif defined(VENDOR_CERT_FILE)
-	.data
-	.align	1
-	.type	vendor_cert_priv, %object
-	.size	vendor_cert_priv, vendor_cert_priv_end-vendor_cert_priv
-	.section .vendor_cert, "a", %progbits
-vendor_cert_priv:
 .incbin VENDOR_CERT_FILE
-
-	.data
-	.align 4
-	.type	vendor_cert_priv_end, %object
-	.size	vendor_cert_priv_end, 4
-	.section .vendor_cert, "a", %progbits
-vendor_cert_priv_end:
-#else
-	.bss
-	.type	vendor_priv, %object
-	.size	vendor_priv, 1
-	.section .vendor_cert, "a", %progbits
-vendor_priv:
-	.zero	1
-
-	.data
-	.align 4
-	.type	vendor_priv_end, %object
-	.size	vendor_priv_end, 4
-	.section .vendor_cert, "a", %progbits
-vendor_priv_end:
 #endif
+.Lvendor_authorized_end:
+	.balign	1, 0
+	.type	vendor_deauthorized, %object
+	.size	vendor_deauthorized, .Lvendor_deauthorized_end - vendor_deauthorized
+	.section .vendor_cert, "a", %progbits
+vendor_deauthorized:
 #if defined(VENDOR_DBX_FILE)
-	.data
-	.align	1
-	.type	vendor_dbx_priv, %object
-	.size	vendor_dbx_priv, vendor_dbx_priv_end-vendor_dbx_priv
-	.section .vendor_cert, "a", %progbits
-vendor_dbx_priv:
 .incbin VENDOR_DBX_FILE
-vendor_dbx_priv_end:
-#else
-	.bss
-	.type	vendor_dbx_priv, %object
-	.size	vendor_dbx_priv, 1
-	.section .vendor_cert, "a", %progbits
-vendor_dbx_priv:
-	.zero	1
-
-	.data
-	.align 4
-	.type	vendor_dbx_priv_end, %object
-	.size	vendor_dbx_priv_end, 4
-	.section .vendor_cert, "a", %progbits
-vendor_dbx_priv_end:
 #endif
+.Lvendor_deauthorized_end:
+.Lcert_table_end:
