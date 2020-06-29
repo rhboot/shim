@@ -1,5 +1,8 @@
 .sw?
 .*.sw?
+*.cer
+*.crt
+*.esl
 cov-int/
 scan-results/
 [Ss]creenlog*
