@@ -4,6 +4,14 @@
 #
 
 CONFIG_ITEMS :=
+
+ifneq ($(origin VENDOR_DB_FILE), undefined)
+	CONFIG_VENDOR_DB:="\#define VENDOR_DB_FILE \"$(VENDOR_DB_FILE)\""
+	CONFIG_ITEMS+=VENDOR_DB
+else
+	CONFIG_ITEMS+=NO_VENDOR_DB
+endif
+
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	CONFIG_VENDOR_CERT:="\#define VENDOR_CERT_FILE \"$(VENDOR_CERT_FILE)\""
 	CONFIG_ITEMS+=VENDOR_CERT
@@ -16,20 +24,6 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CONFIG_ITEMS+=VENDOR_DBX
 else
 	CONFIG_ITEMS+=NO_VENDOR_DBX
-endif
-
-ifneq ($(origin ENABLE_VENDOR_DB), undefined)
-	CONFIG_ENABLE_VENDOR_DB:="\#define ENABLE_VENDOR_DB"
-	CONFIG_ITEMS+=ENABLE_VENDOR_DB
-else
-	CONFIG_ITEMS+=DISABLE_VENDOR_DB
-endif
-
-ifneq ($(origin VENDOR_DB_FILE), undefined)
-	CONFIG_VENDOR_DB:="\#define VENDOR_DB_FILE \"$(VENDOR_DB_FILE)\""
-	CONFIG_ITEMS+=VENDOR_DB
-else
-	CONFIG_ITEMS+=NO_VENDOR_DB
 endif
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)

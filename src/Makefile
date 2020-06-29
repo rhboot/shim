@@ -65,10 +65,9 @@ src/config.h:
 	echo "#define DEBUGDIR L\"/usr/lib/debug/usr/share/shim/$(EFI_ARCH)-$(VERSION)$(DASHRELEASE)/\""
 	echo "#define DEFAULT_LOADER L\"$(DEFAULT_LOADER)\""
 	echo "#define DEFAULT_LOADER_CHAR \"$(DEFAULT_LOADER)\""
+	echo $(CONFIG_VENDOR_DB)
 	echo $(CONFIG_VENDOR_CERT)
 	echo $(CONFIG_VENDOR_DBX)
-	echo $(CONFIG_ENABLE_VENDOR_DB)
-	echo $(CONFIG_VENDOR_DB)
 	echo $(CONFIG_ENABLE_SHIM_CERT)
 	echo $(CONFIG_OVERRIDE_SECURITY_POLICY)
 	echo $(CONFIG_ENABLE_HTTPBOOT)
