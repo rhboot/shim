@@ -55,12 +55,12 @@ matches MokAuth, the user will be prompted to enrol the keys. BS,RT,NV
 
 State variables:
 
-MokList: A list of whitelisted keys and hashes. An EFI_SIGNATURE_LIST 
+MokList: A list of authorized keys and hashes. An EFI_SIGNATURE_LIST 
 as described in the UEFI specification. BS,NV
 
 MokListRT: A copy of MokList made available to the kernel at runtime. RT
 
-MokListX: A list of blacklisted keys and hashes.  An EFI_SIGNATURE_LIST
+MokListX: A list of forbidden keys and hashes.  An EFI_SIGNATURE_LIST
 as described in the UEFI specification. BS,NV
 
 MokListXRT: A copy of MokListX made available to the kernel at runtime. RT
