@@ -479,10 +479,10 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 
 /*
  * Check whether the binary signature or hash are present in dbx or the
- * built-in blacklist
+ * built-in denylist
  */
-static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
-				   UINT8 *sha256hash, UINT8 *sha1hash)
+static EFI_STATUS check_denylist (WIN_CERTIFICATE_EFI_PKCS *cert,
+				  UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
@@ -545,7 +545,7 @@ static void update_verification_method(verification_method_t method)
 /*
  * Check whether the binary signature or hash are present in db or MokList
  */
-static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
+static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	if (!ignore_db) {
@@ -961,22 +961,21 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	}
 
 	/*
-	 * Ensure that the binary isn't blacklisted
+	 * Ensure that the binary isn't forbidden
 	 */
-	efi_status = check_blacklist(cert, sha256hash, sha1hash);
+	efi_status = check_denylist(cert, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status)) {
-		perror(L"Binary is blacklisted\n");
-		LogError(L"Binary is blacklisted: %r\n", efi_status);
+		perror(L"Binary is forbidden\n");
+		LogError(L"Binary is forbidden: %r\n", efi_status);
 		return efi_status;
 	}
 
 	/*
-	 * Check whether the binary is whitelisted in any of the firmware
-	 * databases
+	 * Check whether the binary is authorized
 	 */
-	efi_status = check_whitelist(cert, sha256hash, sha1hash);
+	efi_status = check_allowlist(cert, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status)) {
-		LogError(L"check_whitelist(): %r\n", efi_status);
+		LogError(L"check_allowlist(): %r\n", efi_status);
 	} else {
 		drain_openssl_errors();
 		return efi_status;
@@ -1030,7 +1029,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		}
 	}
 
-	LogError(L"Binary is not whitelisted\n");
+	LogError(L"Binary is not authorized\n");
 	crypterr(EFI_SECURITY_VIOLATION);
 	PrintErrors();
 	efi_status = EFI_SECURITY_VIOLATION;
