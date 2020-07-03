@@ -298,10 +298,10 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 
 /*
  * Check whether the binary signature or hash are present in dbx or the
- * built-in blacklist
+ * built-in denylist
  */
-static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
-				   UINT8 *sha256hash, UINT8 *sha1hash)
+static EFI_STATUS check_denylist (WIN_CERTIFICATE_EFI_PKCS *cert,
+				  UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_deauthorized;
 
@@ -364,7 +364,7 @@ static void update_verification_method(verification_method_t method)
 /*
  * Check whether the binary signature or hash are present in db or MokList
  */
-static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
+static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	if (!ignore_db) {
@@ -480,12 +480,12 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 	EFI_STATUS efi_status;
 
 	/*
-	 * Ensure that the binary isn't blacklisted
+	 * Ensure that the binary isn't forbidden
 	 */
 	drain_openssl_errors();
-	efi_status = check_blacklist(sig, sha256hash, sha1hash);
+	efi_status = check_denylist(sig, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status)) {
-		perror(L"Binary is blacklisted: %r\n", efi_status);
+		perror(L"Binary is forbidden: %r\n", efi_status);
 		PrintErrors();
 		ClearErrors();
 		crypterr(efi_status);
@@ -493,14 +493,14 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 	}
 
 	/*
-	 * Check whether the binary is whitelisted in any of the firmware
+	 * Check whether the binary is authorized in any of the firmware
 	 * databases
 	 */
 	drain_openssl_errors();
-	efi_status = check_whitelist(sig, sha256hash, sha1hash);
+	efi_status = check_allowlist(sig, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status)) {
 		if (efi_status != EFI_NOT_FOUND) {
-			dprint(L"check_whitelist(): %r\n", efi_status);
+			dprint(L"check_allowlist(): %r\n", efi_status);
 			PrintErrors();
 			ClearErrors();
 			crypterr(efi_status);
@@ -603,13 +603,13 @@ verify_buffer (char *data, int datasize,
 	}
 
 	/*
-	 * Ensure that the binary isn't blacklisted by hash
+	 * Ensure that the binary isn't forbidden by hash
 	 */
 	drain_openssl_errors();
-	ret_efi_status = check_blacklist(NULL, sha256hash, sha1hash);
+	ret_efi_status = check_denylist(NULL, sha256hash, sha1hash);
 	if (EFI_ERROR(ret_efi_status)) {
-		perror(L"Binary is blacklisted\n");
-		dprint(L"Binary is blacklisted: %r\n", ret_efi_status);
+//		perror(L"Binary is forbidden\n");
+//		dprint(L"Binary is forbidden: %r\n", ret_efi_status);
 		PrintErrors();
 		ClearErrors();
 		crypterr(ret_efi_status);
@@ -617,15 +617,16 @@ verify_buffer (char *data, int datasize,
 	}
 
 	/*
-	 * Check whether the binary is whitelisted by hash in any of the
+	 * Check whether the binary is authorized by hash in any of the
 	 * firmware databases
 	 */
 	drain_openssl_errors();
-	ret_efi_status = check_whitelist(NULL, sha256hash, sha1hash);
+	ret_efi_status = check_allowlist(NULL, sha256hash, sha1hash);
 	if (EFI_ERROR(ret_efi_status)) {
-		dprint(L"check_whitelist: %r\n", ret_efi_status);
+		LogError(L"check_allowlist(): %r\n", ret_efi_status);
+		dprint(L"check_allowlist: %r\n", ret_efi_status);
 		if (ret_efi_status != EFI_NOT_FOUND) {
-			dprint(L"check_whitelist(): %r\n", ret_efi_status);
+			dprint(L"check_allowlist(): %r\n", ret_efi_status);
 			PrintErrors();
 			ClearErrors();
 			crypterr(ret_efi_status);
@@ -699,7 +700,7 @@ verify_buffer (char *data, int datasize,
 	} while (offset < context->SecDir->Size);
 
 	if (ret_efi_status != EFI_SUCCESS) {
-		dprint(L"Binary is not whitelisted\n");
+		dprint(L"Binary is not authorized\n");
 		PrintErrors();
 		ClearErrors();
 		crypterr(EFI_SECURITY_VIOLATION);
