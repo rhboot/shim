@@ -1,10 +1,7 @@
 /*
  * errlog.c
  * Copyright 2017 Peter Jones <pjones@redhat.com>
- *
- * Distributed under terms of the GPLv3 license.
  */
-
 #include "shim.h"
 
 static CHAR16 **errs = NULL;
