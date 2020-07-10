@@ -90,8 +90,10 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+#if defined(VENDOR_DB_FILE) || defined(VENDOR_CERT_FILE)
 	 .addend_source = &vendor_authorized,
 	 .addend_size = &vendor_authorized_size,
+#endif /* defined(VENDOR_DB_FILE) || defined(VENDOR_CERT_FILE) */
 #if defined(ENABLE_SHIM_CERT)
 	 .build_cert = &build_cert,
 	 .build_cert_size = &build_cert_size,
