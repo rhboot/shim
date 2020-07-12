@@ -113,6 +113,9 @@
 #if defined(VENDOR_DBX_FILE)
 # define vendor_deauthorized vendor_dbx
 # define vendor_deauthorized_size vendor_dbx_size
+#else
+# define vendor_deauthorized vendor_deauthorized_null
+# define vendor_deauthorized_size vendor_deauthorized_null_size
 #endif
 
 #include "include/configtable.h"
@@ -185,8 +188,8 @@ extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
 extern UINT8 *vendor_authorized;
 extern UINT32 vendor_authorized_size;
-extern UINT8 *vendor_dbx;
-extern UINT32 vendor_dbx_size;
+extern UINT8 *vendor_deauthorized;
+extern UINT32 vendor_deauthorized_size;
 #if defined(ENABLE_SHIM_CERT)
 extern UINT32 build_cert_size;
 extern UINT8 *build_cert;

@@ -99,6 +99,16 @@ categorize_authorized(struct mok_state_variable *v)
 	return vendor_authorized_category;
 }
 
+static vendor_addend_category_t
+categorize_deauthorized(struct mok_state_variable *v)
+{
+	if (!(v->addend_source && v->addend_size &&
+	      *v->addend_source && *v->addend_size))
+		return VENDOR_ADDEND_NONE;
+
+	return VENDOR_ADDEND_DB;
+}
+
 #define MOK_MIRROR_KEYDB	0x01
 #define MOK_MIRROR_DELETE_FIRST	0x02
 #define MOK_VARIABLE_MEASURE	0x04
@@ -130,6 +140,9 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+	 .categorize_addend = categorize_deauthorized,
+	 .addend_source = &vendor_deauthorized,
+	 .addend_size = &vendor_deauthorized_size,
 	 .flags = MOK_MIRROR_KEYDB |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
