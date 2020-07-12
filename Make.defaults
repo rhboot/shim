@@ -63,6 +63,10 @@ ifneq ($(origin REQUIRE_TPM), undefined)
 	CFLAGS  += -DREQUIRE_TPM
 endif
 
+ifneq ($(origin ENABLE_VENDOR_DB), undefined)
+	CFLAGS  += -DENABLE_VENDOR_DB
+endif
+
 ifeq ($(ARCH),x86_64)
 	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
 		   $(CLANG_BUGS) -m64 \
@@ -128,6 +132,10 @@ ifneq ($(origin VENDOR_CERT_FILE), undefined)
 endif
 ifneq ($(origin VENDOR_DBX_FILE), undefined)
 	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
+endif
+
+ifneq ($(origin VENDOR_DB_FILE), undefined)
+	CFLAGS += -DVENDOR_DB_FILE=\"$(VENDOR_DB_FILE)\"
 endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined

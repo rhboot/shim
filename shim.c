@@ -68,14 +68,18 @@ static UINT32 load_options_size;
  * The vendor certificate used for validating the second stage loader
  */
 extern struct {
+	UINT32 vendor_db_size;
 	UINT32 vendor_cert_size;
 	UINT32 vendor_dbx_size;
+	UINT32 vendor_db_offset;
 	UINT32 vendor_cert_offset;
 	UINT32 vendor_dbx_offset;
 } cert_table;
 
+UINT32 vendor_db_size;
 UINT32 vendor_cert_size;
 UINT32 vendor_dbx_size;
+UINT8 *vendor_db;
 UINT8 *vendor_cert;
 UINT8 *vendor_dbx;
 #if defined(ENABLE_SHIM_CERT)
@@ -635,6 +639,31 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 			LogError(L"check_db_cert(db, sha256hash) != DATA_FOUND\n");
 		}
 	}
+
+#if defined(ENABLE_VENDOR_DB)
+	EFI_SIGNATURE_LIST *db = (EFI_SIGNATURE_LIST *)vendor_db;
+
+	if (check_db_hash_in_ram(db, vendor_db_size,
+				 sha256hash, SHA256_DIGEST_SIZE,
+				 EFI_CERT_SHA256_GUID, L"db",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(vendor_db, sha256hash) != DATA_FOUND\n");
+	}
+	if (cert &&
+	    check_db_cert_in_ram(db, vendor_db_size,
+				 cert, sha256hash, L"db",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_CERT;
+		update_verification_method(VERIFIED_BY_CERT);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_cert(vendor_db, sha256hash) != DATA_FOUND\n");
+	}
+#endif
 
 	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
@@ -2447,7 +2476,7 @@ shim_init(void)
 	set_second_stage (global_image_handle);
 
 	if (secure_mode()) {
-		if (vendor_cert_size || vendor_dbx_size) {
+		if (vendor_db_size || vendor_cert_size || vendor_dbx_size) {
 			/*
 			 * If shim includes its own certificates then ensure
 			 * that anything it boots has performed some
@@ -2548,8 +2577,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	verification_method = VERIFIED_BY_NOTHING;
 
+	vendor_db_size = cert_table.vendor_db_size;
 	vendor_cert_size = cert_table.vendor_cert_size;
 	vendor_dbx_size = cert_table.vendor_dbx_size;
+	vendor_db = (UINT8 *)&cert_table + cert_table.vendor_db_offset;
 	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
 	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
 #if defined(ENABLE_SHIM_CERT)

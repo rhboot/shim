@@ -165,8 +165,10 @@ extern VOID ClearErrors(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
 extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
+extern UINT32 vendor_db_size;
 extern UINT32 vendor_cert_size;
 extern UINT32 vendor_dbx_size;
+extern UINT8 *vendor_db;
 extern UINT8 *vendor_cert;
 extern UINT8 *vendor_dbx;
 #if defined(ENABLE_SHIM_CERT)
