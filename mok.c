@@ -49,6 +49,15 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+typedef enum {
+	VENDOR_ADDEND_DB,
+	VENDOR_ADDEND_X509,
+	VENDOR_ADDEND_NONE,
+} vendor_addend_category_t;
+
+struct mok_state_variable;
+typedef vendor_addend_category_t (vendor_addend_categorizer_t)(struct mok_state_variable *);
+
 /*
  * MoK variables that need to have their storage validated.
  *
@@ -66,6 +75,7 @@ struct mok_state_variable {
 	 * These two are indirect pointers just to make initialization
 	 * saner...
 	 */
+	vendor_addend_categorizer_t *categorize_addend;
 	UINT8 **addend_source;
 	UINT32 *addend_size;
 #if defined(ENABLE_SHIM_CERT)
@@ -78,6 +88,16 @@ struct mok_state_variable {
 	UINTN pcr;
 	UINT8 *state;
 };
+
+static vendor_addend_category_t
+categorize_authorized(struct mok_state_variable *v)
+{
+	if (!(v->addend_source && v->addend_size &&
+	      *v->addend_source && *v->addend_size))
+		return VENDOR_ADDEND_NONE;
+
+	return vendor_authorized_category;
+}
 
 #define MOK_MIRROR_KEYDB	0x01
 #define MOK_MIRROR_DELETE_FIRST	0x02
@@ -92,8 +112,9 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
-	 .addend_source = &vendor_cert,
-	 .addend_size = &vendor_cert_size,
+	 .categorize_addend = categorize_authorized,
+	 .addend_source = &vendor_authorized,
+	 .addend_size = &vendor_authorized_size,
 #if defined(ENABLE_SHIM_CERT)
 	 .build_cert = &build_cert,
 	 .build_cert_size = &build_cert_size,
@@ -138,20 +159,17 @@ struct mok_state_variable mok_state_variables[] = {
 	{ NULL, }
 };
 
-inline BOOLEAN check_vendor_cert(struct mok_state_variable *v)
-{
-	return (v->addend_source && v->addend_size &&
-		*v->addend_source && *v->addend_size) ? TRUE : FALSE;
-}
+#define should_mirror_addend(v) (((v)->categorize_addend) && ((v)->categorize_addend(v) != VENDOR_ADDEND_NONE))
+
 #if defined(ENABLE_SHIM_CERT)
-inline BOOLEAN check_build_cert(struct mok_state_variable *v)
+should_mirror_build_cert(struct mok_state_variable *v)
 {
 	return (v->build_cert && v->build_cert_size &&
 		*v->build_cert && *v->build_cert_size) ? TRUE : FALSE;
 }
-#define check_addend(v) (check_vendor_cert(v) || check_build_cert(v))
+#define should_mirror(v) (should_mirror_addend(v) || should_mirror_build_cert(v))
 #else
-#define check_addend(v) check_vendor_cert(v)
+#define should_mirror(v) should_mirror_addend(v)
 #endif /* defined(ENABLE_SHIM_CERT) */
 
 static EFI_STATUS nonnull(1)
@@ -162,27 +180,33 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 	UINTN FullDataSize = 0;
 	uint8_t *p = NULL;
 
-	if ((v->flags & MOK_MIRROR_KEYDB) && check_addend(v)) {
+	if ((v->flags & MOK_MIRROR_KEYDB) && should_mirror(v)) {
 		EFI_SIGNATURE_LIST *CertList = NULL;
 		EFI_SIGNATURE_DATA *CertData = NULL;
-#if defined(ENABLE_SHIM_CERT)
+		vendor_addend_category_t addend_category = VENDOR_ADDEND_NONE;
+
+		if (v->categorize_addend)
+			addend_category = v->categorize_addend(v);
 		FullDataSize = v->data_size;
-		if (check_build_cert(v)) {
+#if defined(ENABLE_SHIM_CERT)
+		if (should_mirror_build_cert(v)) {
 			FullDataSize += sizeof (*CertList)
 					+ sizeof (EFI_GUID)
 					+ *v->build_cert_size;
 		}
-		if (check_vendor_cert(v)) {
+#endif /* defined(ENABLE_SHIM_CERT) */
+		switch (addend_category) {
+		case VENDOR_ADDEND_DB:
+			FullDataSize += *v->addend_size;
+			break;
+		case VENDOR_ADDEND_X509:
 			FullDataSize += sizeof (*CertList)
 					+ sizeof (EFI_GUID)
 					+ *v->addend_size;
+			break;
+		case VENDOR_ADDEND_NONE:
+			break;
 		}
-#else
-		FullDataSize = v->data_size
-			     + sizeof (*CertList)
-			     + sizeof (EFI_GUID)
-			     + *v->addend_size;
-#endif /* defined(ENABLE_SHIM_CERT) */
 		FullData = AllocatePool(FullDataSize);
 		if (!FullData) {
 			perror(L"Failed to allocate space for MokListRT\n");
@@ -196,7 +220,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 		}
 
 #if defined(ENABLE_SHIM_CERT)
-		if (check_build_cert(v) == FALSE)
+		if (should_mirror_build_cert(v) == FALSE)
 			goto skip_build_cert;
 
 		CertList = (EFI_SIGNATURE_LIST *)p;
@@ -218,34 +242,37 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 
 		p += *v->build_cert_size;
 
-		if (check_vendor_cert(v) == FALSE)
-			goto skip_vendor_cert;
-skip_build_cert:
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-		CertList = (EFI_SIGNATURE_LIST *)p;
-		p += sizeof (*CertList);
-		CertData = (EFI_SIGNATURE_DATA *)p;
-		p += sizeof (EFI_GUID);
-
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
-		CertList->SignatureListSize = *v->addend_size
-					      + sizeof (*CertList)
-					      + sizeof (*CertData)
-					      -1;
-		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
-
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
-		CopyMem(p, *v->addend_source, *v->addend_size);
-
-#if defined(ENABLE_SHIM_CERT)
-skip_vendor_cert:
 #endif /* defined(ENABLE_SHIM_CERT) */
 		if (v->data && v->data_size)
 			FreePool(v->data);
 		v->data = FullData;
 		v->data_size = FullDataSize;
+
+		switch (addend_category) {
+		case VENDOR_ADDEND_DB:
+			CopyMem(p, *v->addend_source, *v->addend_size);
+			break;
+		case VENDOR_ADDEND_X509:
+			CertList = (EFI_SIGNATURE_LIST *)p;
+			p += sizeof (*CertList);
+			CertData = (EFI_SIGNATURE_DATA *)p;
+			p += sizeof (EFI_GUID);
+
+			CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
+			CertList->SignatureListSize = *v->addend_size
+						      + sizeof (*CertList)
+						      + sizeof (*CertData)
+						      -1;
+			CertList->SignatureHeaderSize = 0;
+			CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
+
+			CertData->SignatureOwner = SHIM_LOCK_GUID;
+			CopyMem(p, *v->addend_source, *v->addend_size);
+			break;
+		case VENDOR_ADDEND_NONE:
+			break;
+		}
+
 	} else {
 		FullDataSize = v->data_size;
 		FullData = v->data;
@@ -314,7 +341,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		UINT32 attrs = 0;
 		BOOLEAN delete = FALSE, present, addend;
 
-		addend = check_addend(v);
+		addend = should_mirror_addend(v);
 
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
