@@ -594,6 +594,12 @@ ScanMem8(const CHAR8 *str, UINTN count, CHAR8 ch)
 }
 
 UINT32
+ReadUnaligned32(const UINT32 *Buffer)
+{
+	return *Buffer;
+}
+
+UINT32
 WriteUnaligned32(UINT32 *Buffer, UINT32 Value)
 {
 	*Buffer = Value;

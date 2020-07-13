@@ -84,7 +84,8 @@ UINT8 ignore_db;
 typedef enum {
 	DATA_FOUND,
 	DATA_NOT_FOUND,
-	VAR_NOT_FOUND
+	VAR_NOT_FOUND,
+	FAILED,
 } CHECK_STATUS;
 
 typedef struct {
@@ -340,16 +341,38 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
+static BOOLEAN check_signature(UINT8 *Cert, UINTN CertSize, WIN_CERTIFICATE_EFI_PKCS *data,
+			       UINT8 *hash, CHAR16 *dbname, EFI_GUID guid)
+{
+	BOOLEAN IsFound;
+	clear_ca_warning();
 
-static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
-					 UINTN dbsize,
-					 WIN_CERTIFICATE_EFI_PKCS *data,
-					 UINT8 *hash, CHAR16 *dbname,
-					 EFI_GUID guid)
+	IsFound = AuthenticodeVerify(data->CertData, data->Hdr.dwLength - sizeof(data->Hdr),
+				     Cert, CertSize, hash, SHA256_DIGEST_SIZE);
+	if (IsFound) {
+		if (get_ca_warning()) {
+			show_ca_warning();
+		}
+		tpm_measure_variable(dbname, guid, CertSize, Cert);
+		drain_openssl_errors();
+		return TRUE;
+	}
+
+	LogError(L"AuthenticodeVerify() failed\n");
+	return FALSE;
+
+}
+
+static CHECK_STATUS check_signature_with_db_buf(EFI_SIGNATURE_LIST *CertList,
+						UINTN dbsize,
+						WIN_CERTIFICATE_EFI_PKCS *data,
+						UINT8 *hash, CHAR16 *dbname,
+						EFI_GUID guid,
+						UINT8 **RootCertOut,
+						UINTN *RootCertSizeOut)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
-	BOOLEAN IsFound = FALSE;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
@@ -357,21 +380,13 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
 				if (verify_eku(Cert->SignatureData, CertSize)) {
-					clear_ca_warning();
-					IsFound = AuthenticodeVerify (data->CertData,
-								      data->Hdr.dwLength - sizeof(data->Hdr),
-								      Cert->SignatureData,
-								      CertSize,
-								      hash, SHA256_DIGEST_SIZE);
-					if (IsFound) {
-						if (get_ca_warning()) {
-							show_ca_warning();
+					if (check_signature(Cert->SignatureData, CertSize,
+							    data, hash, dbname, guid)) {
+						if (RootCertOut) {
+							*RootCertOut = Cert->SignatureData;
+							*RootCertSizeOut = CertSize;
 						}
-						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
-						drain_openssl_errors();
 						return DATA_FOUND;
-					} else {
-						LogError(L"AuthenticodeVerify(): %d\n", IsFound);
 					}
 				}
 			} else if (verbose) {
@@ -386,8 +401,248 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	return DATA_NOT_FOUND;
 }
 
-static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
-				  WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+static CHECK_STATUS check_cert_hash_in_dbx_buf(EFI_SIGNATURE_LIST *CertList,
+					       UINTN dbsize,
+					       UINT8 *Cert,
+					       UINTN CertSize)
+{
+	CHECK_STATUS rc = FAILED;
+	UINT8 *TBSCert = NULL;
+	UINTN TBSCertSize = 0;
+	UINTN HashCtxSize;
+	UINTN DigestSize;
+	BOOLEAN EFIAPI (*HashInit)(VOID *);
+	BOOLEAN EFIAPI (*HashUpdate)(VOID *, CONST VOID *, UINTN);
+	BOOLEAN EFIAPI (*HashFinal)(VOID *, UINT8 *);
+	void *HashCtx = NULL;
+	UINT8 CertDigest[SHA512_DIGEST_SIZE];
+	EFI_SIGNATURE_DATA *DbxCertHash;
+	UINTN CertHashCount;
+	UINTN Index;
+
+	if (!X509GetTBSCert (Cert, CertSize, &TBSCert, &TBSCertSize)) {
+		return FAILED;
+	}
+
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		if (CompareGuid(&CertList->SignatureType, &EFI_CERT_X509_SHA256_GUID)) {
+			HashCtxSize = Sha256GetContextSize();
+			DigestSize = SHA256_DIGEST_SIZE;
+			HashInit = Sha256Init;
+			HashUpdate = Sha256Update;
+			HashFinal = Sha256Final;
+		} else if (CompareGuid(&CertList->SignatureType, &EFI_CERT_X509_SHA384_GUID)) {
+			HashCtxSize = Sha384GetContextSize();
+			DigestSize = SHA384_DIGEST_SIZE;
+			HashInit = Sha384Init;
+			HashUpdate = Sha384Update;
+			HashFinal = Sha384Final;
+		} else if (CompareGuid(&CertList->SignatureType, &EFI_CERT_X509_SHA512_GUID)) {
+			HashCtxSize = Sha512GetContextSize();
+			DigestSize = SHA512_DIGEST_SIZE;
+			HashInit = Sha512Init;
+			HashUpdate = Sha512Update;
+			HashFinal = Sha512Final;
+		} else {
+			dbsize -= CertList->SignatureListSize;
+			CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *)CertList + CertList->SignatureListSize);
+			continue;
+		}
+	
+		HashCtx = AllocatePool(HashCtxSize);
+		if (HashCtx == NULL)
+			goto done;
+
+		if (!HashInit(HashCtx))
+			goto done;
+
+		if (!HashUpdate(HashCtx, TBSCert, TBSCertSize))
+			goto done;
+
+		if (!HashFinal(HashCtx, CertDigest))
+			goto done;
+
+
+		CertHashCount = (CertList->SignatureListSize - sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
+		DbxCertHash = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
+		for (Index = 0; Index < CertHashCount; Index++) {
+			if (CompareMem(DbxCertHash, CertDigest, DigestSize) == 0) {
+				rc = DATA_FOUND;
+				goto done;
+			}
+
+			DbxCertHash = (EFI_SIGNATURE_DATA *) ((UINT8 *) DbxCertHash + CertList->SignatureSize);
+		}
+	}
+
+	rc = DATA_NOT_FOUND;
+
+done:
+	if (HashCtx != NULL)
+		FreePool(HashCtx);
+
+	return rc;
+}
+
+static CHECK_STATUS check_cert_hash_in_dbx(CHAR16 *dbname, EFI_GUID guid,
+					   UINT8 *Cert, UINTN CertSize)
+{
+	CHECK_STATUS rc;
+	EFI_STATUS efi_status;
+	UINT8 *db;
+	UINTN dbsize;
+	EFI_SIGNATURE_LIST *CertList;
+
+	efi_status = get_variable(dbname, &db, &dbsize, guid);
+	if (EFI_ERROR(efi_status))
+		return VAR_NOT_FOUND;
+
+	CertList = (EFI_SIGNATURE_LIST *)db;
+
+	rc = check_cert_hash_in_dbx_buf(CertList, dbsize, Cert, CertSize);
+
+	FreePool(db);
+
+	return rc;
+}
+
+static CHECK_STATUS check_cert_hash_in_dbx_all(UINT8 *Cert, UINTN CertSize)
+{
+	CHECK_STATUS rc;
+
+	rc = check_cert_hash_in_dbx_buf((EFI_SIGNATURE_LIST *)vendor_dbx, vendor_dbx_size,
+					Cert, CertSize);
+	if (rc == DATA_FOUND || rc == FAILED) {
+		LogError(L"cert hash forbidden by vendor dbx\n");
+		return rc;
+	}
+
+	rc = check_cert_hash_in_dbx(L"db", EFI_SECURE_BOOT_DB_GUID, Cert, CertSize);
+	if (rc == DATA_FOUND || rc == FAILED) {
+		LogError(L"cert hash forbidden by system dbx\n");
+		return rc;
+	}
+
+	rc = check_cert_hash_in_dbx(L"MokListX", SHIM_LOCK_GUID, Cert, CertSize);
+	if (rc == DATA_FOUND || rc == FAILED) {
+		LogError(L"cert hash forbidden by Mok dbx\n");
+		return rc;
+	}
+
+	return DATA_NOT_FOUND;
+}
+
+static CHECK_STATUS check_signature_forbidden_by_dbx_buf(EFI_SIGNATURE_LIST *CertList,
+							 UINTN dbsize,
+							 WIN_CERTIFICATE_EFI_PKCS *data,
+							 UINT8 *hash,
+							 CHAR16 *dbname,
+							 EFI_GUID guid)
+{
+	CHECK_STATUS rc = FAILED;
+	UINT8 *CertBuffer = NULL;
+	UINTN CertBufferLength = 0;
+	UINT8 *TrustedCert = NULL;
+	UINTN TrustedCertLength = 0;
+	UINT8 CertNumber;
+	UINT8 *CertPtr;
+	UINTN Index;
+	UINT8 *Cert;
+	UINTN CertSize;
+
+	if (check_signature_with_db_buf(CertList, dbsize, data, hash, dbname, guid,
+					NULL, NULL) == DATA_FOUND) {
+		return DATA_FOUND;
+	}
+
+	//
+	// Check X.509 Certificate Hash & Possible Timestamp.
+	//
+
+	//
+	// Retrieve the certificate stack from AuthData
+	// The output CertStack format will be:
+	//       UINT8  CertNumber;
+	//       UINT32 Cert1Length;
+	//       UINT8  Cert1[];
+	//       UINT32 Cert2Length;
+	//       UINT8  Cert2[];
+	//       ...
+	//       UINT32 CertnLength;
+	//       UINT8  Certn[];
+	//
+	Pkcs7GetSigners(data->CertData, data->Hdr.dwLength - sizeof(data->Hdr),
+			&CertBuffer, &CertBufferLength, &TrustedCert,
+			&TrustedCertLength);
+	if (CertBufferLength == 0 || CertBuffer == NULL || *CertBuffer == 0) {
+		LogError(L"cannot retrieve signing certs from signature\n");
+		goto done;
+	}
+
+	//
+	// Check if any hash of certificates embedded in data->CertData is in the forbidden database.
+	//
+	CertNumber = (UINT8) *CertBuffer;
+	CertPtr = CertBuffer + 1;
+	for (Index = 0; Index < CertNumber; Index++) {
+		CertSize = (UINTN) ReadUnaligned32((UINT32 *) CertPtr);
+		Cert = (UINT8 *) CertPtr + sizeof(UINT32);
+		//
+		// Advance CertPtr to the next cert in image signer's cert list
+		//
+		CertPtr = CertPtr + sizeof(UINT32) + CertSize;
+
+		rc = check_cert_hash_in_dbx_buf(CertList, dbsize, Cert, CertSize);
+		if (rc == DATA_FOUND || rc == FAILED) {
+			LogError(L"cert hash forbidden\n");
+			goto done;
+		}
+	}
+
+done:
+	Pkcs7FreeSigners(CertBuffer);
+	Pkcs7FreeSigners(TrustedCert);
+
+	return rc;
+}
+
+static CHECK_STATUS check_signature_with_db(CHAR16 *dbname, EFI_GUID guid,
+					    WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash)
+{
+	CHECK_STATUS rc;
+	BOOLEAN IsFound = FALSE;
+	EFI_STATUS efi_status;
+	EFI_SIGNATURE_LIST *CertList;
+	UINTN dbsize = 0;
+	UINT8 *db;
+	UINT8 *RootCert = NULL;
+	UINTN RootCertSize;
+
+	efi_status = get_variable(dbname, &db, &dbsize, guid);
+	if (EFI_ERROR(efi_status))
+		return VAR_NOT_FOUND;
+
+	CertList = (EFI_SIGNATURE_LIST *)db;
+
+	if (check_signature_with_db_buf(CertList, dbsize, data, hash, dbname, guid,
+					&RootCert, &RootCertSize) == DATA_FOUND) {
+		IsFound = TRUE;
+	}
+	if (IsFound) {
+		rc = check_cert_hash_in_dbx_all(RootCert, RootCertSize);
+		if (rc == DATA_FOUND || rc == FAILED) {
+			IsFound = FALSE;
+		}
+	}
+
+	FreePool(db);
+
+	return IsFound ? DATA_FOUND : DATA_NOT_FOUND;
+}
+
+static CHECK_STATUS check_signature_forbidden_by_dbx(CHAR16 *dbname, EFI_GUID guid,
+						     WIN_CERTIFICATE_EFI_PKCS *data,
+						     UINT8 *hash)
 {
 	CHECK_STATUS rc;
 	EFI_STATUS efi_status;
@@ -401,7 +656,7 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
-	rc = check_db_cert_in_ram(CertList, dbsize, data, hash, dbname, guid);
+	rc = check_signature_forbidden_by_dbx_buf(CertList, dbsize, data, hash, dbname, guid);
 
 	FreePool(db);
 
@@ -411,7 +666,7 @@ static CHECK_STATUS check_db_cert(CHAR16 *dbname, EFI_GUID guid,
 /*
  * Check a hash against an EFI_SIGNATURE_LIST in a buffer
  */
-static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
+static CHECK_STATUS check_hash_in_db_buf(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize, UINT8 *data,
 					 int SignatureSize, EFI_GUID CertType,
 					 CHAR16 *dbname, EFI_GUID guid)
@@ -454,8 +709,8 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 /*
  * Check a hash against an EFI_SIGNATURE_LIST in a UEFI variable
  */
-static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
-				  int SignatureSize, EFI_GUID CertType)
+static CHECK_STATUS check_hash_in_db(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
+				     int SignatureSize, EFI_GUID CertType)
 {
 	EFI_STATUS efi_status;
 	EFI_SIGNATURE_LIST *CertList;
@@ -469,7 +724,7 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
-	CHECK_STATUS rc = check_db_hash_in_ram(CertList, dbsize, data,
+	CHECK_STATUS rc = check_hash_in_db_buf(CertList, dbsize, data,
 					       SignatureSize, CertType,
 					       dbname, guid);
 	FreePool(db);
@@ -484,52 +739,60 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 static EFI_STATUS check_denylist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				  UINT8 *sha256hash, UINT8 *sha1hash)
 {
+	CHECK_STATUS rc;
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
 
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
+	if (check_hash_in_db_buf(dbx, vendor_dbx_size, sha256hash,
 			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
 			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
+	if (check_hash_in_db_buf(dbx, vendor_dbx_size, sha1hash,
 				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert &&
-	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
-				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in vendor dbx\n");
-		return EFI_SECURITY_VIOLATION;
+	if (cert) {
+		rc = check_signature_forbidden_by_dbx_buf(dbx, vendor_dbx_size, cert,
+							  sha256hash, L"dbx",
+							  EFI_SECURE_BOOT_DB_GUID);
+		if (rc == DATA_FOUND || rc == FAILED) {
+			LogError(L"signature forbidden by vendor dbx\n");
+			return EFI_SECURITY_VIOLATION;
+		}
 	}
-	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha256hash,
-			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_hash_in_db(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha256hash,
+			     SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha1hash,
-			  SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+	if (check_hash_in_db(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha1hash,
+			     SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert &&
-	    check_db_cert(L"dbx", EFI_SECURE_BOOT_DB_GUID,
-			  cert, sha256hash) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in system dbx\n");
-		return EFI_SECURITY_VIOLATION;
+	if (cert) {
+		rc = check_signature_forbidden_by_dbx(L"dbx", EFI_SECURE_BOOT_DB_GUID,
+						      cert, sha256hash);
+		if (rc == DATA_FOUND || rc == FAILED) {
+			LogError(L"signature forbidden by system dbx\n");
+			return EFI_SECURITY_VIOLATION;
+		}
 	}
-	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha256hash,
-			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+	if (check_hash_in_db(L"MokListX", SHIM_LOCK_GUID, sha256hash,
+			     SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (cert &&
-	    check_db_cert(L"MokListX", SHIM_LOCK_GUID,
-			  cert, sha256hash) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in Mok dbx\n");
-		return EFI_SECURITY_VIOLATION;
+	if (cert) {
+		rc = check_signature_forbidden_by_dbx(L"MokListX", SHIM_LOCK_GUID, cert,
+						      sha256hash);
+		if (rc == DATA_FOUND || rc == FAILED) {
+			LogError(L"signature forbidden by Mok dbx\n");
+			return EFI_SECURITY_VIOLATION;
+		}
 	}
 
 	drain_openssl_errors();
@@ -543,53 +806,81 @@ static void update_verification_method(verification_method_t method)
 }
 
 /*
- * Check whether the binary signature or hash are present in db or MokList
+ * Check whether the binary hash is present in or has been signed by an
+ * authority in db or MokList
  */
 static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	if (!ignore_db) {
-		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha256hash, SHA256_DIGEST_SIZE,
-					EFI_CERT_SHA256_GUID) == DATA_FOUND) {
+		if (check_hash_in_db(L"db", EFI_SECURE_BOOT_DB_GUID, sha256hash,
+				     SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		} else {
-			LogError(L"check_db_hash(db, sha256hash) != DATA_FOUND\n");
+			LogError(L"check_hash_in_db(db, sha256hash) != DATA_FOUND\n");
 		}
-		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha1hash, SHA1_DIGEST_SIZE,
-					EFI_CERT_SHA1_GUID) == DATA_FOUND) {
+		if (check_hash_in_db(L"db", EFI_SECURE_BOOT_DB_GUID, sha1hash,
+				     SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) == DATA_FOUND) {
 			verification_method = VERIFIED_BY_HASH;
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		} else {
-			LogError(L"check_db_hash(db, sha1hash) != DATA_FOUND\n");
+			LogError(L"check_hash_in_db(db, sha1hash) != DATA_FOUND\n");
 		}
-		if (cert && check_db_cert(L"db", EFI_SECURE_BOOT_DB_GUID, cert, sha256hash)
-					== DATA_FOUND) {
+		if (cert && check_signature_with_db(L"db", EFI_SECURE_BOOT_DB_GUID, cert, sha256hash)
+		    == DATA_FOUND) {
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
 			return EFI_SUCCESS;
 		} else {
-			LogError(L"check_db_cert(db, sha256hash) != DATA_FOUND\n");
+			LogError(L"check_signature_with_db(db, sha256hash) != DATA_FOUND\n");
 		}
 	}
 
-	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
-			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
-				== DATA_FOUND) {
+	if (check_hash_in_db(L"MokList", SHIM_LOCK_GUID, sha256hash,
+			     SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
 	} else {
-		LogError(L"check_db_hash(MokList, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_hash_in_db(MokList, sha256hash) != DATA_FOUND\n");
 	}
-	if (cert && check_db_cert(L"MokList", SHIM_LOCK_GUID, cert, sha256hash)
-			== DATA_FOUND) {
+	if (cert && check_signature_with_db(L"MokList", SHIM_LOCK_GUID, cert, sha256hash)
+	    == DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
 	} else {
-		LogError(L"check_db_cert(MokList, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_signature_with_db(MokList, sha256hash) != DATA_FOUND\n");
+	}
+
+#if defined(ENABLE_SHIM_CERT)
+	/*
+	 * Check against the shim build key
+	 */
+	if (cert && sizeof(shim_cert) > 0 &&
+	    check_signature(shim_cert, sizeof(shim_cert), cert, sha256hash,
+			    L"Shim", SHIM_LOCK_GUID)) {
+		if (check_cert_hash_in_dbx_all(shim_cert, sizeof(shim_cert)) == DATA_NOT_FOUND) {
+			verification_method = VERIFIED_BY_CERT;
+			update_verification_method(VERIFIED_BY_CERT);
+			return EFI_SUCCESS;
+		}
+	}
+#endif
+
+	/*
+	 * And finally, check against shim's built-in key
+	 */
+	if (cert && vendor_cert_size > 0 &&
+	    check_signature(vendor_cert, vendor_cert_size, cert, sha256hash,
+			    L"Shim", SHIM_LOCK_GUID)) {
+		if (check_cert_hash_in_dbx_all(vendor_cert, vendor_cert_size) == DATA_NOT_FOUND) {
+			verification_method = VERIFIED_BY_CERT;
+			update_verification_method(VERIFIED_BY_CERT);
+			return EFI_SUCCESS;
+		}
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
@@ -979,54 +1270,6 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	} else {
 		drain_openssl_errors();
 		return efi_status;
-	}
-
-	if (cert) {
-#if defined(ENABLE_SHIM_CERT)
-		/*
-		 * Check against the shim build key
-		 */
-		clear_ca_warning();
-		if (sizeof(shim_cert) &&
-		    AuthenticodeVerify(cert->CertData,
-			       cert->Hdr.dwLength - sizeof(cert->Hdr),
-			       shim_cert, sizeof(shim_cert), sha256hash,
-			       SHA256_DIGEST_SIZE)) {
-			if (get_ca_warning()) {
-				show_ca_warning();
-			}
-			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
-					     sizeof(shim_cert), shim_cert);
-			efi_status = EFI_SUCCESS;
-			drain_openssl_errors();
-			return efi_status;
-		} else {
-			LogError(L"AuthenticodeVerify(shim_cert) failed\n");
-		}
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-		/*
-		 * And finally, check against shim's built-in key
-		 */
-		clear_ca_warning();
-		if (vendor_cert_size &&
-		    AuthenticodeVerify(cert->CertData,
-				       cert->Hdr.dwLength - sizeof(cert->Hdr),
-				       vendor_cert, vendor_cert_size,
-				       sha256hash, SHA256_DIGEST_SIZE)) {
-			if (get_ca_warning()) {
-				show_ca_warning();
-			}
-			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
-					     vendor_cert_size, vendor_cert);
-			efi_status = EFI_SUCCESS;
-			drain_openssl_errors();
-			return efi_status;
-		} else {
-			LogError(L"AuthenticodeVerify(vendor_cert) failed\n");
-		}
 	}
 
 	LogError(L"Binary is not authorized\n");

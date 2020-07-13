@@ -3,6 +3,7 @@
 
 #include "Base.h"
 
+UINT32 ReadUnaligned32 (CONST UINT32 *Buffer);
 UINT32 WriteUnaligned32 (UINT32 *Buffer, UINT32 Value);
 UINTN AsciiStrSize (CONST CHAR8 *string);
 RETURN_STATUS AsciiStrnCpyS (CHAR8 *Destination, UINTN DestMax, CONST CHAR8 *Source, UINTN Length);
