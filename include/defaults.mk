@@ -34,7 +34,7 @@ DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(EFI_ARCH)/
 DEBUGINFO	?= $(prefix)/lib/debug/
 DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
-DEFAULT_LOADER	?= \\\\grub$(EFI_ARCH_SUFFIX).efi
+DEFAULT_LOADER	?= \\\\\\\\grub$(EFI_ARCH_SUFFIX).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 OPTIMIZATIONS	?= -Os
 
