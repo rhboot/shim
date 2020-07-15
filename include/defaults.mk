@@ -36,7 +36,7 @@ DATATARGETDIR	?= $(datadir)/$(PKGNAME)/$(VERSION)$(DASHRELEASE)/$(ARCH)/
 DEBUGINFO	?= $(prefix)/lib/debug/
 DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
-DEFAULT_LOADER	?= \\\\grub$(ARCH).efi
+DEFAULT_LOADER	?= \\\\\\\\grub$(ARCH).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
 OPTIMIZATIONS	?= -Os
