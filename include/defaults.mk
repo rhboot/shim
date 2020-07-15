@@ -86,7 +86,7 @@ ifneq ($(origin ENABLE_SBSIGN),undefined)
 	@$(SBSIGN) \
 		--key $(BUILDDIR)/certdb/shim.key \
 		--cert $(BUILDDIR)/certdb/shim.crt \
-		--output $(BUILDDIR)/$@ $(BUILDDIR)/$^
+		--output $(BUILDDIR)/$@ $(BUILDDIR)/$<
 else
 .ONESHELL: $(MMNAME).signed $(FBNAME).signed
 %.efi.signed: %.efi certdb/secmod.db
