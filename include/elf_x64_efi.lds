@@ -15,6 +15,8 @@ SECTIONS
   {
     _text = .;
     *(.text)
+    *(.text.*)
+    *(.gnu.linkonce.t.*)
     _etext = .;
   }
 
