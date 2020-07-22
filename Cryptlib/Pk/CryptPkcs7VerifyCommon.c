@@ -38,6 +38,49 @@ get_ca_warning()
   return ca_warning;
 }
 
+#if 0
+/*
+ * Earlier versions of openssl will need this instead.
+ */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define X509_OBJECT_get0_X509(obj) ((obj)->data.x509)
+#define X509_OBJECT_get_type(obj) ((obj)->type)
+#define X509_STORE_CTX_get0_cert(ctx) ((ctx)->cert)
+#define X509_STORE_get0_objects(certs) ((certs)->objs)
+#define X509_get_extended_key_usage(cert) ((cert)->ex_xkusage)
+#if OPENSSL_VERSION_NUMBER < 0x10020000L
+#define X509_STORE_CTX_get0_store(ctx) ((ctx)->ctx)
+#endif
+#endif
+
+static int cert_in_store(X509 *cert, X509_STORE_CTX *ctx)
+{
+  X509_OBJECT obj;
+  obj.type = X509_LU_X509;
+  obj.data.x509 = cert;
+  return X509_OBJECT_retrieve_match(ctx->ctx->objs, &obj) != NULL;
+}
+#else
+static int cert_in_store(X509 *cert, X509_STORE_CTX *ctx)
+{
+  STACK_OF(X509_OBJECT) *objs;
+  X509_OBJECT *obj;
+  int i;
+
+  objs = X509_STORE_get0_objects(X509_STORE_CTX_get0_store(ctx));
+
+  for (i = 0; i < sk_X509_OBJECT_num(objs); i++) {
+    obj = sk_X509_OBJECT_value(objs, i);
+
+    if (X509_OBJECT_get_type(obj) == X509_LU_X509 &&
+	!X509_cmp(X509_OBJECT_get0_X509(obj), cert))
+      return 1;
+  }
+
+  return 0;
+}
+#endif
+
 int
 X509VerifyCb (
   IN int            Status,
@@ -48,14 +91,33 @@ X509VerifyCb (
 
   Error = (INTN) X509_STORE_CTX_get_error (Context);
 
-  if (Error == X509_V_ERR_INVALID_CA) {
+  /* Accept code-signing keys */
+  if (Error == X509_V_ERR_INVALID_PURPOSE &&
+      X509_get_extended_key_usage(X509_STORE_CTX_get0_cert(Context)) == XKU_CODE_SIGN) {
+    Status = 1;
+  } else if (Error == X509_V_ERR_CERT_UNTRUSTED ||
+	     Error == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT ||
+	     Error == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY ||
+	     Error == X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE) {
+    /* all certs in our cert database are explicitly trusted */
+
+    if (cert_in_store(X509_STORE_CTX_get_current_cert(Context), Context))
+      Status = 1;
+  } else if (Error == X509_V_ERR_CERT_HAS_EXPIRED ||
+	     Error == X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD ||
+	     Error == X509_V_ERR_CERT_NOT_YET_VALID ||
+	     Error == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY ||
+	     Error == X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD) {
+    /* UEFI explicitly allows expired certificates */
+    Status = 1;
+  } else if (Error == X509_V_ERR_INVALID_CA) {
     /* Due to the historical reason, we have to relax the the x509 v3 extension
      * check to allow the CA certificates without the CA flag in the basic
      * constraints or KeyCertSign in the key usage to be loaded. In the future,
      * this callback should be removed to enforce the proper check. */
     ca_warning = TRUE;
 
-    return 1;
+    Status = 1;
   }
 
   return Status;
