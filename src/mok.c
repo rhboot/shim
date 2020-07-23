@@ -5,6 +5,8 @@
 
 #include "shim.h"
 
+#include <stdint.h>
+
 /*
  * Check if a variable exists
  */
@@ -47,6 +49,15 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
+typedef enum {
+	VENDOR_ADDEND_DB,
+	VENDOR_ADDEND_X509,
+	VENDOR_ADDEND_NONE,
+} vendor_addend_category_t;
+
+struct mok_state_variable;
+typedef vendor_addend_category_t (vendor_addend_categorizer_t)(struct mok_state_variable *);
+
 /*
  * MoK variables that need to have their storage validated.
  *
@@ -58,24 +69,48 @@ struct mok_state_variable {
 	char *name8;
 	CHAR16 *rtname;
 	EFI_GUID *guid;
+
 	UINT8 *data;
 	UINTN data_size;
+
 	/*
-	 * These two are indirect pointers just to make initialization
-	 * saner...
+	 * These are indirect pointers just to make initialization saner...
 	 */
-	UINT8 **addend_source;
+	vendor_addend_categorizer_t *categorize_addend;
+	UINT8 **addend;
 	UINT32 *addend_size;
-#if defined(ENABLE_SHIM_CERT)
+
 	UINT8 **build_cert;
 	UINT32 *build_cert_size;
-#endif /* defined(ENABLE_SHIM_CERT) */
+
 	UINT32 yes_attr;
 	UINT32 no_attr;
 	UINT32 flags;
 	UINTN pcr;
 	UINT8 *state;
 };
+
+static vendor_addend_category_t
+categorize_authorized(struct mok_state_variable *v)
+{
+	if (!(v->addend && v->addend_size &&
+	      *v->addend && *v->addend_size)) {
+		return VENDOR_ADDEND_NONE;
+	}
+
+	return vendor_authorized_category;
+}
+
+static vendor_addend_category_t
+categorize_deauthorized(struct mok_state_variable *v)
+{
+	if (!(v->addend && v->addend_size &&
+	      *v->addend && *v->addend_size)) {
+		return VENDOR_ADDEND_NONE;
+	}
+
+	return VENDOR_ADDEND_DB;
+}
 
 #define MOK_MIRROR_KEYDB	0x01
 #define MOK_MIRROR_DELETE_FIRST	0x02
@@ -90,8 +125,9 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
-	 .addend_source = &vendor_cert,
-	 .addend_size = &vendor_cert_size,
+	 .categorize_addend = categorize_authorized,
+	 .addend = &vendor_authorized,
+	 .addend_size = &vendor_authorized_size,
 #if defined(ENABLE_SHIM_CERT)
 	 .build_cert = &build_cert,
 	 .build_cert_size = &build_cert_size,
@@ -107,6 +143,9 @@ struct mok_state_variable mok_state_variables[] = {
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+	 .categorize_addend = categorize_deauthorized,
+	 .addend = &vendor_deauthorized,
+	 .addend_size = &vendor_deauthorized_size,
 	 .flags = MOK_MIRROR_KEYDB |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
@@ -136,123 +175,253 @@ struct mok_state_variable mok_state_variables[] = {
 	{ NULL, }
 };
 
-static inline BOOLEAN nonnull(1)
-check_vendor_cert(struct mok_state_variable *v)
-{
-	return (v->addend_source && v->addend_size &&
-		*v->addend_source && *v->addend_size) ? TRUE : FALSE;
-}
+#define should_mirror_addend(v) (((v)->categorize_addend) && ((v)->categorize_addend(v) != VENDOR_ADDEND_NONE))
 
-#if defined(ENABLE_SHIM_CERT)
 static inline BOOLEAN nonnull(1)
-check_build_cert(struct mok_state_variable *v)
+should_mirror_build_cert(struct mok_state_variable *v)
 {
 	return (v->build_cert && v->build_cert_size &&
 		*v->build_cert && *v->build_cert_size) ? TRUE : FALSE;
 }
-#define check_addend(v) (check_vendor_cert(v) || check_build_cert(v))
-#else
-#define check_addend(v) check_vendor_cert(v)
-#endif /* defined(ENABLE_SHIM_CERT) */
+
+static const uint8_t null_sha256[32] = { 0, };
 
 static EFI_STATUS nonnull(1)
 mirror_one_mok_variable(struct mok_state_variable *v)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
-	void *FullData = NULL;
-	UINTN FullDataSize = 0;
+	uint8_t *FullData = NULL;
+	size_t FullDataSize = 0;
+	vendor_addend_category_t addend_category = VENDOR_ADDEND_NONE;
 	uint8_t *p = NULL;
 
-	if ((v->flags & MOK_MIRROR_KEYDB) && check_addend(v)) {
-		EFI_SIGNATURE_LIST *CertList = NULL;
-		EFI_SIGNATURE_DATA *CertData = NULL;
-#if defined(ENABLE_SHIM_CERT)
+	size_t build_cert_esl_sz = 0, addend_esl_sz = 0;
+
+	if (v->categorize_addend)
+		addend_category = v->categorize_addend(v);
+
+	/*
+	 * we're always mirroring the original data, whether this is an efi
+	 * security database or not
+	 */
+	dprint(L"v->data_size:%lu v->data:0x%08llx\n", v->data_size, v->data);
+	dprint(L"FullDataSize:%lu FullData:0x%08llx\n", FullDataSize, FullData);
+	if (v->data_size) {
 		FullDataSize = v->data_size;
-		if (check_build_cert(v)) {
-			FullDataSize += sizeof (*CertList)
-					+ sizeof (EFI_GUID)
-					+ *v->build_cert_size;
-		}
-		if (check_vendor_cert(v)) {
-			FullDataSize += sizeof (*CertList)
-					+ sizeof (EFI_GUID)
-					+ *v->addend_size;
-		}
-#else
-		FullDataSize = v->data_size
-			     + sizeof (*CertList)
-			     + sizeof (EFI_GUID)
-			     + *v->addend_size;
-#endif /* defined(ENABLE_SHIM_CERT) */
-		FullData = AllocatePool(FullDataSize);
-		if (!FullData) {
-			perror(L"Failed to allocate space for MokListRT\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		p = FullData;
-
-		if (!EFI_ERROR(efi_status) && v->data_size > 0) {
-			CopyMem(p, v->data, v->data_size);
-			p += v->data_size;
-		}
-
-#if defined(ENABLE_SHIM_CERT)
-		if (check_build_cert(v) == FALSE)
-			goto skip_build_cert;
-
-		CertList = (EFI_SIGNATURE_LIST *)p;
-		p += sizeof (*CertList);
-		CertData = (EFI_SIGNATURE_DATA *)p;
-		p += sizeof (EFI_GUID);
-
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
-		CertList->SignatureListSize = *v->build_cert_size
-					      + sizeof (*CertList)
-					      + sizeof (*CertData)
-					      -1;
-		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = *v->build_cert_size +
-					  sizeof (EFI_GUID);
-
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
-		CopyMem(p, *v->build_cert, *v->build_cert_size);
-
-		p += *v->build_cert_size;
-
-		if (check_vendor_cert(v) == FALSE)
-			goto skip_vendor_cert;
-skip_build_cert:
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-		CertList = (EFI_SIGNATURE_LIST *)p;
-		p += sizeof (*CertList);
-		CertData = (EFI_SIGNATURE_DATA *)p;
-		p += sizeof (EFI_GUID);
-
-		CertList->SignatureType = EFI_CERT_TYPE_X509_GUID;
-		CertList->SignatureListSize = *v->addend_size
-					      + sizeof (*CertList)
-					      + sizeof (*CertData)
-					      -1;
-		CertList->SignatureHeaderSize = 0;
-		CertList->SignatureSize = *v->addend_size + sizeof (EFI_GUID);
-
-		CertData->SignatureOwner = SHIM_LOCK_GUID;
-		CopyMem(p, *v->addend_source, *v->addend_size);
-
-#if defined(ENABLE_SHIM_CERT)
-skip_vendor_cert:
-#endif /* defined(ENABLE_SHIM_CERT) */
-		if (v->data && v->data_size)
-			FreePool(v->data);
-		v->data = FullData;
-		v->data_size = FullDataSize;
-	} else {
-		FullDataSize = v->data_size;
-		FullData = v->data;
+		dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+		       FullDataSize, FullData);
 	}
 
+	/*
+	 * if it is, there's more data
+	 */
+	if (v->flags & MOK_MIRROR_KEYDB) {
+
+		/*
+		 * We're mirroring (into) an efi security database, aka an
+		 * array of efi_signature_list_t.  Its layout goes like:
+		 *
+		 *   existing_variable_data
+		 *   existing_variable_data_size
+		 *   if flags & MOK_MIRROR_KEYDB
+		 *     if build_cert
+		 *       build_cert_esl
+		 *       build_cert_header (always sz=0)
+		 *       build_cert_esd[0] { owner, data }
+		 *     if addend==vendor_db
+		 *       for n=[1..N]
+		 *         vendor_db_esl_n
+		 *           vendor_db_header_n (always sz=0)
+		 *           vendor_db_esd_n[m] {{ owner, data }, ... }
+		 *     elif addend==vendor_cert
+		 *       vendor_cert_esl
+		 *         vendor_cert_header (always sz=0)
+		 *         vendor_cert_esd[1] { owner, data }
+		 *
+		 * first we determine the size of the variable, then alloc
+		 * and add the data.
+		 */
+
+		/*
+		 * first bit is existing data, but we added that above
+		 */
+
+		/*
+		 * then the build cert if it's there
+		 */
+		if (should_mirror_build_cert(v)) {
+			efi_status = fill_esl(*v->build_cert,
+					      *v->build_cert_size,
+					      &EFI_CERT_TYPE_X509_GUID,
+					      &SHIM_LOCK_GUID,
+					      NULL, &build_cert_esl_sz);
+			if (efi_status != EFI_BUFFER_TOO_SMALL) {
+				perror(L"Could not add built-in cert to %s: %r\n",
+				       v->name, efi_status);
+				return efi_status;
+			}
+			FullDataSize += build_cert_esl_sz;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+			       FullDataSize, FullData);
+		}
+
+		/*
+		 * then the addend data
+		 */
+		switch (addend_category) {
+		case VENDOR_ADDEND_DB:
+			/*
+			 * if it's an ESL already, we use it wholesale
+			 */
+			FullDataSize += *v->addend_size;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+			       FullDataSize, FullData);
+			break;
+		case VENDOR_ADDEND_X509:
+			efi_status = fill_esl(*v->addend, *v->addend_size,
+					      &EFI_CERT_TYPE_X509_GUID,
+					      &SHIM_LOCK_GUID,
+					      NULL, &addend_esl_sz);
+			if (efi_status != EFI_BUFFER_TOO_SMALL) {
+				perror(L"Could not add built-in cert to %s: %r\n",
+				       v->name, efi_status);
+				return efi_status;
+			}
+			FullDataSize += addend_esl_sz;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+				      FullDataSize, FullData);
+			break;
+		default:
+		case VENDOR_ADDEND_NONE:
+			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+				      FullDataSize, FullData);
+			break;
+		}
+	}
+
+	/*
+	 * Now we have the full size
+	 */
 	if (FullDataSize) {
+		/*
+		 * allocate the buffer, or use the old one if it's just the
+		 * existing data.
+		 */
+		if (FullDataSize != v->data_size) {
+			dprint(L"FullDataSize:%lu FullData:0x%08llx allocating FullData\n",
+			       FullDataSize, FullData);
+			FullData = AllocatePool(FullDataSize);
+			if (!FullData) {
+				FreePool(v->data);
+				v->data = NULL;
+				v->data_size = 0;
+				perror(L"Failed to allocate %lu bytes for %s\n",
+				       FullDataSize, v->name);
+				return EFI_OUT_OF_RESOURCES;
+			}
+			p = FullData;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+			if (v->data && v->data_size) {
+				CopyMem(p, v->data, v->data_size);
+				p += v->data_size;
+			}
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+		} else {
+			FullData = v->data;
+			FullDataSize = v->data_size;
+			p = FullData + FullDataSize;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+			v->data = NULL;
+			v->data_size = 0;
+		}
+	}
+	dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+	       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+
+	/*
+	 * Now fill it.
+	 */
+	if (v->flags & MOK_MIRROR_KEYDB) {
+		/*
+		 * first bit is existing data, but again, we added that above
+		 */
+
+		/*
+		 * second is the build cert
+		 */
+		dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+		       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+		if (should_mirror_build_cert(v)) {
+			efi_status = fill_esl(*v->build_cert,
+					      *v->build_cert_size,
+					      &EFI_CERT_TYPE_X509_GUID,
+					      &SHIM_LOCK_GUID,
+					      p, &build_cert_esl_sz);
+			if (EFI_ERROR(efi_status)) {
+				perror(L"Could not add built-in cert to %s: %r\n",
+				       v->name, efi_status);
+				return efi_status;
+			}
+			p += build_cert_esl_sz;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+		}
+
+		switch (addend_category) {
+		case VENDOR_ADDEND_DB:
+			CopyMem(p, *v->addend, *v->addend_size);
+			p += *v->addend_size;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+			break;
+		case VENDOR_ADDEND_X509:
+			efi_status = fill_esl(*v->addend, *v->addend_size,
+					      &EFI_CERT_TYPE_X509_GUID,
+					      &SHIM_LOCK_GUID,
+					      p, &addend_esl_sz);
+			if (EFI_ERROR(efi_status)) {
+				perror(L"Could not add built-in cert to %s: %r\n",
+				       v->name, efi_status);
+				return efi_status;
+			}
+			p += addend_esl_sz;
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+			break;
+		default:
+		case VENDOR_ADDEND_NONE:
+			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+			break;
+		}
+	}
+	/*
+	 * We always want to create our key databases, so in this case we
+	 * need a dummy entry
+	 */
+	if ((v->flags & MOK_MIRROR_KEYDB) && FullDataSize == 0) {
+		efi_status = variable_create_esl(
+				null_sha256, sizeof(null_sha256),
+				&EFI_CERT_SHA256_GUID, &SHIM_LOCK_GUID,
+				&FullData, &FullDataSize);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Failed to allocate %lu bytes for %s\n",
+			       FullDataSize, v->name);
+			return efi_status;
+		}
+		p = FullData + FullDataSize;
+		dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+		       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+	}
+
+	dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+	       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+	if (FullDataSize) {
+		dprint(L"Setting %s with %lu bytes of data\n",
+		       v->rtname, FullDataSize);
 		efi_status = gRT->SetVariable(v->rtname, v->guid,
 					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
 					      EFI_VARIABLE_RUNTIME_ACCESS,
@@ -262,7 +431,15 @@ skip_vendor_cert:
 			       v->rtname, efi_status);
 		}
 	}
-
+	if (v->data && v->data_size) {
+		FreePool(v->data);
+		v->data = NULL;
+		v->data_size = 0;
+	}
+	if (FullData && FullDataSize) {
+		FreePool(FullData);
+	}
+	dprint(L"returning %r\n", efi_status);
 	return efi_status;
 }
 
@@ -274,6 +451,8 @@ static EFI_STATUS nonnull(1)
 maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
 {
 	EFI_STATUS efi_status;
+	BOOLEAN present = FALSE;
+
 	if (v->rtname) {
 		if (v->flags & MOK_MIRROR_DELETE_FIRST)
 			LibDeleteVariable(v->rtname, v->guid);
@@ -286,6 +465,43 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
 			       efi_status);
 		}
 	}
+
+	present = (v->data && v->data_size) ? TRUE : FALSE;
+	if (!present)
+		return ret;
+
+	if (v->data_size == sizeof(UINT8) && v->state) {
+		*v->state = v->data[0];
+	}
+
+	if (v->flags & MOK_VARIABLE_MEASURE) {
+		/*
+		 * Measure this into PCR 7 in the Microsoft format
+		 */
+		efi_status = tpm_measure_variable(v->name, *v->guid,
+						  v->data_size,
+						  v->data);
+		if (EFI_ERROR(efi_status)) {
+			if (ret != EFI_SECURITY_VIOLATION)
+				ret = efi_status;
+		}
+	}
+
+	if (v->flags & MOK_VARIABLE_LOG) {
+		/*
+		 * Log this variable into whichever PCR the table
+		 * says.
+		 */
+		EFI_PHYSICAL_ADDRESS datap =
+				(EFI_PHYSICAL_ADDRESS)(UINTN)v->data,
+		efi_status = tpm_log_event(datap, v->data_size,
+					   v->pcr, (CHAR8 *)v->name8);
+		if (EFI_ERROR(efi_status)) {
+			if (ret != EFI_SECURITY_VIOLATION)
+				ret = efi_status;
+		}
+	}
+
 	return ret;
 }
 
@@ -311,26 +527,20 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 	user_insecure_mode = 0;
 	ignore_db = 0;
 
+	dprint(L"importing mok state\n");
 	for (i = 0; mok_state_variables[i].name != NULL; i++) {
 		struct mok_state_variable *v = &mok_state_variables[i];
 		UINT32 attrs = 0;
-		BOOLEAN delete = FALSE, present, addend;
-
-		addend = check_addend(v);
+		BOOLEAN delete = FALSE;
 
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
+		dprint(L"maybe mirroring %s\n", v->name);
 		if (efi_status == EFI_NOT_FOUND) {
-			if (addend)
-				ret = maybe_mirror_one_mok_variable(v, ret);
-			/*
-			 * after possibly adding, we can continue, no
-			 * further checks to be done.
-			 */
-			continue;
-		}
-		if (EFI_ERROR(efi_status)) {
+			v->data = NULL;
+			v->data_size = 0;
+		} else if (EFI_ERROR(efi_status)) {
 			perror(L"Could not verify %s: %r\n", v->name,
 			       efi_status);
 			/*
@@ -339,22 +549,22 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			 */
 			if (ret != EFI_SECURITY_VIOLATION)
 				ret = efi_status;
-			continue;
-		}
-
-		if (!(attrs & v->yes_attr)) {
-			perror(L"Variable %s is missing attributes:\n",
-			       v->name);
-			perror(L"  0x%08x should have 0x%08x set.\n",
-			       attrs, v->yes_attr);
 			delete = TRUE;
-		}
-		if (attrs & v->no_attr) {
-			perror(L"Variable %s has incorrect attribute:\n",
-			       v->name);
-			perror(L"  0x%08x should not have 0x%08x set.\n",
-			       attrs, v->no_attr);
-			delete = TRUE;
+		} else {
+			if (!(attrs & v->yes_attr)) {
+				perror(L"Variable %s is missing attributes:\n",
+				       v->name);
+				perror(L"  0x%08x should have 0x%08x set.\n",
+				       attrs, v->yes_attr);
+				delete = TRUE;
+			}
+			if (attrs & v->no_attr) {
+				perror(L"Variable %s has incorrect attribute:\n",
+				       v->name);
+				perror(L"  0x%08x should not have 0x%08x set.\n",
+				       attrs, v->no_attr);
+				delete = TRUE;
+			}
 		}
 		if (delete == TRUE) {
 			perror(L"Deleting bad variable %s\n", v->name);
@@ -366,45 +576,9 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			FreePool(v->data);
 			v->data = NULL;
 			v->data_size = 0;
-			continue;
 		}
 
-		if (v->data && v->data_size == sizeof(UINT8) && v->state) {
-			*v->state = v->data[0];
-		}
-
-		present = (v->data && v->data_size) ? TRUE : FALSE;
-
-		if (v->flags & MOK_VARIABLE_MEASURE && present) {
-			/*
-			 * Measure this into PCR 7 in the Microsoft format
-			 */
-			efi_status = tpm_measure_variable(v->name, *v->guid,
-							  v->data_size,
-							  v->data);
-			if (EFI_ERROR(efi_status)) {
-				if (ret != EFI_SECURITY_VIOLATION)
-					ret = efi_status;
-			}
-		}
-
-		if (v->flags & MOK_VARIABLE_LOG && present) {
-			/*
-			 * Log this variable into whichever PCR the table
-			 * says.
-			 */
-			EFI_PHYSICAL_ADDRESS datap =
-					(EFI_PHYSICAL_ADDRESS)(UINTN)v->data,
-			efi_status = tpm_log_event(datap, v->data_size,
-						   v->pcr, (CHAR8 *)v->name8);
-			if (EFI_ERROR(efi_status)) {
-				if (ret != EFI_SECURITY_VIOLATION)
-					ret = efi_status;
-			}
-		}
-
-		if (present)
-			ret = maybe_mirror_one_mok_variable(v, ret);
+		ret = maybe_mirror_one_mok_variable(v, ret);
 	}
 
 	/*
@@ -412,14 +586,16 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 	 * cause MokManager to demand a machine reboot, so this is safe to
 	 * have after the entire loop.
 	 */
+	dprint(L"checking mok request\n");
 	efi_status = check_mok_request(image_handle);
+	dprint(L"mok returned %r\n", efi_status);
 	if (EFI_ERROR(efi_status)) {
 		if (ret != EFI_SECURITY_VIOLATION)
 			ret = efi_status;
 		return ret;
 	}
 
-
+	dprint(L"returning %ld\n", ret);
 	return ret;
 }
 

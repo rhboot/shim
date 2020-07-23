@@ -99,7 +99,11 @@
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
-#if defined(VENDOR_CERT_FILE)
+#if defined(VENDOR_DB_FILE)
+# define vendor_authorized vendor_db
+# define vendor_authorized_size vendor_db_size
+# define vendor_authorized_category VENDOR_ADDEND_DB
+#elif defined(VENDOR_CERT_FILE)
 # define vendor_authorized vendor_cert
 # define vendor_authorized_size vendor_cert_size
 # define vendor_authorized_category VENDOR_ADDEND_X509
