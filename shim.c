@@ -68,16 +68,18 @@ static UINT32 load_options_size;
  * The vendor certificate used for validating the second stage loader
  */
 extern struct {
-	UINT32 vendor_cert_size;
-	UINT32 vendor_dbx_size;
-	UINT32 vendor_cert_offset;
-	UINT32 vendor_dbx_offset;
+	UINT32 vendor_authorized_size;
+	UINT32 vendor_deauthorized_size;
+	UINT32 vendor_authorized_offset;
+	UINT32 vendor_deauthorized_offset;
 } cert_table;
 
-UINT32 vendor_cert_size;
-UINT32 vendor_dbx_size;
-UINT8 *vendor_cert;
-UINT8 *vendor_dbx;
+UINT32 vendor_authorized_size = 0;
+UINT8 *vendor_authorized = NULL;
+
+UINT32 vendor_deauthorized_size = 0;
+UINT8 *vendor_deauthorized = NULL;
+
 #if defined(ENABLE_SHIM_CERT)
 UINT32 build_cert_size;
 UINT8 *build_cert;
@@ -554,22 +556,22 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data,
 static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
+	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_deauthorized;
 
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha256hash,
 			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
 			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha1hash,
 				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
-	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
+	    check_db_cert_in_ram(dbx, vendor_deauthorized_size, cert, sha256hash, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
@@ -1077,19 +1079,19 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		/*
 		 * And finally, check against shim's built-in key
 		 */
-		if (vendor_cert_size &&
+		if (vendor_authorized_size &&
 		    AuthenticodeVerify(cert->CertData,
 				       cert->Hdr.dwLength - sizeof(cert->Hdr),
-				       vendor_cert, vendor_cert_size,
+				       vendor_authorized, vendor_authorized_size,
 				       sha256hash, SHA256_DIGEST_SIZE)) {
 			update_verification_method(VERIFIED_BY_CERT);
 			tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
-					     vendor_cert_size, vendor_cert);
+					     vendor_authorized_size, vendor_authorized);
 			efi_status = EFI_SUCCESS;
 			drain_openssl_errors();
 			return efi_status;
 		} else {
-			LogError(L"AuthenticodeVerify(vendor_cert) failed\n");
+			LogError(L"AuthenticodeVerify(vendor_authorized) failed\n");
 		}
 	}
 
@@ -2501,7 +2503,7 @@ shim_init(void)
 	}
 
 	if (secure_mode()) {
-		if (vendor_cert_size || vendor_dbx_size) {
+		if (vendor_authorized_size || vendor_deauthorized_size) {
 			/*
 			 * If shim includes its own certificates then ensure
 			 * that anything it boots has performed some
@@ -2606,14 +2608,17 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	verification_method = VERIFIED_BY_NOTHING;
 
-	vendor_cert_size = cert_table.vendor_cert_size;
-	vendor_dbx_size = cert_table.vendor_dbx_size;
-	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
-	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+	vendor_authorized_size = cert_table.vendor_authorized_size;
+	vendor_authorized = (UINT8 *)&cert_table + cert_table.vendor_authorized_offset;
+
+	vendor_deauthorized_size = cert_table.vendor_deauthorized_size;
+	vendor_deauthorized = (UINT8 *)&cert_table + cert_table.vendor_deauthorized_offset;
+
 #if defined(ENABLE_SHIM_CERT)
 	build_cert_size = sizeof(shim_cert);
 	build_cert = shim_cert;
 #endif /* defined(ENABLE_SHIM_CERT) */
+
 	CHAR16 *msgs[] = {
 		L"import_mok_state() failed",
 		L"shim_init() failed",

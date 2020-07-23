@@ -97,6 +97,24 @@
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
+#if defined(VENDOR_CERT_FILE)
+# define vendor_authorized vendor_cert
+# define vendor_authorized_size vendor_cert_size
+# define vendor_authorized_category VENDOR_ADDEND_X509
+#else
+# define vendor_authorized vendor_null
+# define vendor_authorized_size vendor_null_size
+# define vendor_authorized_category VENDOR_ADDEND_NONE
+#endif
+
+#if defined(VENDOR_DBX_FILE)
+# define vendor_deauthorized vendor_dbx
+# define vendor_deauthorized_size vendor_dbx_size
+#else
+# define vendor_deauthorized vendor_deauthorized_null
+# define vendor_deauthorized_size vendor_deauthorized_null_size
+#endif
+
 #include "include/asm.h"
 #include "include/configtable.h"
 #include "include/console.h"
@@ -166,10 +184,12 @@ extern VOID ClearErrors(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
 extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
-extern UINT32 vendor_cert_size;
-extern UINT32 vendor_dbx_size;
-extern UINT8 *vendor_cert;
-extern UINT8 *vendor_dbx;
+extern UINT32 vendor_authorized_size;
+extern UINT8 *vendor_authorized;
+
+extern UINT32 vendor_deauthorized_size;
+extern UINT8 *vendor_deauthorized;
+
 #if defined(ENABLE_SHIM_CERT)
 extern UINT32 build_cert_size;
 extern UINT8 *build_cert;
