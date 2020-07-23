@@ -646,6 +646,31 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		}
 	}
 
+#if defined(VENDOR_DB_FILE)
+	EFI_SIGNATURE_LIST *db = (EFI_SIGNATURE_LIST *)vendor_db;
+
+	if (check_db_hash_in_ram(db, vendor_db_size,
+				 sha256hash, SHA256_DIGEST_SIZE,
+				 EFI_CERT_SHA256_GUID, L"vendor_db",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(vendor_db, sha256hash) != DATA_FOUND\n");
+	}
+	if (cert &&
+	    check_db_cert_in_ram(db, vendor_db_size,
+				 cert, sha256hash, L"vendor_db",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_CERT;
+		update_verification_method(VERIFIED_BY_CERT);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_cert(vendor_db, sha256hash) != DATA_FOUND\n");
+	}
+#endif
+
 	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
 				== DATA_FOUND) {
@@ -1076,6 +1101,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		}
 #endif /* defined(ENABLE_SHIM_CERT) */
 
+#if defined(VENDOR_CERT_FILE)
 		/*
 		 * And finally, check against shim's built-in key
 		 */
@@ -1093,6 +1119,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		} else {
 			LogError(L"AuthenticodeVerify(vendor_authorized) failed\n");
 		}
+#endif /* defined(VENDOR_CERT_FILE) */
 	}
 
 	LogError(L"Binary is not whitelisted\n");

@@ -1,5 +1,12 @@
 
-#if defined(VENDOR_CERT_FILE)
+#if defined(VENDOR_DB_FILE) && defined(VENDOR_CERT_FILE)
+# error both VENDOR_DB_FILE and VENDOR_CERT_FILE have been configured
+#elif defined(VENDOR_DB_FILE)
+# define vendor_authorized vendor_db
+# define vendor_authorized_end vendor_db_end
+# define vendor_authorized_size vendor_db_size
+# define vendor_authorized_size_end vendor_db_size_end
+#elif defined(VENDOR_CERT_FILE)
 # define vendor_authorized vendor_cert
 # define vendor_authorized_end vendor_cert_end
 # define vendor_authorized_size vendor_cert_size
@@ -28,7 +35,9 @@ cert_table:
 	.size	vendor_authorized, .Lvendor_authorized_end - vendor_authorized
 	.section .vendor_cert, "a", %progbits
 vendor_authorized:
-#if defined(VENDOR_CERT_FILE)
+#if defined(VENDOR_DB_FILE)
+.incbin VENDOR_DB_FILE
+#elif defined(VENDOR_CERT_FILE)
 .incbin VENDOR_CERT_FILE
 #endif
 .Lvendor_authorized_end:
