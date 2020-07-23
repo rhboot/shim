@@ -57,7 +57,12 @@ EFI_STATUS
 variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 		     UINT8 hash[SHA256_DIGEST_SIZE]);
 EFI_STATUS
-variable_create_esl(void *cert, int cert_len, EFI_GUID *type, EFI_GUID *owner,
-		    void **out, int *outlen);
+variable_create_esl(const uint8_t *cert, const size_t cert_len,
+		    const EFI_GUID *type, const EFI_GUID *owner,
+		    uint8_t **out, size_t *outlen);
+EFI_STATUS
+fill_esl(const uint8_t *data, const size_t data_len,
+	 const EFI_GUID *type, const EFI_GUID *owner,
+	 uint8_t *out, size_t *outlen);
 
 #endif /* SHIM_VARIABLES_H */
