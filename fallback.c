@@ -983,7 +983,7 @@ debug_hook(void)
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
-	volatile register int x = 0;
+	register volatile int x = 0;
 	extern char _etext, _edata;
 
 	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
