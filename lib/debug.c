@@ -13,7 +13,7 @@ debug_hook(void)
 	UINT8 *data = NULL;
 	UINTN dataSize = 0;
 	EFI_STATUS efi_status;
-	volatile register UINTN x = 0;
+	register volatile UINTN x = 0;
 	extern char _text, _data;
 
 	if (x)
