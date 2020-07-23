@@ -1085,9 +1085,11 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
+	if (DataSize == 0)
+		return EFI_SUCCESS;
 
 	Data = AllocatePool(DataSize);
-	if (Data == NULL && DataSize != 0)
+	if (Data == NULL)
 		return EFI_OUT_OF_RESOURCES;
 
 	ptr = Data;
