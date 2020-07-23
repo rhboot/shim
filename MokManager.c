@@ -1431,7 +1431,7 @@ static CHAR16 get_password_charater(CHAR16 * prompt)
 	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	EFI_STATUS efi_status;
 	CHAR16 *message[2];
-	CHAR16 character;
+	CHAR16 character = 0;
 	UINTN length;
 	UINT32 pw_length;
 
