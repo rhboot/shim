@@ -84,12 +84,13 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
 extern VOID console_fini(VOID);
 extern VOID setup_verbosity(VOID);
 extern UINT32 verbose;
-#define dprint(fmt, ...) ({							\
+#define dprint_(fmt, ...) ({							\
 		UINTN __dprint_ret = 0;						\
 		if (verbose)							\
 			__dprint_ret = console_print((fmt), ##__VA_ARGS__);	\
 		__dprint_ret;							\
 	})
+#define dprint(fmt, ...) dprint_(L"%a:%d:%a() " fmt, __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
 #define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)

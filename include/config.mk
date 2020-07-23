@@ -4,9 +4,26 @@
 #
 
 CONFIG_ITEMS :=
+
+
+ifneq ($(origin VENDOR_DB_FILE), undefined)
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
+	$(error cannot use both VENDOR_DB_FILE and VENDOR_CERT_FILE)
+endif
+	CONFIG_VENDOR_DB:="\#define VENDOR_DB_FILE \"$(VENDOR_DB_FILE)\""
+	CONFIG_ITEMS+=VENDOR_DB
+	CONFIG_ITEMS+=NO_VENDOR_CERT
+else
+	CONFIG_ITEMS+=NO_VENDOR_DB
+endif
+
+ifneq ($(origin VENDOR_CERT_FILE), undefined)
+ifneq ($(origin VENDOR_DB_FILE), undefined)
+	$(error cannot use both VENDOR_DB_FILE and VENDOR_CERT_FILE)
+endif
 	CONFIG_VENDOR_CERT:="\#define VENDOR_CERT_FILE \"$(VENDOR_CERT_FILE)\""
 	CONFIG_ITEMS+=VENDOR_CERT
+	CONFIG_ITEMS+=NO_VENDOR_DB
 else
 	CONFIG_ITEMS+=NO_VENDOR_CERT
 endif
