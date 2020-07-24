@@ -85,6 +85,9 @@ extern UINT32 verbose;
 		__dprint_ret;							\
 	})
 #define dprint(fmt, ...) dprint_(L"%a:%d:%a() " fmt, __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+extern EFI_STATUS
+vdprint_(const CHAR16 *fmt, const char *file, int line, const char *func, va_list args);
+#define vdprint(fmt, ...) vdprint_(fmt, __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
 #define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)

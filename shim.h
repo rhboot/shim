@@ -182,8 +182,9 @@ typedef struct _SHIM_LOCK {
 
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
-extern EFI_STATUS LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...);
-extern EFI_STATUS VLogError(const char *file, int line, const char *func, CHAR16 *fmt, va_list args);
+extern EFI_STATUS LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...);
+extern EFI_STATUS VLogError(const char *file, int line, const char *func, const CHAR16 *fmt, va_list args);
+extern VOID LogHexdump_(const char *file, int line, const char *func, const void *data, size_t sz);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
