@@ -239,7 +239,7 @@ EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	efi_status = tpm_log_event_raw(buf, size, pcr, (CHAR8 *)ImageLoad,
 				       sizeof(*ImageLoad) + path_size,
 				       EV_EFI_BOOT_SERVICES_APPLICATION,
-				       sha1hash);
+				       (CHAR8 *)sha1hash);
 	FreePool(ImageLoad);
 
 	return efi_status;
