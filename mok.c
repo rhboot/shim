@@ -68,6 +68,7 @@ struct mok_state_variable {
 	CHAR16 *name;
 	char *name8;
 	CHAR16 *rtname;
+	char *rtname8;
 	EFI_GUID *guid;
 
 	UINT8 *data;
@@ -121,6 +122,7 @@ struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokList",
 	 .name8 = "MokList",
 	 .rtname = L"MokListRT",
+	 .rtname8 = "MokListRT",
 	 .guid = &SHIM_LOCK_GUID,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
@@ -133,12 +135,14 @@ struct mok_state_variable mok_state_variables[] = {
 	 .build_cert_size = &build_cert_size,
 #endif /* defined(ENABLE_SHIM_CERT) */
 	 .flags = MOK_MIRROR_KEYDB |
+		  MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
 	},
 	{.name = L"MokListX",
 	 .name8 = "MokListX",
 	 .rtname = L"MokListXRT",
+	 .rtname8 = "MokListXRT",
 	 .guid = &SHIM_LOCK_GUID,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
@@ -147,12 +151,14 @@ struct mok_state_variable mok_state_variables[] = {
 	 .addend = &vendor_deauthorized,
 	 .addend_size = &vendor_deauthorized_size,
 	 .flags = MOK_MIRROR_KEYDB |
+		  MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
 	},
 	{.name = L"MokSBState",
 	 .name8 = "MokSBState",
 	 .rtname = L"MokSBStateRT",
+	 .rtname8 = "MokSBStateRT",
 	 .guid = &SHIM_LOCK_GUID,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
@@ -166,6 +172,7 @@ struct mok_state_variable mok_state_variables[] = {
 	{.name = L"MokDBState",
 	 .name8 = "MokDBState",
 	 .rtname = L"MokIgnoreDB",
+	 .rtname8 = "MokIgnoreDB",
 	 .guid = &SHIM_LOCK_GUID,
 	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
 		     EFI_VARIABLE_NON_VOLATILE,
@@ -204,6 +211,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 	 * we're always mirroring the original data, whether this is an efi
 	 * security database or not
 	 */
+	dprint(L"v->name:\"%s\" v->rtname:\"%s\"\n", v->name, v->rtname);
 	dprint(L"v->data_size:%lu v->data:0x%08llx\n", v->data_size, v->data);
 	dprint(L"FullDataSize:%lu FullData:0x%08llx\n", FullDataSize, FullData);
 	if (v->data_size) {
@@ -298,6 +306,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 			break;
 		}
 	}
+
 
 	/*
 	 * Now we have the full size
@@ -417,28 +426,72 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 		       FullDataSize, FullData, p, p-(uintptr_t)FullData);
 	}
 
-	dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+	dprint(L"FullDataSize:%lu FullData:0x%016llx p:0x%016llx pos:%lld\n",
 	       FullDataSize, FullData, p, p-(uintptr_t)FullData);
 	if (FullDataSize) {
-		dprint(L"Setting %s with %lu bytes of data\n",
-		       v->rtname, FullDataSize);
-		efi_status = gRT->SetVariable(v->rtname, v->guid,
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					      EFI_VARIABLE_RUNTIME_ACCESS,
-					      FullDataSize, FullData);
+		uint32_t attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				 EFI_VARIABLE_RUNTIME_ACCESS;
+		uint64_t max_storage_sz = 0;
+		uint64_t remaining_sz = 0;
+		uint64_t max_var_sz = 0;
+		UINT8 *tmp = NULL;
+		UINTN tmpsz = 0;
+
+		efi_status = gRT->QueryVariableInfo(attrs, &max_storage_sz,
+						    &remaining_sz, &max_var_sz);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to set %s: %r\n",
-			       v->rtname, efi_status);
+			perror(L"Could not get variable storage info: %r\n", efi_status);
+			return efi_status;
+		}
+		dprint(L"calling SetVariable(\"%s\", 0x%016llx, 0x%08lx, %lu, 0x%016llx)\n",
+		       v->rtname, v->guid,
+		       EFI_VARIABLE_BOOTSERVICE_ACCESS
+		       | EFI_VARIABLE_RUNTIME_ACCESS,
+		       FullDataSize, FullData);
+		efi_status = gRT->SetVariable(v->rtname, v->guid,
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS
+					      | EFI_VARIABLE_RUNTIME_ACCESS,
+					      FullDataSize, FullData);
+		if (efi_status == EFI_INVALID_PARAMETER && max_var_sz < FullDataSize) {
+			/*
+			 * In this case we're going to try to create a
+			 * dummy variable so that there's one there.  It
+			 * may or may not work, because on some firmware
+			 * builds when the SetVariable call above fails it
+			 * does actually set the variable(!), so aside from
+			 * not using the allocation if it doesn't work, we
+			 * don't care about failures here.
+			 */
+			console_print(L"WARNING: Maximum volatile variable size is %lu.\n", max_var_sz);
+			console_print(L"WARNING: Cannot set %s (%lu bytes)\n", v->rtname, FullDataSize);
+			perror(L"Failed to set %s: %r\n", v->rtname, efi_status);
+			efi_status = variable_create_esl(
+					null_sha256, sizeof(null_sha256),
+					&EFI_CERT_SHA256_GUID, &SHIM_LOCK_GUID,
+					&tmp, &tmpsz);
+			/*
+			 * from here we don't really care if it works or
+			 * doens't.
+			 */
+			if (!EFI_ERROR(efi_status) && tmp && tmpsz) {
+				gRT->SetVariable(v->rtname, v->guid,
+						 EFI_VARIABLE_BOOTSERVICE_ACCESS
+						 | EFI_VARIABLE_RUNTIME_ACCESS,
+						 tmpsz, tmp);
+				FreePool(tmp);
+			}
+			efi_status = EFI_INVALID_PARAMETER;
+		} else if (EFI_ERROR(efi_status)) {
+			perror(L"Failed to set %s: %r\n", v->rtname, efi_status);
 		}
 	}
-	if (v->data && v->data_size) {
+	if (v->data && v->data_size && v->data != FullData) {
 		FreePool(v->data);
 		v->data = NULL;
 		v->data_size = 0;
 	}
-	if (FullData && FullDataSize) {
-		FreePool(FullData);
-	}
+	v->data = FullData;
+	v->data_size = FullDataSize;
 	dprint(L"returning %r\n", efi_status);
 	return efi_status;
 }
@@ -454,8 +507,11 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
 	BOOLEAN present = FALSE;
 
 	if (v->rtname) {
-		if (v->flags & MOK_MIRROR_DELETE_FIRST)
-			LibDeleteVariable(v->rtname, v->guid);
+		if (v->flags & MOK_MIRROR_DELETE_FIRST) {
+			dprint(L"deleting \"%s\"\n", v->rtname);
+			efi_status = LibDeleteVariable(v->rtname, v->guid);
+			dprint(L"LibDeleteVariable(\"%s\",...) => %r\n", v->rtname, efi_status);
+		}
 
 		efi_status = mirror_one_mok_variable(v);
 		if (EFI_ERROR(efi_status)) {
@@ -505,6 +561,12 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
 	return ret;
 }
 
+struct mok_variable_config_entry {
+	CHAR8 name[256];
+	UINT64 data_size;
+	UINT8 data[];
+};
+
 /*
  * Verify our non-volatile MoK state.  This checks the variables above
  * accessable and have valid attributes.  If they don't, it removes
@@ -526,6 +588,11 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 	user_insecure_mode = 0;
 	ignore_db = 0;
+
+	UINT64 config_sz = 0;
+	UINT8 *config_table = NULL;
+	size_t npages = 0;
+	struct mok_variable_config_entry config_template;
 
 	dprint(L"importing mok state\n");
 	for (i = 0; mok_state_variables[i].name != NULL; i++) {
@@ -579,6 +646,61 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		}
 
 		ret = maybe_mirror_one_mok_variable(v, ret);
+		if (v->data && v->data_size) {
+			config_sz += v->data_size;
+			config_sz += sizeof(config_template);
+		}
+	}
+
+	/*
+	 * Alright, so we're going to copy these to a config table.  The
+	 * table is a packed array of N+1 struct mok_variable_config_entry
+	 * items, with the last item having all zero's in name and
+	 * data_size.
+	 */
+	if (config_sz) {
+		config_sz += sizeof(config_template);
+		npages = ALIGN_VALUE(config_sz, PAGE_SIZE) >> EFI_PAGE_SHIFT;
+		config_table = NULL;
+		efi_status = gBS->AllocatePages(AllocateAnyPages,
+						EfiRuntimeServicesData,
+						npages,
+						(EFI_PHYSICAL_ADDRESS *)&config_table);
+		if (EFI_ERROR(efi_status) || !config_table) {
+			console_print(L"Allocating %lu pages for mok config table failed: %r\n",
+				      npages, efi_status);
+			if (ret != EFI_SECURITY_VIOLATION)
+				ret = efi_status;
+			config_table = NULL;
+		} else {
+			ZeroMem(config_table, npages << EFI_PAGE_SHIFT);
+		}
+	}
+
+	UINT8 *p = (UINT8 *)config_table;
+	for (i = 0; p && mok_state_variables[i].name != NULL; i++) {
+		struct mok_state_variable *v = &mok_state_variables[i];
+
+		ZeroMem(&config_template, sizeof(config_template));
+		strncpya(config_template.name, (CHAR8 *)v->rtname8, 255);
+		config_template.name[255] = '\0';
+
+		config_template.data_size = v->data_size;
+
+		CopyMem(p, &config_template, sizeof(config_template));
+		p += sizeof(config_template);
+		CopyMem(p, v->data, v->data_size);
+		p += v->data_size;
+	}
+	if (p) {
+		ZeroMem(&config_template, sizeof(config_template));
+		CopyMem(p, &config_template, sizeof(config_template));
+
+		efi_status = gBS->InstallConfigurationTable(&MOK_VARIABLE_STORE,
+							    config_table);
+		if (EFI_ERROR(efi_status)) {
+			console_print(L"Couldn't install MoK configuration table\n");
+		}
 	}
 
 	/*
