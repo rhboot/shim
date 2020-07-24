@@ -3,12 +3,13 @@
  * Copyright 2017 Peter Jones <pjones@redhat.com>
  */
 #include "shim.h"
+#include "hexdump.h"
 
 static CHAR16 **errs = NULL;
 static UINTN nerrs = 0;
 
 EFI_STATUS
-VLogError(const char *file, int line, const char *func, CHAR16 *fmt, va_list args)
+VLogError(const char *file, int line, const char *func, const CHAR16 *fmt, va_list args)
 {
 	va_list args2;
 	CHAR16 **newerrs;
@@ -35,7 +36,7 @@ VLogError(const char *file, int line, const char *func, CHAR16 *fmt, va_list arg
 }
 
 EFI_STATUS
-LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...)
+LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
 {
 	va_list args;
 	EFI_STATUS efi_status;
@@ -45,6 +46,12 @@ LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...)
 	va_end(args);
 
 	return efi_status;
+}
+
+VOID
+LogHexdump_(const char *file, int line, const char *func, const void *data, size_t sz)
+{
+	hexdumpat(file, line, func, data, sz, 0);
 }
 
 VOID

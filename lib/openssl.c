@@ -49,12 +49,19 @@ BOOLEAN verify_x509(UINT8 *Cert, UINTN CertSize)
          * and 64KB. For convenience, assume the number of value bytes
          * is 2, i.e. the second byte is 0x82.
          */
-        if (Cert[0] != 0x30 || Cert[1] != 0x82)
+        if (Cert[0] != 0x30 || Cert[1] != 0x82) {
+                dprint(L"cert[0:1] is [%02x%02x], should be [%02x%02x]\n",
+                       Cert[0], Cert[1], 0x30, 0x82);
                 return FALSE;
+        }
 
         length = Cert[2]<<8 | Cert[3];
-        if (length != (CertSize - 4))
+        if (length != (CertSize - 4)) {
+                dprint(L"Cert length is %ld, expecting %ld\n",
+                       length, CertSize);
+
                 return FALSE;
+        }
 
         return TRUE;
 }
