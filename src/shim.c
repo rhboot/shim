@@ -34,6 +34,7 @@
  */
 
 #include "shim.h"
+#include "hexdump.h"
 #if defined(ENABLE_SHIM_CERT)
 #include "shim_cert.h"
 #endif /* defined(ENABLE_SHIM_CERT) */
@@ -342,7 +343,6 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
@@ -352,14 +352,17 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
 	BOOLEAN IsFound = FALSE;
+	int i = 0;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
+			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
 				if (verify_eku(Cert->SignatureData, CertSize)) {
 					clear_ca_warning();
+					drain_openssl_errors();
 					IsFound = AuthenticodeVerify (data->CertData,
 								      data->Hdr.dwLength - sizeof(data->Hdr),
 								      Cert->SignatureData,
@@ -369,6 +372,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 						if (get_ca_warning()) {
 							show_ca_warning();
 						}
+						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
 						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
 						drain_openssl_errors();
 						return DATA_FOUND;
@@ -377,7 +381,9 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					}
 				}
 			} else if (verbose) {
-				console_notify(L"Not a DER encoding x.509 Certificate");
+				console_print(L"Not a DER encoded x.509 Certificate");
+				dprint(L"cert:\n");
+				dhexdumpat(Cert->SignatureData, CertSize, 0);
 			}
 		}
 
@@ -571,7 +577,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
 			return EFI_SUCCESS;
-		} else {
+		} else if (cert) {
 			LogError(L"check_db_cert(db, sha256hash) != DATA_FOUND\n");
 		}
 	}
@@ -596,7 +602,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
-	} else {
+	} else if (cert) {
 		LogError(L"check_db_cert(vendor_db, sha256hash) != DATA_FOUND\n");
 	}
 #endif
@@ -615,7 +621,7 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
-	} else {
+	} else if (cert) {
 		LogError(L"check_db_cert(MokList, sha256hash) != DATA_FOUND\n");
 	}
 
@@ -922,6 +928,11 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		goto done;
 	}
 
+	dprint(L"sha1 authenticode hash:\n");
+	dhexdumpat(sha1hash, SHA1_DIGEST_SIZE, 0);
+	dprint(L"sha256 authenticode hash:\n");
+	dhexdumpat(sha256hash, SHA256_DIGEST_SIZE, 0);
+
 done:
 	if (SectionHeader)
 		FreePool(SectionHeader);
@@ -1087,6 +1098,7 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 		LogError(L"check_whitelist(): %r\n", efi_status);
 		dprint(L"check_whitelist: %r\n", ret_efi_status);
 		if (ret_efi_status != EFI_NOT_FOUND) {
+			dprint(L"check_whitelist(): %r\n", ret_efi_status);
 			PrintErrors();
 			ClearErrors();
 			crypterr(ret_efi_status);
@@ -1736,6 +1748,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 
 	device = li->DeviceHandle;
 
+	dprint(L"attempting to load %s\n", PathName);
 	/*
 	 * Open the device
 	 */
@@ -2626,6 +2639,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	InitializeLib(image_handle, systab);
 
+	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
+		      __FILE__, __LINE__, __func__, vendor_authorized, vendor_authorized_size);
+	dprint(L"vendor_deauthorized:0x%08lx vendor_deauthorized_size:%lu\n",
+		      __FILE__, __LINE__, __func__, vendor_deauthorized, vendor_deauthorized_size);
 	/*
 	 * Before we do anything else, validate our non-volatile,
 	 * boot-services-only state variables are what we think they are.
