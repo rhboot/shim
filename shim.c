@@ -1445,7 +1445,10 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 					   sha256hash, sha1hash);
 
 		if (EFI_ERROR(efi_status)) {
-			console_error(L"Verification failed", efi_status);
+			if (verbose)
+				console_print(L"Verification failed: %r\n", efi_status);
+			else
+				console_error(L"Verification failed", efi_status);
 			return efi_status;
 		} else {
 			if (verbose)
@@ -2648,7 +2651,6 @@ shim_init(void)
 {
 	EFI_STATUS efi_status;
 
-	setup_verbosity();
 	dprint(L"%a", shim_version);
 
 	/* Set the second stage loader */
@@ -2797,6 +2799,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
+	setup_verbosity();
 
 	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
 		      __FILE__, __LINE__, __func__, vendor_authorized, vendor_authorized_size);

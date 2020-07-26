@@ -768,7 +768,8 @@ typedef struct {
 	UINT8           CertData[1];
 } WIN_CERTIFICATE_EFI_PKCS;
 
-#define SHA256_DIGEST_SIZE  32
+#define SHA1_DIGEST_SIZE	20
+#define SHA256_DIGEST_SIZE	32
 #define WIN_CERT_TYPE_PKCS_SIGNED_DATA 0x0002
 
 typedef struct {
