@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 static inline unsigned long UNUSED
-prepare_hex(const void *data, size_t size, char *buf, int position)
+prepare_hex(const void *data, size_t size, char *buf, unsigned int position)
 {
 	char hexchars[] = "0123456789abcdef";
 	int offset = 0;
@@ -48,7 +48,7 @@ prepare_hex(const void *data, size_t size, char *buf, int position)
 #define isprint(c) ((c) >= 0x20 && (c) <= 0x7e)
 
 static inline void UNUSED
-prepare_text(const void *data, size_t size, char *buf, int position)
+prepare_text(const void *data, size_t size, char *buf, unsigned int position)
 {
 	int offset = 0;
 	unsigned long i;
@@ -83,6 +83,9 @@ vhexdumpf(const char *file, int line, const char *func, const CHAR16 * const fmt
 {
 	unsigned long display_offset = at;
 	unsigned long offset = 0;
+
+	if (verbose == 0)
+		return;
 
 	while (offset < size) {
 		char hexbuf[49];
