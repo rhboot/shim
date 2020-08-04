@@ -616,9 +616,12 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			 * make sure we've got some zeroes at the end, just
 			 * in case.
 			 */
-			UINTN allocsz = FullDataSize + sizeof(EFI_SIGNATURE_LIST);
-			allocsz = ALIGN_VALUE(allocsz, 4096);
-			FullData = AllocateZeroPool(FullDataSize);
+			UINTN new, allocsz;
+
+			allocsz = FullDataSize + sizeof(EFI_SIGNATURE_LIST);
+			new = ALIGN_VALUE(allocsz, 4096);
+			allocsz = new == allocsz ? new + 4096 : new;
+			FullData = AllocateZeroPool(allocsz);
 			if (!FullData) {
 				perror(L"Failed to allocate %lu bytes for %s\n",
 				       FullDataSize, v->name);
