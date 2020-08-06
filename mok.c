@@ -323,6 +323,7 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v, EFI_STATUS ret)
 				ret = efi_status;
 			perror(L"Could not create %s: %r\n", v->rtname,
 			       efi_status);
+		}
 	}
 	return ret;
 }
