@@ -9,6 +9,8 @@
 
 #include "shim.h"
 
+#include "hexdump.h"
+
 #define PASSWORD_MAX 256
 #define PASSWORD_MIN 1
 #define SB_PASSWORD_LEN 16
@@ -1050,9 +1052,11 @@ static EFI_STATUS mok_reset_prompt(BOOLEAN MokX)
 	if (MokX) {
 		LibDeleteVariable(L"MokXNew", &SHIM_LOCK_GUID);
 		LibDeleteVariable(L"MokXAuth", &SHIM_LOCK_GUID);
+		LibDeleteVariable(L"MokListX", &SHIM_LOCK_GUID);
 	} else {
 		LibDeleteVariable(L"MokNew", &SHIM_LOCK_GUID);
 		LibDeleteVariable(L"MokAuth", &SHIM_LOCK_GUID);
+		LibDeleteVariable(L"MokList", &SHIM_LOCK_GUID);
 	}
 
 	return EFI_SUCCESS;
@@ -1075,6 +1079,7 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 	else
 		db_name = L"MokList";
 
+	dprint(L"Writing back %s (%d entries)\n", db_name, key_num);
 	for (i = 0; i < key_num; i++) {
 		if (list[i].Mok == NULL)
 			continue;
@@ -1085,8 +1090,15 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
-	if (DataSize == 0)
+	if (DataSize == 0) {
+		dprint(L"DataSize = 0; deleting variable %s\n", db_name);
+		efi_status = gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_NON_VOLATILE |
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					      DataSize, Data);
+		dprint(L"efi_status:%llu\n", efi_status);
 		return EFI_SUCCESS;
+	}
 
 	Data = AllocatePool(DataSize);
 	if (Data == NULL)
@@ -1291,11 +1303,15 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	}
 
 	if (auth_size == PASSWORD_CRYPT_SIZE) {
+		dprint(L"matching password with CRYPT");
 		efi_status = match_password((PASSWORD_CRYPT *) auth, NULL, 0,
 					    NULL, NULL);
+		dprint(L"match_password(0x%llx, NULL, 0, NULL, NULL) = %lu\n", auth, efi_status);
 	} else {
+		dprint(L"matching password as sha256sum");
 		efi_status =
 		    match_password(NULL, MokDel, MokDelSize, auth, NULL);
+		dprint(L"match_password(NULL, 0x%llx, %llu, 0x%llx, NULL) = %lu\n", MokDel, MokDelSize, auth, efi_status);
 	}
 	if (EFI_ERROR(efi_status))
 		return EFI_ACCESS_DENIED;
@@ -1365,12 +1381,17 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	}
 
 	/* Search and destroy */
+	dprint(L"deleting certs from %a\n", MokX ? "MokListX" : "MokList");
 	for (i = 0; i < del_num; i++) {
 		type = del_key[i].Type; /* avoid -Werror=address-of-packed-member */
 		if (CompareGuid(&type, &X509_GUID) == 0) {
+			dprint(L"deleting key %d (total %d):\n", i, mok_num);
+			dhexdumpat(del_key[i].Mok, del_key[i].MokSize, 0);
 			delete_cert(del_key[i].Mok, del_key[i].MokSize,
 				    mok, mok_num);
 		} else if (is_sha2_hash(del_key[i].Type)) {
+			dprint(L"deleting hash %d (total %d):\n", i, mok_num);
+			dhexdumpat(del_key[i].Mok, del_key[i].MokSize, 0);
 			delete_hash_list(del_key[i].Type, del_key[i].Mok,
 					 del_key[i].MokSize, mok, mok_num);
 		}
@@ -2564,6 +2585,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE * systab)
 
 	InitializeLib(image_handle, systab);
 
+	setup_verbosity();
 	setup_rand();
 
 	console_mode_handle();
