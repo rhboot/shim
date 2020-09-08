@@ -2320,7 +2320,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	unsigned int i;
 	UINTN second_stage_len;
 
-	second_stage_len = StrLen(DEFAULT_LOADER) + 1;
+	second_stage_len = (StrLen(DEFAULT_LOADER) + 1) * sizeof(CHAR16);
 	second_stage = AllocatePool(second_stage_len);
 	if (!second_stage) {
 		perror(L"Could not allocate %lu bytes\n", second_stage_len);
