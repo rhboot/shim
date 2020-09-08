@@ -16,6 +16,9 @@ EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 
 EFI_STATUS tpm_measure_variable(CHAR16 *dbname, EFI_GUID guid, UINTN size, void *data);
 
+EFI_STATUS tpm_measure_signer(CHAR16 *Name, EFI_GUID VendorGuid,
+			      UINTN Size, VOID *Data);
+
 typedef struct {
   uint8_t Major;
   uint8_t Minor;

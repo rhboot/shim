@@ -21,6 +21,9 @@ PCR7:
   "MokSBState".
 
 PCR8:
+- If you've built shim with ENABLE_PCR8_SIGNER the "SecureBoot", "PK",
+  "KEK", and signing certificate (if used) of the second stage loader are
+  extended into PCR8.
 - If you're using the grub2 TPM patchset we cary in Fedora, the kernel command
   line and all grub commands (including all of grub.cfg that gets run) are
   measured into PCR8.

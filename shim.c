@@ -451,6 +451,19 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					if (IsFound) {
 						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
 						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
+#if defined(ENABLE_PCR8_SIGNER)
+						if (!in_protocol) {
+							EFI_STATUS efi_status;
+							efi_status = tpm_measure_signer(dbname, guid, CertSize, Cert->SignatureData);
+#ifndef REQUIRE_TPM
+							efi_status = EFI_SUCCESS;
+#endif
+							if (EFI_ERROR(efi_status)) {
+								console_print(L"Failed TPM signer measurement\n");
+								return DATA_NOT_FOUND;
+							}
+						}
+#endif /* defined(ENABLE_PCR8_SIGNER) */
 						drain_openssl_errors();
 						return DATA_FOUND;
 					} else {
@@ -1075,9 +1088,24 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 		       SHA256_DIGEST_SIZE)) {
 		dprint(L"AuthenticodeVerify(shim_cert) succeeded\n");
 		update_verification_method(VERIFIED_BY_CERT);
+		efi_status = EFI_SUCCESS;
 		tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
 				     build_cert_size, build_cert);
-		efi_status = EFI_SUCCESS;
+#if defined(ENABLE_PCR8_SIGNER)
+		if (!in_protocol) {
+			EFI_STATUS tpm_status;
+			tpm_status = tpm_measure_signer(L"Shim", SHIM_LOCK_GUID,
+							build_cert_size,
+							build_cert);
+#ifndef REQUIRE_TPM
+			tpm_status = EFI_SUCCESS;
+#endif
+			if (EFI_ERROR(tpm_status) {
+				efi_status = tpm_status;
+				console_print(L"Failed TPM signer measurement\n");
+			}
+		}
+#endif /* defined(ENABLE_PCR8_SIGNER) */
 		drain_openssl_errors();
 		return efi_status;
 	} else {
@@ -1103,9 +1131,24 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 			       sha256hash, SHA256_DIGEST_SIZE)) {
 		dprint(L"AuthenticodeVerify(vendor_cert) succeeded\n");
 		update_verification_method(VERIFIED_BY_CERT);
+		efi_status = EFI_SUCCESS;
 		tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
 				     vendor_cert_size, vendor_cert);
-		efi_status = EFI_SUCCESS;
+#if defined(ENABLE_PCR8_SIGNER)
+		if (!in_protocol) {
+			EFI_STATUS tpm_status;
+			tpm_status = tpm_measure_signer(L"Shim", SHIM_LOCK_GUID,
+							vendor_cert_size,
+							vendor_cert);
+#ifndef REQUIRE_TPM
+			tpm_status = EFI_SUCCESS;
+#endif
+			if (EFI_ERROR(tpm_status) {
+				efi_status = tpm_status;
+				console_print(L"Failed TPM signer measurement\n");
+			}
+		}
+#endif /* defined(ENABLE_PCR8_SIGNER) */
 		drain_openssl_errors();
 		return efi_status;
 	} else {
@@ -1118,6 +1161,52 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 
 	return efi_status;
 }
+
+#if defined(ENABLE_PCR8_SIGNER)
+static EFI_STATUS signer_pcr_setup(void)
+{
+	EFI_STATUS efi_status;
+	UINT8 *var_data;
+	UINTN var_len;
+
+	/* we only want to measure the next loader in the chain */
+	if (in_protocol)
+		return EFI_SUCCESS;
+
+	/* extend SecureBoot, PK, and KEK into PCR8 */
+	efi_status = get_variable(L"SecureBoot",
+					&var_data, &var_len, GV_GUID);
+	if (EFI_ERROR(efi_status))
+		return VAR_NOT_FOUND;
+	efi_status = tpm_measure_signer(L"SecureBoot",
+					GV_GUID, var_len, var_data);
+	FreePool(var_data);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = get_variable(L"PK", &var_data, &var_len, GV_GUID);
+	if (EFI_ERROR(efi_status))
+		return VAR_NOT_FOUND;
+	efi_status = tpm_measure_signer(L"PK",
+					GV_GUID, var_len, var_data);
+	FreePool(var_data);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = get_variable(L"KEK", &var_data, &var_len, GV_GUID);
+	if (EFI_ERROR(efi_status))
+		return VAR_NOT_FOUND;
+	efi_status = tpm_measure_signer(L"KEK",
+					GV_GUID, var_len, var_data);
+	FreePool(var_data);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	return EFI_SUCCESS;
+}
+#else
+static EFI_STATUS signer_pcr_setup(void) { return EFI_SUCCESS; }
+#endif /* defined(ENABLE_PCR8_SIGNER) */
 
 /*
  * Check that the signature is valid and matches the binary
@@ -1158,6 +1247,16 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	if (EFI_ERROR(ret_efi_status)) {
 		perror(L"Binary is blacklisted\n");
 		dprint(L"Binary is blacklisted: %r\n", ret_efi_status);
+		PrintErrors();
+		ClearErrors();
+		crypterr(ret_efi_status);
+		return ret_efi_status;
+	}
+
+	ret_efi_status = signer_pcr_setup();
+	if (EFI_ERROR(ret_efi_status)) {
+		perror(L"Failed to setup signer PCR8\n");
+		dprint(L"Failed to setup signer PCR8: %r\n", ret_efi_status);
 		PrintErrors();
 		ClearErrors();
 		crypterr(ret_efi_status);
@@ -1965,6 +2064,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 
 	efi_status = verify_buffer(buffer, size, &context,
 				   sha256hash, sha1hash);
+
 done:
 	in_protocol = 0;
 	return efi_status;

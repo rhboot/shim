@@ -345,6 +345,42 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 					   VarData);
 }
 
+#if defined(ENABLE_PCR8_SIGNER)
+EFI_STATUS tpm_measure_signer(CHAR16 *Name, EFI_GUID VendorGuid,
+			      UINTN Size, VOID *Data)
+{
+	EFI_STATUS efi_status;
+	UINTN NameSize;
+	EFI_VARIABLE_DATA_TREE *Log;
+	UINT32 LogSize;
+
+	NameSize = StrLen(Name);
+	LogSize = (UINT32)(sizeof(*Log) +
+			   NameSize * sizeof(*Name) +
+			   Size -
+			   sizeof(Log->UnicodeName) -
+			   sizeof(Log->VariableData));
+
+	Log = (EFI_VARIABLE_DATA_TREE *)AllocateZeroPool(LogSize);
+	if (Log == NULL)
+		return EFI_OUT_OF_RESOURCES;
+
+	CopyMem(&Log->VariableName,
+		&VendorGuid, sizeof(Log->VariableName));
+	Log->UnicodeNameLength  = NameSize;
+	Log->VariableDataLength = Size;
+	CopyMem(Log->UnicodeName, Name, NameSize * sizeof(*Name));
+	CopyMem((CHAR16 *)Log->UnicodeName + NameSize, Data, Size);
+
+	efi_status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)Log,
+				       LogSize, 8, (CHAR8 *)Log, LogSize,
+				       EV_EFI_VARIABLE_AUTHORITY, NULL);
+	FreePool(Log);
+
+	return efi_status;
+}
+#endif /* defined(ENABLE_PCR8_SIGNER) */
+
 EFI_STATUS
 fallback_should_prefer_reset(void)
 {

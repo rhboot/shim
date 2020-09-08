@@ -105,6 +105,10 @@ ifneq ($(origin REQUIRE_TPM), undefined)
 	CFLAGS  += -DREQUIRE_TPM
 endif
 
+ifneq ($(origin ENABLE_PCR8_SIGNER), undefined)
+	CFLAGS  += -DENABLE_PCR8_SIGNER
+endif
+
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --target efi-app-$(ARCH)
