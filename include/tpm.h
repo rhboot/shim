@@ -45,7 +45,7 @@ typedef struct _EFI_IMAGE_LOAD_EVENT {
   UINTN ImageLengthInMemory;
   UINTN ImageLinkTimeAddress;
   UINTN LengthOfDevicePath;
-  EFI_DEVICE_PATH DevicePath[1];
+  EFI_DEVICE_PATH DevicePath[0];
 } EFI_IMAGE_LOAD_EVENT;
 
 struct efi_tpm_protocol
