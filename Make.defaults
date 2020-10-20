@@ -1,3 +1,7 @@
+
+# load the local configuration if it exists
+-include Make.local
+
 COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
 LD		= $(CROSS_COMPILE)ld
