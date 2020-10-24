@@ -45,6 +45,17 @@ ifneq ($(origin ENABLE_HTTPBOOT), undefined)
 	OBJS += httpboot.o
 	SOURCES += httpboot.c include/httpboot.h
 endif
+ifneq ($(origin ENABLE_PCRCHECKS), undefined)
+	OBJS += netfile.o
+	ORIG_SOURCES += netfile.c include/netfile.h 
+endif
+
+ifneq ($(origin ENABLE_PCRCHECKS), undefined)
+	ifneq ($(origin ENABLE_HTTPBOOT), undefined)
+		OBJS += httpfile.o
+		ORIG_SOURCES += httpfile.c include/httpfile.h
+	endif
+endif
 
 SOURCES = $(foreach source,$(ORIG_SOURCES),$(TOPDIR)/$(source)) version.c
 MOK_SOURCES = $(foreach source,$(ORIG_MOK_SOURCES),$(TOPDIR)/$(source))

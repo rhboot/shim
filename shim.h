@@ -119,6 +119,24 @@
 # define vendor_deauthorized_size vendor_deauthorized_null_size
 #endif
 
+#if defined ENABLE_PCRCHECKS
+#ifndef DEFAULT_POLICY
+#define DEFAULT_POLICY L"\\shim.cfg"
+#endif
+#ifndef DEFAULT_POLICY_CHAR
+#define DEFAULT_POLICY_CHAR "\\shim.cfg"
+#endif
+#endif
+
+#if defined ENABLE_PCRCHECKS_SIGNATURE
+#ifndef DEFAULT_SIGNATURE
+#define DEFAULT_SIGNATURE L"\\shim.sha256"
+#endif
+#ifndef DEFAULT_SIGNATURE_CHAR
+#define DEFAULT_SIGNATURE_CHAR "\\shim.sha256"
+#endif
+#endif
+
 #include "include/asm.h"
 #include "include/compiler.h"
 #include "include/configtable.h"
@@ -146,6 +164,13 @@
 #include "include/variables.h"
 
 #include "version.h"
+
+#if defined(ENABLE_PCRCHECKS)
+#include "include/netfile.h"
+#endif
+#if defined(ENABLE_PCRCHECKS) && defined(ENABLE_HTTPBOOT)
+#include "include/httpfile.h"
+#endif
 
 INTERFACE_DECL(_SHIM_LOCK);
 

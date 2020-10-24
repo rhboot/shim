@@ -139,5 +139,95 @@ hexdumpat(const char *file, int line, const char *func, const void *data, unsign
 #define dhexdumpat(data, sz, at) hexdumpat(__FILE__, __LINE__, __func__, data, sz, at)
 #define dhexdumpf(fmt, data, sz, at, ...) hexdumpf(__FILE__, __LINE__, __func__, fmt, data, sz, at, ##__VA_ARGS__)
 
+// function has changed since tshim capabilities were built... using the old implementation in the mean time...
+static UINTN
+__attribute__((__unused__))
+format_hex_old(UINT8 *data, UINTN size, CHAR16 *buf)
+{
+	UINTN sz = (UINTN)data % 16;
+	CHAR16 hexchars[] = L"0123456789abcdef";
+	int offset = 0;
+	UINTN i;
+	UINTN j;
+
+	for (i = 0; i < sz; i++) {
+		buf[offset++] = L' ';
+		buf[offset++] = L' ';
+		buf[offset++] = L' ';
+		if (i == 7)
+			buf[offset++] = L' ';
+	}
+	for (j = sz; j < 16 && j < size; j++) {
+		UINT8 d = data[j-sz];
+		buf[offset++] = hexchars[(d & 0xf0) >> 4];
+		buf[offset++] = hexchars[(d & 0x0f)];
+		if (j != 15)
+			buf[offset++] = L' ';
+		if (j == 7)
+			buf[offset++] = L' ';
+	}
+	for (i = j; i < 16; i++) {
+		buf[offset++] = L' ';
+		buf[offset++] = L' ';
+		if (i != 15)
+			buf[offset++] = L' ';
+		if (i == 7)
+			buf[offset++] = L' ';
+	}
+	buf[offset] = L'\0';
+	return j - sz;
+}
+
+static void
+__attribute__((__unused__))
+format_text_old(UINT8 *data, UINTN size, CHAR16 *buf)
+{
+	UINTN sz = (UINTN)data % 16;
+	int offset = 0;
+	UINTN i;
+	UINTN j;
+
+	for (i = 0; i < sz; i++)
+		buf[offset++] = L' ';
+	buf[offset++] = L'|';
+	for (j = sz; j < 16 && j < size; j++) {
+		if (isprint(data[j-sz]))
+			buf[offset++] = data[j-sz];
+		else
+			buf[offset++] = L'.';
+	}
+	buf[offset++] = L'|';
+	for (i = j; i < 16; i++)
+		buf[offset++] = L' ';
+	buf[offset] = L'\0';
+}
+
+static void
+__attribute__((__unused__))
+hexdump_old(UINT8 *data, UINTN size)
+{
+	UINTN display_offset = (UINTN)data & 0xffffffff;
+	UINTN offset = 0;
+	//console_print(L"hexdump: data=0x%016x size=0x%x\n", data, size);
+
+	while (offset < size) {
+		CHAR16 hexbuf[49];
+		CHAR16 txtbuf[19];
+		UINTN sz;
+
+		sz = format_hex_old(data+offset, size-offset, hexbuf);
+		if (sz == 0)
+			return;
+		msleep(200000);
+
+		format_text_old(data+offset, size-offset, txtbuf);
+		console_print(L"%08x  %s  %s\n", display_offset, hexbuf, txtbuf);
+		msleep(200000);
+
+		display_offset += sz;
+		offset += sz;
+	}
+}
+
 #endif /* STATIC_HEXDUMP_H */
 // vim:fenc=utf-8:tw=75:noet

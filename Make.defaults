@@ -21,6 +21,8 @@ DEBUGINFO	?= $(prefix)/lib/debug/
 DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
 DEFAULT_LOADER	?= \\\\grub$(ARCH_SUFFIX).efi
+DEFAULT_POLICY	?= \\\\$(NAME).cfg
+DEFAULT_SIGNATURE	?= \\\\$(NAME).sha256
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
@@ -104,6 +106,44 @@ endif
 ifneq ($(origin REQUIRE_TPM), undefined)
 	CFLAGS  += -DREQUIRE_TPM
 endif
+
+ifneq ($(origin ENABLE_PCRCHECKS), undefined)
+	ifeq ($(shell test $(ENABLE_PCRCHECKS) -gt  2; echo $$?), 0)
+        $(error Not a valid ENABLE_PCRCHECKS value)
+	endif
+	ifeq ($(shell test $(ENABLE_PCRCHECKS) -lt  1; echo $$?), 0)
+        $(error Not a valid ENABLE_PCRCHECKS value)
+	endif
+	CFLAGS +=  	"-DDEFAULT_POLICY=L\"$(DEFAULT_POLICY)\"" \
+				"-DDEFAULT_POLICY_CHAR=\"$(DEFAULT_POLICY)\"" \
+				-DENABLE_PCRCHECKS=$(ENABLE_PCRCHECKS)
+endif
+
+ifneq ($(origin ENABLE_PCRCHECKS_DEBUG), undefined)
+    ifeq ($(origin ENABLE_PCRCHECKS), undefined)
+        $(error ENABLE_PCRCHECKS must be set in unsecure mode)
+    endif
+	ifeq ($(shell test $(ENABLE_PCRCHECKS) -eq 1; echo $$?), 1)
+        $(error ENABLE_PCRCHECKS must be set in unsecure mode)
+    endif
+	CFLAGS +=  -DENABLE_PCRCHECKS_DEBUG
+endif
+
+ifneq ($(origin ENABLE_PCRCHECKS_SIGNATURE), undefined)
+    ifeq ($(origin ENABLE_PCRCHECKS), undefined)
+        $(error ENABLE_PCRCHECKS must be set)
+    endif
+	ifeq ($(shell test $(ENABLE_PCRCHECKS_SIGNATURE) -gt  2; echo $$?), 0)
+        $(error Not a valid ENABLE_PCRCHECKS_SIGNATURE value)
+	endif
+	ifeq ($(shell test $(ENABLE_PCRCHECKS_SIGNATURE) -lt  1; echo $$?), 0)
+        $(error Not a valid ENABLE_PCRCHECKS_SIGNATURE value)
+	endif
+	CFLAGS +=  	"-DDEFAULT_SIGNATURE=L\"$(DEFAULT_SIGNATURE)\"" \
+				"-DDEFAULT_SIGNATURE_CHAR=\"$(DEFAULT_SIGNATURE)\"" \
+				-DENABLE_PCRCHECKS_SIGNATURE=$(ENABLE_PCRCHECKS_SIGNATURE)
+endif
+
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)

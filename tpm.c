@@ -357,3 +357,357 @@ fallback_should_prefer_reset(void)
 		return EFI_NOT_FOUND;
 	return EFI_SUCCESS;
 }
+
+#if defined ENABLE_PCRCHECKS
+EFI_STATUS get_tpm2_pcr(efi_tpm2_protocol_t *tpm2, uint32_t pcr, TPM_ALG_ID Algorithm, TPM_PCR_DIGEST *TPM_PCR_Data){
+	EFI_STATUS efi_status;
+
+    TPM2_PCR_READ_COMMAND	SendBuffer;
+    TPM2_PCR_READ_RESPONSE	RecvBuffer;
+    uint32_t				SendBufferSize = 0;
+    uint32_t				RecvBufferSize = 0;
+    uint32_t                count = 1;
+
+	//Setting up Buffer Sizes
+	SendBufferSize = sizeof(TPM2_PCR_READ_COMMAND);
+    RecvBufferSize = sizeof(TPM2_PCR_READ_RESPONSE);
+
+    //Setting up SendBuffer Header
+    SendBuffer.Header.tag = swap_uint16(TPM_ST_NO_SESSIONS);
+    SendBuffer.Header.commandCode = swap_uint32(TPM_CC_PCR_Read);
+
+    //Setting up PcrSelectionIn for Sendbuffer
+    SendBuffer.pcrSelectionIn.count = swap_uint32(count);
+
+    SendBuffer.pcrSelectionIn.pcrSelections[0].hash = swap_uint16(Algorithm);
+    SendBuffer.pcrSelectionIn.pcrSelections[0].sizeofSelect = 3;
+	SendBuffer.pcrSelectionIn.pcrSelections[0].pcrSelect[0] = 0; //Fixes unitialized error.
+    SendBuffer.pcrSelectionIn.pcrSelections[0].pcrSelect[((pcr)/8)] |= (1 << ((pcr) % 8));
+   
+    //Buffer size initialization
+    SendBuffer.Header.paramSize  = swap_uint32(SendBufferSize);
+
+    efi_status = tpm2->submit_command(tpm2 ,SendBufferSize, (uint8_t *)&SendBuffer, RecvBufferSize, (uint8_t *)&RecvBuffer);
+
+    /*****************************************ERROR_CHECHING*****************************************/
+    if (EFI_ERROR(efi_status)){
+        perror(L"-TPM2 ERROR: SubmitCommand failed [%d]\n", efi_status);
+        msleep(2000000);
+        return efi_status;
+    }
+
+    if (RecvBufferSize < sizeof (TPM2_RESPONSE_HEADER)){
+        perror(L"-TPM2 ERROR: RecvBufferSize [%x]\n", RecvBufferSize);
+        msleep(2000000);
+        return EFI_BUFFER_TOO_SMALL;
+    }
+
+    if (swap_uint32(RecvBuffer.Header.responseCode) != TPM_RC_SUCCESS){
+        perror(L"-TPM2 ERROR: Tpm2 Responce Code [%x]\n", swap_uint32(RecvBuffer.Header.responseCode));
+        msleep(2000000);
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    //PCR selection check
+    if (!(RecvBuffer.pcrSelectionOut.pcrSelections[0].pcrSelect[((pcr) / 8)] & (1 << ((pcr) % 8)))){
+        perror(L"-TPM2 ERROR: PCR Selection and pcrSelect does not match\n");
+		return EFI_PROTOCOL_ERROR;
+	}
+    /*****************************************ERROR_CHECHING*****************************************/
+
+	TPM_PCR_Data->PCR = pcr;
+	TPM_PCR_Data->DIGEST_SIZE = swap_uint16(RecvBuffer.pcrValues.digests[0].size);
+	TPM_PCR_Data->hashAlg = swap_uint16(RecvBuffer.pcrSelectionOut.pcrSelections[0].hash);
+	CopyMem(TPM_PCR_Data->buffer, RecvBuffer.pcrValues.digests[0].buffer, swap_uint16(RecvBuffer.pcrValues.digests[0].size));
+
+	/*********************************************DEBUG*********************************************/
+#ifdef ENABLE_PCRCHECKS_DEBUG
+	EFI_INPUT_KEY key;
+	console_print(L"\n\n-TPM2.0: Return Code: [%r]\n", swap_uint32(RecvBuffer.Header.responseCode));
+    console_print(L"-TPM2.0: PCR Selection = [%d]; HashAlg = [0x%08x]; Digest Size = [%d]\n", TPM_PCR_Data->PCR, TPM_PCR_Data->hashAlg, swap_uint16(RecvBuffer.pcrValues.digests[0].size));
+    hexdump_old(RecvBuffer.pcrValues.digests[0].buffer, swap_uint16(RecvBuffer.pcrValues.digests[0].size));
+    console_print(L"Press any key...\n");
+    console_get_keystroke(&key);
+#endif
+	/*********************************************DEBUG*********************************************/
+
+	SetMem(&RecvBuffer, 0, (UINT8)sizeof(RecvBuffer));
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS get_tpm_pcr(efi_tpm_protocol_t *tpm, uint32_t PCRIndex, TPM_PCR_DIGEST *TPM_PCR_Data){
+	EFI_STATUS efi_status;
+
+	TPM_COMMAND SendBuffer;
+	TPM_RESPONSE RecvBuffer;
+	uint32_t			SendBufferSize = 0;
+	uint32_t			RecvBufferSize = 0;
+
+	//Setting up Buffer Sizes
+	SendBufferSize = sizeof(TPM_COMMAND);
+	RecvBufferSize = sizeof(TPM_RESPONSE);
+
+	SendBuffer.Header.tag 		= swap_uint16(TPM_TAG_RQU_COMMAND);
+	SendBuffer.Header.paramSize = swap_uint32(SendBufferSize);
+	SendBuffer.Header.ordinal	= swap_uint32(TPM_ORD_PcrRead);
+	SendBuffer.PCRRequested		= swap_uint32(PCRIndex);
+
+	efi_status = tpm->pass_through_to_tpm(tpm, SendBufferSize, (UINT8 *)&SendBuffer, RecvBufferSize, (UINT8 *)&RecvBuffer);
+	
+    /*****************************************ERROR_CHECHING*****************************************/
+	if (EFI_ERROR(efi_status)) {
+		perror(L"-ERROR: PassThroughToTpm failed [%r]\n", efi_status);
+		return efi_status;
+	}
+
+	if ((RecvBuffer.Header.tag != swap_uint16(TPM_TAG_RSP_COMMAND)) || (RecvBuffer.Header.returnCode != 0)) {
+		perror(L"-ERROR: TPM command result [%r]\n", swap_uint16(RecvBuffer.Header.returnCode));
+		return EFI_DEVICE_ERROR;
+	}
+    /*****************************************ERROR_CHECHING*****************************************/
+
+	TPM_PCR_Data->PCR = PCRIndex;
+	TPM_PCR_Data->DIGEST_SIZE = TPM_SHA1_160_HASH_LEN;
+	TPM_PCR_Data->hashAlg = TPM_ALG_SHA1;
+	CopyMem(TPM_PCR_Data->buffer, RecvBuffer.pcrValue.digest, TPM_SHA1_160_HASH_LEN);
+
+	/*********************************************DEBUG*********************************************/
+#ifdef ENABLE_PCRCHECKS_DEBUG
+	EFI_INPUT_KEY key;
+	console_print(L"\n\n-TPM1.2: Return Code: [%r]\n", RecvBuffer.Header.returnCode);
+    console_print(L"-TPM1.2: PCR Selection = [%d]; HashAlg = [0x%08x]; Digest Size = [%d]\n", TPM_PCR_Data->PCR, TPM_PCR_Data->hashAlg, TPM_PCR_Data->DIGEST_SIZE);
+    hexdump_old(RecvBuffer.pcrValue.digest, TPM_SHA1_160_HASH_LEN);
+    console_print(L"Press any key...\n");
+    console_get_keystroke(&key);
+#endif
+	/*********************************************DEBUG*********************************************/
+
+	SetMem(&RecvBuffer, 0, (UINT8)sizeof(RecvBuffer));
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS tpm2_error(TPM_PCR_DIGEST *PCR_Data){
+#ifdef ENABLE_PCRCHECKS_DEBUG
+	EFI_INPUT_KEY key;
+	console_print(L"\n-TPM2.0: Comparison: [ERROR] - Invalid PCR Value in file\n");
+	console_print(L"-TPM2.0: PCR Selection = [%d]; HashAlg = [0x%08x]; Digest Size = [%d]\n", PCR_Data->PCR, PCR_Data->hashAlg, PCR_Data->DIGEST_SIZE),
+	hexdump_old(PCR_Data->buffer, PCR_Data->DIGEST_SIZE);
+	console_get_keystroke(&key);
+	return EFI_SUCCESS;
+#else
+	perror(L"-Invalid PCR Value [%d] in config: [%r]\n", PCR_Data->PCR ,EFI_SECURITY_VIOLATION);
+	return EFI_SECURITY_VIOLATION;
+#endif
+}
+
+EFI_STATUS tpm_error(TPM_PCR_DIGEST *PCR_Data){
+#ifdef ENABLE_PCRCHECKS_DEBUG
+	EFI_INPUT_KEY key;
+	console_print(L"\n-TPM1.2: Comparison: [ERROR] - Invalid PCR Value in file\n");
+	console_print(L"-TPM1.2: PCR Selection = [%d]; HashAlg = [0x%08x]; Digest Size = [%d]\n", PCR_Data->PCR, PCR_Data->hashAlg, PCR_Data->DIGEST_SIZE),
+	hexdump_old(PCR_Data->buffer, PCR_Data->DIGEST_SIZE);
+	console_get_keystroke(&key);
+	return EFI_SUCCESS;
+#else
+	perror(L"-Invalid PCR Value [%d] in config: [%r]\n", PCR_Data->PCR ,EFI_SECURITY_VIOLATION);
+	return EFI_SECURITY_VIOLATION;
+#endif
+}
+
+EFI_STATUS tpm_check_pcr(TPM_PCR_DIGEST *PCR_Data, uint32_t PCR_Data_Size){
+	EFI_STATUS efi_status;
+	TPM_PCR_DIGEST *TPM_PCR_Data	= NULL;
+	TPM_PCR_DIGEST *TPM_PCR_Data2	= NULL;
+	efi_tpm_protocol_t *tpm;
+	efi_tpm2_protocol_t *tpm2;
+	BOOLEAN old_caps;
+	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
+
+	TPM_PCR_Data  = AllocatePool(sizeof(TPM_PCR_DIGEST));
+	TPM_PCR_Data2 = AllocatePool(sizeof(TPM_PCR_DIGEST));
+
+	efi_status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
+	if (EFI_ERROR(efi_status)) {
+#ifdef REQUIRE_TPM
+		perror(L"TPM logging failed: [%r]\n", efi_status);
+		return efi_status;
+#else
+		if (efi_status != EFI_NOT_FOUND) {
+			perror(L"TPM logging failed: [%r]\n", efi_status);
+			return efi_status;
+		}
+#endif
+	} else if (tpm2) {
+
+        uint32_t temp = 0;
+		BOOL VALID = false;
+		/*****************************************TPM2_PCR_Checks*****************************************/
+        while(temp < PCR_Data_Size){
+			//If not at the last PCR in the struct
+			if(temp < PCR_Data_Size-1){
+				//If there are multiple same PCR values for a PCR
+				if(PCR_Data[temp].PCR == PCR_Data[temp+1].PCR){
+					//While there are multiple PCR Values for a PCR
+					while(PCR_Data[temp].PCR == PCR_Data[temp+1].PCR && temp < PCR_Data_Size-1){
+						efi_status = get_tpm2_pcr(tpm2, PCR_Data[temp].PCR, PCR_Data[temp].hashAlg, TPM_PCR_Data);
+						if(EFI_ERROR(efi_status)){
+							return efi_status;
+						}
+#ifdef ENABLE_PCRCHECKS_DEBUG
+						if(CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE))
+								tpm2_error(&PCR_Data[temp]);
+#endif
+						//Must due two checks at once to make the loops check the last value
+						efi_status = get_tpm2_pcr(tpm2, PCR_Data[temp+1].PCR, PCR_Data[temp+1].hashAlg, TPM_PCR_Data2);
+						if(EFI_ERROR(efi_status)){
+							return efi_status;
+						}
+#ifdef ENABLE_PCRCHECKS_DEBUG
+						if(CompareMem(PCR_Data[temp+1].buffer, TPM_PCR_Data2->buffer, PCR_Data[temp+1].DIGEST_SIZE))
+								tpm2_error(&PCR_Data[temp+1]);
+#endif
+						//If one of the values are correct then there is a valid value
+						if(!CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE) || !CompareMem(PCR_Data[temp+1].buffer, TPM_PCR_Data2->buffer, PCR_Data[temp+1].DIGEST_SIZE)){
+							VALID = TRUE;
+						}
+						temp++;
+					}
+					//If there are no valid values then KILL IT
+					if(!VALID){
+#ifndef ENABLE_PCRCHECKS_DEBUG
+						if (tpm2_error(&PCR_Data[temp]) == EFI_SECURITY_VIOLATION){
+							return EFI_SECURITY_VIOLATION;
+						}
+#endif
+					}
+					//Resets Valid to false.
+					VALID = false;
+					temp++;
+				}
+				//If there are not multiple same PCR values
+				//A normal check
+				else{
+					efi_status = get_tpm2_pcr(tpm2, PCR_Data[temp].PCR, PCR_Data[temp].hashAlg, TPM_PCR_Data);
+					if(EFI_ERROR(efi_status)){
+						return efi_status;
+					}
+
+					if(CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE) || TPM_PCR_Data->DIGEST_SIZE != PCR_Data[temp].DIGEST_SIZE || PCR_Data[temp].hashAlg != TPM_PCR_Data->hashAlg){
+						if (tpm2_error(&PCR_Data[temp]) == EFI_SECURITY_VIOLATION){
+							return EFI_SECURITY_VIOLATION;
+						}
+					}
+					 temp++;
+				}	
+			}
+			//This check takes care of the off cases where there is only one type of pcr at the end of the list
+			else{
+				efi_status = get_tpm2_pcr(tpm2, PCR_Data[temp].PCR, PCR_Data[temp].hashAlg, TPM_PCR_Data);
+				if(EFI_ERROR(efi_status)){
+					return efi_status;
+				}
+
+				if(CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE) || TPM_PCR_Data->DIGEST_SIZE != PCR_Data[temp].DIGEST_SIZE || PCR_Data[temp].hashAlg != TPM_PCR_Data->hashAlg){
+					if (tpm2_error(&PCR_Data[temp]) == EFI_SECURITY_VIOLATION){
+						return EFI_SECURITY_VIOLATION;
+					}
+				}
+				 temp++;
+			}	
+        }
+		/*****************************************TPM2_PCR_Checks*****************************************/
+
+		//Cleanup
+		FreePool(TPM_PCR_Data);
+		FreePool(TPM_PCR_Data2);
+		return efi_status;
+	} else if (tpm) {
+        uint32_t temp = 0;
+		BOOL VALID = false;
+		/*****************************************TPM_PCR_Checks*****************************************/
+        while(temp < PCR_Data_Size){
+			//If not at the last PCR in the struct
+			if(temp < PCR_Data_Size-1){
+				//If there are multiple same PCR values for a PCR
+				if(PCR_Data[temp].PCR == PCR_Data[temp+1].PCR){
+					//While there are multiple PCR Values for a PCR
+					while(PCR_Data[temp].PCR == PCR_Data[temp+1].PCR && temp < PCR_Data_Size-1){
+						efi_status = get_tpm_pcr(tpm, PCR_Data[temp].PCR, TPM_PCR_Data);
+						if(EFI_ERROR(efi_status)){
+							return efi_status;
+						}
+#ifdef ENABLE_PCRCHECKS_DEBUG
+						if(CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE))
+								tpm_error(&PCR_Data[temp]);
+#endif
+
+						//Must due two checks at once to make the loops check the last value
+						efi_status = get_tpm_pcr(tpm, PCR_Data[temp+1].PCR, TPM_PCR_Data2);
+						if(EFI_ERROR(efi_status)){
+							return efi_status;
+						}
+#ifdef ENABLE_PCRCHECKS_DEBUG
+						if(CompareMem(PCR_Data[temp+1].buffer, TPM_PCR_Data2->buffer, PCR_Data[temp+1].DIGEST_SIZE))
+								tpm_error(&PCR_Data[temp+1]);
+#endif
+						//If one of the values are correct then there is a valid value
+						if(!CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE) || !CompareMem(PCR_Data[temp+1].buffer, TPM_PCR_Data2->buffer, PCR_Data[temp+1].DIGEST_SIZE)){
+							VALID = TRUE;
+						}
+						temp++;
+					}
+					//If there are no valid values then KILL IT
+					if(!VALID){
+#ifndef ENABLE_PCRCHECKS_DEBUG
+						if (tpm_error(&PCR_Data[temp]) == EFI_SECURITY_VIOLATION){
+							return EFI_SECURITY_VIOLATION;
+						}
+#endif
+					}
+					//Resets Valid to false.
+					VALID = false;
+					temp++;
+				}
+				//If there are not multiple same PCR values
+				//A normal check
+				else{
+					efi_status = get_tpm_pcr(tpm, PCR_Data[temp].PCR, TPM_PCR_Data);
+					if(EFI_ERROR(efi_status)){
+						return efi_status;
+					}
+
+					if(CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE) || TPM_PCR_Data->DIGEST_SIZE != PCR_Data[temp].DIGEST_SIZE || PCR_Data[temp].hashAlg != TPM_PCR_Data->hashAlg){
+						if (tpm_error(&PCR_Data[temp]) == EFI_SECURITY_VIOLATION){
+							return EFI_SECURITY_VIOLATION;
+						}
+					}
+					 temp++;
+				}	
+			}
+			//This check takes care of the off cases where there is only one type of pcr at the end of the list
+			else{
+				efi_status = get_tpm_pcr(tpm, PCR_Data[temp].PCR, TPM_PCR_Data);
+				if(EFI_ERROR(efi_status)){
+					return efi_status;
+				}
+
+				if(CompareMem(PCR_Data[temp].buffer, TPM_PCR_Data->buffer, PCR_Data[temp].DIGEST_SIZE) || TPM_PCR_Data->DIGEST_SIZE != PCR_Data[temp].DIGEST_SIZE || PCR_Data[temp].hashAlg != TPM_PCR_Data->hashAlg){
+					if (tpm_error(&PCR_Data[temp]) == EFI_SECURITY_VIOLATION){
+						return EFI_SECURITY_VIOLATION;
+					}
+				}
+				 temp++;
+			}	
+        }
+		/*****************************************TPM_PCR_Checks*****************************************/
+
+		//Cleanup
+		FreePool(TPM_PCR_Data);
+		FreePool(TPM_PCR_Data2);
+
+		return efi_status;
+	}
+
+	return EFI_SUCCESS;
+}
+#endif

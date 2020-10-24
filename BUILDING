@@ -35,6 +35,48 @@ Variables you could set to customize the build:
   build support for http booting
 - REQUIRE_TPM
   if tpm logging or extends return an error code, treat that as a fatal error.
+-ENABLE_PCRCHECKS
+  This allows you to build shims with PCR checking. You will have to create a
+  shim.cfg file in the same directory where shim is installed. There are two
+  modes for this compile option.
+    -ENABLE_PCRCHECKS=1 
+      Does not require the file, or valid PCR values.
+    -ENABLE_PCRCHECKS=2 
+      Makes the system require the file and valid PCR values to boot. 
+  
+  The file's format is bellow:
+
+  PCR_00_SHA1:292F8B2DBAC55043FAF78627D312BACFCA84C63E
+
+  The format is PCR_ then the PCR number, must be between 0-23, then _ and the
+  hash algoritm, : and the Hash in HEX. This algoritm can be any algoritm which 
+  your tpm supports. You can also defind multiple ones for the system to check. 
+  If there is one valid value for a PCR then the system will still boot. This 
+  way you can update your systems firmware and update the values before a reboot.
+  This is a valid shim.cfg bellow:
+  *******************************************************************************************
+  PCR_00_SHA1:973622EEAE5A05417E47345CDE31E8121B7C90FE //Valid
+  PCR_01_SHA1:15F385A6D35E112463D397057D40298321229E7C //Valid
+  PCR_07_SHA1:9C54FA526B77E708ECFA005A33A7FC82E6ACC72B //Not Valid
+
+  PCR_00_SHA256:306B97761A8B59209EEBA0ED4CE1C24F6A3C81801358296F19E607348C5AA8CB //Not Valid
+  PCR_00_SHA256:54FC6E4AF98F9AF990FBC5E5535A82A0B839CBF2D832307D7A89A28901AD385C //Not Valid
+  PCR_01_SHA256:BEE49E08A0629A133A91B104D0C4AD9D227EC771111482C97C5D9C358641F145 //Valid
+  PCR_07_SHA256:4039EC3D435B7E895318CB0A7A38117C8687E5A2700BAF66E29028BDECDD5775 //Valid
+  *******************************************************************************************
+  This is valid because there is at least one valid PCR hash per PCRs in the file.
+-ENABLE_PCRCHECKS_DEBUG
+  Debug output for ENABLE_PCRCHECKS
+-ENABLE_PCRCHECKS_SIGNATURE
+  Adds signature checking to the PCR check file. Must have signed the shim.cfg file with a
+  custom db.key. You can sign the config with the command bellow. Unless you change the
+  name of the file in the make file, shim will only look for shim.sha256. There are two
+  modes for this compile option.
+    -ENABLE_PCRCHECKS_SIGNATURE=1 
+      Does not require the file, or a valid signature.
+    -ENABLE_PCRCHECKS_SIGNATURE=2 
+      Makes the system require the file and valid signature to boot. 
+  Command: openssl dgst -sha256 -sign "db.key" -out shim.sha256 shim.cfg
 - ARCH
   This allows you to do a build for a different arch that we support.  For
   instance, on x86_64 you could do "setarch linux32 make ARCH=ia32" to get

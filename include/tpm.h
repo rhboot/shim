@@ -3,8 +3,16 @@
 
 #include <efilib.h>
 
+#if defined ENABLE_PCRCHECKS
+#include "utils.h"
+#endif
+
 #define TPM_ALG_SHA 0x00000004
 #define EV_IPL      0x0000000d
+
+#if defined ENABLE_PCRCHECKS
+EFI_STATUS tpm_check_pcr(TPM_PCR_DIGEST *PCR_Data, uint32_t PCR_Data_Size);
+#endif
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description);
@@ -47,6 +55,18 @@ typedef struct _EFI_IMAGE_LOAD_EVENT {
   UINTN LengthOfDevicePath;
   EFI_DEVICE_PATH DevicePath[0];
 } EFI_IMAGE_LOAD_EVENT;
+
+#ifdef ENABLE_PCRCHECKS
+typedef struct tdTPM_COMMAND{
+    TPM_RQU_COMMAND_HDR Header;
+    UINT32              PCRRequested;
+} __attribute__ ((packed)) TPM_COMMAND;
+
+typedef struct tdTPM_RESPONSE{
+    TPM_RSP_COMMAND_HDR Header;
+    TPM_PCRVALUE        pcrValue;
+} __attribute__ ((packed)) TPM_RESPONSE;
+#endif
 
 struct efi_tpm_protocol
 {
@@ -138,6 +158,20 @@ typedef struct tdEFI_TCG2_EVENT {
   EFI_TCG2_EVENT_HEADER Header;
   uint8_t Event[1];
 } __attribute__ ((packed)) EFI_TCG2_EVENT;
+
+#if defined ENABLE_PCRCHECKS
+typedef struct tdTPM2_PCR_READ_COMMAND {
+  TPM2_COMMAND_HEADER   Header;
+  TPML_PCR_SELECTION    pcrSelectionIn;
+} __attribute__ ((packed)) TPM2_PCR_READ_COMMAND;
+
+typedef struct tdTPM2_PCR_READ_RESPONSE {
+  TPM2_RESPONSE_HEADER    Header;
+  uint32_t                pcrUpdateCounter;
+  TPML_PCR_SELECTION      pcrSelectionOut;
+  TPML_DIGEST             pcrValues;
+} __attribute__ ((packed)) TPM2_PCR_READ_RESPONSE;
+#endif
 
 #define EFI_TCG2_EVENT_LOG_FORMAT_TCG_1_2 0x00000001
 #define EFI_TCG2_EVENT_LOG_FORMAT_TCG_2   0x00000002

@@ -86,6 +86,10 @@ UINT32 build_cert_size;
 UINT8 *build_cert;
 #endif /* defined(ENABLE_SHIM_CERT) */
 
+//#if defined(ENABLE_PCRCHECKS_SIGNATURE)
+#include "Cryptlib/Include/openssl/evp.h"
+//#endif
+
 /*
  * indicator of how an image has been verified
  */
@@ -1390,6 +1394,10 @@ static EFI_STATUS read_header(void *data, unsigned int datasize,
 	return EFI_SUCCESS;
 }
 
+#if defined ENABLE_PCRCHECKS
+EFI_STATUS efi_pcr_system_check(EFI_HANDLE image_handle); //Defining the function
+#endif
+
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
@@ -1455,7 +1463,11 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 				console_print(L"Verification succeeded\n");
 		}
 	}
-
+	
+#if defined ENABLE_PCRCHECKS
+	efi_pcr_system_check(global_image_handle);
+#endif
+	
 	/* The spec says, uselessly, of SectionAlignment:
 	 * =====
 	 * The alignment (in bytes) of sections when they are loaded into
@@ -2757,6 +2769,378 @@ debug_hook(void)
 	}
 	x = 1;
 }
+#if defined ENABLE_PCRCHECKS
+
+EFI_STATUS retrive_file(EFI_HANDLE image_handle, const char *file_name, CHAR16 *File_Name, CHAR8 **Buf, UINT64 *BufSize){
+	EFI_STATUS efi_status;
+
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *SimpleFileSystem = NULL;
+	EFI_LOADED_IMAGE *li 			= NULL;
+
+	CHAR16 *FilePath 				= NULL;
+	
+	EFI_FILE_PROTOCOL *SystemFile 	= NULL;
+
+	static EFI_GUID FileInfo 		= EFI_FILE_INFO_ID;
+	EFI_FILE_INFO *File_Buff		= NULL;
+
+	//Size alocated based on EFI_FILE_INFO Struct and File_Name
+	UINTN File_BuffSize = sizeof(EFI_FILE_INFO);
+	CHAR16 *ImagePath 				= NULL;
+	EFI_FILE_PROTOCOL *Root 		= NULL;
+
+	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					(void **) &li);
+
+	if (EFI_ERROR(efi_status)) {
+		return efi_status;
+	}
+
+	if (findNetfile(li->DeviceHandle)) {
+		efi_status = parseNetfileinfo(image_handle, file_name);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Netfile parsing failed: %r\n", efi_status);
+			goto error;
+		}
+		console_print(L"Fetching %s\n", File_Name);
+		efi_status = FetchNetfile(image_handle, (void *)Buf, BufSize);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Unable to fetch %s TFTP image: %r\n", File_Name, efi_status);
+			goto error;
+		}
+		msleep(2000000);
+#if defined(ENABLE_PCRCHECKS) && defined(ENABLE_HTTPBOOT)
+	} else if (find_httpfile(li->DeviceHandle)) {
+		efi_status = httpfile_fetch_buffer (image_handle,
+							file_name,
+							(void *)Buf,
+							BufSize);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Unable to fetch %s HTTP image: %r\n", File_Name, efi_status);
+			goto error;
+		}
+		msleep(2000000);
+#endif
+	} else {
+		efi_status = gBS->LocateProtocol(&gEfiSimpleFileSystemProtocolGuid, NULL,
+						(void **)&SimpleFileSystem);
+		
+		if (EFI_ERROR(efi_status)) {
+			return efi_status;
+		}
+		
+		efi_status = SimpleFileSystem->OpenVolume(SimpleFileSystem, &Root);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Failed to open fs: %r\n", efi_status);
+			goto error;
+		}
+
+		//Getting Current Dir name
+		efi_status  = generate_path_from_image_path(li, File_Name, &FilePath);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Unable to generate path %s: %r\n", ImagePath, efi_status);
+		goto error;
+	}
+		
+
+		efi_status = Root->Open(Root, &SystemFile, FilePath, EFI_FILE_MODE_READ, 0);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Failed to open %s - %r\n", FilePath, efi_status);
+			goto error;
+		}
+
+		File_Buff = AllocatePool(File_BuffSize);
+		if (!File_BuffSize){
+			perror(L"-Unable to allocate file info buffer\n");
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto error;
+		}
+
+		efi_status = SystemFile->GetInfo(SystemFile, &FileInfo, &File_BuffSize, 
+						File_Buff);
+
+		if (efi_status == EFI_BUFFER_TOO_SMALL){
+			FreePool(File_Buff);
+			File_Buff = AllocatePool(File_BuffSize);
+			if(!File_Buff){
+				perror(L"-Unable to allocate file info buffer\n");
+				efi_status = EFI_OUT_OF_RESOURCES;
+				goto error;
+			}
+			efi_status = SystemFile->GetInfo(SystemFile, &FileInfo, 
+							&File_BuffSize,	File_Buff);
+		}
+
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Unable to get %s info: %r\n", File_Name, efi_status);
+			goto error;
+		}
+		
+		//Allocating buffers size from file size if no error
+		*BufSize = File_Buff->FileSize;
+		*Buf = AllocatePool(*BufSize);
+		if (!*Buf) {
+			perror(L"-Unable to allocate file buffer\n");
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto error;
+		}
+
+		efi_status = SystemFile->Read(SystemFile, BufSize, *Buf);
+		if (efi_status == EFI_BUFFER_TOO_SMALL) {
+			FreePool(*Buf);
+			*Buf = AllocatePool(*BufSize);
+			efi_status = SystemFile->Read(SystemFile, BufSize, *Buf);
+		}
+		if (EFI_ERROR(efi_status)) {
+			perror(L"-Unexpected return from initial read: %r, buffersize %x\n",
+		       	efi_status, BufSize);
+			goto error;
+		}
+
+		//Close the file after reading
+		SystemFile->Close(SystemFile);
+	}
+
+error:
+	//Cleanup
+	FreePool(ImagePath);
+	FreePool(FilePath);
+	FreePool(File_Buff);
+
+	return efi_status;
+}
+
+EFI_STATUS efi_pcr_value_check(CHAR8 *Buf, UINT64 BufSize){
+	EFI_STATUS efi_status;
+
+	TPM_PCR_DIGEST *PCR_Data		= NULL;
+	uint32_t PCR_Data_Size			= 0;
+
+	PCR_Data_Size = shim_policy_parsing(Buf, BufSize, &PCR_Data);
+
+	if (PCR_Data_Size > 0){
+		efi_status = tpm_check_pcr(PCR_Data, PCR_Data_Size);
+		if (EFI_ERROR(efi_status)) {
+			goto error;
+		}
+	} else{
+		efi_status = EFI_SECURITY_VIOLATION;
+		perror(L"-%s file format is incorrect or file is empty.\n", DEFAULT_POLICY);
+		goto error;
+	}
+
+error:
+	FreePool(PCR_Data);
+	return efi_status;
+}
+
+
+
+#if ENABLE_PCRCHECKS_SIGNATURE
+static BOOLEAN verify_signature_with_cert(UINT8 *Cert, UINTN CertSize, CHAR8 *Buf, UINT64 BufSize, CHAR8 *SigBuf, UINT64 SigBufSize){
+	X509       	*X509Cert = NULL;
+	EVP_PKEY 	*pubKey = EVP_PKEY_new();
+	EVP_MD_CTX 	*m_RSAVerifyCtx = EVP_MD_CTX_create();
+
+	BOOL 		Status = FALSE;
+	
+	//
+	// Read DER-encoded X509 Certificate and Construct X509 object.
+	//
+	Status = X509ConstructCertificate (Cert, CertSize, (UINT8 **) &X509Cert);
+	if ((X509Cert == NULL) || (!Status)) {
+		perror(L"-Cannot construct X509 object\n");
+		goto error;
+	}
+
+	pubKey = X509_get_pubkey(X509Cert);
+	
+	/*
+		BIO *X509PEM = BIO_new(BIO_s_mem());
+		BUF_MEM * X509PEMptr = NULL;
+		PEM_write_bio_X509(X509PEM, X509Cert);
+		BIO_get_mem_ptr(X509PEM, &X509PEMptr);
+		hexdump((CHAR8 *)X509PEMptr->data, X509PEMptr->length);
+		BUF_MEM_free(X509PEMptr);
+		BIO_free(X509PEM);
+	*/
+
+	if(EVP_DigestVerifyInit(m_RSAVerifyCtx, NULL, EVP_sha256(), NULL, pubKey) <= 0){
+		perror(L"-Failed to verify X509 Public Key\n");
+		Status = FALSE;
+		goto error;
+	}
+
+	if(EVP_DigestVerifyUpdate(m_RSAVerifyCtx, Buf, BufSize) <= 0){
+		perror(L"-Failed to update digest Buffer\n");
+		Status = FALSE;
+		goto error;
+	}
+
+	UINTN AuthStatus = EVP_DigestVerifyFinal(m_RSAVerifyCtx, SigBuf, SigBufSize);
+	if (AuthStatus == 1){
+		Status = TRUE;
+	}else{
+		Status = FALSE;
+	}
+
+error:
+	X509_free(X509Cert);
+	EVP_PKEY_free(pubKey);
+	EVP_MD_CTX_destroy(m_RSAVerifyCtx);
+
+	return Status;
+
+}
+
+static CHECK_STATUS verify_signature_with_db_cert(EFI_SIGNATURE_LIST *CertList, UINTN dbsize, CHAR8 *Buf, UINT64 BufSize, CHAR8 *SigBuf, UINT64 SigBufSize){
+	EFI_SIGNATURE_DATA *Cert;
+	UINTN CertSize;
+	BOOLEAN IsFound = FALSE;
+
+	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
+		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
+			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
+			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
+			if (verify_x509(Cert->SignatureData, CertSize)) {
+				if (verify_eku(Cert->SignatureData, CertSize)) {
+					//clear_ca_warning();
+					IsFound = verify_signature_with_cert(Cert->SignatureData, CertSize, Buf, BufSize, SigBuf, SigBufSize);	
+
+					if (IsFound) {
+						// shim15.2 verify changed
+						//if (get_ca_warning()) {
+						//	show_ca_warning();
+						//}
+						drain_openssl_errors();
+						return DATA_FOUND;
+					} else {
+						LogError(L"SignatureVerify(): %d\n", IsFound);
+					}
+				}
+			} else if (verbose) {
+				console_notify(L"Not a DER encoding x.509 Certificate");
+			}
+		}
+
+		dbsize -= CertList->SignatureListSize;
+		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
+	}
+
+	return DATA_NOT_FOUND;
+}
+
+static EFI_STATUS efi_sig_verify(CHAR8 *Buf, UINT64 BufSize, CHAR8 *SigBuf, UINT64 SigBufSize){
+	EFI_STATUS efi_status;
+	EFI_SIGNATURE_LIST *CertList;
+	UINTN dbsize = 0;
+	UINT8 *db;
+
+	efi_status = get_variable(L"db", &db, &dbsize, EFI_SECURE_BOOT_DB_GUID);
+	if (EFI_ERROR(efi_status)){
+		efi_status =  VAR_NOT_FOUND;
+		perror(L"-Cannot get db certificate; error: %r\n", efi_status);
+		goto error;
+	}
+		
+
+	CertList = (EFI_SIGNATURE_LIST *)db;
+
+	if(verify_signature_with_db_cert(CertList, dbsize, Buf, BufSize, SigBuf, SigBufSize) == DATA_FOUND){
+		FreePool(db);
+		drain_openssl_errors();
+		efi_status = EFI_SUCCESS;
+	} else {
+		drain_openssl_errors();
+		efi_status = EFI_SECURITY_VIOLATION;
+		perror(L"-Cannot verify signature; error: %r\n", efi_status);
+		goto error;
+	}
+
+error:
+	return efi_status;
+}
+
+EFI_STATUS efi_sig_error_check(EFI_STATUS efi_status){
+#if ENABLE_PCRCHECKS_SIGNATURE == 1
+	if(EFI_ERROR(efi_status)){
+			perror(L"-Unsecure mode activated, booting.\n");
+			msleep(2000000);
+			return efi_status;
+	}
+#elif ENABLE_PCRCHECKS_SIGNATURE == 2
+	if(EFI_ERROR(efi_status)){
+		perror(L"-Secure mode activated, rebooting.\n");
+		msleep(5000000);
+		gRT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION,
+				0, NULL);
+	}
+#endif
+
+	return efi_status;
+}
+#endif
+
+EFI_STATUS efi_pcr_error_check(EFI_STATUS efi_status){
+#if ENABLE_PCRCHECKS == 1
+	if(EFI_ERROR(efi_status)){
+			perror(L"-Unsecure mode activated, booting.\n");
+			msleep(3000000);
+			return efi_status;
+	}
+#elif ENABLE_PCRCHECKS == 2
+	if(EFI_ERROR(efi_status)){
+		perror(L"-Secure mode activated, rebooting.\n");
+		msleep(5000000);
+		gRT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION,
+				0, NULL);
+	}
+#endif
+
+	return efi_status;
+}
+
+EFI_STATUS efi_pcr_system_check(EFI_HANDLE image_handle){
+	EFI_STATUS efi_status;
+	EFI_STATUS pcr_efi_status;
+
+	CHAR8 *Buf						= NULL;
+	UINT64 BufSize					= 0;
+
+#if ENABLE_PCRCHECKS_SIGNATURE
+	CHAR8 *SigBuf					= NULL;
+	UINTN SigBufSize				= 0;
+#endif
+
+	efi_status = retrive_file(image_handle, DEFAULT_POLICY_CHAR, DEFAULT_POLICY, &Buf, &BufSize);
+	pcr_efi_status = efi_pcr_error_check(efi_status);
+
+#if ENABLE_PCRCHECKS_SIGNATURE
+	efi_status = retrive_file(image_handle, DEFAULT_SIGNATURE_CHAR, DEFAULT_SIGNATURE, &SigBuf, &SigBufSize);
+	efi_sig_error_check(efi_status);
+	if(!EFI_ERROR(efi_status)){
+		efi_status = efi_sig_verify(Buf, BufSize, SigBuf, SigBufSize);
+		efi_sig_error_check(efi_status);
+	}
+#endif
+
+	if(!EFI_ERROR(pcr_efi_status)){
+		efi_status = efi_pcr_value_check(Buf, BufSize);
+		efi_pcr_error_check(efi_status);
+	} else{
+		efi_status = pcr_efi_status;
+	}
+
+	//Clean up
+	FreePool(Buf);
+
+#if ENABLE_PCRCHECKS_SIGNATURE
+	FreePool(SigBuf);
+#endif
+
+	return efi_status;
+}
+#endif
 
 EFI_STATUS
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)

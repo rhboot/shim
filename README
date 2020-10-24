@@ -21,3 +21,64 @@ pub.cer and build with "make VENDOR_CERT_FILE=pub.cer".
 
 There are a couple of build options, and a couple of ways to customize the
 build, described in BUILDING.
+
+=============================================================================
+=============================================================================
+
+Presenting TRUSTEDSHIM (TSHIM), a modified version of SHIM. Enhancements 
+include checking and extending TPM PCRs at boot time. Confuration files 
+signed by UEFI Secure Boot Key. Patch transition support - can list multiple 
+trusted PCR values per index. Multiple file PXE/Netboot support. Boot time 
+debugging output. Leverage TPM to check UEFI Sec and PEI phases.
+
+TRUSTEDSHIM Strengths: Leveraging PCRs to check comparatively static firmware 
+and config - giving the TPM an enforcement role in boot security. Support for 
+most CPUs, hypervisors, TPMs, and OS distributions. PXE boot mode does not 
+download OS image if validation fails. Requires 1 certificate to be added to 
+Secure Boot DB; the correesponding key used to sign TSHIM binary and Microsoft 
+and system vendor keys can be left intact.
+
+Use Cases -Boot security enhancement and misconfiguration mitigation --Use 
+UEFI Secure Boot and TPM in a complementary manner -Insider threat mitigation 
+--Purge UEFI Secure Boot standard values and install organization generated 
+PK, KEK, DB, and DBX --Trust only known good, organization approved hardware 
+and software --Must also lock down UEFI config to limit access -Network boot 
+lockdown --Inspect platform PCRs and UEFI Secure Boot data stores before 
+pulling the OS imageand supporting data -Role and license enforcement 
+--Customize UEFI Secure Boot such that specific machines can only run specific 
+software (e.g. production machines cannot run development loadout)
+
+All modifications presented, implementation, the capability and idea itself 
+as stated above defining TRUSTEDSHIM (TSHIM), is FREE FOR PUBLIC DOMAIN use. 
+There is no gaurantee that this code will work for your machine. 
+Use at your own risk.
+
+See BUILDING for build instructions.
+
+These are the following files that were modified to create TRUSTEDSHIM 
+	README
+	BUILDING
+	Makefile
+	Make.defaults
+	tpm.c
+	shim.h
+	shim.c
+	include/str.h
+	include/tpm.h
+	include/hexdump.h
+
+These are the following files that are new and add to SHIM to create TSHIM.
+	httpfile.h
+	httpfile.c
+	Tpm12.h
+	Tpm20.h
+	include/Tpm12.h
+	include/Tpm20.h
+	include/httpfile.h
+	include/netfile.h
+	include/utils.h
+	netfile.c
+	netfile.h
+	utils.h
+
+
