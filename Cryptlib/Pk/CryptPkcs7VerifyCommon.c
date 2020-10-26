@@ -24,6 +24,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 UINT8 mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
 CHAR8 mOidCodeSign[] = "1.3.6.1.5.5.7.3.3";
+CHAR8 mOidModSign[] = "1.3.6.1.4.1.2312.16.1.2";
 
 BOOLEAN ca_warning;
 
@@ -816,6 +817,7 @@ Pkcs7Verify (
   UINTN       SignedDataSize;
   BOOLEAN     Wrapped;
   CONST CHAR8 *RequiredEku[1];
+  CONST CHAR8 *RejectedEku[1];
   EFI_STATUS  EFI_Status;
 
   //
@@ -831,6 +833,7 @@ Pkcs7Verify (
   Cert      = NULL;
   CertStore = NULL;
   RequiredEku[0] = mOidCodeSign;
+  RejectedEku[0] = mOidModSign;
 
   //
   // Register & Initialize necessary digest algorithms for PKCS#7 Handling
@@ -928,6 +931,15 @@ Pkcs7Verify (
   // Bypass the certificate purpose checking by enabling any purposes setting.
   //
   X509_STORE_set_purpose (CertStore, X509_PURPOSE_ANY);
+
+  //
+  // Reject the signature if the signer certificate contains the rejected EKUs
+  // such as ModSign.
+  //
+  EFI_Status = VerifyEKUsInPkcs7Signature(P7Data, P7Length, RejectedEku, 1, FALSE);
+  if (EFI_Status == EFI_SUCCESS) {
+    goto _Exit;
+  }
 
   //
   // Make sure the signer certificate contains the required EKUs such as CodeSign.

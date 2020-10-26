@@ -360,25 +360,23 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
-				if (verify_eku(Cert->SignatureData, CertSize)) {
-					clear_ca_warning();
-					drain_openssl_errors();
-					IsFound = AuthenticodeVerify (data->CertData,
-								      data->Hdr.dwLength - sizeof(data->Hdr),
-								      Cert->SignatureData,
-								      CertSize,
-								      hash, SHA256_DIGEST_SIZE);
-					if (IsFound) {
-						if (get_ca_warning()) {
-							show_ca_warning();
-						}
-						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
-						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
-						drain_openssl_errors();
-						return DATA_FOUND;
-					} else {
-						LogError(L"AuthenticodeVerify(): %d\n", IsFound);
+				clear_ca_warning();
+				drain_openssl_errors();
+				IsFound = AuthenticodeVerify (data->CertData,
+							      data->Hdr.dwLength - sizeof(data->Hdr),
+							      Cert->SignatureData,
+							      CertSize,
+							      hash, SHA256_DIGEST_SIZE);
+				if (IsFound) {
+					if (get_ca_warning()) {
+						show_ca_warning();
 					}
+					dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
+					tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
+					drain_openssl_errors();
+					return DATA_FOUND;
+				} else {
+					LogError(L"AuthenticodeVerify(): %d\n", IsFound);
 				}
 			} else if (verbose) {
 				console_print(L"Not a DER encoded x.509 Certificate");
