@@ -381,6 +381,61 @@ EFI_STATUS tpm_measure_signer(CHAR16 *Name, EFI_GUID VendorGuid,
 }
 #endif /* defined(ENABLE_PCR8_SIGNER) */
 
+#if defined(ENABLE_PCR9_LOADER)
+static void string_hex(UINT8 *str, UINT8 *buf, UINT32 buf_len)
+{
+	const char hexchars[] = "0123456789abcdef";
+	unsigned int i;
+
+	for (i = 0; i < buf_len; i++) {
+		str[(2 * i)] = hexchars[(buf[i] & 0xf0) >> 4];
+		str[(2 * i) + 1] = hexchars[buf[i] & 0x0f];
+	}
+}
+
+EFI_STATUS tpm_measure_loader(UINT8 *digest, UINT32 digest_size,
+			      UINT8 *options, UINT32 options_size)
+{
+	EFI_STATUS efi_status;
+	CHAR8 *log;
+	UINT32 log_size;
+	const CHAR8 digest_prefix[] = "loader digest: 0x";
+	const CHAR8 options_prefix[] = "loader options: 0x";
+	UINT32 prefix_len;
+
+	/* loader digest */
+	prefix_len = sizeof(digest_prefix);
+	log_size = prefix_len + digest_size * 2 + 1;
+	log = AllocateZeroPool(log_size);
+	if (!log)
+		return EFI_OUT_OF_RESOURCES;
+	CopyMem(log, digest_prefix, prefix_len);
+	string_hex(&log[prefix_len], digest, digest_size);
+	efi_status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)digest,
+				       digest_size, 9, log, log_size,
+				       EV_IPL, NULL);
+	FreePool(log);
+	/* if there are no options, we can return */
+	if (EFI_ERROR(efi_status) || options_size == 0)
+		return efi_status;
+
+	/* loader options */
+	prefix_len = sizeof(options_prefix);
+	log_size = prefix_len + options_size * 2 + 1;
+	log = AllocateZeroPool(log_size);
+	if (!log)
+		return EFI_OUT_OF_RESOURCES;
+	CopyMem(log, options_prefix, prefix_len);
+	string_hex(&log[prefix_len], options, options_size);
+	efi_status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)options,
+				       options_size, 9, log, log_size,
+				       EV_IPL, NULL);
+	FreePool(log);
+
+	return efi_status;
+}
+#endif /* defined (ENABLE_PCR9_LOADER) */
+
 EFI_STATUS
 fallback_should_prefer_reset(void)
 {

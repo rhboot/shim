@@ -772,6 +772,50 @@ static BOOLEAN secure_mode (void)
 #define check_size(d,ds,h,hs) check_size_line(d,ds,h,hs,__LINE__)
 
 /*
+ * Calculate the SHA256 hashes of an opaque blob
+ */
+
+#if defined(ENABLE_PCR9_LOADER)
+static EFI_STATUS generate_hash_raw (char *data, unsigned int data_size,
+				     UINT8 *sha256digest)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	void *ctx = NULL;
+	unsigned int ctx_size;
+
+	ctx_size = Sha256GetContextSize();
+	ctx = AllocatePool(ctx_size);
+	if (!ctx) {
+		perror(L"Unable to allocate memory for hash context\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	if (!Sha256Init(ctx)) {
+		perror(L"Unable to initialise hash\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+
+	if (!Sha256Update(ctx, data, data_size)) {
+		perror(L"Unable to generate hash\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+
+	if (!Sha256Final(ctx, sha256digest)) {
+		perror(L"Unable to finalise hash\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+
+out:
+	if (ctx)
+		FreePool(ctx);
+	return efi_status;
+}
+#endif /* defined(ENABLE_PCR9_LOADER) */
+
+/*
  * Calculate the SHA1 and SHA256 hashes of a binary
  */
 
@@ -1728,6 +1772,29 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		li->LoadOptions = load_options;
 		li->LoadOptionsSize = load_options_size;
 	}
+
+#if defined(ENABLE_PCR9_LOADER)
+	{
+		UINT8 loader_digest[SHA256_DIGEST_SIZE];
+		efi_status = generate_hash_raw(data, datasize, loader_digest);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Unable to hash the loader\n");
+			return efi_status;
+		}
+
+		efi_status = tpm_measure_loader(loader_digest,
+						SHA256_DIGEST_SIZE,
+						li->LoadOptions,
+						li->LoadOptionsSize);
+#ifndef REQUIRE_TPM
+		efi_status = EFI_SUCCESS;
+#endif
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Unable to extend the loader into the TPM\n");
+			return efi_status;
+		}
+	}
+#endif /* defined(ENABLE_PCR9_LOADER) */
 
 	if (!found_entry_point) {
 		perror(L"Entry point is not within sections\n");

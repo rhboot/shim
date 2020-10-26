@@ -109,6 +109,10 @@ ifneq ($(origin ENABLE_PCR8_SIGNER), undefined)
 	CFLAGS  += -DENABLE_PCR8_SIGNER
 endif
 
+ifneq ($(origin ENABLE_PCR9_LOADER), undefined)
+	CFLAGS  += -DENABLE_PCR9_LOADER
+endif
+
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --target efi-app-$(ARCH)

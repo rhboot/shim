@@ -29,6 +29,8 @@ PCR8:
   measured into PCR8.
   
 PCR9:
+- If you've built shim with ENABLE_PCR9_LOADER the SHA256 hash of the loader
+  and the original, non-hashed loader options are extended into PCR9.
 - If you're using the grub2 TPM patchset we carry in Fedora, the kernel,
   initramfs, and any multiboot modules loaded are measured into PCR9.
 

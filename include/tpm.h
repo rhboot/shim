@@ -19,6 +19,9 @@ EFI_STATUS tpm_measure_variable(CHAR16 *dbname, EFI_GUID guid, UINTN size, void 
 EFI_STATUS tpm_measure_signer(CHAR16 *Name, EFI_GUID VendorGuid,
 			      UINTN Size, VOID *Data);
 
+EFI_STATUS tpm_measure_loader(UINT8 *digest, UINT32 digest_size,
+			      UINT8 *options, UINT32 options_size);
+
 typedef struct {
   uint8_t Major;
   uint8_t Minor;
