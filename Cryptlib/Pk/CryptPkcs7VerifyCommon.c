@@ -23,6 +23,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <openssl/pkcs7.h>
 
 UINT8 mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
+CHAR8 mOidCodeSign[] = "1.3.6.1.5.5.7.3.3";
 
 BOOLEAN ca_warning;
 
@@ -814,6 +815,8 @@ Pkcs7Verify (
   CONST UINT8 *Temp;
   UINTN       SignedDataSize;
   BOOLEAN     Wrapped;
+  CONST CHAR8 *RequiredEku[1];
+  EFI_STATUS  EFI_Status;
 
   //
   // Check input parameters.
@@ -827,6 +830,7 @@ Pkcs7Verify (
   DataBio   = NULL;
   Cert      = NULL;
   CertStore = NULL;
+  RequiredEku[0] = mOidCodeSign;
 
   //
   // Register & Initialize necessary digest algorithms for PKCS#7 Handling
@@ -924,6 +928,14 @@ Pkcs7Verify (
   // Bypass the certificate purpose checking by enabling any purposes setting.
   //
   X509_STORE_set_purpose (CertStore, X509_PURPOSE_ANY);
+
+  //
+  // Make sure the signer certificate contains the required EKUs such as CodeSign.
+  //
+  EFI_Status = VerifyEKUsInPkcs7Signature(P7Data, P7Length, RequiredEku, 1, TRUE);
+  if (EFI_Status != EFI_SUCCESS) {
+    goto _Exit;
+  }
 
   //
   // Verifies the PKCS#7 signedData structure
