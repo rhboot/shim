@@ -131,6 +131,7 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 	return efi_status;
 }
 
+#if !defined(DISABLE_EBS_PROTECTION)
 static EFI_STATUS EFIAPI
 exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 {
@@ -150,6 +151,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 	gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
 	return EFI_SECURITY_VIOLATION;
 }
+#endif /* !defined(DISABLE_EBS_PROTECTION) */
 
 static EFI_STATUS EFIAPI
 do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
@@ -199,17 +201,22 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 	system_start_image = systab->BootServices->StartImage;
 	systab->BootServices->StartImage = replacement_start_image;
 
+#if !defined(DISABLE_EBS_PROTECTION)
 	/* we need to hook ExitBootServices() so a) we can enforce the policy
 	 * and b) we can unwrap when we're done. */
 	system_exit_boot_services = systab->BootServices->ExitBootServices;
 	systab->BootServices->ExitBootServices = exit_boot_services;
+#endif /* defined(DISABLE_EBS_PROTECTION) */
 }
 
 void
 unhook_exit(void)
 {
+#if !defined(DISABLE_EBS_PROTECTION)
 	systab->BootServices->Exit = system_exit;
 	gBS = systab->BootServices;
+#endif /* defined(DISABLE_EBS_PROTECTION) */
+	return;
 }
 
 void
