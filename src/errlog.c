@@ -1,17 +1,15 @@
 /*
  * errlog.c
  * Copyright 2017 Peter Jones <pjones@redhat.com>
- *
- * Distributed under terms of the GPLv3 license.
  */
-
 #include "shim.h"
+#include "hexdump.h"
 
 static CHAR16 **errs = NULL;
 static UINTN nerrs = 0;
 
 EFI_STATUS
-VLogError(const char *file, int line, const char *func, CHAR16 *fmt, VA_LIST args)
+VLogError(const char *file, int line, const char *func, CONST CHAR16 *fmt, VA_LIST args)
 {
 	VA_LIST args2;
 	CHAR16 **newerrs;
@@ -41,7 +39,7 @@ VLogError(const char *file, int line, const char *func, CHAR16 *fmt, VA_LIST arg
 }
 
 EFI_STATUS
-LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...)
+LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
 {
 	VA_LIST args;
 	EFI_STATUS efi_status;
@@ -51,6 +49,12 @@ LogError_(const char *file, int line, const char *func, CHAR16 *fmt, ...)
 	VA_END(args);
 
 	return efi_status;
+}
+
+VOID
+LogHexdump_(const char *file, int line, const char *func, const void *data, UINTN sz)
+{
+	hexdumpat(file, line, func, data, sz, 0);
 }
 
 VOID

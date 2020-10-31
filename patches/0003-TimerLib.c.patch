@@ -1,7 +1,7 @@
 From 07ee6f2a9826fc8390304df7a78ff7ca81f5a75e Mon Sep 17 00:00:00 2001
 From: "dunno@dunno" <dunno@dunno>
 Date: Thu, 29 Oct 2020 23:36:30 -0400
-Subject: [PATCH 3/5] TimerLib.c changes
+Subject: [PATCH 3/6] TimerLib.c changes
 
 ---
  TimerLib.c |    1 -

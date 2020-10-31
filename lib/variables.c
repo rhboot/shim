@@ -27,30 +27,57 @@
 #include "shim.h"
 
 EFI_STATUS
-variable_create_esl(void *cert, int cert_len, EFI_GUID *type, EFI_GUID *owner,
-		    void **out, int *outlen)
+fill_esl(CONST UINT8 *data, CONST UINTN data_len,
+	 CONST EFI_GUID *type, CONST EFI_GUID *owner,
+	 UINT8 *out, UINTN *outlen)
 {
-	*outlen = cert_len + sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID);
+	EFI_SIGNATURE_LIST *sl;
+	EFI_SIGNATURE_DATA *sd;
+	UINTN needed = 0;
+
+	if (!data || !data_len || !type || !outlen)
+		return EFI_INVALID_PARAMETER;
+
+	needed = sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID) + data_len;
+	if (!out || *outlen < needed) {
+		*outlen = needed;
+		return EFI_BUFFER_TOO_SMALL;
+	}
+
+	*outlen = needed;
+	sl = (EFI_SIGNATURE_LIST *)out;
+
+	sl->SignatureHeaderSize = 0;
+	sl->SignatureType = *type;
+	sl->SignatureSize = sizeof(EFI_GUID) + data_len;
+	sl->SignatureListSize = needed;
+
+	sd = (EFI_SIGNATURE_DATA *)(out + sizeof(EFI_SIGNATURE_LIST));
+	if (owner)
+		sd->SignatureOwner = *owner;
+
+	CopyMem(sd->SignatureData, data, data_len);
+
+	return EFI_SUCCESS;
+}
+
+EFI_STATUS
+variable_create_esl(CONST UINT8 *data, CONST UINTN data_len,
+		    CONST EFI_GUID *type, CONST EFI_GUID *owner,
+		    UINT8 **out, UINTN *outlen)
+{
+	EFI_STATUS efi_status;
+
+	*outlen = 0;
+	efi_status = fill_esl(data, data_len, type, owner, NULL, outlen);
+	if (efi_status != EFI_BUFFER_TOO_SMALL)
+		return efi_status;
 
 	*out = AllocateZeroPool(*outlen);
 	if (!*out)
 		return EFI_OUT_OF_RESOURCES;
 
-	EFI_SIGNATURE_LIST *sl = *out;
-
-	sl->SignatureHeaderSize = 0;
-	sl->SignatureType = *type;
-	sl->SignatureSize = cert_len + sizeof(EFI_GUID);
-	sl->SignatureListSize = *outlen;
-
-	EFI_SIGNATURE_DATA *sd = *out + sizeof(EFI_SIGNATURE_LIST);
-
-	if (owner)
-		sd->SignatureOwner = *owner;
-
-	CopyMem(sd->SignatureData, cert, cert_len);
-
-	return EFI_SUCCESS;
+	return fill_esl(data, data_len, type, owner, *out, outlen);
 }
 
 EFI_STATUS
@@ -139,9 +166,9 @@ SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID *owner,
 		return EFI_SECURITY_VIOLATION;
 
 	if (createtimebased) {
-		int ds;
+		UINTN ds;
 		efi_status = variable_create_esl(Data, len, &gEfiCertX509Guid, NULL,
-						 (void **)&Cert, &ds);
+						 (UINT8 **)&Cert, &ds);
 		if (EFI_ERROR(efi_status)) {
 			console_print(L"Failed to create %s certificate %d\n",
 				      var, efi_status);

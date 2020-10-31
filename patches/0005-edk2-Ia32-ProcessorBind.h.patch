@@ -1,7 +1,7 @@
 From 518be714e1da5933e4b74f22961d763c309348ad Mon Sep 17 00:00:00 2001
 From: "dunno@dunno" <dunno@dunno>
 Date: Thu, 29 Oct 2020 23:36:30 -0400
-Subject: [PATCH 4/5] Fixing Ia32's calling convention
+Subject: [PATCH 4/6] Fixing Ia32's calling convention
 
 ---
  ProcessorBind.h |    2 +-

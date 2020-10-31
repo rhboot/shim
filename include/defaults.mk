@@ -34,6 +34,7 @@ DEBUGINFO	?= $(prefix)/lib/debug/
 DEBUGSOURCE	?= $(prefix)/src/debug/
 DEBUG		?= no
 OSLABEL		?= $(EFIDIR)
+DEFAULT_LOADER	?= \\\\\\\\grub$(EFI_ARCH_SUFFIX).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
 
 ifeq ($(DEBUG),yes)
@@ -71,7 +72,7 @@ EFI_CFLAGS = -Wall -Wsign-compare -Werror -Werror=sign-compare -std=gnu11 \
 		$(EFI_DEBUG_CFLAGS)
 
 define get-config
-$(shell git config --local --get "shim.$(1)")
+$(shell if [ -e .git ] ; then git config --local --get "shim.$(1)"; fi)
 endef
 
 define object-template
@@ -97,7 +98,7 @@ ifneq ($(origin ENABLE_SBSIGN),undefined)
 	@$(SBSIGN) \
 		--key $(BUILDDIR)/certdb/shim.key \
 		--cert $(BUILDDIR)/certdb/shim.crt \
-		--output $(BUILDDIR)/$@ $(BUILDDIR)/$^
+		--output $(BUILDDIR)/$@ $(BUILDDIR)/$<
 else
 .ONESHELL: $(MMNAME).signed $(FBNAME).signed
 %.efi.signed: %.efi certdb/secmod.db

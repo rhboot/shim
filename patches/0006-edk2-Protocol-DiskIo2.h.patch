@@ -1,7 +1,7 @@
 From 0ce6479cbcc3e3f74af8a3633df718b59ad3572a Mon Sep 17 00:00:00 2001
 From: "dunno@dunno" <dunno@dunno>
 Date: Thu, 29 Oct 2020 23:36:30 -0400
-Subject: [PATCH 5/5] Fixing DiskIo2
+Subject: [PATCH 5/6] Fixing DiskIo2
 
 ---
  DiskIo2.h |    2 +-

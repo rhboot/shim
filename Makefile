@@ -13,17 +13,21 @@ EFI_ARCH ?= $(shell $(CC) -dumpmachine | cut -f1 -d- | \
 		)
 
 ifeq ($(MAKELEVEL),0)
-TOPDIR != if [ "$$(git rev-parse --is-inside-work-tree)" = true ]; then echo ./$$(git rev-parse --show-cdup) ; else echo $(PWD) ; fi
+ifneq (, $(shell which git))
+TOPDIR != if [ "$$(git rev-parse --is-inside-work-tree)" = true ]; then echo $$(realpath ./$$(git rev-parse --show-cdup)) ; else echo $(PWD) ; fi
+else
+TOPDIR != echo $(PWD)
+endif
 BUILDDIR ?= $(TOPDIR)/build-$(EFI_ARCH)
 endif
 
-include $(TOPDIR)include/version.mk
+include $(TOPDIR)/include/version.mk
 export VERSION DASHRELEASE EFI_ARCH
 
 all : | mkbuilddir
 % : |
 	@if ! [ -d $(BUILDDIR)/ ] ; then $(MAKE) BUILDDIR=$(BUILDDIR) TOPDIR=$(TOPDIR) mkbuilddir ; fi
-	$(MAKE) TOPDIR=../$(TOPDIR) BUILDDIR=../$(BUILDDIR) -C $(BUILDDIR) -f Makefile $@
+	$(MAKE) TOPDIR=$(TOPDIR) BUILDDIR=$(BUILDDIR) -C $(BUILDDIR) -f Makefile $@
 
 mkbuilddir :
 	@mkdir -p $(BUILDDIR)
@@ -50,8 +54,8 @@ update :
 		git rebase origin/shim-$(VERSION) ; \
 		git config --local --add am.keepcr true ; \
 		git am \
-    		../patches/0004-edk2-Ia32-ProcessorBind.h.patch \
-			../patches/0005-edk2-Protocol-DiskIo2.h.patch
+			../patches/0005-edk2-Ia32-ProcessorBind.h.patch \
+			../patches/0006-edk2-Protocol-DiskIo2.h.patch
 	cd $(TOPDIR) ; \
 		if ! git diff-index --quiet HEAD -- edk2 ; then \
 			git commit -m "Update edk2" edk2 ; \

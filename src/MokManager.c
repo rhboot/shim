@@ -1063,9 +1063,11 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
+	if (DataSize == 0)
+		return EFI_SUCCESS;
 
 	Data = AllocatePool(DataSize);
-	if (Data == NULL && DataSize != 0)
+	if (Data == NULL)
 		return EFI_OUT_OF_RESOURCES;
 
 	ptr = Data;
@@ -1409,7 +1411,7 @@ static CHAR16 get_password_charater(CHAR16 * prompt)
 	EFI_SIMPLE_TEXT_OUTPUT_MODE SavedMode;
 	EFI_STATUS efi_status;
 	CHAR16 *message[2];
-	CHAR16 character;
+	CHAR16 character = 0;
 	UINTN length;
 	UINT32 pw_length;
 

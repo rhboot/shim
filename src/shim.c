@@ -34,6 +34,7 @@
  */
 
 #include "shim.h"
+#include "hexdump.h"
 #if defined(ENABLE_SHIM_CERT)
 #include "shim_cert.h"
 #endif /* defined(ENABLE_SHIM_CERT) */
@@ -60,16 +61,18 @@ static UINT32 load_options_size;
  * The vendor certificate used for validating the second stage loader
  */
 extern struct {
-	UINT32 vendor_cert_size;
-	UINT32 vendor_dbx_size;
-	UINT32 vendor_cert_offset;
-	UINT32 vendor_dbx_offset;
+	UINT32 vendor_authorized_size;
+	UINT32 vendor_deauthorized_size;
+	UINT32 vendor_authorized_offset;
+	UINT32 vendor_deauthorized_offset;
 } cert_table;
 
-UINT32 vendor_cert_size;
-UINT32 vendor_dbx_size;
-CONST UINT8 *vendor_cert;
-CONST UINT8 *vendor_dbx;
+UINT32 vendor_authorized_size = 0;
+CONST UINT8 *vendor_authorized = NULL;
+
+UINT32 vendor_deauthorized_size = 0;
+CONST UINT8 *vendor_deauthorized = NULL;
+
 #if defined(ENABLE_SHIM_CERT)
 UINT32 build_cert_size;
 UINT8 *build_cert;
@@ -175,6 +178,10 @@ static const UINT16 machine_type =
 	IMAGE_FILE_MACHINE_I386;
 #elif defined(__ia64__)
 	IMAGE_FILE_MACHINE_IA64;
+#elif (defined(__riscv) && (__riscv_xlen == 32))
+	IMAGE_FILE_MACHINE_RISCV32;
+#elif (defined(__riscv) && (__riscv_xlen == 64))
+	IMAGE_FILE_MACHINE_RISCV64;
 #else
 #error this architecture is not supported by shim
 #endif
@@ -339,7 +346,6 @@ static EFI_STATUS relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return EFI_SUCCESS;
 }
 
-
 static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 UINTN dbsize,
 					 WIN_CERTIFICATE_EFI_PKCS *data,
@@ -349,14 +355,17 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
 	BOOLEAN IsFound = FALSE;
+	int i = 0;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &gEfiCertX509Guid) == 0) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
+			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
 				if (verify_eku(Cert->SignatureData, CertSize)) {
 					clear_ca_warning();
+					drain_openssl_errors();
 					IsFound = AuthenticodeVerify (data->CertData,
 								      data->Hdr.dwLength - sizeof(data->Hdr),
 								      Cert->SignatureData,
@@ -366,6 +375,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 						if (get_ca_warning()) {
 							show_ca_warning();
 						}
+						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
 						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
 						drain_openssl_errors();
 						return DATA_FOUND;
@@ -374,7 +384,9 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					}
 				}
 			} else if (verbose) {
-				console_notify(L"Not a DER encoding x.509 Certificate");
+				console_print(L"Not a DER encoded x.509 Certificate");
+				dprint(L"cert:\n");
+				dhexdumpat(Cert->SignatureData, CertSize, 0);
 			}
 		}
 
@@ -478,27 +490,27 @@ static CHECK_STATUS check_db_hash(CHAR16 *dbname, EFI_GUID *guid, UINT8 *data,
 
 /*
  * Check whether the binary signature or hash are present in dbx or the
- * built-in blacklist
+ * built-in denylist
  */
-static EFI_STATUS check_blacklist (WIN_CERTIFICATE_EFI_PKCS *cert,
-				   UINT8 *sha256hash, UINT8 *sha1hash)
+static EFI_STATUS check_denylist (WIN_CERTIFICATE_EFI_PKCS *cert,
+				  UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_dbx;
+	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_deauthorized;
 
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha256hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha256hash,
 			SHA256_DIGEST_SIZE, &gEfiCertSha256Guid, L"dbx",
 			&gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash_in_ram(dbx, vendor_dbx_size, sha1hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha1hash,
 				 SHA1_DIGEST_SIZE, &gEfiCertSha1Guid, L"dbx",
 				 &gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
-	    check_db_cert_in_ram(dbx, vendor_dbx_size, cert, sha256hash, L"dbx",
+	    check_db_cert_in_ram(dbx, vendor_deauthorized_size, cert, sha256hash, L"dbx",
 				 &gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
 		LogError(L"cert sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
@@ -544,7 +556,7 @@ static void update_verification_method(verification_method_t method)
 /*
  * Check whether the binary signature or hash are present in db or MokList
  */
-static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
+static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 				   UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	if (!ignore_db) {
@@ -570,10 +582,35 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
 			return EFI_SUCCESS;
-		} else {
+		} else if (cert) {
 			LogError(L"check_db_cert(db, sha256hash) != DATA_FOUND\n");
 		}
 	}
+
+#if defined(VENDOR_DB_FILE)
+	EFI_SIGNATURE_LIST *db = (EFI_SIGNATURE_LIST *)vendor_db;
+
+	if (check_db_hash_in_ram(db, vendor_db_size,
+				 sha256hash, SHA256_DIGEST_SIZE,
+				 &gEfiCertSha256Guid, L"vendor_db",
+				 &gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(vendor_db, sha256hash) != DATA_FOUND\n");
+	}
+	if (cert &&
+	    check_db_cert_in_ram(db, vendor_db_size,
+				 cert, sha256hash, L"vendor_db",
+				 &gEfiImageSecurityDatabaseGuid) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_CERT;
+		update_verification_method(VERIFIED_BY_CERT);
+		return EFI_SUCCESS;
+	} else if (cert) {
+		LogError(L"check_db_cert(vendor_db, sha256hash) != DATA_FOUND\n");
+	}
+#endif
 
 	if (check_db_hash(L"MokList", &gShimLockGuid, sha256hash,
 			  SHA256_DIGEST_SIZE, &gEfiCertSha256Guid)
@@ -589,12 +626,12 @@ static EFI_STATUS check_whitelist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
-	} else {
+	} else if (cert) {
 		LogError(L"check_db_cert(MokList, sha256hash) != DATA_FOUND\n");
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
-	return EFI_SECURITY_VIOLATION;
+	return EFI_NOT_FOUND;
 }
 
 /*
@@ -896,6 +933,11 @@ static EFI_STATUS generate_hash (char *data, unsigned int datasize_in,
 		goto done;
 	}
 
+	dprint(L"sha1 authenticode hash:\n");
+	dhexdumpat(sha1hash, SHA1_DIGEST_SIZE, 0);
+	dprint(L"sha256 authenticode hash:\n");
+	dhexdumpat(sha256hash, SHA256_DIGEST_SIZE, 0);
+
 done:
 	if (SectionHeader)
 		FreePool(SectionHeader);
@@ -907,6 +949,105 @@ done:
 	return efi_status;
 }
 
+static EFI_STATUS
+verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
+		     UINT8 *sha256hash, UINT8 *sha1hash)
+{
+	EFI_STATUS efi_status;
+
+	/*
+	 * Ensure that the binary isn't forbidden
+	 */
+	drain_openssl_errors();
+	efi_status = check_denylist(sig, sha256hash, sha1hash);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Binary is forbidden: %r\n", efi_status);
+		PrintErrors();
+		ClearErrors();
+		crypterr(efi_status);
+		return efi_status;
+	}
+
+	/*
+	 * Check whether the binary is authorized in any of the firmware
+	 * databases
+	 */
+	drain_openssl_errors();
+	efi_status = check_allowlist(sig, sha256hash, sha1hash);
+	if (EFI_ERROR(efi_status)) {
+		if (efi_status != EFI_NOT_FOUND) {
+			dprint(L"check_allowlist(): %r\n", efi_status);
+			PrintErrors();
+			ClearErrors();
+			crypterr(efi_status);
+		}
+	} else {
+		drain_openssl_errors();
+		return efi_status;
+	}
+
+	efi_status = EFI_NOT_FOUND;
+#if defined(ENABLE_SHIM_CERT)
+	/*
+	 * Check against the shim build key
+	 */
+	drain_openssl_errors();
+	if (build_cert && build_cert_size) {
+		dprint("verifying against shim cert\n");
+		LogHexdump(build_cert, build_cert_size);
+	}
+	if (build_cert && build_cert_size &&
+	    AuthenticodeVerify(sig->CertData,
+		       sig->Hdr.dwLength - sizeof(sig->Hdr),
+		       build_cert, build_cert_size, sha256hash,
+		       SHA256_DIGEST_SIZE)) {
+		dprint(L"AuthenticodeVerify(shim_cert) succeeded\n");
+		update_verification_method(VERIFIED_BY_CERT);
+		tpm_measure_variable(L"Shim", &gShimLockGuid,
+				     build_cert_size, build_cert);
+		efi_status = EFI_SUCCESS;
+		drain_openssl_errors();
+		return efi_status;
+	} else {
+		dprint(L"AuthenticodeVerify(shim_cert) failed\n");
+		PrintErrors();
+		ClearErrors();
+		crypterr(EFI_NOT_FOUND);
+	}
+#endif /* defined(ENABLE_SHIM_CERT) */
+
+#if defined(VENDOR_CERT_FILE)
+	/*
+	 * And finally, check against shim's built-in key
+	 */
+	drain_openssl_errors();
+	if (vendor_cert_size) {
+		dprint("verifying against vendor_cert\n");
+		LogHexdump(vendor_cert, sizeof(vendor_cert_size));
+	}
+	if (vendor_cert_size &&
+	    AuthenticodeVerify(sig->CertData,
+			       sig->Hdr.dwLength - sizeof(sig->Hdr),
+			       vendor_cert, vendor_cert_size,
+			       sha256hash, SHA256_DIGEST_SIZE)) {
+		dprint(L"AuthenticodeVerify(vendor_cert) succeeded\n");
+		update_verification_method(VERIFIED_BY_CERT);
+		tpm_measure_variable(L"Shim", &gShimLockGuid,
+				     vendor_cert_size, vendor_cert);
+		efi_status = EFI_SUCCESS;
+		drain_openssl_errors();
+		return efi_status;
+	} else {
+		dprint(L"AuthenticodeVerify(vendor_cert) failed\n");
+		PrintErrors();
+		ClearErrors();
+		crypterr(EFI_NOT_FOUND);
+	}
+#endif /* defined(VENDOR_CERT_FILE) */
+
+	return efi_status;
+}
+
 /*
  * Check that the signature is valid and matches the binary
  */
@@ -914,39 +1055,13 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 				 PE_COFF_LOADER_IMAGE_CONTEXT *context,
 				 UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_STATUS efi_status = EFI_SECURITY_VIOLATION;
-	WIN_CERTIFICATE_EFI_PKCS *cert = NULL;
-	unsigned int size = datasize;
+	EFI_STATUS ret_efi_status;
+	UINTN size = datasize;
+	UINTN offset = 0;
+	unsigned int i = 0;
 
 	if (datasize < 0)
 		return EFI_INVALID_PARAMETER;
-
-	if (context->SecDir->Size != 0) {
-		if (context->SecDir->Size >= size) {
-			perror(L"Certificate Database size is too large\n");
-			return EFI_INVALID_PARAMETER;
-		}
-
-		cert = ImageAddress (data, size,
-				     context->SecDir->VirtualAddress);
-
-		if (!cert) {
-			perror(L"Certificate located outside the image\n");
-			return EFI_INVALID_PARAMETER;
-		}
-
-		if (cert->Hdr.dwLength > context->SecDir->Size) {
-			perror(L"Certificate list size is inconsistent with PE headers");
-			return EFI_INVALID_PARAMETER;
-		}
-
-		if (cert->Hdr.wCertificateType !=
-		    WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
-			perror(L"Unsupported certificate type %x\n",
-				cert->Hdr.wCertificateType);
-			return EFI_UNSUPPORTED;
-		}
-	}
 
 	/*
 	 * Clear OpenSSL's error log, because we get some DSO unimplemented
@@ -955,87 +1070,122 @@ static EFI_STATUS verify_buffer (char *data, int datasize,
 	 */
 	drain_openssl_errors();
 
-	efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
-	if (EFI_ERROR(efi_status)) {
-		LogError(L"generate_hash: %r\n", efi_status);
-		return efi_status;
+	ret_efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
+	if (EFI_ERROR(ret_efi_status)) {
+		dprint(L"generate_hash: %r\n", ret_efi_status);
+		PrintErrors();
+		ClearErrors();
+		crypterr(ret_efi_status);
+		return ret_efi_status;
 	}
 
 	/*
-	 * Ensure that the binary isn't blacklisted
+	 * Ensure that the binary isn't forbidden by hash
 	 */
-	efi_status = check_blacklist(cert, sha256hash, sha1hash);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Binary is blacklisted\n");
-		LogError(L"Binary is blacklisted: %r\n", efi_status);
-		return efi_status;
+	drain_openssl_errors();
+	ret_efi_status = check_denylist(NULL, sha256hash, sha1hash);
+	if (EFI_ERROR(ret_efi_status)) {
+//		perror(L"Binary is forbidden\n");
+//		dprint(L"Binary is forbidden: %r\n", ret_efi_status);
+		PrintErrors();
+		ClearErrors();
+		crypterr(ret_efi_status);
+		return ret_efi_status;
 	}
 
 	/*
-	 * Check whether the binary is whitelisted in any of the firmware
-	 * databases
+	 * Check whether the binary is authorized by hash in any of the
+	 * firmware databases
 	 */
-	efi_status = check_whitelist(cert, sha256hash, sha1hash);
-	if (EFI_ERROR(efi_status)) {
-		LogError(L"check_whitelist(): %r\n", efi_status);
+	drain_openssl_errors();
+	ret_efi_status = check_allowlist(NULL, sha256hash, sha1hash);
+	if (EFI_ERROR(ret_efi_status)) {
+		LogError(L"check_allowlist(): %r\n", ret_efi_status);
+		dprint(L"check_allowlist: %r\n", ret_efi_status);
+		if (ret_efi_status != EFI_NOT_FOUND) {
+			dprint(L"check_allowlist(): %r\n", ret_efi_status);
+			PrintErrors();
+			ClearErrors();
+			crypterr(ret_efi_status);
+			return ret_efi_status;
+		}
 	} else {
 		drain_openssl_errors();
-		return efi_status;
+		return ret_efi_status;
 	}
 
-	if (cert) {
-#if defined(ENABLE_SHIM_CERT)
-		/*
-		 * Check against the shim build key
-		 */
-		clear_ca_warning();
-		if (sizeof(shim_cert) &&
-		    AuthenticodeVerify(cert->CertData,
-			       cert->Hdr.dwLength - sizeof(cert->Hdr),
-			       shim_cert, sizeof(shim_cert), sha256hash,
-			       SHA256_DIGEST_SIZE)) {
-			if (get_ca_warning()) {
-				show_ca_warning();
-			}
-			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", &gShimLockGuid,
-					     sizeof(shim_cert), shim_cert);
-			efi_status = EFI_SUCCESS;
-			drain_openssl_errors();
-			return efi_status;
-		} else {
-			LogError(L"AuthenticodeVerify(shim_cert) failed\n");
-		}
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-		/*
-		 * And finally, check against shim's built-in key
-		 */
-		clear_ca_warning();
-		if (vendor_cert_size &&
-		    AuthenticodeVerify(cert->CertData,
-				       cert->Hdr.dwLength - sizeof(cert->Hdr),
-				       vendor_cert, vendor_cert_size,
-				       sha256hash, SHA256_DIGEST_SIZE)) {
-			if (get_ca_warning()) {
-				show_ca_warning();
-			}
-			update_verification_method(VERIFIED_BY_CERT);
-			tpm_measure_variable(L"Shim", &gShimLockGuid,
-					     vendor_cert_size, vendor_cert);
-			efi_status = EFI_SUCCESS;
-			drain_openssl_errors();
-			return efi_status;
-		} else {
-			LogError(L"AuthenticodeVerify(vendor_cert) failed\n");
-		}
+	if (context->SecDir->Size == 0) {
+		dprint(L"No signatures found\n");
+		return EFI_SECURITY_VIOLATION;
 	}
 
-	LogError(L"Binary is not whitelisted\n");
-	crypterr(EFI_SECURITY_VIOLATION);
-	PrintErrors();
-	efi_status = EFI_SECURITY_VIOLATION;
-	return efi_status;
+	if (context->SecDir->Size >= size) {
+		perror(L"Certificate Database size is too large\n");
+		return EFI_INVALID_PARAMETER;
+	}
+
+	ret_efi_status = EFI_NOT_FOUND;
+	do {
+		WIN_CERTIFICATE_EFI_PKCS *sig = NULL;
+		UINTN sz;
+
+		sig = ImageAddress(data, size,
+				   context->SecDir->VirtualAddress + offset);
+		if (!sig)
+			break;
+
+		sz = offset + offsetof(WIN_CERTIFICATE_EFI_PKCS, Hdr.dwLength)
+		     + sizeof(sig->Hdr.dwLength);
+		if (sz > context->SecDir->Size) {
+			perror(L"Certificate size is too large for secruity database");
+			return EFI_INVALID_PARAMETER;
+		}
+
+		sz = sig->Hdr.dwLength;
+		if (sz > context->SecDir->Size - offset) {
+			perror(L"Certificate size is too large for secruity database");
+			return EFI_INVALID_PARAMETER;
+		}
+
+		if (sz < sizeof(sig->Hdr)) {
+			perror(L"Certificate size is too small for certificate data");
+			return EFI_INVALID_PARAMETER;
+		}
+
+		if (sig->Hdr.wCertificateType == WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
+			EFI_STATUS efi_status;
+
+			dprint(L"Attempting to verify signature %d:\n", i++);
+			LogHexdump(sig, sz);
+
+			efi_status = verify_one_signature(sig, sha256hash, sha1hash);
+
+			/*
+			 * If we didn't get EFI_SECURITY_VIOLATION from
+			 * checking the hashes above, then any dbx entries are
+			 * for a certificate, not this individual binary.
+			 *
+			 * So don't clobber successes with security violation
+			 * here; that just means it isn't a success.
+			 */
+			if (ret_efi_status != EFI_SUCCESS)
+				ret_efi_status = efi_status;
+		} else {
+			perror(L"Unsupported certificate type %x\n",
+				sig->Hdr.wCertificateType);
+		}
+		offset = ALIGN_VALUE(offset + sz, 8);
+	} while (offset < context->SecDir->Size);
+
+	if (ret_efi_status != EFI_SUCCESS) {
+		dprint(L"Binary is not authorized\n");
+		PrintErrors();
+		ClearErrors();
+		crypterr(EFI_SECURITY_VIOLATION);
+		ret_efi_status = EFI_SECURITY_VIOLATION;
+	}
+	drain_openssl_errors();
+	return ret_efi_status;
 }
 
 /*
@@ -1604,6 +1754,7 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 
 	device = li->DeviceHandle;
 
+	dprint(L"attempting to load %s\n", PathName);
 	/*
 	 * Open the device
 	 */
@@ -2099,7 +2250,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	unsigned int i;
 	UINTN second_stage_len;
 
-	second_stage_len = StrLen(DEFAULT_LOADER) + 1;
+	second_stage_len = (StrLen(DEFAULT_LOADER) + 1) * sizeof(CHAR16);
 	second_stage = AllocatePool(second_stage_len);
 	if (!second_stage) {
 		perror(L"Could not allocate %lu bytes\n", second_stage_len);
@@ -2401,7 +2552,7 @@ shim_init(void)
 	}
 
 	if (secure_mode()) {
-		if (vendor_cert_size || vendor_dbx_size) {
+		if (vendor_authorized_size || vendor_deauthorized_size) {
 			/*
 			 * If shim includes its own certificates then ensure
 			 * that anything it boots has performed some
@@ -2466,14 +2617,17 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	verification_method = VERIFIED_BY_NOTHING;
 
-	vendor_cert_size = cert_table.vendor_cert_size;
-	vendor_dbx_size = cert_table.vendor_dbx_size;
-	vendor_cert = (UINT8 *)&cert_table + cert_table.vendor_cert_offset;
-	vendor_dbx = (UINT8 *)&cert_table + cert_table.vendor_dbx_offset;
+	vendor_authorized_size = cert_table.vendor_authorized_size;
+	vendor_authorized = (UINT8 *)&cert_table + cert_table.vendor_authorized_offset;
+
+	vendor_deauthorized_size = cert_table.vendor_deauthorized_size;
+	vendor_deauthorized = (UINT8 *)&cert_table + cert_table.vendor_deauthorized_offset;
+
 #if defined(ENABLE_SHIM_CERT)
 	build_cert_size = sizeof(shim_cert);
 	build_cert = shim_cert;
 #endif /* defined(ENABLE_SHIM_CERT) */
+
 	STATIC CONST CHAR16 *msgs[] = {
 		L"import_mok_state() failed",
 		L"shim_init() failed",
@@ -2489,6 +2643,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Hash = shim_hash;
 	shim_lock_interface.Context = shim_read_header;
 
+	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
+		      __FILE__, __LINE__, __func__, vendor_authorized, vendor_authorized_size);
+	dprint(L"vendor_deauthorized:0x%08lx vendor_deauthorized_size:%lu\n",
+		      __FILE__, __LINE__, __func__, vendor_deauthorized, vendor_deauthorized_size);
 	/*
 	 * Before we do anything else, validate our non-volatile,
 	 * boot-services-only state variables are what we think they are.

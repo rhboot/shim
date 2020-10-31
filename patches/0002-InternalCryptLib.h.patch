@@ -1,7 +1,7 @@
 From 3866926da1ff796a70442c1b76b7abb38f7f2f6a Mon Sep 17 00:00:00 2001
 From: "dunno@dunno" <dunno@dunno>
 Date: Thu, 29 Oct 2020 23:36:30 -0400
-Subject: [PATCH 2/5] InternalCryptLib.h changes
+Subject: [PATCH 2/6] InternalCryptLib.h changes
 
 ---
  InternalCryptLib.h |    4 ++--

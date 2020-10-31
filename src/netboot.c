@@ -137,7 +137,7 @@ static CHAR16 str2ns(CHAR8 *str)
 static CHAR8 *str2ip6(CHAR8 *str)
 {
 	UINT8 i = 0, j = 0, p = 0;
-	size_t len = 0, dotcount = 0;
+	UINTN len = 0, dotcount = 0;
 	enum { MAX_IP6_DOTS = 7 };
 	CHAR8 *a = NULL, *b = NULL, t = 0;
 	static UINT16 ip[8];
@@ -267,6 +267,15 @@ static EFI_STATUS parseDhcp4()
 		 */
 		if(pxe->Mode->DhcpAck.Dhcpv4.BootpBootFile[0] == '\0')
 			pkt_v4 = &pxe->Mode->ProxyOffer.Dhcpv4;
+	}
+
+	if(pxe->Mode->PxeReplyReceived) {
+		/*
+		 * If we have no bootinfo yet search for it in the PxeReply.
+		 * Some mainboards run into this when the server uses boot menus
+		 */
+		if(pkt_v4->BootpBootFile[0] == '\0' && pxe->Mode->PxeReply.Dhcpv4.BootpBootFile[0] != '\0')
+			pkt_v4 = &pxe->Mode->PxeReply.Dhcpv4;
 	}
 
 	INTN dir_len = strnlena((CHAR8 *)pkt_v4->BootpBootFile, 127);

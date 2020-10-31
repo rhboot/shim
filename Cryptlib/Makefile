@@ -1,5 +1,4 @@
-CRYPTLIB_SOURCES = $(shell cd $(TOPDIR) ; cat edk2/CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf | dos2unix | grep '.*\.c$$' | sed 's,^ \+,Cryptlib/,' | git check-ignore --stdin -n -v | grep :: | cut -d: -f3- | sort -u) \
-	Cryptlib/Library/TimerLib.c Cryptlib/Library/Console.c
+include $(TOPDIR)/Cryptlib/cryptlib.mk
 
 ifeq ($(EFI_ARCH),ia32)
 	CRYPTLIB_SOURCES+=Cryptlib/Library/Ia32/GccInline.c

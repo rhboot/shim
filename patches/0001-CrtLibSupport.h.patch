@@ -1,7 +1,7 @@
 From ed3c34948164ae2a3870bda17a69cf1158c28fe1 Mon Sep 17 00:00:00 2001
 From: "dunno@dunno" <dunno@dunno>
 Date: Thu, 29 Oct 2020 23:36:30 -0400
-Subject: [PATCH 1/5] CrtLibSupport.h changes
+Subject: [PATCH 1/6] CrtLibSupport.h changes
 
 ---
  CrtLibSupport.h |   46 ++++++++++++++++++++++++++++++++++++++--------

@@ -1,0 +1,22 @@
+From 5240d6157995cbd0e2ecfc160e221a32f243e4eb Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Thu, 31 Oct 2020 16:05:30 -0400
+Subject: [PATCH 4/6] CryptX509.c changes
+
+---
+ CryptX509.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Cryptlib/Pk/CryptX509.c b/Cryptlib/Pk/CryptX509.c
+index 9b5579e..7bb3265 100644
+--- a/Cryptlib/Pk/CryptX509.c
++++ b/Cryptlib/Pk/CryptX509.c
+@@ -751,7 +751,7 @@ X509GetTBSCert (
+   CONST UINT8  *Temp;
+   UINT32       Asn1Tag;
+   UINT32       ObjClass;
+-  UINTN        Length;
++  unsigned long Length;
+ 
+   //
+   // Check input parameters.
