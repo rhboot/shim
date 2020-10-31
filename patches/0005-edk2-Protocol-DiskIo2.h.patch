@@ -1,0 +1,22 @@
+From 0ce6479cbcc3e3f74af8a3633df718b59ad3572a Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Thu, 29 Oct 2020 23:36:30 -0400
+Subject: [PATCH 5/5] Fixing DiskIo2
+
+---
+ DiskIo2.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/MdePkg/Include/Protocol/DiskIo2.h b/MdePkg/Include/Protocol/DiskIo2.h
+index 08f2aabcd4..fdb6715977 100644
+--- a/MdePkg/Include/Protocol/DiskIo2.h
++++ b/MdePkg/Include/Protocol/DiskIo2.h
+@@ -14,7 +14,7 @@
+ 
+ #define EFI_DISK_IO2_PROTOCOL_GUID \
+   { \
+-    0x151c8eae, 0x7f2c, 0x472c, 0x9e, 0x54, 0x98, 0x28, 0x19, 0x4f, 0x6a, 0x88 \
++    0x151c8eae, 0x7f2c, 0x472c, {0x9e, 0x54, 0x98, 0x28, 0x19, 0x4f, 0x6a, 0x88} \
+   }
+ 
+ typedef struct _EFI_DISK_IO2_PROTOCOL EFI_DISK_IO2_PROTOCOL;

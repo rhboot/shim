@@ -7,9 +7,10 @@
 #include <efi.h>
 #include <efilib.h>
 #include <stdarg.h>
-#include <stdbool.h>
 
 #include "shim.h"
+
+#include <Protocol/GraphicsOutput.h>
 
 static UINT8 console_text_mode = 0;
 
@@ -484,6 +485,90 @@ console_countdown(CHAR16* title, const CHAR16* message, int timeout)
 	return timeout;
 }
 
+#define HORIZONTAL_MAX_OK 1920
+#define VERTICAL_MAX_OK 1080
+#define COLUMNS_MAX_OK 200
+#define ROWS_MAX_OK 100
+
+void
+console_mode_handle(VOID)
+{
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = gST->ConOut;
+	EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
+	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
+
+	UINTN mode_set;
+	UINTN rows = 0, columns = 0;
+	EFI_STATUS efi_status = EFI_SUCCESS;
+
+	efi_status = gBS->LocateProtocol(&gEfiGraphicsOutputProtocolGuid, NULL, (void **)&gop);
+	if (EFI_ERROR(efi_status)) {
+		console_error(L"Locate graphic output protocol fail", efi_status);
+		return;
+	}
+
+	Info = gop->Mode->Info;
+
+	/*
+	 * Start verifying if we are in a resolution larger than Full HD
+	 * (1920x1080). If we're not, assume we're in a good mode and do not
+	 * try to change it.
+	 */
+	if (Info->HorizontalResolution <= HORIZONTAL_MAX_OK &&
+	    Info->VerticalResolution <= VERTICAL_MAX_OK) {
+		/* keep original mode and return */
+		return;
+	}
+
+        efi_status = co->QueryMode(co, co->Mode->Mode, &columns, &rows);
+	if (EFI_ERROR(efi_status)) {
+		console_error(L"Console query mode fail", efi_status);
+		return;
+	}
+
+	/*
+	 * Verify current console output to check if the character columns and
+	 * rows in a good mode.
+	 */
+	if (columns <= COLUMNS_MAX_OK && rows <= ROWS_MAX_OK) {
+		/* keep original mode and return */
+		return;
+	}
+
+	if (!console_text_mode)
+		setup_console(1);
+
+	co->Reset(co, TRUE);
+
+	/*
+	 * If we reached here, then we have a high resolution screen and the
+	 * text too small. Try to switch to a better mode. Mode number 2 is
+	 * first non standard mode, which is provided by the device
+	 * manufacturer, so it should be a good mode.
+	 */
+	if (co->Mode->MaxMode > 2)
+		mode_set = 2;
+	else
+		mode_set = 0;
+
+	efi_status = co->SetMode(co, mode_set);
+	if (EFI_ERROR(efi_status) && mode_set != 0) {
+		/*
+		 * Set to 0 mode which is required that all output devices
+		 * support at least 80x25 text mode.
+		 */
+		mode_set = 0;
+		efi_status = co->SetMode(co, mode_set);
+	}
+
+	co->ClearScreen(co);
+
+	if (EFI_ERROR(efi_status)) {
+		console_error(L"Console set mode fail", efi_status);
+	}
+
+	return;
+}
 /* Copy of gnu-efi-3.0 with the added secure boot strings */
 static struct {
     EFI_STATUS      Code;
@@ -616,33 +701,6 @@ setup_verbosity(VOID)
 	}
 
 	setup_console(-1);
-}
-
-/* Included here because they mess up the definition of VA_LIST and friends */
-#include <Library/BaseCryptLib.h>
-#include <openssl/err.h>
-#include <openssl/crypto.h>
-
-static int
-print_errors_cb(const char *str, size_t len, void *u)
-{
-	console_print(L"%a", str);
-
-	return len;
-}
-
-EFI_STATUS
-print_crypto_errors(EFI_STATUS efi_status,
-		    char *file, const char *func, int line)
-{
-	if (!(verbose && EFI_ERROR(efi_status)))
-		return efi_status;
-
-	console_print(L"SSL Error: %a:%d %a(): %r\n", file, line, func,
-		      efi_status);
-	ERR_print_errors_cb(print_errors_cb, NULL);
-
-	return efi_status;
 }
 
 VOID

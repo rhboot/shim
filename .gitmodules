@@ -1,3 +1,7 @@
 [submodule "fwimage"]
 	path = fwimage
 	url = https://github.com/rusnikola/fwimage
+[submodule "edk2"]
+	path = edk2
+	url = https://github.com/rhboot/edk2.git
+	branch = shim-16

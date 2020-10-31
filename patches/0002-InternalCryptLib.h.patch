@@ -1,0 +1,30 @@
+From 3866926da1ff796a70442c1b76b7abb38f7f2f6a Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Thu, 29 Oct 2020 23:36:30 -0400
+Subject: [PATCH 2/5] InternalCryptLib.h changes
+
+---
+ InternalCryptLib.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Cryptlib/InternalCryptLib.h b/Cryptlib/InternalCryptLib.h
+index ff6d338..e1fb8aa 100644
+--- a/Cryptlib/InternalCryptLib.h
++++ b/Cryptlib/InternalCryptLib.h
+@@ -12,14 +12,14 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
+ #undef _WIN32
+ #undef _WIN64
+ 
++#include "CrtLibSupport.h"
++
+ #include <Library/BaseLib.h>
+ #include <Library/BaseMemoryLib.h>
+ #include <Library/MemoryAllocationLib.h>
+ #include <Library/DebugLib.h>
+ #include <Library/BaseCryptLib.h>
+ 
+-#include "CrtLibSupport.h"
+-
+ #include <openssl/opensslv.h>
+ 
+ #if OPENSSL_VERSION_NUMBER < 0x10100000L

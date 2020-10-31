@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2010-2018 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -12,6 +12,7 @@
 #include <string.h>
 #include "internal/cryptlib.h"
 #include <openssl/cmac.h>
+#include <openssl/err.h>
 
 struct CMAC_CTX_st {
     /* Cipher context to use */
@@ -46,9 +47,10 @@ CMAC_CTX *CMAC_CTX_new(void)
 {
     CMAC_CTX *ctx;
 
-    ctx = OPENSSL_malloc(sizeof(*ctx));
-    if (ctx == NULL)
+    if ((ctx = OPENSSL_malloc(sizeof(*ctx))) == NULL) {
+        CRYPTOerr(CRYPTO_F_CMAC_CTX_NEW, ERR_R_MALLOC_FAILURE);
         return NULL;
+    }
     ctx->cctx = EVP_CIPHER_CTX_new();
     if (ctx->cctx == NULL) {
         OPENSSL_free(ctx);
@@ -60,7 +62,7 @@ CMAC_CTX *CMAC_CTX_new(void)
 
 void CMAC_CTX_cleanup(CMAC_CTX *ctx)
 {
-    EVP_CIPHER_CTX_free(ctx->cctx);
+    EVP_CIPHER_CTX_reset(ctx->cctx);
     OPENSSL_cleanse(ctx->tbl, EVP_MAX_BLOCK_LENGTH);
     OPENSSL_cleanse(ctx->k1, EVP_MAX_BLOCK_LENGTH);
     OPENSSL_cleanse(ctx->k2, EVP_MAX_BLOCK_LENGTH);
@@ -78,6 +80,7 @@ void CMAC_CTX_free(CMAC_CTX *ctx)
     if (!ctx)
         return;
     CMAC_CTX_cleanup(ctx);
+    EVP_CIPHER_CTX_free(ctx->cctx);
     OPENSSL_free(ctx);
 }
 

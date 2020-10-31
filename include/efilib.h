@@ -203,3 +203,11 @@ StatusToString (
 	OUT CHAR16	*buffer,
 	IN EFI_STATUS	efi_status
 	);
+
+/* Used by Cryptlib. */
+UINTN
+console_print(const CHAR16 *fmt, ...);
+UINTN
+console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...);
+#define Print console_print
+#define PrintAt console_print_at

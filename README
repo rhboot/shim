@@ -3,20 +3,20 @@ Native UEFI shim. Forked from https://github.com/rhboot/shim
 by Ruslan Nikolaev
 
 Distinctive Features:
-1. Completely standalone, i.e. does not require the gnu-efi library. To access
+1. Completely standalone, i.e., does not require the gnu-efi library. To access
    UEFI interfaces, it is using official Edk2/TianoCore headers.
-2. Native UEFI PE/COFF (DLL) compilation using out-of-box clang/llvm
+2. Native UEFI PE/COFF (DLL) compilation using out-of-the-box clang/llvm
    (or, potentially, the mingw-gcc cross-compiler) instead of creating
    internally relocatable ELF objects with PE/COFF wrapper stubs (gnu-efi).
-3. The Edk's FwImage tool (which I ported from Windows to Linux/POSIX)
+3. Edk's FwImage tool (which I ported from Windows to Linux/POSIX)
    converts DLL to EFI.
 4. Using smarter linking with llvm's PE/COFF lld-link to prune all unused
    functions/objects in the OpenSSL library.
 5. Added own printf, string, memory, etc implementations to substitute
    functions previously imported from gnu-efi.
 6. As the result, substantially reduced footprints of EFI files
-   (e.g., 425Kb vs 1Mb for shimx64.efi compiled with -Os).
-7. Fixed some bugs, removed a lot of copy&paste code from TianoCore
+   (e.g., 425Kb vs. 1Mb for shimx64.efi compiled with -Os).
+7. Fixed some bugs, removed a lot of copy & paste code from TianoCore
    (official TianoCore headers are now used anyway) and added other
    improvements to the code.
 

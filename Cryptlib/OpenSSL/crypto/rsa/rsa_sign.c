@@ -73,6 +73,13 @@ int RSA_sign(int type, const unsigned char *m, unsigned int m_len,
     unsigned char *tmps = NULL;
     const unsigned char *encoded = NULL;
 
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(rsa->meth->flags & RSA_FLAG_FIPS_METHOD)
+        && !(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)) {
+        RSAerr(RSA_F_RSA_SIGN, RSA_R_NON_FIPS_RSA_METHOD);
+        return 0;
+    }
+#endif
     if (rsa->meth->rsa_sign) {
         return rsa->meth->rsa_sign(type, m, m_len, sigret, siglen, rsa);
     }
@@ -100,8 +107,9 @@ int RSA_sign(int type, const unsigned char *m, unsigned int m_len,
         RSAerr(RSA_F_RSA_SIGN, RSA_R_DIGEST_TOO_BIG_FOR_RSA_KEY);
         goto err;
     }
-    encrypt_len = RSA_private_encrypt(encoded_len, encoded, sigret, rsa,
-                                      RSA_PKCS1_PADDING);
+    /* NB: call underlying method directly to avoid FIPS blocking */
+    encrypt_len = rsa->meth->rsa_priv_enc ? rsa->meth->rsa_priv_enc(encoded_len, encoded, sigret, rsa,
+                                                                    RSA_PKCS1_PADDING) : 0;
     if (encrypt_len <= 0)
         goto err;
 

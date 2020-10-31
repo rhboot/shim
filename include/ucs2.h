@@ -36,8 +36,6 @@
 #ifndef SHIM_UCS2_H
 #define SHIM_UCS2_H
 
-#include <stdbool.h>
-
 static inline INTN
 __attribute__((unused))
 StrCaseCmp(CHAR16 *s0, CHAR16 *s1)
@@ -96,7 +94,7 @@ StrCSpn(const CHAR16 *s, const CHAR16 *reject)
  * implementation "gracefully" ignores the difference between the
  * UTF-8/ASCII 1-byte NUL and the UCS-2 2-byte NUL.
  */
-static inline bool
+static inline BOOLEAN
 __attribute__((__unused__))
 is_all_nuls(UINT8 *data, UINTN data_size)
 {
@@ -104,9 +102,9 @@ is_all_nuls(UINT8 *data, UINTN data_size)
 
 	for (i = 0; i < data_size; i++) {
 		if (data[i] != 0)
-			return false;
+			return FALSE;
 	}
-	return true;
+	return TRUE;
 }
 
 static inline UINTN

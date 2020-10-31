@@ -1,27 +1,22 @@
-TARGET = lib.a
-
-LIBFILES	= memory.o
-ifeq ($(ARCH),x86_64)
-	LIBFILES	= memory_x64.o
+LIB_SOURCES = $(foreach x,$(wildcard $(TOPDIR)/lib/*.c),$(subst $(TOPDIR)/,,$(x)))
+ifeq ($(EFI_ARCH),x64)
+	LIB_SOURCES	:= $(filter-out lib/memory.c,$(LIB_SOURCES)) lib/memory_x64.S
 endif
-ifeq ($(ARCH),ia32)
-	LIBFILES	= memory_x86.o
+ifeq ($(EFI_ARCH),ia32)
+	LIB_SOURCES := $(filter-out lib/memory.c,$(LIB_SOURCES)) lib/memory_x86.S
 endif
 
-LIBFILES	+= simple_file.o guid.o console.o printf.o efilib.o dpath.o misc.o execute.o configtable.o shell.o variables.o security_policy.o
+LIB_OBJECTS = $(foreach x,$(LIB_SOURCES),$(patsubst %.S,%.efi.o,$(patsubst %.c,%.efi.o,$(x))))
 
-EFI_INCLUDES    = -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_EFI) -I$(TOPDIR)/../include \
-		  -I$(TOPDIR)/CryptLib/Include/openssl/
+$(foreach x,$(LIB_SOURCES),$(eval vpath $(x) $(TOPDIR)))
+$(foreach x,$(LIB_OBJECTS),$(eval vpath $(x) $(BUILDDIR)))
+$(foreach x,$(LIB_SOURCES),$(eval $(call object-template,lib/,$(x),$$(CRYPTLIB_INCLUDES))))
 
-%.o : %.S
-	$(CC) $(CFLAGS) -c -o $@ $<
+clean-lib-objs :
+	@rm -rf $(BUILDDIR)/lib
 
-lib.a: $(LIBFILES)
-	$(AR) rcs lib.a $(LIBFILES)
+clean : | clean-lib-objs
 
-all: $(TARGET)
-
-clean:
-	rm -f lib.a
-	rm -f $(LIBFILES)
-
+vpath lib.efi.a $(BUILDDIR)/lib
+lib.efi.a : $(LIB_OBJECTS)
+	$(AR) rcsD $@ $^

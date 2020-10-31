@@ -2,13 +2,15 @@
  * WARNING: do not edit!
  * Generated from include/openssl/opensslconf.h.in
  *
- * Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2018 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
  */
+
+#include <openssl/opensslv.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -62,9 +64,6 @@ extern "C" {
 #ifndef OPENSSL_NO_MD2
 # define OPENSSL_NO_MD2
 #endif
-#ifndef OPENSSL_NO_MD4
-# define OPENSSL_NO_MD4
-#endif
 #ifndef OPENSSL_NO_MDC2
 # define OPENSSL_NO_MDC2
 #endif
@@ -83,17 +82,23 @@ extern "C" {
 #ifndef OPENSSL_NO_SEED
 # define OPENSSL_NO_SEED
 #endif
+#ifndef OPENSSL_NO_SIPHASH
+# define OPENSSL_NO_SIPHASH
+#endif
+#ifndef OPENSSL_NO_SM2
+# define OPENSSL_NO_SM2
+#endif
 #ifndef OPENSSL_NO_SRP
 # define OPENSSL_NO_SRP
 #endif
 #ifndef OPENSSL_NO_TS
 # define OPENSSL_NO_TS
 #endif
-#ifndef OPENSSL_NO_UI
-# define OPENSSL_NO_UI
-#endif
 #ifndef OPENSSL_NO_WHIRLPOOL
 # define OPENSSL_NO_WHIRLPOOL
+#endif
+#ifndef OPENSSL_RAND_SEED_NONE
+# define OPENSSL_RAND_SEED_NONE
 #endif
 #ifndef OPENSSL_NO_AFALGENG
 # define OPENSSL_NO_AFALGENG
@@ -116,6 +121,9 @@ extern "C" {
 #ifndef OPENSSL_NO_AUTOERRINIT
 # define OPENSSL_NO_AUTOERRINIT
 #endif
+#ifndef OPENSSL_NO_AUTOLOAD_CONFIG
+# define OPENSSL_NO_AUTOLOAD_CONFIG
+#endif
 #ifndef OPENSSL_NO_CAPIENG
 # define OPENSSL_NO_CAPIENG
 #endif
@@ -127,6 +135,9 @@ extern "C" {
 #endif
 #ifndef OPENSSL_NO_DEPRECATED
 # define OPENSSL_NO_DEPRECATED
+#endif
+#ifndef OPENSSL_NO_DEVCRYPTOENG
+# define OPENSSL_NO_DEVCRYPTOENG
 #endif
 #ifndef OPENSSL_NO_DGRAM
 # define OPENSSL_NO_DGRAM
@@ -160,6 +171,9 @@ extern "C" {
 #endif
 #ifndef OPENSSL_NO_ERR
 # define OPENSSL_NO_ERR
+#endif
+#ifndef OPENSSL_NO_EXTERNAL_TESTS
+# define OPENSSL_NO_EXTERNAL_TESTS
 #endif
 #ifndef OPENSSL_NO_FILENAMES
 # define OPENSSL_NO_FILENAMES
@@ -215,6 +229,9 @@ extern "C" {
 #ifndef OPENSSL_NO_TESTS
 # define OPENSSL_NO_TESTS
 #endif
+#ifndef OPENSSL_NO_TLS1_3
+# define OPENSSL_NO_TLS1_3
+#endif
 #ifndef OPENSSL_NO_UBSAN
 # define OPENSSL_NO_UBSAN
 #endif
@@ -223,6 +240,9 @@ extern "C" {
 #endif
 #ifndef OPENSSL_NO_WEAK_SSL_CIPHERS
 # define OPENSSL_NO_WEAK_SSL_CIPHERS
+#endif
+#ifndef OPENSSL_NO_DYNAMIC_ENGINE
+# define OPENSSL_NO_DYNAMIC_ENGINE
 #endif
 #ifndef OPENSSL_NO_AFALGENG
 # define OPENSSL_NO_AFALGENG
@@ -241,12 +261,14 @@ extern "C" {
  * still won't see them if the library has been built to disable deprecated
  * functions.
  */
-#if defined(OPENSSL_NO_DEPRECATED)
-# define DECLARE_DEPRECATED(f)
-#elif __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ > 0)
-# define DECLARE_DEPRECATED(f)    f __attribute__ ((deprecated));
-#else
+#ifndef DECLARE_DEPRECATED
 # define DECLARE_DEPRECATED(f)   f;
+# ifdef __GNUC__
+#  if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ > 0)
+#   undef DECLARE_DEPRECATED
+#   define DECLARE_DEPRECATED(f)    f __attribute__ ((deprecated));
+#  endif
+# endif
 #endif
 
 #ifndef OPENSSL_FILE
@@ -268,6 +290,18 @@ extern "C" {
 # define OPENSSL_API_COMPAT OPENSSL_MIN_API
 #endif
 
+/*
+ * Do not deprecate things to be deprecated in version 1.2.0 before the
+ * OpenSSL version number matches.
+ */
+#if OPENSSL_VERSION_NUMBER < 0x10200000L
+# define DEPRECATEDIN_1_2_0(f)   f;
+#elif OPENSSL_API_COMPAT < 0x10200000L
+# define DEPRECATEDIN_1_2_0(f)   DECLARE_DEPRECATED(f)
+#else
+# define DEPRECATEDIN_1_2_0(f)
+#endif
+
 #if OPENSSL_API_COMPAT < 0x10100000L
 # define DEPRECATEDIN_1_1_0(f)   DECLARE_DEPRECATED(f)
 #else
@@ -285,8 +319,6 @@ extern "C" {
 #else
 # define DEPRECATEDIN_0_9_8(f)
 #endif
-
-
 
 /* Generate 80386 code? */
 #undef I386_ONLY
@@ -308,6 +340,11 @@ extern "C" {
 #endif
 
 #define RC4_INT unsigned int
+
+/* Always build FIPS module */
+#ifndef OPENSSL_FIPS
+# define OPENSSL_FIPS
+#endif
 
 #ifdef  __cplusplus
 }

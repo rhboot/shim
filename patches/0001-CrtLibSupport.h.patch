@@ -1,0 +1,94 @@
+From ed3c34948164ae2a3870bda17a69cf1158c28fe1 Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Thu, 29 Oct 2020 23:36:30 -0400
+Subject: [PATCH 1/5] CrtLibSupport.h changes
+
+---
+ CrtLibSupport.h |   46 ++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 38 insertions(+), 8 deletions(-)
+
+diff --git a/Cryptlib/Include/CrtLibSupport.h b/Cryptlib/Include/CrtLibSupport.h
+index 81d10b8..64f463d 100644
+--- a/Cryptlib/Include/CrtLibSupport.h
++++ b/Cryptlib/Include/CrtLibSupport.h
+@@ -10,6 +10,9 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
+ #ifndef __CRT_LIB_SUPPORT_H__
+ #define __CRT_LIB_SUPPORT_H__
+ 
++#include <efi.h>
++#include <efilib.h>
++#include <internal/numbers.h>
+ #include "Base.h"
+ #include "Library/BaseLib.h"
+ #include "Library/BaseMemoryLib.h"
+@@ -80,6 +83,39 @@ typedef VOID  *FILE;
+ #define ULONG_MAX    0xFFFFFFFF       /* Maximum unsigned long value */
+ #define CHAR_BIT     8                /* Number of bits in a char */
+ 
++//
++// Map all va_xxxx elements to VA_xxx defined in MdePkg/Include/Base.h
++//
++#if !defined(__CC_ARM) || defined(_STDARG_H) // if va_list is not already defined
++/*
++ * These are now unconditionally #defined by GNU_EFI's efistdarg.h,
++ * so we should #undef them here before providing a new definition.
++ */
++#undef va_arg
++#undef va_start
++#undef va_end
++
++#define va_list   VA_LIST
++#define va_arg    VA_ARG
++#define va_start  VA_START
++#define va_end    VA_END
++
++#else // __CC_ARM
++#define va_start(Marker, Parameter)   __va_start(Marker, Parameter)
++#define va_arg(Marker, TYPE)          __va_arg(Marker, TYPE)
++#define va_end(Marker)                ((void)0)
++#endif
++
++typedef INT8 int8_t;
++typedef INT16 int16_t;
++typedef INT32 int32_t;
++typedef INT64 int64_t;
++
++typedef UINT8 uint8_t;
++typedef UINT16 uint16_t;
++typedef UINT32 uint32_t;
++typedef UINT64 uint64_t;
++
+ //
+ // Macros from EFI Application Toolkit required to buiild Open SSL
+ //
+@@ -94,8 +130,6 @@ typedef VOID  *FILE;
+ 
+ typedef UINTN RETURN_STATUS;
+ 
+-#define MAX_BIT     (1ULL << (sizeof (INTN) * 8 - 1))
+-
+ #define ENCODE_ERROR(StatusCode)     ((RETURN_STATUS)(MAX_BIT | (StatusCode)))
+ #define ENCODE_WARNING(StatusCode)   ((RETURN_STATUS)(StatusCode))
+ #define RETURN_ERROR(StatusCode)     (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
+@@ -324,11 +358,7 @@ extern FILE  *stdout;
+ //
+ // Macros that directly map functions to BaseLib, BaseMemoryLib, and DebugLib functions
+ //
+-#define memcpy(dest,source,count)         ( {CopyMem(dest,source,(UINTN)(count)); dest; })
+-#define memset(dest,ch,count)             SetMem(dest,(UINTN)(count),(UINT8)(ch))
+ #define memchr(buf,ch,count)              ScanMem8((CHAR8 *)buf,(UINTN)(count),ch)
+-#define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
+-#define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
+ #define strlen(str)                       (size_t)(AsciiStrnLenS(str,MAX_STRING_SIZE))
+ #define strcpy(strDest,strSource)         AsciiStrCpyS(strDest,MAX_STRING_SIZE,strSource)
+ #define strncpy(strDest,strSource,count)  AsciiStrnCpyS(strDest,MAX_STRING_SIZE,strSource,(UINTN)count)
+@@ -342,7 +372,7 @@ extern FILE  *stdout;
+ #define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
+ #define gmtime_r(timer,result)            (result = NULL)
+ 
+-void clear_ca_warning();
+-BOOLEAN get_ca_warning();
++void clear_ca_warning(void);
++BOOLEAN get_ca_warning(void);
+ 
+ #endif

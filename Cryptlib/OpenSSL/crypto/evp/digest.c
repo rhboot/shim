@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2019 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -14,6 +14,9 @@
 #include <openssl/engine.h>
 #include "internal/evp_int.h"
 #include "evp_locl.h"
+#ifdef OPENSSL_FIPS
+# include <openssl/fips.h>
+#endif
 
 /* This call frees resources associated with the context */
 int EVP_MD_CTX_reset(EVP_MD_CTX *ctx)
@@ -32,7 +35,12 @@ int EVP_MD_CTX_reset(EVP_MD_CTX *ctx)
         && !EVP_MD_CTX_test_flags(ctx, EVP_MD_CTX_FLAG_REUSE)) {
         OPENSSL_clear_free(ctx->md_data, ctx->digest->ctx_size);
     }
-    EVP_PKEY_CTX_free(ctx->pctx);
+    /*
+     * pctx should be freed by the user of EVP_MD_CTX
+     * if EVP_MD_CTX_FLAG_KEEP_PKEY_CTX is set
+     */
+    if (!EVP_MD_CTX_test_flags(ctx, EVP_MD_CTX_FLAG_KEEP_PKEY_CTX))
+        EVP_PKEY_CTX_free(ctx->pctx);
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_finish(ctx->engine);
 #endif
@@ -61,6 +69,12 @@ int EVP_DigestInit(EVP_MD_CTX *ctx, const EVP_MD *type)
 int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl)
 {
     EVP_MD_CTX_clear_flags(ctx, EVP_MD_CTX_FLAG_CLEANED);
+#ifdef OPENSSL_FIPS
+    if (FIPS_selftest_failed()) {
+        FIPSerr(FIPS_F_EVP_DIGESTINIT_EX, FIPS_R_FIPS_SELFTEST_FAILED);
+        return 0;
+    }
+#endif
 #ifndef OPENSSL_NO_ENGINE
     /*
      * Whether it's nice or not, "Inits" can be used on "Final"'d contexts so
@@ -114,6 +128,15 @@ int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl)
     }
 #endif
     if (ctx->digest != type) {
+#ifdef OPENSSL_FIPS
+        if (FIPS_mode()) {
+            if (!(type->flags & EVP_MD_FLAG_FIPS)
+                && !(ctx->flags & EVP_MD_CTX_FLAG_NON_FIPS_ALLOW)) {
+                EVPerr(EVP_F_EVP_DIGESTINIT_EX, EVP_R_DISABLED_FOR_FIPS);
+                return 0;
+            }
+        }
+#endif
         if (ctx->digest && ctx->digest->ctx_size) {
             OPENSSL_clear_free(ctx->md_data, ctx->digest->ctx_size);
             ctx->md_data = NULL;
@@ -145,6 +168,13 @@ int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl)
 
 int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *data, size_t count)
 {
+#ifdef OPENSSL_FIPS
+    FIPS_selftest_check();
+#endif
+
+    if (count == 0)
+        return 1;
+
     return ctx->update(ctx, data, count);
 }
 
@@ -162,6 +192,9 @@ int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *size)
 {
     int ret;
 
+#ifdef OPENSSL_FIPS
+    FIPS_selftest_check();
+#endif
     OPENSSL_assert(ctx->digest->md_size <= EVP_MAX_MD_SIZE);
     ret = ctx->digest->final(ctx, md);
     if (size != NULL)
@@ -171,6 +204,27 @@ int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *size)
         EVP_MD_CTX_set_flags(ctx, EVP_MD_CTX_FLAG_CLEANED);
     }
     OPENSSL_cleanse(ctx->md_data, ctx->digest->ctx_size);
+    return ret;
+}
+
+int EVP_DigestFinalXOF(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
+{
+    int ret = 0;
+
+    if (ctx->digest->flags & EVP_MD_FLAG_XOF
+        && size <= INT_MAX
+        && ctx->digest->md_ctrl(ctx, EVP_MD_CTRL_XOF_LEN, (int)size, NULL)) {
+        ret = ctx->digest->final(ctx, md);
+
+        if (ctx->digest->cleanup != NULL) {
+            ctx->digest->cleanup(ctx);
+            EVP_MD_CTX_set_flags(ctx, EVP_MD_CTX_FLAG_CLEANED);
+        }
+        OPENSSL_cleanse(ctx->md_data, ctx->digest->ctx_size);
+    } else {
+        EVPerr(EVP_F_EVP_DIGESTFINALXOF, EVP_R_NOT_XOF_OR_INVALID_LENGTH);
+    }
+
     return ret;
 }
 
@@ -202,6 +256,9 @@ int EVP_MD_CTX_copy_ex(EVP_MD_CTX *out, const EVP_MD_CTX *in)
         tmp_buf = NULL;
     EVP_MD_CTX_reset(out);
     memcpy(out, in, sizeof(*out));
+
+    /* copied EVP_MD_CTX should free the copied EVP_PKEY_CTX */
+    EVP_MD_CTX_clear_flags(out, EVP_MD_CTX_FLAG_KEEP_PKEY_CTX);
 
     /* Null these variables, since they are getting fixed up
      * properly below.  Anything else may cause a memleak and/or

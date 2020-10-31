@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2000-2018 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -41,6 +41,11 @@ struct evp_cipher_ctx_st {
     unsigned char final[EVP_MAX_BLOCK_LENGTH]; /* possible final block */
 } /* EVP_CIPHER_CTX */ ;
 
+struct evp_kdf_ctx_st {
+    const EVP_KDF_METHOD *kmeth;
+    EVP_KDF_IMPL *impl;          /* Algorithm-specific data */
+} /* EVP_KDF_CTX */ ;
+
 int PKCS5_v2_PBKDF2_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass,
                              int passlen, ASN1_TYPE *param,
                              const EVP_CIPHER *c, const EVP_MD *md,
@@ -59,7 +64,7 @@ struct evp_Encode_Ctx_st {
     unsigned char enc_data[80];
     /* number read on current line */
     int line_num;
-    int expect_nl;
+    unsigned int flags;
 };
 
 typedef struct evp_pbe_st EVP_PBE_CTL;

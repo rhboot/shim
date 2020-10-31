@@ -1,0 +1,21 @@
+From 07ee6f2a9826fc8390304df7a78ff7ca81f5a75e Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Thu, 29 Oct 2020 23:36:30 -0400
+Subject: [PATCH 3/5] TimerLib.c changes
+
+---
+ TimerLib.c |    1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/Cryptlib/Library/TimerLib.c b/Cryptlib/Library/TimerLib.c
+index ea728b9..3207e39 100644
+--- a/Cryptlib/Library/TimerLib.c
++++ b/Cryptlib/Library/TimerLib.c
+@@ -6,7 +6,6 @@
+ #include <efi.h>
+ #include <efilib.h>
+ #include <stdarg.h>
+-#include <stdbool.h>
+ 
+ #include "shim.h"
+ 

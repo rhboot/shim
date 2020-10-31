@@ -44,6 +44,7 @@
 
 #include <Protocol/SimpleTextIn.h>
 #include <Protocol/SimpleTextOut.h>
+#include <Protocol/GraphicsOutput.h>
 #include <Protocol/BlockIo.h>
 #include <Protocol/BlockIo2.h>
 #include <Protocol/DiskIo.h>
@@ -102,6 +103,7 @@ EFI_GUID gEfiPartTypeLegacyMbrGuid = EFI_PART_TYPE_LEGACY_MBR_GUID;
 
 EFI_GUID gEfiSimpleTextInProtocolGuid = EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID;
 EFI_GUID gEfiSimpleTextOutProtocolGuid = EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
+EFI_GUID gEfiGraphicsOutputProtocolGuid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 EFI_GUID gEfiBlockIoProtocolGuid = EFI_BLOCK_IO_PROTOCOL_GUID;
 EFI_GUID gEfiBlockIo2ProtocolGuid = EFI_BLOCK_IO2_PROTOCOL_GUID;
 EFI_GUID gEfiDiskIoProtocolGuid = EFI_DISK_IO_PROTOCOL_GUID;
@@ -209,6 +211,7 @@ static struct {
 	{  &gEfiLoadedImageProtocolGuid,                    L"LdImg" },
 	{  &gEfiSimpleTextInProtocolGuid,                   L"TxtIn" },
 	{  &gEfiSimpleTextOutProtocolGuid,                  L"TxtOut" },
+	{  &gEfiGraphicsOutputProtocolGuid,                 L"GOP" },
 	{  &gEfiBlockIoProtocolGuid,                        L"BlkIo" },
 	{  &gEfiBlockIo2ProtocolGuid,                       L"BlkIo2" },
 	{  &gEfiDiskIoProtocolGuid,                         L"DskIo" },

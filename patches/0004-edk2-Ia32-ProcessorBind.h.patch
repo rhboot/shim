@@ -1,0 +1,22 @@
+From 518be714e1da5933e4b74f22961d763c309348ad Mon Sep 17 00:00:00 2001
+From: "dunno@dunno" <dunno@dunno>
+Date: Thu, 29 Oct 2020 23:36:30 -0400
+Subject: [PATCH 4/5] Fixing Ia32's calling convention
+
+---
+ ProcessorBind.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/MdePkg/Include/Ia32/ProcessorBind.h b/MdePkg/Include/Ia32/ProcessorBind.h
+index 497c58b33b..66bf435d01 100644
+--- a/MdePkg/Include/Ia32/ProcessorBind.h
++++ b/MdePkg/Include/Ia32/ProcessorBind.h
+@@ -285,7 +285,7 @@ typedef INT32   INTN;
+   ///
+   /// GCC specific method for EFIAPI calling convention.
+   ///
+-  #define EFIAPI __attribute__((cdecl))
++  #define EFIAPI __attribute__((cdecl, regparm(0)))
+ #else
+   ///
+   /// The default for a non Microsoft* or GCC compiler is to assume the EFI ABI

@@ -1,12 +1,6 @@
 #ifndef SHIM_CONSOLE_H
 #define SHIM_CONSOLE_H
 
-#define Print(fmt, ...) \
-	({"Do not directly call Print() use console_print() instead" = 1;});
-
-#define PrintAt(fmt, ...) \
-	({"Do not directly call PrintAt() use console_print_at() instead" = 1;});
-
 EFI_STATUS
 console_get_keystroke(EFI_INPUT_KEY *key);
 UINTN
@@ -40,6 +34,8 @@ int
 console_countdown(CHAR16* title, const CHAR16* message, int timeout);
 void
 console_reset(void);
+void
+console_mode_handle(void);
 #define NOSEL 0x7fffffff
 
 typedef struct _EFI_CONSOLE_CONTROL_PROTOCOL   EFI_CONSOLE_CONTROL_PROTOCOL;

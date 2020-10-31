@@ -3,13 +3,7 @@
   Cryptographic Library.
 
 Copyright (c) 2009 - 2017, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -84,14 +78,14 @@ QuickSortWorker (
     }
   }
   //
-  // Swap pivot to it's final position (NextSwapLocaiton)
+  // Swap pivot to its final position (NextSwapLocation)
   //
   CopyMem (Buffer, Pivot, ElementSize);
   CopyMem (Pivot, (UINT8 *)BufferToSort + (NextSwapLocation * ElementSize), ElementSize);
   CopyMem ((UINT8 *)BufferToSort + (NextSwapLocation * ElementSize), Buffer, ElementSize);
 
   //
-  // Now recurse on 2 paritial lists.  Neither of these will have the 'pivot' element.
+  // Now recurse on 2 partial lists.  Neither of these will have the 'pivot' element.
   // IE list is sorted left half, pivot element, sorted right half...
   //
   QuickSortWorker (
@@ -361,6 +355,19 @@ char *getenv (const char *varname)
   return NULL;
 }
 
+/* Get a value from the current environment */
+char *secure_getenv (const char *varname)
+{
+  //
+  // Null secure_getenv() function implementation to satisfy the linker, since
+  // there is no direct functionality logic dependency in present UEFI cases.
+  //
+  // From the secure_getenv() manual: 'just like getenv() except that it
+  // returns NULL in cases where "secure execution" is required'.
+  //
+  return NULL;
+}
+
 //
 // -- Stream I/O Routines --
 //
@@ -370,6 +377,22 @@ size_t fwrite (const void *buffer, size_t size, size_t count, FILE *stream)
 {
   return 0;
 }
+
+//
+//  -- Dummy OpenSSL Support Routines --
+//
+
+#if !defined(OPENSSL_SYS_UEFI) && !defined(OPENSSL_SYS_UEFI_APP)
+int BIO_printf (void *bio, const char *format, ...)
+{
+  return 0;
+}
+
+int BIO_snprintf(char *buf, size_t n, const char *format, ...)
+{
+  return 0;
+}
+#endif
 
 #ifdef __GNUC__
 

@@ -1,62 +1,30 @@
+CRYPTLIB_SOURCES = $(shell cd $(TOPDIR) ; cat edk2/CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf | dos2unix | grep '.*\.c$$' | sed 's,^ \+,Cryptlib/,' | git check-ignore --stdin -n -v | grep :: | cut -d: -f3- | sort -u) \
+	Cryptlib/Library/TimerLib.c Cryptlib/Library/Console.c
 
-EFI_INCLUDES	= -I$(TOPDIR)/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_EFI) -I$(TOPDIR)/../include
-
-CFLAGS		= $(DEBUG_CFLAGS)	\
-			  -I$(TOPDIR) -iquote $(TOPDIR) -Wall -fshort-wchar	\
-			  -fno-stack-protector -fno-strict-aliasing $(EFI_INCLUDES)	\
-			  -std=gnu89 -UWIN32 -U_WIN32 -U__CYGWIN_ -ffunction-sections	\
-			  -fdata-sections -ffreestanding -integrated-as \
-			  -I$(shell $(CC) -print-file-name=include)
-
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
-
-ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-red-zone -nostdinc $(CLANG_BUGS)	\
-		   -m64 -mno-stack-arg-probe -target x86_64-windows-gnu
+ifeq ($(EFI_ARCH),ia32)
+	CRYPTLIB_SOURCES+=Cryptlib/Library/Ia32/GccInline.c
 endif
-ifeq ($(ARCH),ia32)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   $(CLANG_BUGS) -m32 -mregparm=3 -mrtd	\
-		   -mno-stack-arg-probe -march=i586 -target i586-windows-gnu
+ifeq ($(EFI_ARCH),x64)
+	CRYPTLIB_SOURCES+=Cryptlib/Library/X64/GccInline.c
 endif
-ifeq ($(ARCH),aarch64)
-	CFLAGS	+= -mno-stack-arg-probe -target aarch64-windows-gnu
-endif
-ifeq ($(ARCH),arm)
-	CFLAGS	+= -mno-stack-arg-probe -target arm-windows-gnu
-endif
-LDFLAGS		= -nostdlib -znocombreloc
 
-TARGET		= libcryptlib.a
-OBJS		=   Hash/CryptMd4Null.o \
-		    Hash/CryptMd5.o \
-		    Hash/CryptSha1.o \
-		    Hash/CryptSha256.o \
-		    Hash/CryptSha512.o \
-		    Hmac/CryptHmacMd5Null.o \
-		    Hmac/CryptHmacSha1Null.o \
-		    Hmac/CryptHmacSha256Null.o \
-		    Cipher/CryptAesNull.o \
-		    Cipher/CryptTdesNull.o \
-		    Cipher/CryptArc4Null.o \
-		    Rand/CryptRand.o \
-		    Pk/CryptRsaBasic.o \
-		    Pk/CryptRsaExtNull.o \
-		    Pk/CryptPkcs7SignNull.o \
-		    Pk/CryptPkcs7Verify.o \
-		    Pk/CryptDhNull.o \
-		    Pk/CryptTs.o \
-		    Pk/CryptX509.o \
-		    Pk/CryptAuthenticode.o \
-		    Pem/CryptPemNull.o \
-		    SysCall/CrtWrapper.o \
-		    SysCall/TimerWrapper.o \
-		    SysCall/BaseMemAllocation.o \
-		    SysCall/BaseStrings.o
+CRYPTLIB_INCLUDES = \
+		    -I$(TOPDIR)/Cryptlib \
+		    -I$(TOPDIR)/Cryptlib/Include \
+		    -I$(TOPDIR)/Cryptlib/Include/openssl
 
-all: $(TARGET)
+CRYPTLIB_OBJECTS = $(foreach x,$(CRYPTLIB_SOURCES),$(patsubst %.c,%.efi.o,$(x)))
 
-libcryptlib.a: $(OBJS)
-	ar rcs libcryptlib.a $(OBJS)
-clean:
-	rm -f $(TARGET) $(OBJS)
+$(foreach x,$(CRYPTLIB_SOURCES),$(eval vpath $(x) $(TOPDIR)))
+$(foreach x,$(CRYPTLIB_OBJECTS),$(eval vpath $(x) $(BUILDDIR)))
+
+$(foreach x,$(CRYPTLIB_SOURCES),$(eval $(call object-template,,$(x),$$(CRYPTLIB_INCLUDES) $$(OPENSSL_INCLUDES))))
+
+clean-cryptlib-objs :
+	@rm -rf "$(BUILDDIR)/Cryptlib"
+
+clean : | clean-cryptlib-objs
+
+vpath libcryptlib.efi.a $(BUILDDIR)
+libcryptlib.efi.a : $(CRYPTLIB_OBJECTS)
+	$(AR) rcsD $@ $^
