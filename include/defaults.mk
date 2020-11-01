@@ -87,7 +87,7 @@ src/%.o : $(BUILDDIR)/src/%.o
 %.crt : $(BUILDDIR)/certdb/%.crt
 %.cer : $(BUILDDIR)/certdb/%.cer
 
-EFI_LDFLAGS = $(EFI_DEBUG_LDFLAGS) /dll /entry:efi_main /nodefaultlib $(EFI_ARCH_LDFLAGS)
+EFI_LDFLAGS = $(EFI_DEBUG_LDFLAGS) /dll /entry:efi_main /safeseh:no /nodefaultlib $(EFI_ARCH_LDFLAGS)
 
 %.efi: %.efi.dll fwimage/fwimage
 	./fwimage/fwimage app $< $@

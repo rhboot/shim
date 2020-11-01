@@ -2253,7 +2253,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	second_stage_len = (StrLen(DEFAULT_LOADER) + 1) * sizeof(CHAR16);
 	second_stage = AllocatePool(second_stage_len);
 	if (!second_stage) {
-		perror(L"Could not allocate %lu bytes\n", second_stage_len);
+		perror(L"Could not allocate %zu bytes\n", second_stage_len);
 		return EFI_OUT_OF_RESOURCES;
 	}
 	StrCpy(second_stage, DEFAULT_LOADER);
@@ -2643,10 +2643,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Hash = shim_hash;
 	shim_lock_interface.Context = shim_read_header;
 
-	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
-		      __FILE__, __LINE__, __func__, vendor_authorized, vendor_authorized_size);
-	dprint(L"vendor_deauthorized:0x%08lx vendor_deauthorized_size:%lu\n",
-		      __FILE__, __LINE__, __func__, vendor_deauthorized, vendor_deauthorized_size);
+	dprint(L"vendor_authorized:0x%08zx vendor_authorized_size:%u\n",
+		      vendor_authorized, vendor_authorized_size);
+	dprint(L"vendor_deauthorized:0x%08zx vendor_deauthorized_size:%u\n",
+		      vendor_deauthorized, vendor_deauthorized_size);
 	/*
 	 * Before we do anything else, validate our non-volatile,
 	 * boot-services-only state variables are what we think they are.

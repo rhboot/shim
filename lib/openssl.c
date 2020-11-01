@@ -55,7 +55,7 @@ BOOLEAN verify_x509(UINT8 *Cert, UINTN CertSize)
 
         length = Cert[2]<<8 | Cert[3];
         if (length != (CertSize - 4)) {
-                dprint(L"Cert length is %ld, expecting %ld\n",
+                dprint(L"Cert length is %zd, expecting %zd\n",
                        length, CertSize);
 
                 return FALSE;

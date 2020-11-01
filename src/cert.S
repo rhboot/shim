@@ -22,11 +22,13 @@
 #endif
 
 #ifdef __i386__
+# define cert_table_sym _cert_table
 # define SYMBOL(S)		\
 	.global	_##S;		\
 	.p2align	2;	\
 	_##S:
 #else
+# define cert_table_sym cert_table
 # define SYMBOL(S)		\
 	.global	S;		\
 	.p2align	2;	\
@@ -38,8 +40,8 @@
 SYMBOL(cert_table)
 	.long	.Lvendor_authorized_end - vendor_authorized
 	.long	.Lvendor_deauthorized_end - vendor_deauthorized
-	.long	vendor_authorized - cert_table
-	.long	vendor_deauthorized - cert_table
+	.long	vendor_authorized - cert_table_sym
+	.long	vendor_deauthorized - cert_table_sym
 	.balign	1, 0
 vendor_authorized:
 #if defined(VENDOR_DB_FILE)

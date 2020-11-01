@@ -99,7 +99,7 @@ vhexdumpf(const char *file, int line, const char *func, const CHAR16 * const fmt
 			     (UINTN)data+offset);
 		if (fmt && fmt[0] != 0)
 			VLogError(file, line, func, fmt, ap);
-		LogError_(file, line, func, L"%08lx  %a  %a\n", display_offset, hexbuf, txtbuf);
+		LogError_(file, line, func, L"%08zx  %a  %a\n", display_offset, hexbuf, txtbuf);
 
 		display_offset += sz;
 		offset += sz;

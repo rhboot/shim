@@ -202,11 +202,11 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 	 * we're always mirroring the original data, whether this is an efi
 	 * security database or not
 	 */
-	dprint(L"v->data_size:%lu v->data:0x%08llx\n", v->data_size, v->data);
-	dprint(L"FullDataSize:%lu FullData:0x%08llx\n", FullDataSize, FullData);
+	dprint(L"v->data_size:%zu v->data:0x%08zx\n", v->data_size, v->data);
+	dprint(L"FullDataSize:%zu FullData:0x%08zx\n", FullDataSize, FullData);
 	if (v->data_size) {
 		FullDataSize = v->data_size;
-		dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+		dprint(L"FullDataSize:%zu FullData:0x%08zx\n",
 		       FullDataSize, FullData);
 	}
 
@@ -259,7 +259,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 				return efi_status;
 			}
 			FullDataSize += build_cert_esl_sz;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx\n",
 			       FullDataSize, FullData);
 		}
 
@@ -272,7 +272,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 			 * if it's an ESL already, we use it wholesale
 			 */
 			FullDataSize += *v->addend_size;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx\n",
 			       FullDataSize, FullData);
 			break;
 		case VENDOR_ADDEND_X509:
@@ -286,12 +286,12 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 				return efi_status;
 			}
 			FullDataSize += addend_esl_sz;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx\n",
 				      FullDataSize, FullData);
 			break;
 		default:
 		case VENDOR_ADDEND_NONE:
-			dprint(L"FullDataSize:%lu FullData:0x%08llx\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx\n",
 				      FullDataSize, FullData);
 			break;
 		}
@@ -306,37 +306,37 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 		 * existing data.
 		 */
 		if (FullDataSize != v->data_size) {
-			dprint(L"FullDataSize:%lu FullData:0x%08llx allocating FullData\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx allocating FullData\n",
 			       FullDataSize, FullData);
 			FullData = AllocatePool(FullDataSize);
 			if (!FullData) {
 				FreePool(v->data);
 				v->data = NULL;
 				v->data_size = 0;
-				perror(L"Failed to allocate %lu bytes for %s\n",
+				perror(L"Failed to allocate %zu bytes for %s\n",
 				       FullDataSize, v->name);
 				return EFI_OUT_OF_RESOURCES;
 			}
 			p = FullData;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 			if (v->data && v->data_size) {
 				CopyMem(p, v->data, v->data_size);
 				p += v->data_size;
 			}
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 		} else {
 			FullData = v->data;
 			FullDataSize = v->data_size;
 			p = FullData + FullDataSize;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 			v->data = NULL;
 			v->data_size = 0;
 		}
 	}
-	dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+	dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 	       FullDataSize, FullData, p, p-(UINTN)FullData);
 
 	/*
@@ -350,7 +350,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 		/*
 		 * second is the build cert
 		 */
-		dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+		dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 		       FullDataSize, FullData, p, p-(UINTN)FullData);
 		if (should_mirror_build_cert(v)) {
 			efi_status = fill_esl(*v->build_cert,
@@ -364,7 +364,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 				return efi_status;
 			}
 			p += build_cert_esl_sz;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 		}
 
@@ -372,7 +372,7 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 		case VENDOR_ADDEND_DB:
 			CopyMem(p, *v->addend, *v->addend_size);
 			p += *v->addend_size;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 			break;
 		case VENDOR_ADDEND_X509:
@@ -386,12 +386,12 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 				return efi_status;
 			}
 			p += addend_esl_sz;
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 			break;
 		default:
 		case VENDOR_ADDEND_NONE:
-			dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+			dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 			       FullDataSize, FullData, p, p-(UINTN)FullData);
 			break;
 		}
@@ -406,19 +406,19 @@ mirror_one_mok_variable(struct mok_state_variable *v)
 				&gEfiCertSha256Guid, &gShimLockGuid,
 				&FullData, &FullDataSize);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to allocate %lu bytes for %s\n",
+			perror(L"Failed to allocate %zu bytes for %s\n",
 			       FullDataSize, v->name);
 			return efi_status;
 		}
 		p = FullData + FullDataSize;
-		dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+		dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 		       FullDataSize, FullData, p, p-(UINTN)FullData);
 	}
 
-	dprint(L"FullDataSize:%lu FullData:0x%08llx p:0x%08llx pos:%lld\n",
+	dprint(L"FullDataSize:%zu FullData:0x%08zx p:0x%08zx pos:%zd\n",
 	       FullDataSize, FullData, p, p-(UINTN)FullData);
 	if (FullDataSize) {
-		dprint(L"Setting %s with %lu bytes of data\n",
+		dprint(L"Setting %s with %zu bytes of data\n",
 		       v->rtname, FullDataSize);
 		efi_status = gRT->SetVariable(v->rtname, v->guid,
 					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
