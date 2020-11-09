@@ -373,7 +373,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 							show_ca_warning();
 						}
 						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
-						tpm_measure_variable(dbname, guid, CertSize, Cert->SignatureData);
+						tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
 						drain_openssl_errors();
 						return DATA_FOUND;
 					} else {
@@ -438,7 +438,7 @@ static CHECK_STATUS check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList,
 					// Find the signature in database.
 					//
 					IsFound = TRUE;
-					tpm_measure_variable(dbname, guid, SignatureSize, data);
+					tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
 					break;
 				}
 
