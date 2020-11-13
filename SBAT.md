@@ -114,13 +114,11 @@ in a VS_VERSIONINFO structure as StringFileInfo components making up a
 VERSION_RECORD_ENTRIES structure:
 
 ```
-{
 typedef struct {
   CHAR16                   *ProductName;
   CHAR16                   *ComponentName;
   UINT16                   FileVersion[2];
 } VERSION_RECORD_ENTRIES;
-}
 ```
 
 #### Version-Based Revocation Authorization
