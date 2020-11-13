@@ -31,7 +31,8 @@ Microsoft has brainstormed with partners possible solutions for evaluation and f
 This document focuses on the shim bootloader, not the UEFI specification or updates to UEFI system BIOS.
 
 ### Version Number Based Revocation
-Microsoft may refer to this as a form of Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT.
+Microsoft may refer to this as a form of Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT. This introduces a mechanism to require a
+specific level of resistance to secure boot bypasses. It is orthogonal to, and does not allow for, key revocation.
 
 #### Version-Based Revocation Overview
 Metadata that includes the vendor, product family, product/module, & version are added to modules. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure, describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security version could be used for each revocable boot module, replacing many image hashes with 1 entry with security version. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-version metadata instead of the metadata itself.
@@ -40,11 +41,87 @@ Ideally, servicing of the image authorization databases would be updated to supp
 While previously the APPEND attribute guaranteed that it is not possible to downgrade the set of revocations on a system using a previously signed variable update, this guarantee can also be accomplished by setting the EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute. This will verify that the
 timestamp value of the signed data is later than the current timestamp value associated with the data currently stored in that variable.
 
+#### Version-Based Revocation Scenarios
+
+ Products (not vendors, a vendor can have multiple products or even
+pass a product from one vendor to another over time) are assigned a
+name. Product names can specify a specifc version or refer to the
+entire prodcut family. For example mydistro and mydistro-12.
+
+ Components that are used as a link in the UEFI secure boot chain of
+trust are also assigned names. Examples of components are shim, GRUB,
+kernel, hypervisors, etc.
+
+ We could conceivably support sub-components, but it's hard to
+conceive of a scenario that would trigger a UEFI variable update that
+wouldn't justify a hypervisor or kernel re-release to enforce that sub
+component level from there. Something like a "level 1.5 hypervisor"
+that can exist between different kernel generations can be considered
+its own component.
+
+ Each component is assigned a minimum global generation number. Vendors
+signing component binary artifacts with a specific global generation
+number are required to include fixes for any public or pre-disclosed
+issue required for that generation. Additionally, in the event that a
+bypass only manifests in a specific products component, vendors may
+ask for a product specific generation number to be published for one
+of their products components. This avoids triggering an industry wide
+re-publishing of otherwise safe components.
+
+ A product specific minimum generation number only applies to the
+instance of that component that is signed with that product
+name. Another products instance of the same component may be installed
+on the same system and would not be subject to the other products
+product specific minimum generation number. However both of those
+components will need to meet the global minimum generation number for
+that component. A very likely scenario would be that a product is
+shipped with an incomplete fix required for a specific minimum
+generation number, but is labeled with that number. Rather than having
+the entire industry that uses that component re-release, just that
+products minimum generation number is incremented and that products
+component is re-released along with a UEFI variable update that
+specifies that requirement.
+
+ The global and product specific generation number name spaces are not
+tied to each other. The global number is managed externally, and the
+vast majority of products will never publish a minimum product
+specific generation number for any of their components. These
+components will be signed with a product specific generation number of
+0.
+
+ A minimum feature set, for example enforced kernel lock down, may be
+required as well to sign and label a component with a specific
+generation number. As time goes on it is likely that the minimum
+feature set required for the currently valid generation number will
+expand. (For example, hyper visors supporting secure boot guests may
+at some point require memory encryption or similar protection
+mechanism.)
+
+~~A specific component can be future proofed for such requirements by
+listing enforced features, for example guest VM memory protection as a
+feature in their signed binary. In such an event the global generation
+number would be bumped, but also include an allow list of prior
+generation numbers with the list of features required along with them.~~
+
 #### Version-Based Revocation Metadata
 Existing specifications and tools exist for adding this type of authenticated metadata to PE images. For example, Windows applications and drivers accomplish this by adding a resource section (.RSRC) containing a VS_VERSIONINFO structure. Microsoft has produced [an extension to the edk2-pytools-extensions build system](https://github.com/tianocore/edk2-pytool-extensions/pull/214/files) to easily add this metadata to EFI PE images on both [Windows](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12047&view=logs&j=1372d9e0-5cd3-5ef5-5e82-7ce7a218d320&t=807a83c4-d85c-5f7b-2bd5-ab855378aa38)
 and [Linux](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12046&view=logs&j=ec3a3918-b516-55e3-c6c9-a51bd985c058&t=0fc8d1a9-cd73-59c5-9625-ee1ecb5064e8) build platforms.
 
-_Open item:_ define VS_VERSIONINFO usage for compatibility with standardized authorization and revocation mechanisms
+ Each component carries a meta data payload within the signed binary
+that contains the publishing product name, the component name and both
+a global and product specific generation number. This data is embedded
+in a VS_VERSIONINFO structure as StringFileInfo components making up a
+VERSION_RECORD_ENTRIES structure:
+
+```
+{
+typedef struct {
+  CHAR16                   *ProductName;
+  CHAR16                   *ComponentName;
+  UINT16                   FileVersion[2];
+} VERSION_RECORD_ENTRIES;
+}
+```
 
 #### Version-Based Revocation Authorization
 A compatible system may need to trust multiple, in-support major/minor versions of products, only revoking ranges of build &/or security version numbers. The authorization system must support this, details TBD.
