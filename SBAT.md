@@ -103,6 +103,34 @@ feature in their signed binary. In such an event the global generation
 number would be bumped, but also include an allow list of prior
 generation numbers with the list of features required along with them.~~
 
+#### Retiring Signed Releases
+
+Products that have reached the end of their support life by definition
+no longer receive patches. They are also generally not examined	for
+CVEs. Allowing such unsupported	products to continue to	participate in
+UEFI Secure Boot is at the very	least questionable. If an EoSL product
+is made up of commonly	used components,	such as	the GRUB and the Linux
+kernel,	it is reasonable	to assume that the global generation numbers
+will eventually move forward and	exclude	those products from booting on
+a UEFI Secure Boot enabled system. However a product made up of	GRUB
+and a closed source kernel is just a conceivable. In that case the
+kernel version may never move forward once the product reaches its end
+of support. Therefor it	is recommended that the	product	specific
+generation number be incremented past the latest one shown in any
+binary for that	product, effectively disabling that product on UEFI
+Secure Boot enabled systems.
+
+A subset of this case are beta-release that may contain eventually
+abandoned, experimental, kernel code. Such releases should have their
+product specific generation numbers incremented past the latest one
+shown in any, released or unreleased, production key signed binary.
+
+Until a release is retired in this manner, vendors	are responsible	for
+keeping up with fixes for CVEs and ensuring that any known signed
+binaries containing known CVEs are denied from booting on UEFI Secure
+Boot enabled systems via the most up to date UEFI	meta data.
+
+
 #### Version-Based Revocation Metadata
 Existing specifications and tools exist for adding this type of authenticated metadata to PE images. For example, Windows applications and drivers accomplish this by adding a resource section (.RSRC) containing a VS_VERSIONINFO structure. Microsoft has produced [an extension to the edk2-pytools-extensions build system](https://github.com/tianocore/edk2-pytool-extensions/pull/214/files) to easily add this metadata to EFI PE images on both [Windows](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12047&view=logs&j=1372d9e0-5cd3-5ef5-5e82-7ce7a218d320&t=807a83c4-d85c-5f7b-2bd5-ab855378aa38)
 and [Linux](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12046&view=logs&j=ec3a3918-b516-55e3-c6c9-a51bd985c058&t=0fc8d1a9-cd73-59c5-9625-ee1ecb5064e8) build platforms.
