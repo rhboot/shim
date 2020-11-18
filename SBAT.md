@@ -32,7 +32,7 @@ This document focuses on the shim bootloader, not the UEFI specification or upda
 
 ### Version Number Based Revocation
 Microsoft may refer to this as a form of Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT. This introduces a mechanism to require a
-specific level of resistance to secure boot bypasses. It is orthogonal to, and does not allow for, key revocation.
+specific level of resistance to secure boot bypasses.
 
 #### Version-Based Revocation Overview
 Metadata that includes the vendor, product family, product/module, & version are added to modules. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure, describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security version could be used for each revocable boot module, replacing many image hashes with 1 entry with security version. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-version metadata instead of the metadata itself.
@@ -129,6 +129,12 @@ Until a release is retired in this manner, vendors	are responsible	for
 keeping up with fixes for CVEs and ensuring that any known signed
 binaries containing known CVEs are denied from booting on UEFI Secure
 Boot enabled systems via the most up to date UEFI	meta data.
+
+
+#### Key Revocations
+Since Vendor Product keys are brought into Shim	as signed binaries,
+generation numbering can and should be used to revoke them in case of
+a private key compromise.
 
 
 #### Version-Based Revocation Metadata
