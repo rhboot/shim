@@ -130,11 +130,22 @@ keeping up with fixes for CVEs and ensuring that any known signed
 binaries containing known CVEs are denied from booting on UEFI Secure
 Boot enabled systems via the most up to date UEFI	meta data.
 
-
 #### Key Revocations
 Since Vendor Product keys are brought into Shim	as signed binaries,
 generation numbering can and should be used to revoke them in case of
 a private key compromise.
+
+#### Kernels execing other kernels (aka kexec, fast reboot)
+
+It is expected that kexec and other similar implementations of kernels
+spawning other kernels will eventually consume and honor SBAT
+metadata. Until they do, revocations of kernels will need to be done
+by revoking the keys signing those kernels. While keys built into Shim
+can be revoked via SBAT and Shim introspection, this practice would
+still result in a proliferation of Shim binaries that would need to be
+revoked via dbx in the event of an early Shim code bug. Therefor,
+products that support kexec or a similar mechanism must use separate
+Vendor Product Key binaries.
 
 
 #### Version-Based Revocation Metadata
