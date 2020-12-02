@@ -1052,8 +1052,8 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 		goto done;
 	}
 
-	efi_status = verify_buffer(buffer, size, &context,
-				   sha256hash, sha1hash);
+	efi_status = verify_buffer(buffer, size,
+				   &context, sha256hash, sha1hash);
 done:
 	in_protocol = 0;
 	return efi_status;
