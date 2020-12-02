@@ -186,6 +186,60 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 })
 #define check_size(d, ds, h, hs) check_size_line(d, ds, h, hs, __LINE__)
 
+EFI_STATUS
+get_section_vma (UINTN section_num,
+		 char *buffer, size_t bufsz,
+		 PE_COFF_LOADER_IMAGE_CONTEXT *context,
+		 char **basep, size_t *sizep,
+		 EFI_IMAGE_SECTION_HEADER **sectionp)
+{
+	EFI_IMAGE_SECTION_HEADER *sections = context->FirstSection;
+	EFI_IMAGE_SECTION_HEADER *section;
+	char *base = NULL, *end = NULL;
+
+	if (section_num >= context->NumberOfSections)
+		return EFI_NOT_FOUND;
+
+	if (context->FirstSection == NULL) {
+		perror(L"Invalid section %d requested\n", section_num);
+		return EFI_UNSUPPORTED;
+	}
+
+	section = &sections[section_num];
+
+	base = ImageAddress (buffer, context->ImageSize, section->VirtualAddress);
+	end = ImageAddress (buffer, context->ImageSize,
+			    section->VirtualAddress + section->Misc.VirtualSize - 1);
+
+	if (!(section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE)) {
+		if (!base) {
+			perror(L"Section %d has invalid base address\n", section_num);
+			return EFI_UNSUPPORTED;
+		}
+		if (!end) {
+			perror(L"Section %d has zero size\n", section_num);
+			return EFI_UNSUPPORTED;
+		}
+	}
+
+	if (!(section->Characteristics & EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA) &&
+	    (section->VirtualAddress < context->SizeOfHeaders ||
+	     section->PointerToRawData < context->SizeOfHeaders)) {
+		perror(L"Section %d is inside image headers\n", section_num);
+		return EFI_UNSUPPORTED;
+	}
+
+	if (end < base) {
+		perror(L"Section %d has negative size\n", section_num);
+		return EFI_UNSUPPORTED;
+	}
+
+	*basep = base;
+	*sizep = end - base;
+	*sectionp = section;
+	return EFI_SUCCESS;
+}
+
 /*
  * Calculate the SHA1 and SHA256 hashes of a binary
  */
@@ -203,8 +257,8 @@ generate_hash(char *data, unsigned int datasize_in,
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
 	unsigned int index, pos;
 	unsigned int datasize;
-	EFI_IMAGE_SECTION_HEADER  *Section;
-	EFI_IMAGE_SECTION_HEADER  *SectionHeader = NULL;
+	EFI_IMAGE_SECTION_HEADER *Section;
+	EFI_IMAGE_SECTION_HEADER *SectionHeader = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	EFI_IMAGE_DOS_HEADER *DosHdr = (void *)data;
 	unsigned int PEHdr_offset = 0;
@@ -282,22 +336,81 @@ generate_hash(char *data, unsigned int datasize_in,
 	/* Sort sections */
 	SumOfBytesHashed = context->SizeOfHeaders;
 
-	/* Validate section locations and sizes */
-	for (index = 0, SumOfSectionBytes = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
-		EFI_IMAGE_SECTION_HEADER  *SectionPtr;
+	/*
+	 * XXX Do we need this here, or is it already done in all cases?
+	 */
+	if (context->NumberOfSections == 0 ||
+	    context->FirstSection == NULL) {
+		uint16_t opthdrsz;
+		uint64_t addr;
+		uint16_t nsections;
+		EFI_IMAGE_SECTION_HEADER *section0, *sectionN;
 
-		/* Validate SectionPtr is within image */
-		SectionPtr = ImageAddress(data, datasize,
-			PEHdr_offset +
-			sizeof (UINT32) +
-			sizeof (EFI_IMAGE_FILE_HEADER) +
-			context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader +
-			(index * sizeof(*SectionPtr)));
-		if (!SectionPtr) {
-			perror(L"Malformed section %d\n", index);
+		nsections = context->PEHdr->Pe32.FileHeader.NumberOfSections;
+		opthdrsz = context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader;
+
+		/* Validate section0 is within image */
+		addr = PEHdr_offset + sizeof(UINT32)
+			+ sizeof(EFI_IMAGE_FILE_HEADER)
+			+ opthdrsz;
+		section0 = ImageAddress(data, datasize, addr);
+		if (!section0) {
+			perror(L"Malformed file header.\n");
+			perror(L"Image address for Section Header 0 is 0x%016llx\n",
+			       addr);
+			perror(L"File size is 0x%016llx\n", datasize);
 			efi_status = EFI_INVALID_PARAMETER;
 			goto done;
 		}
+
+		/* Validate sectionN is within image */
+		addr += (uint64_t)&section0[nsections-1] - (uint64_t)section0;
+		sectionN = ImageAddress(data, datasize, addr);
+		if (!sectionN) {
+			perror(L"Malformed file header.\n");
+			perror(L"Image address for Section Header %d is 0x%016llx\n",
+			       nsections - 1, addr);
+			perror(L"File size is 0x%016llx\n", datasize);
+			efi_status = EFI_INVALID_PARAMETER;
+			goto done;
+		}
+
+		context->NumberOfSections = nsections;
+		context->FirstSection = section0;
+	}
+
+	/*
+	 * Allocate a new section table so we can sort them without
+	 * modifying the image.
+	 */
+	SectionHeader = AllocateZeroPool (sizeof (EFI_IMAGE_SECTION_HEADER)
+					  * context->NumberOfSections);
+	if (SectionHeader == NULL) {
+		perror(L"Unable to allocate section header\n");
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
+
+	/*
+	 * Validate section locations and sizes, and sort the table into
+	 * our newly allocated header table
+	 */
+	SumOfSectionBytes = 0;
+	Section = context->FirstSection;
+	for (index = 0; index < context->NumberOfSections; index++) {
+		EFI_IMAGE_SECTION_HEADER *SectionPtr;
+		char *base;
+		size_t size;
+
+		efi_status = get_section_vma(index, data, datasize, context,
+					     &base, &size, &SectionPtr);
+		if (efi_status == EFI_NOT_FOUND)
+			break;
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Malformed section header\n");
+			goto done;
+		}
+
 		/* Validate section size is within image. */
 		if (SectionPtr->SizeOfRawData >
 		    datasize - SumOfBytesHashed - SumOfSectionBytes) {
@@ -306,37 +419,7 @@ generate_hash(char *data, unsigned int datasize_in,
 			goto done;
 		}
 		SumOfSectionBytes += SectionPtr->SizeOfRawData;
-	}
 
-	SectionHeader = (EFI_IMAGE_SECTION_HEADER *) AllocateZeroPool (sizeof (EFI_IMAGE_SECTION_HEADER) * context->PEHdr->Pe32.FileHeader.NumberOfSections);
-	if (SectionHeader == NULL) {
-		perror(L"Unable to allocate section header\n");
-		efi_status = EFI_OUT_OF_RESOURCES;
-		goto done;
-	}
-
-	/* Already validated above */
-	Section = ImageAddress(data, datasize,
-		PEHdr_offset +
-		sizeof (UINT32) +
-		sizeof (EFI_IMAGE_FILE_HEADER) +
-		context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader);
-	/* But check it again just for better error messaging, and so
-	 * clang-analyzer doesn't get confused. */
-	if (Section == NULL) {
-		uint64_t addr;
-
-		addr = PEHdr_offset + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER)
-			+ context->PEHdr->Pe32.FileHeader.SizeOfOptionalHeader;
-		perror(L"Malformed file header.\n");
-		perror(L"Image address for Section 0 is 0x%016llx\n", addr);
-		perror(L"File size is 0x%016llx\n", datasize);
-		efi_status = EFI_INVALID_PARAMETER;
-		goto done;
-	}
-
-	/* Sort the section headers */
-	for (index = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
 		pos = index;
 		while ((pos > 0) && (Section->PointerToRawData < SectionHeader[pos - 1].PointerToRawData)) {
 			CopyMem (&SectionHeader[pos], &SectionHeader[pos - 1], sizeof (EFI_IMAGE_SECTION_HEADER));
@@ -344,16 +427,17 @@ generate_hash(char *data, unsigned int datasize_in,
 		}
 		CopyMem (&SectionHeader[pos], Section, sizeof (EFI_IMAGE_SECTION_HEADER));
 		Section += 1;
+
 	}
 
 	/* Hash the sections */
-	for (index = 0; index < context->PEHdr->Pe32.FileHeader.NumberOfSections; index++) {
+	for (index = 0; index < context->NumberOfSections; index++) {
 		Section = &SectionHeader[index];
 		if (Section->SizeOfRawData == 0) {
 			continue;
 		}
-		hashbase  = ImageAddress(data, size, Section->PointerToRawData);
 
+		hashbase  = ImageAddress(data, size, Section->PointerToRawData);
 		if (!hashbase) {
 			perror(L"Malformed section header\n");
 			efi_status = EFI_INVALID_PARAMETER;
