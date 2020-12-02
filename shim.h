@@ -29,6 +29,7 @@
 #undef uefi_call_wrapper
 
 #include <stddef.h>
+#include <stdint.h>
 
 #define nonnull(...) __attribute__((__nonnull__(__VA_ARGS__)))
 
@@ -135,6 +136,7 @@
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
 #include "include/peimage.h"
+#include "include/pe.h"
 #include "include/replacements.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
@@ -204,6 +206,15 @@ extern UINT8 *build_cert;
 extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;
 extern UINT8 in_protocol;
+extern void *load_options;
+extern UINT32 load_options_size;
+
+BOOLEAN secure_mode (void);
+
+EFI_STATUS
+verify_buffer (char *data, int datasize,
+	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	       UINT8 *sha256hash, UINT8 *sha1hash);
 
 #define perror_(file, line, func, fmt, ...) ({					\
 		UINTN __perror_ret = 0;						\
