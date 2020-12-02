@@ -873,22 +873,6 @@ handle_image (void *data, unsigned int datasize,
 	}
 #endif
 
-	if (secure_mode ()) {
-		efi_status = verify_buffer(data, datasize, &context,
-					   sha256hash, sha1hash);
-
-		if (EFI_ERROR(efi_status)) {
-			if (verbose)
-				console_print(L"Verification failed: %r\n", efi_status);
-			else
-				console_error(L"Verification failed", efi_status);
-			return efi_status;
-		} else {
-			if (verbose)
-				console_print(L"Verification succeeded\n");
-		}
-	}
-
 	/* The spec says, uselessly, of SectionAlignment:
 	 * =====
 	 * The alignment (in bytes) of sections when they are loaded into
@@ -945,6 +929,9 @@ handle_image (void *data, unsigned int datasize,
 
 	EFI_IMAGE_SECTION_HEADER *RelocSection = NULL;
 
+	char *SBATBase = NULL;
+	size_t SBATSize = 0;
+
 	/*
 	 * Copy the executable's sections to their desired offsets
 	 */
@@ -989,6 +976,27 @@ handle_image (void *data, unsigned int datasize,
 					RelocBaseEnd == end) {
 				RelocSection = Section;
 			}
+		} else if (CompareMem(Section->Name, ".sbat\0\0\0", 8) == 0) {
+			if (SBATBase || SBATSize) {
+				perror(L"Image has multiple resource sections\n");
+				return EFI_UNSUPPORTED;
+			}
+
+			if (Section->NumberOfRelocations != 0 ||
+			    Section->PointerToRelocations != 0) {
+				perror(L"SBAT section has relocations\n");
+				return EFI_UNSUPPORTED;
+			}
+
+			/* If it has nonzero size, and our bounds check made
+			 * sense, sizes match, then we believe it's okay. */
+			if (Section->SizeOfRawData &&
+			    Section->SizeOfRawData == Section->Misc.VirtualSize &&
+			    base && end) {
+				SBATBase = base;
+				/* +1 because of size vs last byte location */
+				SBATSize = end - base + 1;
+			}
 		}
 
 		if (Section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE) {
@@ -1026,6 +1034,22 @@ handle_image (void *data, unsigned int datasize,
 			if (Section->SizeOfRawData < Section->Misc.VirtualSize)
 				ZeroMem(base + Section->SizeOfRawData,
 					Section->Misc.VirtualSize - Section->SizeOfRawData);
+		}
+	}
+
+	if (secure_mode ()) {
+		efi_status = verify_buffer(data, datasize,
+					   &context, sha256hash, sha1hash);
+
+		if (EFI_ERROR(efi_status)) {
+			if (verbose)
+				console_print(L"Verification failed: %r\n", efi_status);
+			else
+				console_error(L"Verification failed", efi_status);
+			return efi_status;
+		} else {
+			if (verbose)
+				console_print(L"Verification succeeded\n");
 		}
 	}
 
@@ -1073,6 +1097,5 @@ handle_image (void *data, unsigned int datasize,
 
 	return EFI_SUCCESS;
 }
-
 
 // vim:fenc=utf-8:tw=75:noet

@@ -785,6 +785,8 @@ typedef struct {
 	EFI_IMAGE_DATA_DIRECTORY *SecDir;
 	UINT64 NumberOfRvaAndSizes;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
+	// not really a DD, but the structure is convenient.
+	EFI_IMAGE_DATA_DIRECTORY *ResourceSection;
 } PE_COFF_LOADER_IMAGE_CONTEXT;
 
 #endif /* SHIM_PEIMAGE_H */

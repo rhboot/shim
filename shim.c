@@ -1020,6 +1020,10 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+#if 0
+	char *sbat_base = NULL;
+	size_t sbat_size = 0;
+#endif
 
 	if ((INT32)size < 0)
 		return EFI_INVALID_PARAMETER;
@@ -1035,6 +1039,13 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 				   sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status))
 		goto done;
+
+#if 0
+	efi_status = get_sbat_section(buffer, size, &context,
+				      &sbat_base, &sbat_size);
+	if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND)
+		goto done;
+#endif
 
 	/* Measure the binary into the TPM */
 #ifdef REQUIRE_TPM
@@ -1052,8 +1063,8 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 		goto done;
 	}
 
-	efi_status = verify_buffer(buffer, size, &context,
-				   sha256hash, sha1hash);
+	efi_status = verify_buffer(buffer, size,
+				   &context, sha256hash, sha1hash);
 done:
 	in_protocol = 0;
 	return efi_status;
