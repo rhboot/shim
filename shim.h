@@ -228,4 +228,7 @@ verify_buffer (char *data, int datasize,
 #define LogError(fmt, ...) \
 	LogError_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
 
+#define MIN(a, b) (((a) <= (b))?(a):(b))
+#define MAX(a, b) (((a) <= (b))?(b):(a))
+
 #endif /* SHIM_H_ */
