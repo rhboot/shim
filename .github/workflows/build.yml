@@ -2,9 +2,12 @@ name: Build for CI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - github-workflow-ci
 
 jobs:
   build:
