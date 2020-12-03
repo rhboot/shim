@@ -10,10 +10,8 @@ on:
       - github-workflow-ci
 
 jobs:
-  build:
-
+  do-build:
     runs-on: ubuntu-latest
-
     steps:
     - name: docker-pull
       run: docker pull vathpela/efi-ci-rawhide:v0
