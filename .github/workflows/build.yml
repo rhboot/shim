@@ -1,0 +1,18 @@
+name: Build for CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: docker-pull
+      run: docker pull vathpela/efi-ci-rawhide:v0
+    - name: build
+      run: docker run vathpela/efi-ci-rawhide:v0 /bin/sh -c "cd /root/ && ./build.sh --branch \"$GITHUB_REF\" --commit \"$GITHUB_BASE_REF\" --event-type \"$GITHUB_EVENT_NAME\" --pr-branch \"$GITHUB_HEAD_REF\" --pr-sha \"$GITHUB_SHA\" --remote \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\" --repo \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\" --test-subject shim"
