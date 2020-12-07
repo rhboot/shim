@@ -18,12 +18,9 @@ jobs:
       - name: Do the build
         uses: ./.github/build-f33
         id: build
-#       with:
-#         platforms: linux/amd64,linux/arm64
-      - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
-        with:
-#         platforms: linux/amd64,linux/arm64
-          name: shim
-          path: |
-            /destdir
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
