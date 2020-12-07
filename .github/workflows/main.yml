@@ -9,8 +9,8 @@ on:
       - github-workflow-ci
 
 jobs:
-  do-build-test-f33:
-    runs-on: ubuntu-20.04
+  build-f33-x64:
+    runs-on: fedora-latest
     name: A job to test building on Fedora 33
     steps:
       - name: Checkout
