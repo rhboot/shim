@@ -11,15 +11,19 @@ on:
     - cron: '0 3 * * *'
 
 jobs:
-  build-f33-x64:
-    runs-on: fedora-latest
-    name: A job to test building on Fedora 33
+  build-f34-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f34
+    name: A job to test building on Fedora 34
     steps:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Do the build
-        uses: ./.github/build-f33
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 clean all
         id: build
+      - name: Install in /destdir
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir install
+        id: install
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
 #        with:
