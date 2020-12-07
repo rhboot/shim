@@ -1,9 +1,6 @@
-SCAN_BUILD ?= $(shell x=$$(which --skip-alias --skip-functions scan-build 2>/dev/null) ; [ -n "$$x" ] && echo 1)
-ifeq ($(SCAN_BUILD),)
-	SCAN_BUILD_ERROR = $(error scan-build not found)
-endif
+SCAN_BUILD ?= $(shell x=$$(which --skip-alias --skip-functions scan-build 2>/dev/null) ; [ -n "$$x" ] && echo "$$x")
 
-scan-test : ; $(SCAN_BUILD_ERROR)
+scan-test : ; $(if $(findstring /,$(SCAN_BUILD)),,$(error scan-build not found))
 
 scan-clean :
 	@if [[ -d scan-results ]]; then rm -rf scan-results && echo "removed 'scan-results'"; fi
