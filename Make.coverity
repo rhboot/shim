@@ -38,11 +38,8 @@ coverity-all : cov-int-all cov-file cov-upload
 
 clean : | cov-clean
 
-COV_BUILD ?= $(shell x=$$(which --skip-alias --skip-functions cov-build 2>/dev/null) ; [ -n "$$x" ] && echo 1)
-ifeq ($(COV_BUILD),)
-	COV_BUILD_ERROR = $(error cov-build not found)
-endif
+COV_BUILD ?= $(shell x=$$(which --skip-alias --skip-functions cov-build 2>/dev/null) ; [ -n "$$x" ] && echo "$$x")
 
-cov-test : ; $(COV_BUILD_ERROR)
+cov-test : ; $(if $(findstring /,$(COV_BUILD)),,$(error cov-build not found))
 
 .PHONY : coverity cov-upload cov-clean cov-file cov-test
