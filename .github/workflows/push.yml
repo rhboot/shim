@@ -1,0 +1,146 @@
+name: Build pushed commits for CI
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  push-f31-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f31
+    name: A job to test building on Fedora 31
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  clean all
+        id: build
+      - name: Install in /destdir
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
+  push-f32-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f32
+    name: A job to test building on Fedora 32
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  clean all
+        id: build
+      - name: Install in /destdir
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
+  push-f33-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f33
+    name: A job to test building on Fedora 33
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: log-git-head
+        run: git log --oneline HEAD -1
+      - name: log-git-orig-head
+        run: git log --oneline ORIG_HEAD -1
+      - name: Do the build
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  clean all
+        id: build
+      - name: Install in /destdir
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
+  push-f34-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f34
+    name: A job to test building on Fedora 34
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  clean all
+        id: build
+      - name: Install in /destdir
+        run: make
+                  PREFIX=/usr
+                  LIBDIR=/usr/lib64
+                  DESTDIR=/destdir
+                  EFIDIR=test
+                  ENABLE_HTTPBOOT=true
+                  ENABLE_SHIM_HASH=true
+                  install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
