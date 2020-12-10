@@ -251,7 +251,7 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	SIZE_T howmany, varsz = 0, esdsz;
 	UINT8 *var, *data;
 
-	howmany = min((maxsz - sizeof(*esl)) / esl->SignatureSize,
+	howmany = MIN((maxsz - sizeof(*esl)) / esl->SignatureSize,
 		      (esl->SignatureListSize - sizeof(*esl)) / esl->SignatureSize);
 	if (howmany < 1) {
 		return EFI_BUFFER_TOO_SMALL;
@@ -409,7 +409,7 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 
 		SIZE_T howmany;
 		UINTN adj = 0;
-		howmany = min((max_var_sz - sizeof(*esl)) / esl->SignatureSize,
+		howmany = MIN((max_var_sz - sizeof(*esl)) / esl->SignatureSize,
 			      (esl->SignatureListSize - sizeof(*esl)) / esl->SignatureSize);
 		if (!only_first && i == 0 && howmany >= 1) {
 			adj = howmany * esl->SignatureSize;

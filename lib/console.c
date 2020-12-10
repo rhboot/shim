@@ -214,7 +214,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 			if (col < 0)
 				col = 0;
 
-			CopyMem(Line + col + 1, s, min(len, size_cols - 2)*2);
+			CopyMem(Line + col + 1, s, MIN(len, size_cols - 2)*2);
 		}
 		if (line >= 0 && line == highlight)
 			co->SetAttribute(co, EFI_LIGHTGRAY |
