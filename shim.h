@@ -35,8 +35,6 @@
 
 #define nonnull(...) __attribute__((__nonnull__(__VA_ARGS__)))
 
-#define min(a, b) ({(a) < (b) ? (a) : (b);})
-
 #ifdef __x86_64__
 #ifndef DEFAULT_LOADER
 #define DEFAULT_LOADER L"\\grubx64.efi"
@@ -232,8 +230,5 @@ verify_buffer (char *data, int datasize,
 	perror_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
 #define LogError(fmt, ...) \
 	LogError_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
-
-#define MIN(a, b) (((a) <= (b))?(a):(b))
-#define MAX(a, b) (((a) <= (b))?(b):(a))
 
 #endif /* SHIM_H_ */
