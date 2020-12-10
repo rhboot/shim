@@ -1,0 +1,86 @@
+name: push-builds
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  push-f34-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f34
+    name: f34 build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        id: build
+      - name: Install in /destdir
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
+  push-f33-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f33
+    name: f33 build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        id: build
+      - name: Install in /destdir
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
+  push-f32-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f32
+    name: f32 build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        id: build
+      - name: Install in /destdir
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
+  push-f31-x64:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:f31
+    name: f31 build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Do the build
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+        id: build
+      - name: Install in /destdir
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+        id: install
+#      - name: Archive production artifacts
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: shim
+#          path: |
+#            /destdir
