@@ -152,5 +152,8 @@
 #define ALIGN_DOWN(x, a)        __ALIGN((x) - ((a) - 1), (a))
 #endif
 
+#define MIN(a, b) ({(a) < (b) ? (a) : (b);})
+#define MAX(a, b) ({(a) <= (b) ? (b) : (a);})
+
 #endif /* !COMPILER_H_ */
 // vim:fenc=utf-8:tw=75:et
