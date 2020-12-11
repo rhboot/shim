@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
- * Copyright 2012-2013 Red Hat, Inc.
- * All rights reserved.
- *
- * See "COPYING" for license terms.
- *
- * Author(s): Peter Jones <pjones@redhat.com>
+ * Copyright Red Hat, Inc.
+ * Copyright Peter Jones <pjones@redhat.com>
  */
 
 #include <efi.h>

@@ -1,7 +1,4 @@
-/*
- * asm.h
- * Copyright 2018 Peter Jones <pjones@redhat.com>
- */
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #ifndef SHIM_ASM_H_
 #define SHIM_ASM_H_

@@ -1,20 +1,11 @@
-/** @file
-  This file provides a definition of the EFI IPv4 Configuration II
-  Protocol.
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 
-Copyright (c) 2015 - 2016, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at<BR>
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
-
-@par Revision Reference:
-This Protocol is introduced in UEFI Specification 2.5
-
-**/
+/*
+ * This file provides a definition of the EFI IPv4 Configuration II
+ * Protocol.
+ *
+ * Copyright (c) 2015 - 2016, Intel Corporation. All rights reserved.
+ */
 #ifndef SHIM_IP4CONFIG2_H
 #define SHIM_IP4CONFIG2_H
 

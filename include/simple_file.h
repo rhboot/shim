@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #ifndef SHIM_SIMPLE_FILE_H
 #define SHIM_SIMPLE_FILE_H
 
