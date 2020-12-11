@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
- * mok.c
+ * mok.c - MoK variable processing
  * Copyright 2017 Peter Jones <pjones@redhat.com>
  */
 

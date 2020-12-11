@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #ifndef SHIM_SECURITY_POLICY_H
 #define SHIM_SECURITY_POLICY_H
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #ifndef SHIM_VARIABLES_H
 #define SHIM_VARIABLES_H
 
