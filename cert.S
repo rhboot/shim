@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #include "config.h"
 
 #if defined(VENDOR_DB_FILE) && defined(VENDOR_CERT_FILE)

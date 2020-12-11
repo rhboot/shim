@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #ifndef SHIM_WINCERT_H
 #define SHIM_WINCERT_H
 

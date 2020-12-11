@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 /*
  * Walk a list of input files, printing the name and buildid of any file
  * that has one.
