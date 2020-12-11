@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #ifndef SHIM_LIB_EXECUTE_H
 #define SHIM_LIB_EXECUTE_H
 

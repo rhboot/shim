@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #ifndef STATIC_HEXDUMP_H
 #define STATIC_HEXDUMP_H
 

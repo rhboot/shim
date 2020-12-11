@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+
 #include <efi.h>
 #include <efilib.h>
 #include <Library/BaseCryptLib.h>

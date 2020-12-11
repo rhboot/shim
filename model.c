@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
  * model.c - modeling file for coverity
- * Copyright 2017 Peter Jones <pjones@redhat.com>
- *
+ * Copyright Peter Jones <pjones@redhat.com>
  */
 
 #ifndef __COVERITY__

@@ -1,7 +1,4 @@
-/*
- * compiler.h
- * Copyright 2019 Peter Jones <pjones@redhat.com>
- */
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #ifndef COMPILER_H_
 #define COMPILER_H_
