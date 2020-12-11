@@ -15,6 +15,7 @@ OPENSSL_CFLAGS = \
 		 -iquote $(OPENSSLDIR)/crypto \
 		 -iquote $(OPENSSLDIR)/crypto/include \
 		 -iquote $(TOPDIR)/Cryptlib \
+		 -Wno-error=maybe-uninitialized \
 		 -Wno-unused
 
 TARGET = libopenssl.a
