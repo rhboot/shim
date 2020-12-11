@@ -13,8 +13,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: fetch-origin
+        run: git fetch origin
+        id: fetch-origin
+      - name: dammit0
+        run: git remote -v
+        id: dammit0
+      - name: dammit1
+        run: ls .git/refs/heads/
+        id: dammit1
       - name: Do the build
-        run: git rebase --exec "make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all" "${GITHUB_BASE_REF}"
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
         run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
@@ -32,8 +45,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Do the build
-        run: git rebase --exec "make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all" "${GITHUB_BASE_REF}"
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
         run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
@@ -51,8 +68,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Do the build
-        run: git rebase --exec "make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all" "${GITHUB_BASE_REF}"
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
         run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
@@ -70,10 +91,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - name: Do the build
-        run: git rebase --exec "make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all" "${GITHUB_BASE_REF}"
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
         id: build
       - name: Install in /destdir
+        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
         id: install
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
