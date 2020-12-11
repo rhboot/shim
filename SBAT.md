@@ -97,12 +97,6 @@ expand. (For example, hyper visors supporting secure boot guests may
 at some point require memory encryption or similar protection
 mechanism.)
 
-~~A specific component can be future proofed for such requirements by
-listing enforced features, for example guest VM memory protection as a
-feature in their signed binary. In such an event the global generation
-number would be bumped, but also include an allow list of prior
-generation numbers with the list of features required along with them.~~
-
 #### Retiring Signed Releases
 
 Products that have reached the end of their support life by definition
@@ -135,17 +129,28 @@ Since Vendor Product keys are brought into Shim	as signed binaries,
 generation numbering can and should be used to revoke them in case of
 a private key compromise.
 
+#### Kernel support for SBAT
+
+The initial SBAT implementation will add SBAT metadata to Shim and
+GRUB and enforce SBAT on all components labeled with it. Until a
+component like say the Linux kernel gains SBAT metadata it can not be
+revoked	via SBAT, but only by revoking the keys signing those
+kernels. These keys will should live in separate, product specific
+signed PE files that contain only the certificate and SBAT metadata for the key
+files. These key files can then be revoked via SBAT in order to invalidate
+and replace a specic key. While certificates built into Shim can be revoked via
+SBAT and Shim introspection, this practice would still result in a proliferation of
+Shim binaries that would need to be revoked via dbx in the event of an
+early Shim code bug. Therefor, SBAT must be used in conjunction with
+separate Vendor Product Key binaries.
+
 #### Kernels execing other kernels (aka kexec, fast reboot)
 
 It is expected that kexec and other similar implementations of kernels
 spawning other kernels will eventually consume and honor SBAT
-metadata. Until they do, revocations of kernels will need to be done
-by revoking the keys signing those kernels. While keys built into Shim
-can be revoked via SBAT and Shim introspection, this practice would
-still result in a proliferation of Shim binaries that would need to be
-revoked via dbx in the event of an early Shim code bug. Therefor,
-products that support kexec or a similar mechanism must use separate
-Vendor Product Key binaries.
+metadata. Until they do, the same Vendor Product Key binary based
+revocation needs to be used for them.
+
 
 
 #### Version-Based Revocation Metadata
@@ -159,14 +164,64 @@ in a VS_VERSIONINFO structure as StringFileInfo components making up a
 VERSION_RECORD_ENTRIES structure:
 
 ```
-typedef struct {
-  CHAR16                   *ProductName;
-  CHAR16                   *ComponentName;
-  UINT16                   FileVersion[2];
-} VERSION_RECORD_ENTRIES;
+BEGIN
+      // encoding
+      BLOCK "040904b0"
+      BEGIN
+        // unused by sbat, required for VERSIONINFO
+        VALUE "CompanyName",        "ACME Corporation"
+        VALUE "FileDescription",    "GRUB2 bootloader"
+        VALUE "FileVersion",        "11.6-preview.rc7552"
+        VALUE "OriginalFilename",    "kernel.img"
+
+        // used by sbat
+        VALUE "InternalName",          "GRUB2"
+        VALUE "ComponentGeneration",    "4"
+        VALUE "ProductName",        "Friendly Distro"
+        VALUE "ProductGeneration",    "16"
+        VALUE "ProductVersion",     "11.6"
+        VALUE "VersionGeneration",    "0"
+     END
+END
 ```
 
-#### Version-Based Revocation Authorization
-A compatible system may need to trust multiple, in-support major/minor versions of products, only revoking ranges of build &/or security version numbers. The authorization system must support this, details TBD.
+#### UEFI SBAT Variable content
+The SBAT UEFI variable then contains a descriptive form of all
+components used by all UEFI signed Operating Systems, along with a
+minimum generation number for each one.	It may also contain a product
+specific generation number, which in turn also specify version
+specific generation numbers. It	is expected that specific generation
+numbers will be	exceptions that	will be	obsoleted if and when the
+global number for a component is incremented.
 
-An EDK2 example demonstrating a method of image authorization, based upon version metadata, should be available in the coming week. We expect the structures and methods to evolve as feedback is incorporated.
+Example:
+```
+// XXX evolving, this does is not meant to imply any specific form of notation or markup
+COMPONENTS
+  InternalName                   "SHIM"
+    MinComponentGeneration       0
+  InternalName                   "GRUB2"
+    MinComponentGeneration       3
+  InternalName                   "Linux Kernel"
+    MinComponentGeneration       73
+    PRODUCTS
+      ProductName                "Some Linux"
+        MinProductGeneration     1
+      ProductName                "Other Linux"
+        MinProductGeneration     0
+        VERSIONS
+          ProductVersion         "32"
+            MinVersionGeneration 2
+          ProductVersion         "33"
+            MinVersionGeneration 1
+        /VERSIONS
+    /PRODUCTS
+  InternalName                   "Some Vendor Cert"
+    MinComponentGeneration       22
+  InternalName                   "Other Vendor Cert"
+    MinComponentGeneration       4
+/COMPONENTS
+
+```
+
+An EDK2 example demonstrating a method of image authorization, based upon version metadata, should be available soon. We expect the structures and methods to evolve as feedback is incorporated.
