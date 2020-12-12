@@ -17,31 +17,31 @@ The background section identified 2 opportunities for improvement:
 
 1. Improving the efficiency of revocation when a number of version have a vulnerability
   
-   * For example, a vulnerability spans foo versions, it might be more efficient to be able to revoke by version, and simply modify the revocation entry to modify the version each time a vulnerablity is detected.
+   * For example, a vulnerability spans some number of versions, it might be more efficient to be able to revoke by version, and simply modify the revocation entry to modify the version each time a vulnerablity is detected.
 2. Improving the efficiency of revocation when there are many shim variations
   
    * For example, a new shim is released to address bugs or adding features. In the current model, the number of images signed are multiplied by the number of authorities as they sign shims to gain the fixes and features.
 
 Microsoft has brainstormed with partners possible solutions for evaluation and feedback:
 
-1. To improve revocation when there are many versions of vulnerable boot images, shim, grub, or otherwise, investigate methods of revoking by image metadata that includes version numbers. Once targeting data is established (e.g. Company foo, product bar, boot component zed), each revocation event ideally edits an existing entry, increasing the trusted minimum security version.
+1. To improve revocation when there are many versions of vulnerable boot images, shim, grub, or otherwise, investigate methods of revoking by image metadata that includes generation numbers. Once targeting data is established (e.g. Company foo, product bar, boot component zed), each revocation event ideally edits an existing entry, increasing the trusted minimum security generation.
 2. To improve revocation when there is a shim vulnerability, and there are many shim images, standardize on a single image shared by authorities. Each release of bug fixes and features result in 1 shim being signed, compressing the number by dozens. This has the stellar additional benefit of reducing the number of shim reviews, which should result in much rejoicing. A vendor's certificates can be revoked by placing the image hash into dbx, similar to the many shim solution we have today.
 
 ## Proposals
 This document focuses on the shim bootloader, not the UEFI specification or updates to UEFI system BIOS.
 
-### Version Number Based Revocation
+### Generation Number Based Revocation
 Microsoft may refer to this as a form of Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT. This introduces a mechanism to require a
 specific level of resistance to secure boot bypasses.
 
-#### Version-Based Revocation Overview
-Metadata that includes the vendor, product family, product/module, & version are added to modules. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure, describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security version could be used for each revocable boot module, replacing many image hashes with 1 entry with security version. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-version metadata instead of the metadata itself.
-Ideally, servicing of the image authorization databases would be updated to support replace of individual EFI_SIGNATURE_DATA items. However, if we assume that new UEFI variable(s) are used, to be serviced by 1 entity per variable (no sharing), then the existing, in-market SetVariable(), without the APPEND attribute, could be used. Microsoft currently issues dbx updates exclusively with the APPEND attribute under the assumption that multiple entities might be servicing dbx. When a new revocation event takes place, rather than increasing the size of variables with image hashes, existing variables can simply be updated with new security versions, consuming no additional space. This constrains the number of entries to the number of unique boot components revoked, independent of versions revoked. The solution may support several major/minor versions, limiting revocation to build/security versions, perhaps via wildcards.
+#### Generation-Based Revocation Overview
+Metadata that includes the vendor, product family, product/module, version and generation are added to modules. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure, describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security generations could be used for each revocable boot module, replacing many image hashes with 1 entry with security generations. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-generation metadata instead of the metadata itself.
+Ideally, servicing of the image authorization databases would be updated to support replace of individual EFI_SIGNATURE_DATA items. However, if we assume that new UEFI variable(s) are used, to be serviced by 1 entity per variable (no sharing), then the existing, in-market SetVariable(), without the APPEND attribute, could be used. Microsoft currently issues dbx updates exclusively with the APPEND attribute under the assumption that multiple entities might be servicing dbx. When a new revocation event takes place, rather than increasing the size of variables with image hashes, existing variables can simply be updated with new security generations, consuming no additional space. This constrains the number of entries to the number of unique boot components revoked, independent of generations revoked. The solution may support several major/minor versions, limiting revocation to build/security generations, perhaps via wildcards.
 
 While previously the APPEND attribute guaranteed that it is not possible to downgrade the set of revocations on a system using a previously signed variable update, this guarantee can also be accomplished by setting the EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute. This will verify that the
 timestamp value of the signed data is later than the current timestamp value associated with the data currently stored in that variable.
 
-#### Version-Based Revocation Scenarios
+#### Generation-Based Revocation Scenarios
 
  Products (not vendors, a vendor can have multiple products or even
 pass a product from one vendor to another over time) are assigned a
