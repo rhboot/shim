@@ -2,20 +2,25 @@
 
 # UEFI shim bootloader secure boot lifecycle improvements
 ## Background
-In the PC ecosystem, [UEFI Secure Boot](https://docs.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-secure-boot) is typically configured to trust 2 authorities for signing UEFI boot code, the Microsoft UEFI Certificate Authority (CA) and Windows CA. When malicious or security compromised code is detected, 2 revocation mechanisms are provided by compatible UEFI implementations, signing certificate or image hash. The UEFI Specification provides additional revocation mechanisms, but their availability and compatibility have not undergone testing.
+In the PC ecosystem, [UEFI Secure Boot](https://docs.microsoft.com/en-us/windows-hardware/design/device-experiences/oem-secure-boot) is typically configured to trust 2 authorities for signing UEFI boot code, the Microsoft UEFI Certificate Authority (CA) and Windows CA. When malicious or security compromised code is detected, 2 revocation mechanisms are provided by compatible UEFI implementations, signing certificate or image hash. The UEFI Specification does not provides any well tested additional revocation mechanisms.
+
 Signing certificate revocation is not practical for the Windows and Microsoft UEFI CAs because it would revoke too many UEFI applications and drivers, especially for Option ROMs. This is true even for the UEFI CA leaf certificates as they generally sign 1 entire year of UEFI images. For this reason UEFI revocations have, until recently, been performed via image hash.
+
 The UEFI shim bootloader provides a level of digital signature indirection, enabling more authorities to participate in UEFI Secure Boot. Shims' certificates typically sign targeted UEFI applications, enabling certificate-based revocation where it makes sense.
-As part of the recent "boothole" security incident [CVE-2020-10713](https://nvd.nist.gov/vuln/detail/CVE-2020-10713), 3 certificates and 150 image hashes were added to the UEFI Secure Boot revocation database `dbx` on the popular x64 architecture. This single revocation event consumes 10kB of the 32kB, or roughly one third, of revocation storage typically available on UEFI platforms. Due to the way that UEFI merges revocation lists, this plus prior revocation events can result in a `dbx` that is almost 15kB in size, approaching 50% capacity.
-The large size of the boothole revocation event is due to the inefficiency of revocation by image hash when there is a security vulnerability in a popular module signed by many authorities, sometimes with many versions.
-Coordinating the boothole revocation has required numerous person months of planning, implementation, and testing multiplied by the number of authorities, deployments, & devices. It is not yet complete, and we anticipate many months of upgrades and testing with a long tail that may last years.
+As part of the recent "BootHole" security incident [CVE-2020-10713](https://nvd.nist.gov/vuln/detail/CVE-2020-10713), 3 certificates and 150 image hashes were added to the UEFI Secure Boot revocation database `dbx` on the popular x64 architecture. This single revocation event consumes 10kB of the 32kB, or roughly one third, of revocation storage typically available on UEFI platforms. Due to the way that UEFI merges revocation lists, this plus prior revocation events can result in a `dbx` that is almost 15kB in size, approaching 50% capacity.
+
+The large size of the BootHole revocation event is due to the inefficiency of revocation by image hash when there is a security vulnerability in a popular component signed by many authorities, sometimes with many versions.
+
+Coordinating the BootHole revocation has required numerous person months of planning, implementation, and testing multiplied by the number of authorities, deployments, & devices. It is not yet complete, and we anticipate many months of upgrades and testing with a long tail that may last years.
+
 Additionally, when bugs or features require updates to UEFI shim, the number of images signed are multiplied by the number of authorities.
 
 ## Summary
-Given the tremendous cost and disruption of a revocation event like boothole, and increased activity by security researchers in the secure boot space, we should take action to greatly improve this process. Updating revocation capabilities in the UEFI spec and system BIOS implementations will take years to deploy into the ecosystem. As such, the focus of this document is on improvements that can be made to the UEFI shim, which are compatible with existing UEFI implementations. Shim can move faster than the UEFI system BIOS ecosystem while providing large impact to the in-market Secure Boot ecosystem.
+Given the tremendous cost and disruption of a revocation event like BootHole, and increased activity by security researchers in the secure boot space, we should take action to greatly improve this process. Updating revocation capabilities in the UEFI specification and system firmware implementations will take years to deploy into the ecosystem. As such, the focus of this document is on improvements that can be made to the UEFI shim, which are compatible with existing UEFI implementations. Shim can move faster than the UEFI system BIOS ecosystem while providing large impact to the in-market Secure Boot ecosystem.
 
 The background section identified 2 opportunities for improvement:
 
-1. Improving the efficiency of revocation when a number of version have a vulnerability
+1. Improving the efficiency of revocation when a number of versions have a vulnerability
   
    * For example, a vulnerability spans some number of versions, it might be more efficient to be able to revoke by version, and simply modify the revocation entry to modify the version each time a vulnerablity is detected.
 2. Improving the efficiency of revocation when there are many shim variations
@@ -25,17 +30,19 @@ The background section identified 2 opportunities for improvement:
 Microsoft has brainstormed with partners possible solutions for evaluation and feedback:
 
 1. To improve revocation when there are many versions of vulnerable boot images, shim, grub, or otherwise, investigate methods of revoking by image metadata that includes generation numbers. Once targeting data is established (e.g. Company foo, product bar, boot component zed), each revocation event ideally edits an existing entry, increasing the trusted minimum security generation.
-2. To improve revocation when there is a shim vulnerability, and there are many shim images, standardize on a single image shared by authorities. Each release of bug fixes and features result in 1 shim being signed, compressing the number by dozens. This has the stellar additional benefit of reducing the number of shim reviews, which should result in much rejoicing. A vendor's certificates can be revoked by placing the image hash into dbx, similar to the many shim solution we have today.
+2. To improve revocation when there is a shim vulnerability, and there are many shim images, standardize on a single image shared by authorities. Each release of bug fixes and features result in 1 shim being signed, compressing the number by dozens. This has the stellar additional benefit of reducing the number of shim reviews, which should result in much rejoicing. The certificates used by a vendor to sign individual boot components would be picked up from additional PE files that are signed either by a shim specific key controlled by Microsoft, or controlled by a vendor, but used only to sign additinal key files. This key built into shim is functionally similar so a CA certificate.
+The certificates built into shim can be revoked by placing the image hash into dbx, similar to the many shim solution we have today.
 
 ## Proposals
-This document focuses on the shim bootloader, not the UEFI specification or updates to UEFI system BIOS.
+This document focuses on the shim bootloader, not the UEFI specification or updates to UEFI firmware.
 
 ### Generation Number Based Revocation
 Microsoft may refer to this as a form of Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT. This introduces a mechanism to require a
 specific level of resistance to secure boot bypasses.
 
 #### Generation-Based Revocation Overview
-Metadata that includes the vendor, product family, product/module, version and generation are added to modules. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure, describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security generations could be used for each revocable boot module, replacing many image hashes with 1 entry with security generations. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-generation metadata instead of the metadata itself.
+Metadata that includes the vendor, product family, product, component, version and generation are added to artifacts. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure (see Signature Database in UEFI specification), describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security generations could be used for each revocable boot module, replacing many image hashes with 1 entry with security generations. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-generation metadata instead of the metadata itself.
+
 Ideally, servicing of the image authorization databases would be updated to support replace of individual EFI_SIGNATURE_DATA items. However, if we assume that new UEFI variable(s) are used, to be serviced by 1 entity per variable (no sharing), then the existing, in-market SetVariable(), without the APPEND attribute, could be used. Microsoft currently issues dbx updates exclusively with the APPEND attribute under the assumption that multiple entities might be servicing dbx. When a new revocation event takes place, rather than increasing the size of variables with image hashes, existing variables can simply be updated with new security generations, consuming no additional space. This constrains the number of entries to the number of unique boot components revoked, independent of generations revoked. The solution may support several major/minor versions, limiting revocation to build/security generations, perhaps via wildcards.
 
 While previously the APPEND attribute guaranteed that it is not possible to downgrade the set of revocations on a system using a previously signed variable update, this guarantee can also be accomplished by setting the EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute. This will verify that the
@@ -97,6 +104,13 @@ expand. (For example, hyper visors supporting secure boot guests may
 at some point require memory encryption or similar protection
 mechanism.)
 
+ The footprint of the UEFI variable payload will expand as product specific
+generation numbers ahead of the global number are added. However it will
+shrink again as the global number for that component is incremented again.
+The variable payload will be stored publicly in the shim source base and identify
+the global generation associated with a product or version specific one. The
+payload is also built into shim to additionally limit exposure.
+
 #### Retiring Signed Releases
 
 Products that have reached the end of their support life by definition
@@ -107,7 +121,7 @@ is made up of commonly	used components,	such as	the GRUB and the Linux
 kernel,	it is reasonable	to assume that the global generation numbers
 will eventually move forward and	exclude	those products from booting on
 a UEFI Secure Boot enabled system. However a product made up of	GRUB
-and a closed source kernel is just a conceivable. In that case the
+and a closed source kernel is just as conceivable. In that case the
 kernel version may never move forward once the product reaches its end
 of support. Therefor it	is recommended that the	product	specific
 generation number be incremented past the latest one shown in any
@@ -154,8 +168,9 @@ revocation needs to be used for them.
 
 
 #### Version-Based Revocation Metadata
-Existing specifications and tools exist for adding this type of authenticated metadata to PE images. For example, Windows applications and drivers accomplish this by adding a resource section (.RSRC) containing a VS_VERSIONINFO structure. Microsoft has produced [an extension to the edk2-pytools-extensions build system](https://github.com/tianocore/edk2-pytool-extensions/pull/214/files) to easily add this metadata to EFI PE images on both [Windows](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12047&view=logs&j=1372d9e0-5cd3-5ef5-5e82-7ce7a218d320&t=807a83c4-d85c-5f7b-2bd5-ab855378aa38)
+Specifications and tools for adding this type of authenticated metadata to PE images. For example, Windows applications and drivers accomplish this by adding a resource section (.RSRC) containing a VS_VERSIONINFO structure. With a GNU Binutils toolchain, this can be accmplished with . Microsoft has produced [an extension to the edk2-pytools-extensions build system](https://github.com/tianocore/edk2-pytool-extensions/pull/214/files) to easily add this metadata to EFI PE images on both [Windows](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12047&view=logs&j=1372d9e0-5cd3-5ef5-5e82-7ce7a218d320&t=807a83c4-d85c-5f7b-2bd5-ab855378aa38)
 and [Linux](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12046&view=logs&j=ec3a3918-b516-55e3-c6c9-a51bd985c058&t=0fc8d1a9-cd73-59c5-9625-ee1ecb5064e8) build platforms.
+
 
  Each component carries a meta data payload within the signed binary
 that contains the publishing product name, the component name and both
@@ -169,7 +184,7 @@ BEGIN
       BLOCK "040904b0"
       BEGIN
         // unused by sbat, required for VERSIONINFO
-        VALUE "CompanyName",        "ACME Corporation"
+        VALUE "CompanyName",        "Fake Corporation"
         VALUE "FileDescription",    "GRUB2 bootloader"
         VALUE "FileVersion",        "11.6-preview.rc7552"
         VALUE "OriginalFilename",    "kernel.img"
