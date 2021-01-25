@@ -1037,6 +1037,29 @@ handle_image (void *data, unsigned int datasize,
 		}
 	}
 
+        if (SBATBase && SBATSize) {
+		int res;
+		struct sbat_metadata sbat = { 0 };
+
+		res = parse_sbat(SBATBase, SBATSize, buffer, &sbat);
+		if (res < 0) {
+			console_print(L"SBAT metadata not correct: %r\n", res);
+			return EFI_UNSUPPORTED;
+		}
+
+		dprint(L"SBAT metadata\n");
+		dprint(L"Data version: \"%a\"\n", sbat.sbat_data_version);
+		dprint(L"Component name: \"%a\"\n", sbat.component_name);
+		dprint(L"Component generation: \"%a\"\n", sbat.component_generation);
+		dprint(L"Product name: \"%a\"\n", sbat.product_name);
+		dprint(L"Product generation: \"%a\"\n", sbat.product_generation);
+		dprint(L"Product version: \"%a\"\n", sbat.product_version);
+		dprint(L"Version generation: \"%a\"\n", sbat.version_generation);
+        } else {
+		console_print(L"SBAT metadata not found\n");
+		return EFI_UNSUPPORTED;
+        }
+
 	if (secure_mode ()) {
 		efi_status = verify_buffer(data, datasize,
 					   &context, sha256hash, sha1hash);
