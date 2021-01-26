@@ -104,12 +104,57 @@ expand. (For example, hyper visors supporting secure boot guests may
 at some point require memory encryption or similar protection
 mechanism.)
 
- The footprint of the UEFI variable payload will expand as product specific
-generation numbers ahead of the global number are added. However it will
-shrink again as the global number for that component is incremented again.
-The variable payload will be stored publicly in the shim source base and identify
-the global generation associated with a product or version specific one. The
-payload is also built into shim to additionally limit exposure.
+ The footprint of the UEFI variable payload will expand as product
+specific generation numbers ahead of the global number are
+added. However it will shrink again as the global number for that
+component is incremented again.  The expectation is that a product or
+vendor specific generation number is a rare event, and that the
+generation number for the upstream code base will suffice in most cases.
+
+A product specific generation number is needed if a CVE is fixed in
+code that only exists in a specific products branch. This would either
+be something like product specific patches, or a miss-merge that only
+occurred in that product. Setting a product specific generation number
+for such an event eliminates the need for other vendors to have to
+re-release the binaries for their products with an incremented global
+number.
+
+However once the global number is bumped for the next upstream CVE fix
+there is no need to carry it any longer since satisfying the check of
+the global number will also exclude any of the older product specific
+binaries.
+
+For example: There is a global CVE disclosure and all vendors
+coordinate to release fixed components on the disclosure date, which
+bumps the global generation number for GRUB to 4.
+
+ sbat revocation data would then require a grub with a global
+ generation number of 4.
+
+However, Vendor C mismerges the patches into one of their products and
+does not become aware of the fact that this mismerge created an
+additional vulnerability until after they have published a signed
+binary in that, vulnerable, state.
+
+ Vendor C's grub binary can now be used to compromise anyone's system.
+
+To remedy this, Vendor C will release a fixed binary with the same
+global generation number and the product specific generation number
+set to 1.
+
+ sbat revocation data would then require a grub with a global
+ generation number of 4, as well as a product specific generation
+ number of 1 for the product that had the vulnerable binary.
+
+If and when there is another upstream fix for a CVE that would bump
+the global number, this product specific number can be dropped from
+the UEFI revocation variable.
+
+The variable payload will be stored publicly in the shim source base
+and identify the global generation associated with a product or
+version specific one. The payload is also built into shim to
+additionally limit exposure.
+
 
 #### Retiring Signed Releases
 
@@ -157,6 +202,14 @@ SBAT and Shim introspection, this practice would still result in a proliferation
 Shim binaries that would need to be revoked via dbx in the event of an
 early Shim code bug. Therefor, SBAT must be used in conjunction with
 separate Vendor Product Key binaries.
+
+At the time of this writing, revoking a Linux kernel with	a
+lockdown compromise is not spelled out as a requirement for shim
+signing. In fact, with limited dbx space and the size of the attack
+surface for lockdown it would be impractical do so without sbat. With
+sbat it should be possible to raise the bar, and treat lockdown bugs
+that would allow a kexec of a tampered kernel as revocations.
+
 
 #### Kernels execing other kernels (aka kexec, fast reboot)
 
