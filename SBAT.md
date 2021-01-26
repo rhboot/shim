@@ -150,6 +150,19 @@ If and when there is another upstream fix for a CVE that would bump
 the global number, this product specific number can be dropped from
 the UEFI revocation variable.
 
+If this	same Vendor C has a similar event after	the global number is
+incremented, they would	again set their	product	or version specific
+number to 1. If	they have a second event on with the same component,
+they would set their product or version specific number to 2.
+
+In such an even a vendor would set the product or product version
+specific generation number based on whether the mismerge occurred in
+all of their branches or in just a subset of them. The goal is
+generally to limit end customer impact with as few re-releases as
+possible while not creating an unnecessarily large UEFI revocation
+variable payload.
+
+
 The variable payload will be stored publicly in the shim source base
 and identify the global generation associated with a product or
 version specific one. The payload is also built into shim to
