@@ -141,8 +141,8 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 }
 
 EFI_STATUS
-SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID owner,
-		  UINT32 options, int createtimebased)
+SetSecureVariable(const CHAR16 * const var, UINT8 *Data, UINTN len,
+		  EFI_GUID owner, UINT32 options, int createtimebased)
 {
 	EFI_SIGNATURE_LIST *Cert;
 	UINTN DataSize;
@@ -177,7 +177,7 @@ SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID owner,
 		return efi_status;
 	}
 
-	efi_status = gRT->SetVariable(var, &owner,
+	efi_status = gRT->SetVariable((CHAR16 *)var, &owner,
 			EFI_VARIABLE_NON_VOLATILE |
 			EFI_VARIABLE_RUNTIME_ACCESS |
 			EFI_VARIABLE_BOOTSERVICE_ACCESS |
@@ -222,14 +222,14 @@ SETOSIndicationsAndReboot(UINT64 indications)
 }
 
 EFI_STATUS
-get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
-		  UINT32 *attributes)
+get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
+		  EFI_GUID owner, UINT32 *attributes)
 {
 	EFI_STATUS efi_status;
 
 	*len = 0;
 
-	efi_status = gRT->GetVariable(var, &owner, NULL, len, NULL);
+	efi_status = gRT->GetVariable((CHAR16 *)var, &owner, NULL, len, NULL);
 	if (efi_status != EFI_BUFFER_TOO_SMALL) {
 		if (!EFI_ERROR(efi_status)) /* this should never happen */
 			return EFI_PROTOCOL_ERROR;
@@ -244,7 +244,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 	if (!*data)
 		return EFI_OUT_OF_RESOURCES;
 
-	efi_status = gRT->GetVariable(var, &owner, attributes, len, *data);
+	efi_status = gRT->GetVariable((CHAR16 *)var, &owner, attributes, len, *data);
 	if (EFI_ERROR(efi_status)) {
 		FreePool(*data);
 		*data = NULL;
@@ -254,7 +254,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 }
 
 EFI_STATUS
-get_variable(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner)
+get_variable(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner)
 {
 	return get_variable_attr(var, data, len, owner, NULL);
 }
@@ -277,7 +277,8 @@ find_in_esl(UINT8 *Data, UINTN DataSize, UINT8 *key, UINTN keylen)
 }
 
 EFI_STATUS
-find_in_variable_esl(CHAR16* var, EFI_GUID owner, UINT8 *key, UINTN keylen)
+find_in_variable_esl(const CHAR16 * const var, EFI_GUID owner, UINT8 *key,
+		     UINTN keylen)
 {
 	UINTN DataSize = 0;
 	UINT8 *Data = NULL;
@@ -328,7 +329,7 @@ variable_is_secureboot(void)
 }
 
 EFI_STATUS
-variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
+variable_enroll_hash(const CHAR16 * const var, EFI_GUID owner,
 		     UINT8 hash[SHA256_DIGEST_SIZE])
 {
 	EFI_STATUS efi_status;
@@ -353,7 +354,7 @@ variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
 		efi_status = SetSecureVariable(var, sig, sizeof(sig), owner,
 					       EFI_VARIABLE_APPEND_WRITE, 0);
 	else
-		efi_status = gRT->SetVariable(var, &owner,
+		efi_status = gRT->SetVariable((CHAR16 *)var, &owner,
 					      EFI_VARIABLE_NON_VOLATILE |
 					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
 					      EFI_VARIABLE_APPEND_WRITE,
