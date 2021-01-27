@@ -31,6 +31,11 @@ Variables you could set to customize the build:
   generate keys during the build and sign MokManager and fallback with
   them, and the signed version will be what gets installed with the
   install targets
+- ENABLE_SHIM_DEVEL
+  If this is set, we look for SHIM_DEVEL_DEBUG instead of SHIM_DEBUG in
+  our debugger delay hook, thus meaning you can have it pause for a
+  debugger only on the development branch and not the OS you need to boot
+  to scp in a new development build.
 - DISABLE_EBS_PROTECTION
   On systems where a second stage bootloader is not used, and the Linux
   Kernel is embedded in the same EFI image as shim and booted directly

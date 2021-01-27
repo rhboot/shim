@@ -1787,10 +1787,17 @@ debug_hook(void)
 	register volatile UINTN x = 0;
 	extern char _text, _data;
 
+	const CHAR16 * const debug_var_name =
+#ifdef ENABLE_SHIM_DEVEL
+		L"SHIM_DEVEL_DEBUG";
+#else
+		L"SHIM_DEBUG";
+#endif
+
 	if (x)
 		return;
 
-	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
+	efi_status = get_variable(debug_var_name, &data, &dataSize,
 				  SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		return;
@@ -1803,8 +1810,8 @@ debug_hook(void)
 		      &_text, &_data);
 
 	console_print(L"Pausing for debugger attachment.\n");
-	console_print(L"To disable this, remove the EFI variable SHIM_DEBUG-%g .\n",
-		      &SHIM_LOCK_GUID);
+	console_print(L"To disable this, remove the EFI variable %s-%g .\n",
+		      debug_var_name, &SHIM_LOCK_GUID);
 	x = 1;
 	while (x++) {
 		/* Make this so it can't /totally/ DoS us. */
