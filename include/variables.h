@@ -34,16 +34,15 @@ CreateTimeBasedPayload (
   IN OUT UINT8            **Data
 			);
 EFI_STATUS
-SetSecureVariable(CHAR16 *var, UINT8 *Data, UINTN len, EFI_GUID owner, UINT32 options, int createtimebased);
+SetSecureVariable(const CHAR16 * const var, UINT8 *Data, UINTN len, EFI_GUID owner, UINT32 options, int createtimebased);
 EFI_STATUS
-get_variable(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner);
+get_variable(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner);
 EFI_STATUS
-get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
-		  UINT32 *attributes);
+get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner, UINT32 *attributes);
 EFI_STATUS
 find_in_esl(UINT8 *Data, UINTN DataSize, UINT8 *key, UINTN keylen);
 EFI_STATUS
-find_in_variable_esl(CHAR16* var, EFI_GUID owner, UINT8 *key, UINTN keylen);
+find_in_variable_esl(const CHAR16 * const var, EFI_GUID owner, UINT8 *key, UINTN keylen);
 
 #define EFI_OS_INDICATIONS_BOOT_TO_FW_UI 0x0000000000000001
 
@@ -56,7 +55,7 @@ variable_is_secureboot(void);
 int
 variable_is_setupmode(int default_return);
 EFI_STATUS
-variable_enroll_hash(CHAR16 *var, EFI_GUID owner,
+variable_enroll_hash(const CHAR16 * const var, EFI_GUID owner,
 		     UINT8 hash[SHA256_DIGEST_SIZE]);
 EFI_STATUS
 variable_create_esl(const uint8_t *cert, const size_t cert_len,
