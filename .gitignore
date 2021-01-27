@@ -13,6 +13,7 @@
 *.efi.debug
 *.efi.signed
 *.esl
+*.gdbinit
 *.hash
 *.key
 *.key
