@@ -234,36 +234,27 @@ revocation needs to be used for them.
 
 
 #### Version-Based Revocation Metadata
-Specifications and tools for adding this type of authenticated metadata to PE images. For example, Windows applications and drivers accomplish this by adding a resource section (.RSRC) containing a VS_VERSIONINFO structure. With a GNU Binutils toolchain, this can be accmplished with . Microsoft has produced [an extension to the edk2-pytools-extensions build system](https://github.com/tianocore/edk2-pytool-extensions/pull/214/files) to easily add this metadata to EFI PE images on both [Windows](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12047&view=logs&j=1372d9e0-5cd3-5ef5-5e82-7ce7a218d320&t=807a83c4-d85c-5f7b-2bd5-ab855378aa38)
-and [Linux](https://dev.azure.com/tianocore/edk2-pytool-extensions/_build/results?buildId=12046&view=logs&j=ec3a3918-b516-55e3-c6c9-a51bd985c058&t=0fc8d1a9-cd73-59c5-9625-ee1ecb5064e8) build platforms.
+Adding a .sbat section containing the sbat metadata structure to PE images.
 
+Each component carries a meta-data payload within the signed binary.
+This meta-data contains the component name, the name of the product
+that the component is released as a part of and the version of that
+product, along with a global generation	number that is in sync with
+the patch level of that build. If applicable it	may also contain
+non-zero product and product version specific generation	numbers.
 
- Each component carries a meta data payload within the signed binary
-that contains the publishing product name, the component name and both
-a global and product specific generation number. This data is embedded
-in a VS_VERSIONINFO structure as StringFileInfo components making up a
-VERSION_RECORD_ENTRIES structure:
 
 ```
-BEGIN
-      // encoding
-      BLOCK "040904b0"
-      BEGIN
-        // unused by sbat, required for VERSIONINFO
-        VALUE "CompanyName",        "Fake Corporation"
-        VALUE "FileDescription",    "GRUB2 bootloader"
-        VALUE "FileVersion",        "11.6-preview.rc7552"
-        VALUE "OriginalFilename",    "kernel.img"
+struct sbat_metadata {
+       CHAR16 *SBAT_DateVersion           // version of this structure 1 at initial release
+       CHAR16 *ComponentName; 	      	  // for example grub2
+       CHAR16 *ComponentGeneration;       // 1 at initial release then incrementing
+       CHAR16 *ProductName;   	      	  // for example: Oracle Linux
+       CHAR16 *ProductGeneration;     	  // generally 0 unless	needed
+       CHAR16 *ProductVersion;	      	  // for example: "7.9"
+       CHAR16 *VersionGeneration;     	  // generally 0 unless needed
+};
 
-        // used by sbat
-        VALUE "InternalName",          "GRUB2"
-        VALUE "ComponentGeneration",    "4"
-        VALUE "ProductName",        "Friendly Distro"
-        VALUE "ProductGeneration",    "16"
-        VALUE "ProductVersion",     "11.6"
-        VALUE "VersionGeneration",    "0"
-     END
-END
 ```
 
 #### UEFI SBAT Variable content
@@ -275,9 +266,8 @@ specific generation numbers. It	is expected that specific generation
 numbers will be	exceptions that	will be	obsoleted if and when the
 global number for a component is incremented.
 
-Example:
 ```
-// XXX evolving, this does is not meant to imply any specific form of notation or markup
+// XXX evolving
 COMPONENTS
   InternalName                   "SHIM"
     MinComponentGeneration       0
