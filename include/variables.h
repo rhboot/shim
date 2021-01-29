@@ -2,7 +2,7 @@
 #define SHIM_VARIABLES_H
 
 #include "efiauthenticated.h"
-#include "pe.h"		/* for SHA256_DIGEST_SIZE */
+#include "peimage.h"		/* for SHA256_DIGEST_SIZE */
 
 #define certlist_for_each_certentry(cl, cl_init, s, s_init)		\
 	for (cl = (EFI_SIGNATURE_LIST *)(cl_init), s = (s_init);	\
