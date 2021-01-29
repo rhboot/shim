@@ -27,14 +27,15 @@ static BOOLEAN check_var(CHAR16 *varname)
 	return FALSE;
 }
 
-#define SetVariable(name, guid, attrs, varsz, var) ({			\
-	EFI_STATUS efi_status_;						\
-	efi_status_ = gRT->SetVariable(name, guid, attrs, varsz, var);	\
-	dprint_(L"%a:%d:%a() SetVariable(\"%s\", ... varsz=0x%llx) = %r\n",\
-		 __FILE__, __LINE__, __func__,				\
-		name, varsz, efi_status_);				\
-	efi_status_;							\
-})
+#define SetVariable(name, guid, attrs, varsz, var)                                  \
+	({                                                                          \
+		EFI_STATUS efi_status_;                                             \
+		efi_status_ = gRT->SetVariable(name, guid, attrs, varsz, var);      \
+		dprint_(L"%a:%d:%a() SetVariable(\"%s\", ... varsz=0x%llx) = %r\n", \
+		        __FILE__, __LINE__ - 5, __func__, name, varsz,              \
+		        efi_status_);                                               \
+		efi_status_;                                                        \
+	})
 
 /*
  * If the OS has set any of these variables we need to drop into MOK and

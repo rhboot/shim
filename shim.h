@@ -212,7 +212,9 @@ extern UINT8 in_protocol;
 		LogError_(file, line, func, fmt, ##__VA_ARGS__);		\
 		__perror_ret;							\
 	})
-#define perror(fmt, ...) perror_(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)
-#define LogError(fmt, ...) LogError_(__FILE__, __LINE__, __func__, fmt, ## __VA_ARGS__)
+#define perror(fmt, ...) \
+	perror_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
+#define LogError(fmt, ...) \
+	LogError_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
 
 #endif /* SHIM_H_ */

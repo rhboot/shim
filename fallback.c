@@ -54,14 +54,15 @@ get_fallback_verbose(void)
 		ret_;							\
 	})
 
-#define VerbosePrint(fmt, ...)						\
-	({	UINTN line_ = __LINE__;					\
-		UINTN ret_ = 0;						\
-		if (get_fallback_verbose()) {				\
-			console_print(L"%a:%d: ", __func__, line_);	\
-			ret_ = console_print((fmt), ##__VA_ARGS__);	\
-		}							\
-		ret_;							\
+#define VerbosePrint(fmt, ...)                                      \
+	({                                                          \
+		UINTN line_ = __LINE__ - 2;                         \
+		UINTN ret_ = 0;                                     \
+		if (get_fallback_verbose()) {                       \
+			console_print(L"%a:%d: ", __func__, line_); \
+			ret_ = console_print((fmt), ##__VA_ARGS__); \
+		}                                                   \
+		ret_;                                               \
 	})
 
 static EFI_STATUS

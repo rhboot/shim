@@ -756,7 +756,7 @@ static BOOLEAN secure_mode (void)
 		goto done;						\
 	}								\
 })
-#define check_size(d,ds,h,hs) check_size_line(d,ds,h,hs,__LINE__)
+#define check_size(d, ds, h, hs) check_size_line(d, ds, h, hs, __LINE__)
 
 /*
  * Calculate the SHA1 and SHA256 hashes of a binary
@@ -2802,9 +2802,9 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	setup_verbosity();
 
 	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
-		      __FILE__, __LINE__, __func__, vendor_authorized, vendor_authorized_size);
+	       vendor_authorized, vendor_authorized_size);
 	dprint(L"vendor_deauthorized:0x%08lx vendor_deauthorized_size:%lu\n",
-		      __FILE__, __LINE__, __func__, vendor_deauthorized, vendor_deauthorized_size);
+	       vendor_deauthorized, vendor_deauthorized_size);
 	init_openssl();
 
 	/*
