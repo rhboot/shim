@@ -11,12 +11,7 @@
 
 #include "shim.h"
 
-#include <variables.h>
-#include <simple_file.h>
-#include <errors.h>
-
 #if defined(OVERRIDE_SECURITY_POLICY)
-#include <security_policy.h>
 
 /*
  * See the UEFI Platform Initialization manual (Vol2: DXE) for this
