@@ -1,7 +1,7 @@
 #ifndef SHIM_EFIAUTHENTICATED_H
 #define SHIM_EFIAUTHENTICATED_H
 
-#include <wincert.h>
+#include "wincert.h"
 
 /***********************************************************************
  * Signature Database

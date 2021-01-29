@@ -22,7 +22,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef SHIM_PEIMAGE_H
 #define SHIM_PEIMAGE_H
 
-#include <wincert.h>
+#include "wincert.h"
 
 #define SIGNATURE_16(A, B)        ((A) | (B << 8))
 #define SIGNATURE_32(A, B, C, D)  (SIGNATURE_16 (A, B) | (SIGNATURE_16 (C, D) << 16))
