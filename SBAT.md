@@ -232,7 +232,6 @@ metadata. Until they do, the same Vendor Product Key binary based
 revocation needs to be used for them.
 
 
-
 #### Version-Based Revocation Metadata
 Adding a .sbat section containing the sbat metadata structure to PE images.
 
@@ -243,19 +242,44 @@ product, along with a global generation	number that is in sync with
 the patch level of that build. If applicable it	may also contain
 non-zero product and product version specific generation	numbers.
 
+The format of this .sbat section is comma separated values, or more
+specifically UTF-8 encoded strings:
+
+sbat_data_version,component_name,component_generation,product_name,product_generation,product_version,version_generation
+
+For example:
+
+```
+1,GRUB2,1,Oracle Linux,0,7.9,0
+```
+
+Components that do not have special code to construct the final PE files can simply add this secrion using objcopy(1)
+
+Components that do not have special code to construct the final PE
+files can simply add this section using objcopy(1):
+
+```
+objcopy --add-section .sbat=sbat.csv foo.efi
+
+```
+
+This is then used to populate the following data structure:
 
 ```
 struct sbat_metadata {
-       CHAR16 *SBAT_DateVersion           // version of this structure 1 at initial release
-       CHAR16 *ComponentName; 	      	  // for example grub2
-       CHAR16 *ComponentGeneration;       // 1 at initial release then incrementing
-       CHAR16 *ProductName;   	      	  // for example: Oracle Linux
-       CHAR16 *ProductGeneration;     	  // generally 0 unless	needed
-       CHAR16 *ProductVersion;	      	  // for example: "7.9"
-       CHAR16 *VersionGeneration;     	  // generally 0 unless needed
+       char *sbat_data_version          // version of this structure, 1 at initial release
+       char *component_name; 	      	  // for example "GRUB2"
+       char *component_generation;      // 1 at initial release then incrementing
+       char *product_name;   	      	  // for example: "Oracle Linux"
+       char *product_generation;     	  // generally 0 unless	needed
+       char *product_version;	      	  // for example: "7.9"
+       char *version_generation;     	  // generally 0 unless needed
 };
 
 ```
+
+
+
 
 #### UEFI SBAT Variable content
 The SBAT UEFI variable then contains a descriptive form of all
