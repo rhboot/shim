@@ -134,7 +134,7 @@
 #include "include/ip6config.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
-#include "include/pe.h"
+#include "include/peimage.h"
 #include "include/replacements.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
