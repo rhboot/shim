@@ -196,6 +196,22 @@ keeping up with fixes for CVEs and ensuring that any known signed
 binaries containing known CVEs are denied from booting on UEFI Secure
 Boot enabled systems via the most up to date UEFI	meta data.
 
+#### Vendor Key Files
+
+Even prior to or without moving to one-shim, it is desirable to get
+every vendor onto as few shims as possible. Ideally a vendor would
+have a single shim signed with	their certificate embedded and then use
+that certificate to sign additional <Vendor>_key.EFI key files that
+then contain all the keys that the individual components for their
+products are signed	with. This file name	needs to be registered at the
+time of shim review and	should not be changed without going back to a
+shim review. A vendor should be	able to	store as many certificated (or
+a CA certificate) as they need for all the components of all of their
+products. Older versions of this file can be revoked via sbat. In
+order to limit the footprint of the sbat revocation meta data, it is
+vital that vendors do not create additional key	files beyond what they
+have been approved for at shim review.
+
 #### Key Revocations
 Since Vendor Product keys are brought into Shim	as signed binaries,
 generation numbering can and should be used to revoke them in case of
