@@ -11,12 +11,12 @@ As part of the recent "BootHole" security incident [CVE-2020-10713](https://nvd.
 
 The large size of the BootHole revocation event is due to the inefficiency of revocation by image hash when there is a security vulnerability in a popular component signed by many authorities, sometimes with many versions.
 
-Coordinating the BootHole revocation has required numerous person months of planning, implementation, and testing multiplied by the number of authorities, deployments, & devices. It is not yet complete, and we anticipate many months of upgrades and testing with a long tail that may last years.
+Coordinating the BootHole revocation has required numerous person months of planning, implementation, and testing multiplied by the number of authorities, deployments, & devices. It is not yet complete, and we anticipate many months of upgrades and testing with a long tail that may last years
 
 Additionally, when bugs or features require updates to UEFI shim, the number of images signed are multiplied by the number of authorities.
 
 ## Summary
-Given the tremendous cost and disruption of a revocation event like BootHole, and increased activity by security researchers in the secure boot space, we should take action to greatly improve this process. Updating revocation capabilities in the UEFI specification and system firmware implementations will take years to deploy into the ecosystem. As such, the focus of this document is on improvements that can be made to the UEFI shim, which are compatible with existing UEFI implementations. Shim can move faster than the UEFI system BIOS ecosystem while providing large impact to the in-market Secure Boot ecosystem.
+Given the tremendous cost and disruption of a revocation event like BootHole, and increased activity by security researchers in the UEFI Secure Boot space, we should take action to greatly improve this process. Updating revocation capabilities in the UEFI specification and system firmware implementations will take years to deploy into the ecosystem. As such, the focus of this document is on improvements that can be made to the UEFI shim, which are compatible with existing UEFI implementations. Shim can move faster than the UEFI system BIOS ecosystem while providing large impact to the in-market UEFI Secure Boot ecosystem.
 
 The background section identified 2 opportunities for improvement:
 
@@ -29,7 +29,7 @@ The background section identified 2 opportunities for improvement:
 
 Microsoft has brainstormed with partners possible solutions for evaluation and feedback:
 
-1. To improve revocation when there are many versions of vulnerable boot images, shim, grub, or otherwise, investigate methods of revoking by image metadata that includes generation numbers. Once targeting data is established (e.g. Company foo, product bar, boot component zed), each revocation event ideally edits an existing entry, increasing the trusted minimum security generation.
+1. To improve revocation when there are many versions of vulnerable boot images, shim, GRUB, or otherwise, investigate methods of revoking by image metadata that includes generation numbers. Once targeting data is established (e.g. Company foo, product bar, boot component zed), each revocation event ideally edits an existing entry, increasing the trusted minimum security generation.
 2. To improve revocation when there is a shim vulnerability, and there are many shim images, standardize on a single image shared by authorities. Each release of bug fixes and features result in 1 shim being signed, compressing the number by dozens. This has the stellar additional benefit of reducing the number of shim reviews, which should result in much rejoicing. The certificates used by a vendor to sign individual boot components would be picked up from additional PE files that are signed either by a shim specific key controlled by Microsoft, or controlled by a vendor, but used only to sign additinal key files. This key built into shim is functionally similar so a CA certificate.
 The certificates built into shim can be revoked by placing the image hash into dbx, similar to the many shim solution we have today.
 
@@ -37,8 +37,8 @@ The certificates built into shim can be revoked by placing the image hash into d
 This document focuses on the shim bootloader, not the UEFI specification or updates to UEFI firmware.
 
 ### Generation Number Based Revocation
-Microsoft may refer to this as a form of Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT. This introduces a mechanism to require a
-specific level of resistance to secure boot bypasses.
+Microsoft may refer to this as a form of UEFI Secure Boot Advanced Targeting (SBAT), perhaps to be named EFI_CERT_SBAT. This introduces a mechanism to require a
+specific level of resistance to UEFI Secure Boot bypasses.
 
 #### Generation-Based Revocation Overview
 Metadata that includes the vendor, product family, product, component, version and generation are added to artifacts. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure (see Signature Database in UEFI specification), describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security generations could be used for each revocable boot module, replacing many image hashes with 1 entry with security generations. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-generation metadata instead of the metadata itself.
@@ -55,7 +55,7 @@ pass a product from one vendor to another over time) are assigned a
 name. Product names can specify a specifc version or refer to the
 entire prodcut family. For example mydistro and mydistro-12.
 
- Components that are used as a link in the UEFI secure boot chain of
+ Components that are used as a link in the UEFI Secure Boot chain of
 trust are also assigned names. Examples of components are shim, GRUB,
 kernel, hypervisors, etc.
 
@@ -78,7 +78,7 @@ re-publishing of otherwise safe components.
  A product specific minimum generation number only applies to the
 instance of that component that is signed with that product
 name. Another products instance of the same component may be installed
-on the same system and would not be subject to the other products
+on the same system and would not be subject to the other
 product specific minimum generation number. However both of those
 components will need to meet the global minimum generation number for
 that component. A very likely scenario would be that a product is
@@ -100,7 +100,7 @@ components will be signed with a product specific generation number of
 required as well to sign and label a component with a specific
 generation number. As time goes on it is likely that the minimum
 feature set required for the currently valid generation number will
-expand. (For example, hyper visors supporting secure boot guests may
+expand. (For example, hypervisors supporting UEFI Secure Boot guests may
 at some point require memory encryption or similar protection
 mechanism.)
 
@@ -128,7 +128,7 @@ For example: There is a global CVE disclosure and all vendors
 coordinate to release fixed components on the disclosure date, which
 bumps the global generation number for GRUB to 4.
 
- sbat revocation data would then require a grub with a global
+ SBAT revocation data would then require a GRUB with a global
  generation number of 4.
 
 However, Vendor C mismerges the patches into one of their products and
@@ -136,13 +136,13 @@ does not become aware of the fact that this mismerge created an
 additional vulnerability until after they have published a signed
 binary in that, vulnerable, state.
 
- Vendor C's grub binary can now be used to compromise anyone's system.
+ Vendor C's GRUB binary can now be used to compromise anyone's system.
 
 To remedy this, Vendor C will release a fixed binary with the same
 global generation number and the product specific generation number
 set to 1.
 
- sbat revocation data would then require a grub with a global
+ SBAT revocation data would then require a GRUB with a global
  generation number of 4, as well as a product specific generation
  number of 1 for the product that had the vulnerable binary.
 
@@ -207,8 +207,8 @@ products are signed	with. This file name	needs to be registered at the
 time of shim review and	should not be changed without going back to a
 shim review. A vendor should be	able to	store as many certificated (or
 a CA certificate) as they need for all the components of all of their
-products. Older versions of this file can be revoked via sbat. In
-order to limit the footprint of the sbat revocation meta data, it is
+products. Older versions of this file can be revoked via SBAT. In
+order to limit the footprint of the SBAT revocation meta data, it is
 vital that vendors do not create additional key	files beyond what they
 have been approved for at shim review.
 
@@ -235,8 +235,8 @@ separate Vendor Product Key binaries.
 At the time of this writing, revoking a Linux kernel with	a
 lockdown compromise is not spelled out as a requirement for shim
 signing. In fact, with limited dbx space and the size of the attack
-surface for lockdown it would be impractical do so without sbat. With
-sbat it should be possible to raise the bar, and treat lockdown bugs
+surface for lockdown it would be impractical do so without SBAT. With
+SBAT it should be possible to raise the bar, and treat lockdown bugs
 that would allow a kexec of a tampered kernel as revocations.
 
 
@@ -249,7 +249,7 @@ revocation needs to be used for them.
 
 
 #### Version-Based Revocation Metadata
-Adding a .sbat section containing the sbat metadata structure to PE images.
+Adding a .sbat section containing the SBAT metadata structure to PE images.
 
 Each component carries a meta-data payload within the signed binary.
 This meta-data contains the component name, the name of the product
