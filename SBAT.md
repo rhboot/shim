@@ -162,7 +162,7 @@ generally to limit end customer impact with as few re-releases as
 possible while not creating an unnecessarily large UEFI revocation
 variable payload.
 
-|                                                                                      | prior to<br>disclosure | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>first update | after next global<br>disclosure |
+|                                                                                      | prior to<br>disclosure | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>second update | after next global<br>disclosure |
 |--------------------------------------------------------------------------------------|------------------------|---------------------|----------------------------------|----------------------------------|---------------------------------|
 | GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                      | 4                   | 4                                | 4                                | 5                               |
 | Vendor C's product specific<br>generation number in artifacts<br>.sbat section       | 0                      | 0                   | 1                                | 2                                | 0                               |
@@ -171,7 +171,7 @@ variable payload.
 
 XXX alternative numbering scheme up for votes:
 
-|                                                                                      | prior to<br>disclosure | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>first update | after next global<br>disclosure |
+|                                                                                      | prior to<br>disclosure | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>second update | after next global<br>disclosure |
 |--------------------------------------------------------------------------------------|------------------------|---------------------|----------------------------------|----------------------------------|---------------------------------|
 | GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                      | 4                   | 4                                | 4                                | 5                               |
 | Vendor C's product specific<br>generation number in artifacts<br>.sbat section       | 0                      | 0                   | 5                                | 6                                | 0                               |
