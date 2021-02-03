@@ -169,6 +169,15 @@ variable payload.
 | GRUB global<br>generation number in<br>UEFI SBAT revocation variable                 | 3                      | 4                   | 4                                | 4                                | 5                               |
 | Vendor C's product specific<br>generation number in<br>UEFI SBAT revocation variable | not set                | not set             | 1                                | 2                                | not set                         |
 
+XXX alternative numbering scheme up for votes:
+
+|                                                                                      | prior to<br>disclosure | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>first update | after next global<br>disclosure |
+|--------------------------------------------------------------------------------------|------------------------|---------------------|----------------------------------|----------------------------------|---------------------------------|
+| GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                      | 4                   | 4                                | 4                                | 5                               |
+| Vendor C's product specific<br>generation number in artifacts<br>.sbat section       | 0                      | 0                   | 5                                | 6                                | 0                               |
+| GRUB global<br>generation number in<br>UEFI SBAT revocation variable                 | 3                      | 4                   | 4                                | 4                                | 5                               |
+| Vendor C's product specific<br>generation number in<br>UEFI SBAT revocation variable | not set                | not set             | 5                                | 6                                | not set                         |
+
 The variable payload will be stored publicly in the shim source base
 and identify the global generation associated with a product or
 version specific one. The payload is also built into shim to
