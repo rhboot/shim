@@ -262,7 +262,7 @@ metadata. Until they do, the same Vendor Product Key binary based
 revocation needs to be used for them.
 
 
-#### Version-Based Revocation Metadata
+#### Generation-Based Revocation Metadata
 Adding a .sbat section containing the SBAT metadata structure to PE images.
 
 | field | meaning |
@@ -283,14 +283,14 @@ Example sbat sections
 For grub, a build from a fresh checkout of upstream might have the following in
 `.sbat`:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 ```
 
 A Fedora build believed to have exactly the same set of vulnerabilities plus
 one that was never upstream might have:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.fedora,0,The Fedora Project,grub2,2.04-31.fc33,https://src.fedoraproject.org/rpms/grub2
 ```
@@ -298,7 +298,7 @@ grub.fedora,0,The Fedora Project,grub2,2.04-31.fc33,https://src.fedoraproject.or
 Likewise, Red Hat has various builds for RHEL 7 and RHEL 8, all of which have
 something akin to the following in `.sbat`:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.02,https://www.gnu.org/software/grub/
 grub.fedora,0,Red Hat Enterprise Linux,grub2,2.02-0.34.fc24,mail:secalert@redhat.com
 grub.rhel,0,Red Hat Enterprise Linux,grub2,2.02-0.34.el7_2,mail:secalert@redhat.com
@@ -307,7 +307,7 @@ grub.rhel,0,Red Hat Enterprise Linux,grub2,2.02-0.34.el7_2,mail:secalert@redhat.
 The Debian package believed to have the same set of vulnerabilities as upstream
 might have:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.debian,0,Debian,grub2,2.04-12,https://packages.debian.org/source/sid/grub2
 ```
@@ -319,14 +319,15 @@ upstream vulns, and in fact have never shipped any vulnerabilities.  Their grub
 `.sbat` might have the following (which we'd be very suspect of signing, but
 hey, suppose it turns out to be correct):
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub.acme,0,Acme Corporation,grub,1.96-8191,https://acme.arpa/packages/grub
 ```
 
 At the same time, we're all shipping the same `shim-16` codebase, and in our
 `shim` builds, we all have the following in `.sbat`:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+shim,0,UEFI shim,shim,16,https://github.com/rhboot/shim
 ```
 
 How to add .sbat sections
@@ -363,7 +364,7 @@ fedora grub, so it's product specific generation number has been bumped:
 
 ```
 {
-  { 0, 5, "sbat" },
+  { 1, 5, "sbat" },
   { 0, 5, "shim" },
   { 0, 5, "grub" },
   { 1, 12, "grub.fedora" },
@@ -376,15 +377,15 @@ in upstream grub-0.94 and every version after that, and is shipped by all
 vendors.
 
 At this point, each vendor updates their grub builds, and updates the
-`component_generation` in `.sbat` to `1`.  The upstream build now looks like:
+`component_generation` in `.sbat` to `1`.  The GRUB upstream build now looks like:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,2.05,https://www.gnu.org/software/grub/
 ```
 
 But Fedora's now looks like:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,0,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.fedora,1,The Fedora Project,grub2,2.04-33.fc33,https://src.fedoraproject.org/rpms/grub2
 ```
@@ -396,7 +397,7 @@ Other distros either rebase on 2.05 or theirs change similarly to Fedora's.  We 
 We talk to Acme and they agree to do the latter, thus saving flash real estate
 to be developed on another day:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,0,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,1.96,https://www.gnu.org/software/grub/
 grub.acme,0,Acme Corporation,grub,1.96-8192,https://acme.arpa/packages/grub
 ```
@@ -404,7 +405,7 @@ grub.acme,0,Acme Corporation,grub,1.96-8192,https://acme.arpa/packages/grub
 The UEFI CA issues an update which looks like:
 ```
 {
-  { 0, 5, "sbat" },
+  { 1, 5, "sbat" },
   { 0, 5, "shim" },
   { 1, 5, "grub" },
   { 1, 12, "grub.fedora" },
@@ -417,7 +418,7 @@ Acme at this point discovers some features have been added to grub and they
 want them.  They ship a new grub build that's completely rebased on top of
 upstream and has no known vulnerabilities.  Its `.sbat` data looks like:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,2.05,https://www.gnu.org/software/grub/
 grub.acme,0,Acme Corporation,grub,2.05-1,https://acme.arpa/packages/grub
 ```
@@ -427,7 +428,7 @@ Someone was wrong on the internet and bug 2
 Debian discovers that they actually shipped bug 0 as well (woops).  They
 produce a new build which fixes it and has the following in `.sbat`:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
 ```
@@ -436,7 +437,7 @@ Before the UEFI CA has released an update, though, another upstream issue is
 found.  Everybody updates their builds as they did for bug 1.  Debian also
 updates theirs, as they would, and their new build has:
 ```
-sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+sbat,1,SBAT Version,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,2,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
 ```
@@ -444,7 +445,7 @@ grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
 And the UEFI CA issues an update to SBAT which has:
 ```
 {
-  { 0, 5, "sbat" },
+  { 1, 5, "sbat" },
   { 0, 5, "shim" },
   { 2, 5, "grub" },
   { 1, 12, "grub.fedora" },
