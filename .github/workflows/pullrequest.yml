@@ -6,10 +6,45 @@ on:
       - main
 
 jobs:
-  pull-request-f34-x64:
+  pull-request-intel:
     runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f34
-    name: f34 build
+    container: vathpela/efi-ci:f34-x64
+    name: ${{ matrix.distro }} ${{ matrix.efiarch }} build
+
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: efi-ci-f34
+            libdir: /usr/lib64
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: efi-ci-f33
+            libdir: /usr/lib64
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: efi-ci-f32
+            libdir: /usr/lib64
+          - arch: amd64
+            efiarch: ia32
+            makearch: ia32
+            distro: efi-ci-f34
+            libdir: /usr/lib
+          - arch: amd64
+            efiarch: ia32
+            makearch: ia32
+            distro: efi-ci-f33
+            libdir: /usr/lib
+          - arch: amd64
+            efiarch: ia32
+            makearch: ia32
+            distro: efi-ci-f32
+            libdir: /usr/lib
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -17,90 +52,13 @@ jobs:
           # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: fetch-origin
-        run: git fetch origin
-        id: fetch-origin
-      - name: dammit0
-        run: git remote -v
-        id: dammit0
-      - name: dammit1
-        run: ls .git/refs/heads/
-        id: dammit1
-      - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+      - name: Do the build on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: build
-      - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
-        id: install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
-  pull-request-f33-x64:
-    runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f33
-    name: f33 build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
-        id: build
-      - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
-        id: install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
-  pull-request-f32-x64:
-    runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f32
-    name: f32 build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
-        id: build
-      - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
-        id: install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
-  pull-request-f31-x64:
-    runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f31
-    name: f31 build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - name: Do the build
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
-        id: build
-      - name: Install in /destdir
-        run: make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
-        id: install
+        run: |
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true clean all
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_HTTPBOOT=true ENABLE_SHIM_HASH=true install
+          echo 'results:'
+          find /destdir -type f
 #      - name: Archive production artifacts
 #        uses: actions/upload-artifact@v2
 #        with:
