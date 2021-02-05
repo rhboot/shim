@@ -53,10 +53,10 @@ timestamp value of the signed data is later than the current timestamp value ass
  Products (not vendors, a vendor can have multiple products or even
 pass a product from one vendor to another over time) are assigned a
 name. Product names can specify a specifc version or refer to the
-entire prodcut family. For example mydistro and mydistro-12.
+entire prodcut family. For example mydistro and mydistro,12.
 
  Components that are used as a link in the UEFI Secure Boot chain of
-trust are also assigned names. Examples of components are shim, GRUB,
+trust are assigned names. Examples of components are shim, GRUB,
 kernel, hypervisors, etc.
 
  We could conceivably support sub-components, but it's hard to
@@ -92,9 +92,8 @@ specifies that requirement.
  The global and product specific generation number name spaces are not
 tied to each other. The global number is managed externally, and the
 vast majority of products will never publish a minimum product
-specific generation number for any of their components. These
-components will be signed with a product specific generation number of
-0.
+specific generation number for any of their components. Unspecified,
+more specific generation numbers are treated as 0.
 
  A minimum feature set, for example enforced kernel lock down, may be
 required as well to sign and label a component with a specific
@@ -266,24 +265,72 @@ revocation needs to be used for them.
 #### Version-Based Revocation Metadata
 Adding a .sbat section containing the SBAT metadata structure to PE images.
 
-Each component carries a meta-data payload within the signed binary.
-This meta-data contains the component name, the name of the product
-that the component is released as a part of and the version of that
-product, along with a global generation	number that is in sync with
-the patch level of that build. If applicable it	may also contain
-non-zero product and product version specific generation	numbers.
+| field | meaning |
+|---|---|
+| component_name | the name we're comparing
+| component_generation | the generation number for the comparison
+| vendor_name | human readable vendor name
+| vendor_package_name | human readable package name
+| vendor_version | human readable package version (maybe machine parseable too, not specified here)
+| vendor_url | url to look stuff up, contact, whatever.
 
 The format of this .sbat section is comma separated values, or more
-specifically UTF-8 encoded strings:
+specifically UTF-8 encoded strings.
 
-sbat_data_version,component_name,component_generation,product_name,product_generation,product_version,version_generation
 
-For example:
-
+Example sbat sections
+---------------------
+For grub, a build from a fresh checkout of upstream might have the following in
+`.sbat`:
 ```
-1,GRUB2,1,Oracle Linux,0,7.9,0
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 ```
 
+A Fedora build believed to have exactly the same set of vulnerabilities plus
+one that was never upstream might have:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
+grub.fedora,0,The Fedora Project,grub2,2.04-31.fc33,https://src.fedoraproject.org/rpms/grub2
+```
+
+Likewise, Red Hat has various builds for RHEL 7 and RHEL 8, all of which have
+something akin to the following in `.sbat`:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,0,Free Software Foundation,grub,2.02,https://www.gnu.org/software/grub/
+grub.fedora,0,Red Hat Enterprise Linux,grub2,2.02-0.34.fc24,mail:secalert@redhat.com
+grub.rhel,0,Red Hat Enterprise Linux,grub2,2.02-0.34.el7_2,mail:secalert@redhat.com
+```
+
+The Debian package believed to have the same set of vulnerabilities as upstream
+might have:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
+grub.debian,0,Debian,grub2,2.04-12,https://packages.debian.org/source/sid/grub2
+```
+
+Another party known for less than high quality software who carry a bunch of
+out of tree grub patches on top of a very old grub version from before any of
+the upstream vulns were committed to the tree.  They haven't ever had the
+upstream vulns, and in fact have never shipped any vulnerabilities.  Their grub
+`.sbat` might have the following (which we'd be very suspect of signing, but
+hey, suppose it turns out to be correct):
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub.acme,0,Acme Corporation,grub,1.96-8191,https://acme.arpa/packages/grub
+```
+
+At the same time, we're all shipping the same `shim-16` codebase, and in our
+`shim` builds, we all have the following in `.sbat`:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+```
+
+How to add .sbat sections
+-------------------------
 Components that do not have special code to construct the final PE files can simply add this secrion using objcopy(1)
 
 Components that do not have special code to construct the final PE
@@ -293,22 +340,6 @@ files can simply add this section using objcopy(1):
 objcopy --add-section .sbat=sbat.csv foo.efi
 
 ```
-
-This is then used to populate the following data structure:
-
-```
-struct sbat_metadata {
-       char *sbat_data_version          // version of this structure, 1 at initial release
-       char *component_name; 	      	  // for example "GRUB2"
-       char *component_generation;      // 1 at initial release then incrementing
-       char *product_name;   	      	  // for example: "Oracle Linux"
-       char *product_generation;     	  // generally 0 unless	needed
-       char *product_version;	      	  // for example: "7.9"
-       char *version_generation;     	  // generally 0 unless needed
-};
-
-```
-
 
 
 
@@ -321,33 +352,107 @@ specific generation numbers. It	is expected that specific generation
 numbers will be	exceptions that	will be	obsoleted if and when the
 global number for a component is incremented.
 
-```
-// XXX evolving
-COMPONENTS
-  InternalName                   "SHIM"
-    MinComponentGeneration       0
-  InternalName                   "GRUB2"
-    MinComponentGeneration       3
-  InternalName                   "Linux Kernel"
-    MinComponentGeneration       73
-    PRODUCTS
-      ProductName                "Some Linux"
-        MinProductGeneration     1
-      ProductName                "Other Linux"
-        MinProductGeneration     0
-        VERSIONS
-          ProductVersion         "32"
-            MinVersionGeneration 2
-          ProductVersion         "33"
-            MinVersionGeneration 1
-        /VERSIONS
-    /PRODUCTS
-  InternalName                   "Some Vendor Cert"
-    MinComponentGeneration       22
-  InternalName                   "Other Vendor Cert"
-    MinComponentGeneration       4
-/COMPONENTS
+Initially the SBAT UEFI variable will set generation numbers for
+components to 0, but is expect to grow as CVEs are discovered and
+fixed. The following show the evolution over a sample set of events:
+
+Starting point
+--------------
+Before CVEs are encountered, an undesirable moudule was built into the a 
+fedora grub, so it's product specific generation number has been bumped:
 
 ```
+{
+  { 0, 5, "sbat" },
+  { 0, 5, "shim" },
+  { 0, 5, "grub" },
+  { 1, 12, "grub.fedora" },
+}
+```
+Along comes bug 1
+-----------------
+Another kind security researcher shows up with a serious bug, and this one was
+in upstream grub-0.94 and every version after that, and is shipped by all
+vendors.
 
-An EDK2 example demonstrating a method of image authorization, based upon version metadata, should be available soon. We expect the structures and methods to evolve as feedback is incorporated.
+At this point, each vendor updates their grub builds, and updates the
+`component_generation` in `.sbat` to `1`.  The upstream build now looks like:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,1,Free Software Foundation,grub,2.05,https://www.gnu.org/software/grub/
+```
+
+But Fedora's now looks like:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,1,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
+grub.fedora,1,The Fedora Project,grub2,2.04-33.fc33,https://src.fedoraproject.org/rpms/grub2
+```
+
+Other distros either rebase on 2.05 or theirs change similarly to Fedora's.  We now have two options for Acme Corp:
+- add a `{ 1, 10, "grub.acme" }` entry to `SBAT`
+- have Acme Corp add `grub,1,Free Software Foundation,grub,1.96,https://www.gnu.org/software/grub/` to their new build's `.sbat`
+
+We talk to Acme and they agree to do the latter, thus saving flash real estate
+to be developed on another day:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,1,Free Software Foundation,grub,1.96,https://www.gnu.org/software/grub/
+grub.acme,0,Acme Corporation,grub,1.96-8192,https://acme.arpa/packages/grub
+```
+
+The UEFI CA issues an update which looks like:
+```
+{
+  { 0, 5, "sbat" },
+  { 0, 5, "shim" },
+  { 1, 5, "grub" },
+  { 1, 12, "grub.fedora" },
+}
+```
+
+Acme Corp gets with the program
+-------------------------------
+Acme at this point discovers some features have been added to grub and they
+want them.  They ship a new grub build that's completely rebased on top of
+upstream and has no known vulnerabilities.  Its `.sbat` data looks like:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,1,Free Software Foundation,grub,2.05,https://www.gnu.org/software/grub/
+grub.acme,0,Acme Corporation,grub,2.05-1,https://acme.arpa/packages/grub
+```
+
+Someone was wrong on the internet and bug 2
+-------------------------------------------
+Debian discovers that they actually shipped bug 0 as well (woops).  They
+produce a new build which fixes it and has the following in `.sbat`:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,1,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
+grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
+```
+
+Before the UEFI CA has released an update, though, another upstream issue is
+found.  Everybody updates their builds as they did for bug 1.  Debian also
+updates theirs, as they would, and their new build has:
+```
+sbat,0,UEFI shim,sbat,0,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,2,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
+grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
+```
+
+And the UEFI CA issues an update to SBAT which has:
+```
+{
+  { 0, 5, "sbat" },
+  { 0, 5, "shim" },
+  { 2, 5, "grub" },
+  { 1, 12, "grub.fedora" },
+}
+```
+
+XXX technically we could drop the grub.fedora line since we never published a fedora grub with a global generation number of 2 that had the other bug in it.
+
+Two key things here:
+- `debian.grub` still got updated to `1` in their `.sbat` data, because a vuln was fixed that is only covered by that updated number.
+- There is still no `SBAT` update for `debian.grub`, because there's no binary that needs it which is not covered by updating `grub` to `2`.
