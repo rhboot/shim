@@ -328,8 +328,6 @@ shim,0,UEFI shim,shim,16,https://github.com/rhboot/shim
 
 How to add .sbat sections
 -------------------------
-Components that do not have special code to construct the final PE files can simply add this secrion using objcopy(1)
-
 Components that do not have special code to construct the final PE
 files can simply add this section using objcopy(1):
 
@@ -461,5 +459,5 @@ results in the following reduced UEFI SBAT revocation update:
 ```
 
 Two key things here:
-- `debian.grub` still got updated to `1` in their `.sbat` data, because a vuln was fixed that is only covered by that updated number.
-- There is still no `SBAT` update for `debian.grub`, because there's no binary that needs it which is not covered by updating `grub` to `2`.
+- `grub.debian` still got updated to `1` in their `.sbat` data, because a vuln was fixed that is only covered by that updated number.
+- There is still no `SBAT` update for `grub.debian`, because there's no binary that needs it which is not covered by updating `grub` to `2`.
