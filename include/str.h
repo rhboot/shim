@@ -64,4 +64,30 @@ translate_slashes(CHAR8 *out, const char *str)
 	return out;
 }
 
+static inline UNUSED const CHAR8 *
+strchrnula(const CHAR8 *s, int c)
+{
+	unsigned int i;
+
+	if (s == NULL)
+		return NULL;
+
+	for (i = 0; s[i] != '\000' && s[i] != c; i++)
+		;
+
+	return &s[i];
+}
+
+static inline UNUSED const CHAR8 *
+strchra(const CHAR8 *s, int c)
+{
+	const CHAR8 *s1;
+
+	s1 = strchrnula(s, c);
+	if (!s1 || s1[0] == '\000')
+		return NULL;
+
+	return s1;
+}
+
 #endif /* SHIM_STR_H */
