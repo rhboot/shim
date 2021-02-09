@@ -46,16 +46,16 @@ sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 ```
 
-A Fedora build believed to have exactly the same set of vulnerabilities plus
-one that was never upstream might have:
+A Fedora `grub2` build believed to have exactly the same set of vulnerabilities
+plus one that was never upstream might have:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.fedora,0,The Fedora Project,grub2,2.04-31.fc33,https://src.fedoraproject.org/rpms/grub2
 ```
 
-Likewise, Red Hat has various builds for RHEL 7 and RHEL 8, all of which have
-something akin to the following in `.sbat`:
+Likewise, Red Hat has various `grub2` builds for RHEL 7 and RHEL 8, all of which
+have something akin to the following in `.sbat`:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.02,https://www.gnu.org/software/grub/
@@ -101,18 +101,18 @@ The `SBAT` data we've all agreed on and the UEFI CA has distributed is:
 Along comes bug 0
 -----------------
 Let's say we find a bug in Fedora that's serious, but it's only in Fedora's
-patches, because we're the dumb ones.  Fedora issues a new grub2 build with the
-following `.sbat` info:
+patches, because we're the dumb ones.  Fedora issues a new `grub2` build with
+the following `.sbat` info:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
 grub.fedora,1,The Fedora Project,grub2,2.04-32.fc33,https://src.fedoraproject.org/rpms/grub2
 ```
 
-For some (clearly insane) reason, 9 RHEL builds are also produced with the same
-fixes and the same data in `.sbat` that Fedora has.  The RHEL 7.2 update (just
-one example, same one as the RHEL example above) has the following in its
-`.sbat` data:
+For some (clearly insane) reason, 9 RHEL `grub2` builds are also produced with
+the same fixes and the same data in `.sbat` that Fedora has.  The RHEL 7.2
+update (just one example, same one as the RHEL example above) has the following
+in its `.sbat` data:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,0,Free Software Foundation,grub,2.02,https://www.gnu.org/software/grub/
@@ -136,8 +136,9 @@ Another kind security researcher shows up with a serious bug, and this one was
 in upstream grub-0.94 and every version after that, and is shipped by all
 vendors.
 
-At this point, each vendor updates their grub builds, and updates the
-`component_generation` in `.sbat` to `1`.  The upstream build now looks like:
+At this point, each vendor updates their `grub` builds, and updates the
+`component_generation` in `.sbat` to `1`.  The upstream `grub` build now looks
+like:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,2.05,https://www.gnu.org/software/grub/
@@ -152,7 +153,7 @@ grub.fedora,1,The Fedora Project,grub2,2.04-33.fc33,https://src.fedoraproject.or
 
 Other distros either rebase on 2.05 or theirs change similarly to Fedora's.  We now have two options for Acme Corp:
 - add a `{ 1, 10, "grub.acme" }` entry to `SBAT`
-- have Acme Corp add `grub,1,Free Software Foundation,grub,1.96,https://www.gnu.org/software/grub/` to their new build's `.sbat`
+- have Acme Corp add `grub,1,Free Software Foundation,grub,1.96,https://www.gnu.org/software/grub/` to their new `grub` build's `.sbat`
 
 We talk to Acme and they agree to do the latter, thus saving flash real estate
 to be developed on another day:
@@ -175,7 +176,7 @@ The UEFI CA issues an update which looks like:
 Acme Corp gets with the program
 -------------------------------
 Acme at this point discovers some features have been added to grub and they
-want them.  They ship a new grub build that's completely rebased on top of
+want them.  They ship a new `grub` build that's completely rebased on top of
 upstream and has no known vulnerabilities.  Its `.sbat` data looks like:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
@@ -186,7 +187,7 @@ grub.acme,0,Acme Corporation,grub,2.05-1,https://acme.arpa/packages/grub
 Someone was wrong on the internet and bug 2
 -------------------------------------------
 Debian discovers that they actually shipped bug 0 as well (woops).  They
-produce a new build which fixes it and has the following in `.sbat`:
+produce a new `grub2` build which fixes it and has the following in `.sbat`:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,1,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
@@ -195,7 +196,7 @@ grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
 
 Before the UEFI CA has released an update, though, another upstream issue is
 found.  Everybody updates their builds as they did for bug 1.  Debian also
-updates theirs, as they would, and their new build has:
+updates theirs, as they would, and their new `grub2` build has:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,2,Free Software Foundation,grub,2.04,https://www.gnu.org/software/grub/
