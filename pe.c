@@ -1045,7 +1045,19 @@ handle_image (void *data, unsigned int datasize,
 		struct sbat_entry *entry = NULL;
 
 		if (SBATBase && SBATSize) {
-			res = parse_sbat(SBATBase, SBATSize, buffer, &sbat);
+			char *sbat_data;
+			size_t sbat_size;
+
+			sbat_size = SBATSize + 1;
+			sbat_data = AllocatePool(sbat_size);
+			if (!sbat_data) {
+				console_print(L"Failed to allocate SBAT buffer\n");
+				return EFI_OUT_OF_RESOURCES;
+			}
+			CopyMem(sbat_data, SBATBase, SBATSize);
+			sbat_data[SBATSize] = '\0';
+
+			res = parse_sbat(sbat_data, sbat_size, buffer, &sbat);
 			if (res < 0) {
 				console_print(L"SBAT data not correct: %r\n", res);
 				return EFI_UNSUPPORTED;
