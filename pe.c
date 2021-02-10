@@ -1039,8 +1039,40 @@ handle_image (void *data, unsigned int datasize,
 	}
 
 	if (secure_mode ()) {
+		int res;
+		unsigned int i;
+		struct sbat sbat = { 0 };
+		struct sbat_entry *entry = NULL;
+
+		if (SBATBase && SBATSize) {
+			res = parse_sbat(SBATBase, SBATSize, buffer, &sbat);
+			if (res < 0) {
+				console_print(L"SBAT data not correct: %r\n", res);
+				return EFI_UNSUPPORTED;
+			}
+
+			dprint(L"SBAT data\n");
+			for (i = 0; i < sbat.size; i++) {
+				entry = sbat.entries[i];
+				dprint(L"%a, %a, %a, %a, %a, %a\n",
+				       entry->component_name,
+				       entry->component_generation,
+				       entry->vendor_name,
+				       entry->vendor_package_name,
+				       entry->vendor_version,
+				       entry->vendor_url);
+			}
+		} else {
+			perror(L"SBAT data not found\n");
+			return EFI_UNSUPPORTED;
+		}
+
 		efi_status = verify_buffer(data, datasize,
 					   &context, sha256hash, sha1hash);
+
+		if (sbat.entries)
+			for (i = 0; i < sbat.size; i++)
+				FreePool(sbat.entries[i]);
 
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
