@@ -60,4 +60,10 @@ Variables you could set to customize the build:
   This is the label that will be put in BOOT$(EFI_ARCH).CSV for your OS.
   By default this is the same value as EFIDIR .
 
+Vendor SBAT data:
+It will sometimes be requested by reviewers that a build includes extra
+.sbat data.  The mechanism to do so is to add a CSV file in data/ with the
+name sbat.FOO.csv, where foo is your EFI subdirectory name.  The build
+system will automatically include any such files.
+
 # vim:filetype=mail:tw=74

@@ -40,6 +40,7 @@ MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat.o
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
 FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat.o
 ORIG_FALLBACK_SRCS = fallback.c
+SBATPATH = data/sbat.csv
 
 ifneq ($(origin ENABLE_HTTPBOOT), undefined)
 	OBJS += httpboot.o
@@ -84,9 +85,17 @@ shim.o: $(wildcard $(TOPDIR)/*.h)
 cert.o : $(TOPDIR)/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+sbat.%.csv : data/sbat.%.csv
+	$(DOS2UNIX) $(D2UFLAGS) $< $@
+	tail -c1 $@ | read -r _ || echo >> $@ # ensure a trailing newline
+
+VENDOR_SBATS := $(foreach x,$(wildcard data/sbat.*.csv),$(notdir $(x)))
+
+sbat.o : | $(SBATPATH) $(VENDOR_SBATS)
 sbat.o : $(TOPDIR)/sbat.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 	$(OBJCOPY) --add-section .sbat=$(SBATPATH) $@
+	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
 
 $(SHIMNAME) : $(SHIMSONAME)
 $(MMNAME) : $(MMSONAME)

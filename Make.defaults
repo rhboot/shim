@@ -2,6 +2,8 @@ COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
 LD		= $(CROSS_COMPILE)ld
 OBJCOPY		= $(CROSS_COMPILE)objcopy
+DOS2UNIX	?= dos2unix
+D2UFLAGS	?= -r -l -F -f -n
 OPENSSL		?= openssl
 HEXDUMP		?= hexdump
 INSTALL		?= install
@@ -22,7 +24,6 @@ DEBUGSOURCE	?= $(prefix)/src/debug/
 OSLABEL		?= $(EFIDIR)
 DEFAULT_LOADER	?= \\\\grub$(ARCH_SUFFIX).efi
 DASHJ		?= -j$(shell echo $$(($$(grep -c "^model name" /proc/cpuinfo) + 1)))
-SBATPATH	?= data/sbat.csv
 
 ARCH		?= $(shell $(CC) -dumpmachine | cut -f1 -d- | sed s,i[3456789]86,ia32,)
 OBJCOPY_GTE224	= $(shell expr `$(OBJCOPY) --version |grep ^"GNU objcopy" | sed 's/^.*\((.*)\|version\) //g' | cut -f1-2 -d.` \>= 2.24)
