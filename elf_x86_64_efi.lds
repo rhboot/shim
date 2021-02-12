@@ -63,6 +63,7 @@ SECTIONS
   {
     _sbat = .;
     *(.sbat)
+    *(.sbat.*)
     _esbat = .;
   }
   . = ALIGN(4096);
