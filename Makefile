@@ -33,12 +33,12 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
-OBJS	= shim.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o
+OBJS	= shim.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c mok.c netboot.c replacements.c tpm.c errlog.c shim.h version.h $(wildcard include/*.h)
-MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o
+MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat.o
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
-FALLBACK_OBJS = fallback.o tpm.o errlog.o
+FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat.o
 ORIG_FALLBACK_SRCS = fallback.c
 
 ifneq ($(origin ENABLE_HTTPBOOT), undefined)
@@ -83,6 +83,10 @@ shim.o: $(wildcard $(TOPDIR)/*.h)
 
 cert.o : $(TOPDIR)/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+sbat.o : $(TOPDIR)/sbat.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+	$(OBJCOPY) --add-section .sbat=$(SBATPATH) $@
 
 $(SHIMNAME) : $(SHIMSONAME)
 $(MMNAME) : $(MMSONAME)
@@ -192,8 +196,8 @@ endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .dynsym -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
-		-j .vendor_cert \
-		$(FORMAT) $^ $@
+		-j .vendor_cert -j .sbat \
+		$(FORMAT) $< $@
 	# I am tired of wasting my time fighting binutils timestamp code.
 	dd conv=notrunc bs=1 count=4 seek=$(TIMESTAMP_LOCATION) if=/dev/zero of=$@
 
@@ -208,11 +212,11 @@ ifneq ($(OBJCOPY_GTE224),1)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data \
 		-j .dynamic -j .dynsym -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame \
+		-j .rela* -j .reloc -j .eh_frame -j .sbat \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		-j .note.gnu.build-id \
-		$^ $@
+		$< $@
 
 ifneq ($(origin ENABLE_SBSIGN),undefined)
 %.efi.signed: %.efi shim.key shim.crt
