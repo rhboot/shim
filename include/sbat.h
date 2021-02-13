@@ -21,7 +21,7 @@ struct sbat {
 };
 
 EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, char *buffer,
-		      struct sbat *sbat);
+                      struct sbat *sbat);
 
 #endif /* !SBAT_H_ */
 // vim:fenc=utf-8:tw=75:noet

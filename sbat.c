@@ -6,25 +6,25 @@
 #include "shim.h"
 
 CHAR8 *
-get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 ** field, char delim)
+get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 **field, char delim)
 {
-        CHAR8 *offset;
+	CHAR8 *offset;
 
-        if (!field || !current || !end || current >= end)
-                return NULL;
+	if (!field || !current || !end || current >= end)
+		return NULL;
 
-        offset = strchrnula(current, delim);
-        *field = current;
+	offset = strchrnula(current, delim);
+	*field = current;
 
-        if (!*offset)
-                return NULL;
+	if (!*offset)
+		return NULL;
 
-        *offset = '\0';
-        return offset + 1;
+	*offset = '\0';
+	return offset + 1;
 }
 
-EFI_STATUS parse_sbat_entry(CHAR8 **current, CHAR8 *end,
-			    struct sbat_entry **sbat_entry)
+EFI_STATUS
+parse_sbat_entry(CHAR8 **current, CHAR8 *end, struct sbat_entry **sbat_entry)
 {
 	struct sbat_entry *entry = NULL;
 
@@ -36,23 +36,25 @@ EFI_STATUS parse_sbat_entry(CHAR8 **current, CHAR8 *end,
 	if (!entry->component_name)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->component_generation,',');
+	*current = get_sbat_field(*current, end, &entry->component_generation,
+	                          ',');
 	if (!entry->component_generation)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_name,',');
+	*current = get_sbat_field(*current, end, &entry->vendor_name, ',');
 	if (!entry->vendor_name)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_package_name, ',');
+	*current =
+		get_sbat_field(*current, end, &entry->vendor_package_name, ',');
 	if (!entry->vendor_package_name)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_version,',');
+	*current = get_sbat_field(*current, end, &entry->vendor_version, ',');
 	if (!entry->vendor_version)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_url,'\n');
+	*current = get_sbat_field(*current, end, &entry->vendor_url, '\n');
 	if (!entry->vendor_url)
 		goto error;
 
@@ -65,11 +67,11 @@ error:
 	return EFI_INVALID_PARAMETER;
 }
 
-EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, char *buffer,
-		      struct sbat *sbat)
+EFI_STATUS
+parse_sbat(char *sbat_base, size_t sbat_size, char *buffer, struct sbat *sbat)
 {
-	CHAR8 *current = (CHAR8 *) sbat_base;
-	CHAR8 *end = (CHAR8 *) sbat_base + sbat_size;
+	CHAR8 *current = (CHAR8 *)sbat_base;
+	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_entry *entry;
 	struct sbat_entry **entries;
@@ -98,9 +100,9 @@ EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, char *buffer,
 		}
 
 		if (entry) {
-			entries = ReallocatePool(sbat->entries,
-						 sbat->size * sizeof(entry),
-						 (sbat->size + 1) * sizeof(entry));
+			entries = ReallocatePool(
+				sbat->entries, sbat->size * sizeof(entry),
+				(sbat->size + 1) * sizeof(entry));
 			if (!entries) {
 				efi_status = EFI_OUT_OF_RESOURCES;
 				goto error;
