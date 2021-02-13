@@ -12,8 +12,11 @@ struct sbat_var {
 	const CHAR8 *component_generation;
 	const CHAR8 *component_name_size;
 	const CHAR8 *component_name;
-	struct sbat_var *next;
+	list_t list;
 };
+
+#define for_each_sbat_var(sbat, head) list_for_each(sbat, head)
+#define for_each_sbat_var_safe(sbat, n, head) list_for_each_safe(sbat, n, head)
 
 struct sbat_entry {
 	const CHAR8 *component_name;
@@ -29,7 +32,7 @@ struct sbat {
 	struct sbat_entry **entries;
 };
 
-struct sbat_var *parse_sbat_var();
+int parse_sbat_var(list_t *entries);
 
 struct sbat_var *add_entry(struct sbat_var *, const CHAR8 *comp_gen,
                            const CHAR8 *comp_name_size, const CHAR8 *comp_name);

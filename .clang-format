@@ -72,6 +72,8 @@ ForEachMacros:
   - list_for_each_safe
   - list_for_each_prev
   - list_for_each_prev_safe
+  - for_each_sbat_var
+  - for_each_sbat_var_safe
 IncludeBlocks:   Preserve
 IncludeCategories:
   - Regex:           '.*'
