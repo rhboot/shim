@@ -29,17 +29,17 @@ struct sbat {
 	struct sbat_entry **entries;
 };
 
-struct sbat_var* parse_sbat_var();
+struct sbat_var *parse_sbat_var();
 
-struct sbat_var* add_entry(struct sbat_var*, const CHAR8 *comp_gen,
-			   const CHAR8 *comp_name_size, const CHAR8 *comp_name);
+struct sbat_var *add_entry(struct sbat_var *, const CHAR8 *comp_gen,
+                           const CHAR8 *comp_name_size, const CHAR8 *comp_name);
 
-struct sbat_var* new_entry(const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
-			   const CHAR8 *comp_name);
-EFI_STATUS verify_sbat (struct sbat *sbat, struct sbat_var *sbat_var);
+struct sbat_var *new_entry(const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
+                           const CHAR8 *comp_name);
+EFI_STATUS verify_sbat(struct sbat *sbat, struct sbat_var *sbat_var);
 
 EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, char *buffer,
-		      struct sbat *sbat);
+                      struct sbat *sbat);
 
 #endif /* !SBAT_H_ */
 // vim:fenc=utf-8:tw=75:noet

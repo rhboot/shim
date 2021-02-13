@@ -7,25 +7,25 @@
 #include <string.h>
 
 CHAR8 *
-get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 ** field, char delim)
+get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 **field, char delim)
 {
-        CHAR8 *offset;
+	CHAR8 *offset;
 
-        if (!field || !current || !end || current >= end)
-                return NULL;
+	if (!field || !current || !end || current >= end)
+		return NULL;
 
-        offset = strchrnula(current, delim);
-        *field = current;
+	offset = strchrnula(current, delim);
+	*field = current;
 
-        if (!*offset)
-                return NULL;
+	if (!*offset)
+		return NULL;
 
-        *offset = '\0';
-        return offset + 1;
+	*offset = '\0';
+	return offset + 1;
 }
 
-EFI_STATUS parse_sbat_entry(CHAR8 **current, CHAR8 *end,
-			    struct sbat_entry **sbat_entry)
+EFI_STATUS
+parse_sbat_entry(CHAR8 **current, CHAR8 *end, struct sbat_entry **sbat_entry)
 {
 	struct sbat_entry *entry = NULL;
 
@@ -37,23 +37,25 @@ EFI_STATUS parse_sbat_entry(CHAR8 **current, CHAR8 *end,
 	if (!entry->component_name)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->component_generation,',');
+	*current = get_sbat_field(*current, end, &entry->component_generation,
+	                          ',');
 	if (!entry->component_generation)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_name,',');
+	*current = get_sbat_field(*current, end, &entry->vendor_name, ',');
 	if (!entry->vendor_name)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_package_name, ',');
+	*current =
+		get_sbat_field(*current, end, &entry->vendor_package_name, ',');
 	if (!entry->vendor_package_name)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_version,',');
+	*current = get_sbat_field(*current, end, &entry->vendor_version, ',');
 	if (!entry->vendor_version)
 		goto error;
 
-	*current = get_sbat_field(*current, end, &entry->vendor_url,'\n');
+	*current = get_sbat_field(*current, end, &entry->vendor_url, '\n');
 	if (!entry->vendor_url)
 		goto error;
 
@@ -66,11 +68,11 @@ error:
 	return EFI_INVALID_PARAMETER;
 }
 
-EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, char *buffer,
-		      struct sbat *sbat)
+EFI_STATUS
+parse_sbat(char *sbat_base, size_t sbat_size, char *buffer, struct sbat *sbat)
 {
-	CHAR8 *current = (CHAR8 *) sbat_base;
-	CHAR8 *end = (CHAR8 *) sbat_base + sbat_size;
+	CHAR8 *current = (CHAR8 *)sbat_base;
+	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_entry *entry;
 	struct sbat_entry **entries;
@@ -99,9 +101,9 @@ EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, char *buffer,
 		}
 
 		if (entry) {
-			entries = ReallocatePool(sbat->entries,
-						 sbat->size * sizeof(entry),
-						 (sbat->size + 1) * sizeof(entry));
+			entries = ReallocatePool(
+				sbat->entries, sbat->size * sizeof(entry),
+				(sbat->size + 1) * sizeof(entry));
 			if (!entries) {
 				efi_status = EFI_OUT_OF_RESOURCES;
 				goto error;
@@ -121,7 +123,8 @@ error:
 	return efi_status;
 }
 
-EFI_STATUS verify_sbat (struct sbat *sbat, struct sbat_var *sbat_var_root)
+EFI_STATUS
+verify_sbat(struct sbat *sbat, struct sbat_var *sbat_var_root)
 {
 	unsigned int i;
 	struct sbat_entry *entry = NULL;
@@ -129,12 +132,14 @@ EFI_STATUS verify_sbat (struct sbat *sbat, struct sbat_var *sbat_var_root)
 		entry = sbat->entries[i];
 		struct sbat_var *sbat_var_entry = sbat_var_root;
 		while (sbat_var_entry != NULL) {
-			if (strcmp(entry->component_name,sbat_var_entry->component_name) == 0) {
+			if (strcmp(entry->component_name,
+			           sbat_var_entry->component_name) == 0) {
 				dprint(L"component %a has a matching SBAT variable entry, verifying\n", entry->component_name);
 				/* atoi returns zero for failed conversion, so essentially
 				   badly parsed component_generation will be treated as zero 
 				*/
-				if (atoi(entry->component_generation) < atoi(sbat_var_entry->component_generation)) {
+				if (atoi(entry->component_generation) <
+				    atoi(sbat_var_entry->component_generation)) {
 					dprint(L"component's %a generation: %d. Conflicts with SBAT variable generation %d\n",
 					       entry->component_name,
 					       atoi(entry->component_generation),
@@ -146,18 +151,20 @@ EFI_STATUS verify_sbat (struct sbat *sbat, struct sbat_var *sbat_var_root)
 			sbat_var_entry = sbat_var_entry->next;
 		}
 	}
-		dprint(L"all entries from SBAT section verified\n");
-		return EFI_SUCCESS;
+	dprint(L"all entries from SBAT section verified\n");
+	return EFI_SUCCESS;
 }
 
-static BOOLEAN is_utf8_bom(CHAR8 *buf)
+static BOOLEAN
+is_utf8_bom(CHAR8 *buf)
 {
-	unsigned char bom[] = { 0xEF,0xBB,0xBF };
+	unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
 	return !!CompareMem(buf, bom, MIN(sizeof(bom), sizeof(buf)));
 }
 
-struct sbat_var* new_entry(const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
-			   const CHAR8 *comp_name)
+struct sbat_var *
+new_entry(const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
+          const CHAR8 *comp_name)
 {
 	struct sbat_var *new_entry = AllocatePool(sizeof(*new_entry));
 	new_entry->next = NULL;
@@ -167,17 +174,19 @@ struct sbat_var* new_entry(const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
 	return new_entry;
 }
 
-struct sbat_var* add_entry(struct sbat_var *n, const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
-			   const CHAR8 *comp_name)
+struct sbat_var *
+add_entry(struct sbat_var *n, const CHAR8 *comp_gen,
+          const CHAR8 *comp_name_size, const CHAR8 *comp_name)
 {
-	if ( n == NULL )
+	if (n == NULL)
 		return NULL;
 	while (n->next)
 		n = n->next;
 	return (n->next = new_entry(comp_gen, comp_name_size, comp_name));
 }
 
-struct sbat_var* parse_sbat_var()
+struct sbat_var *
+parse_sbat_var()
 {
 	UINT8 *data = 0;
 	UINTN datasize;
@@ -188,10 +197,11 @@ struct sbat_var* parse_sbat_var()
 		return NULL;
 	}
 
-	struct sbat_var *root = new_entry((CHAR8 *)"0",(CHAR8 *)"0",(CHAR8 *)"entries");
+	struct sbat_var *root =
+		new_entry((CHAR8 *)"0", (CHAR8 *)"0", (CHAR8 *)"entries");
 	struct sbat_var *nodename = root;
-	CHAR8 *start = (CHAR8 *) data;
-	CHAR8 *end = (CHAR8 *) data + datasize;
+	CHAR8 *start = (CHAR8 *)data;
+	CHAR8 *end = (CHAR8 *)data + datasize;
 	while ((*end == '\r' || *end == '\n') && end < start)
 		end--;
 	*end = '\0';
