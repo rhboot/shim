@@ -45,6 +45,24 @@ strcata(CHAR8 *dest, const CHAR8 *src)
 static inline
 __attribute__((unused))
 CHAR8 *
+strndupa(const CHAR8 * const src, const UINTN srcmax)
+{
+	UINTN len;
+	CHAR8 *news = NULL;
+
+	if (!src || !srcmax)
+		return news;
+
+	len = strnlena(src, srcmax);
+	news = AllocateZeroPool(len);
+	if (news)
+		strncpya(news, src, len);
+	return news;
+}
+
+static inline
+__attribute__((unused))
+CHAR8 *
 translate_slashes(CHAR8 *out, const char *str)
 {
 	int i;
