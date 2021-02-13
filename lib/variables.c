@@ -245,7 +245,11 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 		return efi_status;
 	}
 
-	*data = AllocateZeroPool(*len);
+	/*
+	 * Add three zero pad bytes; at least one correctly aligned UCS-2
+	 * character.
+	 */
+	*data = AllocateZeroPool(*len + 3);
 	if (!*data)
 		return EFI_OUT_OF_RESOURCES;
 
@@ -254,6 +258,7 @@ get_variable_attr(CHAR16 *var, UINT8 **data, UINTN *len, EFI_GUID owner,
 		FreePool(*data);
 		*data = NULL;
 	}
+
 	return efi_status;
 }
 
