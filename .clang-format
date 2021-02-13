@@ -68,6 +68,10 @@ FixNamespaceComments: true
 ForEachMacros:
   - certlist_for_each_certentry
   - certentry_for_each_cert
+  - list_for_each
+  - list_for_each_safe
+  - list_for_each_prev
+  - list_for_each_prev_safe
 IncludeBlocks:   Preserve
 IncludeCategories:
   - Regex:           '.*'
