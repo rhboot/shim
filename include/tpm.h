@@ -3,8 +3,6 @@
 #ifndef SHIM_TPM_H
 #define SHIM_TPM_H
 
-#include <efilib.h>
-
 #define TPM_ALG_SHA 0x00000004
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,

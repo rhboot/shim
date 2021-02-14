@@ -3,8 +3,6 @@
 #ifndef SHIM_GUID_H
 #define SHIM_GUID_H
 
-#include <efi.h>
-
 extern EFI_GUID BDS_GUID;
 extern EFI_GUID GV_GUID;
 extern EFI_GUID SIG_DB;

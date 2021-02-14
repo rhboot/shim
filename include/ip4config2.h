@@ -9,8 +9,6 @@
 #ifndef SHIM_IP4CONFIG2_H
 #define SHIM_IP4CONFIG2_H
 
-#include <efiip.h>
-
 typedef struct _EFI_IP4_CONFIG2_PROTOCOL EFI_IP4_CONFIG2_PROTOCOL;
 
 

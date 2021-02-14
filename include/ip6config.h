@@ -8,8 +8,6 @@
 #ifndef SHIM_IP6CONFIG_H
 #define SHIM_IP6CONFIG_H
 
-#include <efiip.h>
-
 typedef struct _EFI_IP6_CONFIG_PROTOCOL EFI_IP6_CONFIG_PROTOCOL;
 
 ///
