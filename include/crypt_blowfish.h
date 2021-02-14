@@ -1,4 +1,13 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
+ * The crypt_blowfish homepage is:
+ *
+ *	http://www.openwall.com/crypt/
+ *
+ * This code comes from John the Ripper password cracker, with reentrant
+ * and crypt(3) interfaces added, but optimizations specific to password
+ * cracking removed.
+ *
  * Written by Solar Designer <solar at openwall.com> in 2000-2011.
  * No copyright is claimed, and the software is hereby placed in the public
  * domain.  In case this attempt to disclaim copyright and place the software
