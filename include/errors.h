@@ -3,8 +3,6 @@
 #ifndef SHIM_ERRORS_H
 #define SHIM_ERRORS_H
 
-#include <efierr.h>
-
 #ifndef EFI_INCOMPATIBLE_VERSION
 #define EFI_INCOMPATIBLE_VERSION	EFIERR(25)
 #endif

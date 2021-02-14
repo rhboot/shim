@@ -29,6 +29,8 @@
 #include <efi.h>
 #include <efilib.h>
 #undef uefi_call_wrapper
+#include <efierr.h>
+#include <efiip.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -146,7 +148,6 @@
 #include "include/tpm.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
-#include "include/sbat.h"
 
 #include "version.h"
 
