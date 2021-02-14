@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
  * Copyright 2012 <James.Bottomley@HansenPartnership.com>
- *
- * see COPYING file
  *
  * Install and remove a platform security2 override policy
  */

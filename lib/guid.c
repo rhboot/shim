@@ -1,8 +1,4 @@
-/*
- * Copyright 2012 <James.Bottomley@HansenPartnership.com>
- *
- * see COPYING file
- */
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #include "shim.h"
 
