@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
  * Copyright 2013 <James.Bottomley@HansenPartnership.com>
- *
- * see COPYING file
  *
  * read some platform configuration tables
  */

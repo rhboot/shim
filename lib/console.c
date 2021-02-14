@@ -1,8 +1,7 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
  * Copyright 2012 <James.Bottomley@HansenPartnership.com>
  * Copyright 2013 Red Hat Inc. <pjones@redhat.com>
- *
- * see COPYING file
  */
 #include <efi.h>
 #include <efilib.h>
