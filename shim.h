@@ -26,14 +26,20 @@
 #endif
 #endif
 
+#ifndef SHIM_UNIT_TEST
 #include <efi.h>
 #include <efilib.h>
 #undef uefi_call_wrapper
 #include <efierr.h>
 #include <efiip.h>
+#endif
 
 #include <stddef.h>
 #include <stdint.h>
+
+#ifdef SHIM_UNIT_TEST
+#include "include/test.h"
+#endif
 
 #ifdef __x86_64__
 #ifndef DEFAULT_LOADER
@@ -222,6 +228,7 @@ verify_buffer (char *data, int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       UINT8 *sha256hash, UINT8 *sha1hash);
 
+#ifndef SHIM_UNIT_TEST
 #define perror_(file, line, func, fmt, ...) ({					\
 		UINTN __perror_ret = 0;						\
 		if (!in_protocol)						\
@@ -233,5 +240,9 @@ verify_buffer (char *data, int datasize,
 	perror_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
 #define LogError(fmt, ...) \
 	LogError_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
+#else
+#define perror(fmt, ...)
+#define LogError(fmt, ...)
+#endif
 
 #endif /* SHIM_H_ */

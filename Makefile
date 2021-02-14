@@ -240,6 +240,17 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
+test :
+	@make -f include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" all
+
+$(patsubst %.c,%,$(wildcard test-*.c)) :
+	@make -f include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
+
+.PHONY : $(patsubst %.c,%,$(wildcard test-*.c)) test
+
+clean-test-objs:
+	@make -f include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
+
 clean-shim-objs:
 	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
@@ -247,7 +258,7 @@ clean-shim-objs:
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
-clean: clean-shim-objs
+clean: clean-shim-objs clean-test-objs
 	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
 	$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile clean
 
