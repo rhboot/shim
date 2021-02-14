@@ -49,22 +49,22 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath)
 		/* print what we have for debugging */
 		UINT8 *d = (UINT8 *)e; // + sizeof(UINT32)*2;
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
+		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 		d += 16;
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
+		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 		d += 16;
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
+		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 		d += 16;
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
+		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 		d += 16;
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
+		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 		d += 16;
 		console_print(L"Data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]); 
+		      d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 #endif
 		CHAR16 *name = (CHAR16 *)(e->Data);
 		int skip = 0;
@@ -93,12 +93,12 @@ configtable_find_image(const EFI_DEVICE_PATH *DevicePath)
 		console_print(L"Device Path Size %d\n", Size);
 #endif
 		if (Size > e->InfoSize) {
-			/* parse error; the platform obviously has a 
+			/* parse error; the platform obviously has a
 			 * corrupted image table; bail */
 			console_print(L"Image Execution Information table corrupt\n");
 			break;
 		}
-		
+
 		if (CompareMem(dp, (void *)DevicePath, Size) == 0) {
 #ifdef DEBUG_CONFIG
 			console_print(L"***FOUND\n");

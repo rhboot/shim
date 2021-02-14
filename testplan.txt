@@ -27,7 +27,7 @@ How to test a new shim build for RHEL/fedora:
 	-c "Red Hat Test Certificate"
 9) copy grub.cfg to our test directory:
     cp /boot/efi/EFI/redhat/grub.cfg /boot/efi/EFI/test/grub.cfg
-10) *move* \EFI\redhat\BOOT.CSV to \EFI\test 
+10) *move* \EFI\redhat\BOOT.CSV to \EFI\test
     rm -rf /boot/efi/EFI/BOOT/
     mkdir /boot/efi/EFI/BOOT/
     mv /boot/efi/EFI/redhat/BOOT.CSV /boot/efi/EFI/test/BOOT.CSV
@@ -73,7 +73,7 @@ How to test a new shim build for RHEL/fedora:
     removed ‘Boot0002-8be4df61-93ca-11d2-aa0d-00e098032b8c’
     removed ‘Boot2001-8be4df61-93ca-11d2-aa0d-00e098032b8c’
     removed ‘BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c’
-    [root@uefi efivars]# 
+    [root@uefi efivars]#
 25) reboot
 26) the system should run \EFI\BOOT\BOOTX64.EFI .  If it doesn't, you may just
     have an old machine.  In that case, go to the EFI shell and run:

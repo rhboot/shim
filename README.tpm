@@ -24,7 +24,7 @@ PCR8:
 - If you're using the grub2 TPM patchset we cary in Fedora, the kernel command
   line and all grub commands (including all of grub.cfg that gets run) are
   measured into PCR8.
-  
+
 PCR9:
 - If you're using the grub2 TPM patchset we carry in Fedora, the kernel,
   initramfs, and any multiboot modules loaded are measured into PCR9.
