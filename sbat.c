@@ -235,17 +235,29 @@ parse_sbat_var(list_t *entries)
 	dprint(L"SBAT variable data:\n");
 
 	rc = 0;
+	char delim;
 	while (start[0] != '\0') {
 		const CHAR8 *fields[3] = { NULL, };
 
 		for (i = 0; i < 4; i++) {
 			const CHAR8 *tmp;
-			start = get_sbat_field(start, end, &tmp, ',');
+			if (i == 3 && start[0] != '\0') {
+				if (delim == ',') {
+					start = get_sbat_field(start, end, &tmp, '\n');
+					break;
+				}
+				else
+					break;
+			}
+			delim = ',';
+			if ( (strchrnula(start,'\n') - start +1) <= (strchrnula(start,',') - start +1)) {
+				delim = '\n';
 			if (!start) {
 				rc = -1;
 				break;
-			}
-			fields[i] = strndupa(tmp, end-start);
+			start = get_sbat_field(start, end, &tmp, delim);
+
+			fields[i] = tmp;
 			if (!fields[i]) {
 				rc = -1;
 				break;
