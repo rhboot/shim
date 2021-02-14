@@ -1043,8 +1043,8 @@ handle_image (void *data, unsigned int datasize,
 		unsigned int i;
 		struct sbat sbat = { 0 };
 		struct sbat_entry *entry = NULL;
-		struct sbat_var *var = NULL;
-
+		struct sbat_var *sbat_var_entries = NULL;
+		INIT_LIST_HEAD(&sbat_var_entries->list);
 		if (SBATBase && SBATSize) {
 			char *sbat_data;
 			size_t sbat_size;
@@ -1075,31 +1075,23 @@ handle_image (void *data, unsigned int datasize,
 				       entry->vendor_version,
 				       entry->vendor_url);
 			}
-			var = parse_sbat_var();
-			if (var == NULL)
-				console_print(L"SBAT variable not read");
+			res = parse_sbat_var(&sbat_var_entries->list);
+			if (res < 0)
+				console_print(L"could not parse SBAT variable");
 		} else {
 			perror(L"SBAT data not found\n");
 			return EFI_UNSUPPORTED;
 		}
 		efi_status = verify_buffer(data, datasize,
 					   &context, sha256hash, sha1hash);
-		if (sbat.entries && var )
-			efi_status = verify_sbat(&sbat, var);
+		if (sbat.entries)
+			efi_status = verify_sbat(&sbat, &sbat_var_entries->list);
 			/* Add EFI_SECURITY_VIOLATION if variable is set,
 			and binary has no SBAT section ?*/
 		if (sbat.entries)
 			for (i = 0; i < sbat.size; i++)
 				FreePool(sbat.entries[i]);
-		if (var) {
-			while (var != NULL) {
-				struct sbat_var* tmp;
-				tmp = var;
-				var = var->next;
-				FreePool(tmp);
-			}
-		}
-
+				
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
 				console_print(L"Verification failed: %r\n", efi_status);

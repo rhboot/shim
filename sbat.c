@@ -124,29 +124,27 @@ error:
 }
 
 EFI_STATUS
-verify_sbat(struct sbat *sbat, struct sbat_var *sbat_var_root)
+verify_sbat(struct sbat *sbat, list_t *sbat_entries)
 {
 	unsigned int i;
-	list_t *pos;
+	list_t *pos = NULL, *tmp = NULL;
 
 	for (i = 0; i < sbat->size; i++) {
 		struct sbat_entry *entry = entry = sbat->entries[i];
-		for_each_sbat_var (pos, &sbat_var_root->list) {
-			struct sbat_var *sbat_var_entry =
-				list_entry(pos, struct sbat_var, list);
-
+		for_each_sbat_var_safe (pos, tmp, sbat_entries) {
+			struct sbat_var *sbat_var_entry;
+			sbat_var_entry = list_entry(pos, struct sbat_var, list);
 			if (strcmp(entry->component_name,
 			           sbat_var_entry->component_name) == 0) {
 				dprint(L"component %a has a matching SBAT variable entry, verifying\n", entry->component_name);
 				/* atoi returns zero for failed conversion, so essentially
 				   badly parsed component_generation will be treated as zero 
 				*/
-				if (atoi(entry->component_generation) <
-				    atoi(sbat_var_entry->component_generation)) {
+				UINT16 sbat_gen = atoi(entry->component_generation);
+				UINT16 sbat_var_gen = atoi(sbat_var_entry->component_generation);
+				if ( sbat_gen < sbat_var_gen ) {
 					dprint(L"component's %a generation: %d. Conflicts with SBAT variable generation %d\n",
-					       entry->component_name,
-					       atoi(entry->component_generation),
-					       atoi(sbat_var_entry->component_generation));
+					       entry->component_name, sbat_gen, sbat_var_gen );
 					LogError(L"image did not pass SBAT verification\n");
 					return EFI_SECURITY_VIOLATION;
 				}
@@ -158,10 +156,10 @@ verify_sbat(struct sbat *sbat, struct sbat_var *sbat_var_root)
 }
 
 static BOOLEAN
-is_utf8_bom(CHAR8 *buf)
+is_utf8_bom(CHAR8 *buf, size_t bufsize)
 {
 	unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
-	return !!CompareMem(buf, bom, MIN(sizeof(bom), sizeof(buf)));
+	return !CompareMem(buf, bom, MIN(sizeof(bom), bufsize));
 }
 
 static struct sbat_var *
@@ -174,7 +172,6 @@ new_entry(const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
 	new_entry->component_generation = comp_gen;
 	new_entry->component_name_size = comp_name_size;
 	new_entry->component_name = comp_name;
-
 	return new_entry;
 }
 
@@ -183,7 +180,6 @@ add_entry(list_t *list, const CHAR8 *comp_gen, const CHAR8 *comp_name_size,
           const CHAR8 *comp_name)
 {
 	struct sbat_var *new;
-
 	new = new_entry(comp_gen, comp_name_size, comp_name);
 	if (!new)
 		return -1;
@@ -227,18 +223,18 @@ parse_sbat_var(list_t *entries)
 
 	CHAR8 *start = (CHAR8 *)data;
 	CHAR8 *end = (CHAR8 *)data + datasize;
+	if (is_utf8_bom(start, datasize))
+		start += 3;
 	while ((*end == '\r' || *end == '\n') && end < start)
 		end--;
 	*end = '\0';
-	if (is_utf8_bom(start))
-		start += 3;
+
 	dprint(L"SBAT variable data:\n");
 
 	rc = 0;
 	char delim;
-	while (start[0] != '\0') {
+	while (start) {
 		const CHAR8 *fields[3] = { NULL, };
-
 		for (i = 0; i < 4; i++) {
 			const CHAR8 *tmp;
 			if (i == 3 && start[0] != '\0') {
@@ -250,11 +246,13 @@ parse_sbat_var(list_t *entries)
 					break;
 			}
 			delim = ',';
-			if ( (strchrnula(start,'\n') - start +1) <= (strchrnula(start,',') - start +1)) {
+			if ( (strchrnula(start,'\n') - start + 1) <= (strchrnula(start,',') - start + 1)) {
 				delim = '\n';
+			}
 			if (!start) {
 				rc = -1;
 				break;
+			}
 			start = get_sbat_field(start, end, &tmp, delim);
 
 			fields[i] = tmp;
@@ -263,17 +261,16 @@ parse_sbat_var(list_t *entries)
 				break;
 			}
 		}
-		if (rc < 0)
+		if (rc < 0) {
 			break;
+		}
 		dprint(L"component %a with generation %a\n", fields[2], fields[0]);
-
 		rc = add_entry(entries, fields[0], fields[1], fields[2]);
 		if (rc < 0)
 			break;
 	}
 	if (rc < 0)
 		clean_up_vars(entries);
-
 	FreePool(data);
 	return rc;
 }
