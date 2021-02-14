@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
  * The crypt_blowfish homepage is:
  *
