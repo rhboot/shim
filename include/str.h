@@ -54,7 +54,7 @@ strndupa(const CHAR8 * const src, const UINTN srcmax)
 		return news;
 
 	len = strnlena(src, srcmax);
-	news = AllocateZeroPool(len);
+	news = AllocateZeroPool(len+1);
 	if (news)
 		strncpya(news, src, len);
 	return news;

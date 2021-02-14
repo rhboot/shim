@@ -1043,6 +1043,8 @@ handle_image (void *data, unsigned int datasize,
 		unsigned int i;
 		struct sbat sbat = { 0 };
 		struct sbat_entry *entry = NULL;
+		list_t sbat_var_entries;
+		INIT_LIST_HEAD(&sbat_var_entries);
 
 		if (SBATBase && SBATSize) {
 			char *sbat_data;
@@ -1078,13 +1080,24 @@ handle_image (void *data, unsigned int datasize,
 			perror(L"SBAT data not found\n");
 			return EFI_UNSUPPORTED;
 		}
-
+		
+		efi_status = parse_sbat_var(&sbat_var_entries);
+		/* we get EFI_SUCCESS only if variable is fully parsed,
+		   and EFI_NOT FOUND means do not perform verificaiton
+		   continue with EFI_SUCCESS
+		*/
+		if (efi_status == EFI_SUCCESS)
+			efi_status = verify_sbat(&sbat, &sbat_var_entries);
+		else if (efi_status == EFI_NOT_FOUND)
+			efi_status = EFI_SUCCESS;
+		
 		efi_status = verify_buffer(data, datasize,
 					   &context, sha256hash, sha1hash);
 
-		if (sbat.entries)
+		if (sbat.entries) {
 			for (i = 0; i < sbat.size; i++)
 				FreePool(sbat.entries[i]);
+		}
 
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
