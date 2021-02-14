@@ -54,7 +54,7 @@ extern EFI_STATUS thunk_security_policy_authentication(
 	const EFI_SECURITY_PROTOCOL *This,
 	UINT32 AuthenticationStatus,
 	const EFI_DEVICE_PATH_PROTOCOL *DevicePath
-						       ) 
+						       )
 __attribute__((unused));
 
 extern EFI_STATUS thunk_security2_policy_authentication(
@@ -63,7 +63,7 @@ extern EFI_STATUS thunk_security2_policy_authentication(
 	VOID *FileBuffer,
 	UINTN FileSize,
 	BOOLEAN	BootPolicy
-						       ) 
+						       )
 __attribute__((unused));
 
 static __attribute__((used)) EFI_STATUS
@@ -106,7 +106,7 @@ security_policy_authentication (
 	)
 {
 	EFI_STATUS efi_status, fail_status;
-	EFI_DEVICE_PATH *DevPath 
+	EFI_DEVICE_PATH *DevPath
 		= DuplicateDevicePath((EFI_DEVICE_PATH *)DevicePathConst),
 		*OrigDevPath = DevPath;
 	EFI_HANDLE h;

@@ -49,7 +49,7 @@ generate_path(CHAR16* name, EFI_LOADED_IMAGE *li, EFI_DEVICE_PATH **path, CHAR16
 	if (name[0] != '\\')
 		StrCat(*PathName, L"\\");
 	StrCat(*PathName, name);
-	
+
 	*path = FileDevicePath(li->DeviceHandle, *PathName);
 
 error:

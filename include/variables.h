@@ -26,7 +26,7 @@ CreatePkX509SignatureList (
   IN	UINT8			    *X509Data,
   IN	UINTN			    X509DataSize,
   IN	EFI_GUID		    owner,
-  OUT   EFI_SIGNATURE_LIST          **PkCert 
+  OUT   EFI_SIGNATURE_LIST          **PkCert
 			   );
 EFI_STATUS
 CreateTimeBasedPayload (

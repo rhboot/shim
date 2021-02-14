@@ -8,8 +8,8 @@ SECTIONS
   ImageBase = .;
   .hash : { *(.hash) }	/* this MUST come first! */
   . = ALIGN(4096);
-  .eh_frame : 
-  { 
+  .eh_frame :
+  {
     *(.eh_frame)
   }
   . = ALIGN(4096);
