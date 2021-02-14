@@ -32,4 +32,6 @@
 /scan-results/
 [Ss]creenlog*
 shim_cert.h
+test-*
+!test-*.c
 version.c
