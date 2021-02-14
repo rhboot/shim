@@ -33,6 +33,15 @@ Variables you could set to customize the build:
   install targets
 - ENABLE_HTTPBOOT
   build support for http booting
+- DISABLE_EBS_PROTECTION
+  On systems where a second stage bootloader is not used, and the Linux
+  Kernel is embedded in the same EFI image as shim and booted directly
+  from shim, shim's ExitBootServices() hook can cause problems as the
+  kernel never calls the shim's verification protocol.  In this case
+  calling the shim verification protocol is unnecessary and redundant as
+  shim has already verified the kernel when shim loaded the kernel as the
+  second stage loader.  In such a case, and only in this case, you should
+  use DISABLE_EBS_PROTECTION=y to build.
 - REQUIRE_TPM
   if tpm logging or extends return an error code, treat that as a fatal error.
 - ARCH
