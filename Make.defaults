@@ -88,11 +88,13 @@ ifeq ($(ARCH),arm)
 	TIMESTAMP_LOCATION	:= 72
 endif
 
+MACRO_PREFIX_MAP := -fmacro-prefix-map="$(TOPDIR)/"="$(DEBUGSRC)"
 CFLAGS		= -ggdb $(OPTIMIZATIONS) -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
 		  -Werror=sign-compare -ffreestanding -std=gnu89 \
 		  $(if $(filter-out undefined,$(FANALYZER)),-fanalyzer,) \
 		  $(if $(filter-out undefined,$(COLOR)),-fdiagnostics-color=always,) \
+		  $(MACRO_PREFIX_MAP) \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
