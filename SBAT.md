@@ -44,9 +44,9 @@ require a specific level of resistance to UEFI Secure Boot bypasses.
 #### Generation-Based Revocation Overview
 Metadata that includes the vendor, product family, product, component, version and generation are added to artifacts. This metadata is protected by the digital signature. New image authorization data structures, akin to the EFI_CERT_foo EFI_SIGNATURE_DATA structure (see Signature Database in UEFI specification), describe how this metadata can be incorporated into allow or deny lists. In a simple implementation, 1 SBAT entry with security generations could be used for each revocable boot module, replacing many image hashes with 1 entry with security generations. To minimize the size of EFI_CERT_SBAT, the signature owner field might be omitted, and recommend that either metadata use shortened names, or perhaps the EFI_CERT_SBAT contains a hash of the non-generation metadata instead of the metadata itself.
 
-Ideally, servicing of the image authorization databases would be updated to support replace of individual EFI_SIGNATURE_DATA items. However, if we assume that new UEFI variable(s) are used, to be serviced by 1 entity per variable (no sharing), then the existing, in-market SetVariable(), without the APPEND attribute, could be used. Microsoft currently issues dbx updates exclusively with the APPEND attribute under the assumption that multiple entities might be servicing dbx. When a new revocation event takes place, rather than increasing the size of variables with image hashes, existing variables can simply be updated with new security generations, consuming no additional space. This constrains the number of entries to the number of unique boot components revoked, independent of generations revoked. The solution may support several major/minor versions, limiting revocation to build/security generations, perhaps via wildcards.
+Ideally, servicing of the image authorization databases would be updated to support replacement of individual EFI_SIGNATURE_DATA items. However, if we assume that new UEFI variable(s) are used, to be serviced by 1 entity per variable (no sharing), then the existing, in-market SetVariable(), without the APPEND attribute, could be used. Microsoft currently issues dbx updates exclusively with the APPEND attribute under the assumption that multiple entities might be servicing dbx. When a new revocation event takes place, rather than increasing the size of variables with image hashes, existing variables can simply be updated with new security generations, consuming no additional space. This constrains the number of entries to the number of unique boot components revoked, independent of generations revoked. The solution may support several major/minor versions, limiting revocation to build/security generations, perhaps via wildcards.
 
-While previously the APPEND attribute guaranteed that it is not possible to downgrade the set of revocations on a system using a previously signed variable update, this guarantee can also be accomplished by setting the EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute. This will verify that the
+While previously the APPEND attribute guaranteed that it would not be possible to downgrade the set of revocations on a system using a previously signed variable update, this guarantee can also be accomplished by setting the EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute. This will verify that the
 timestamp value of the signed data is later than the current timestamp value associated with the data currently stored in that variable.
 
 #### Generation-Based Revocation Scenarios
@@ -73,20 +73,22 @@ number are required to include fixes for any public or pre-disclosed
 issue required for that generation. Additionally, in the event that a
 bypass only manifests in a specific product's component, vendors may
 ask for a product-specific generation number to be published for one
-of their products components. This avoids triggering an industry wide
+of their product's components. This avoids triggering an industry wide
 re-publishing of otherwise safe components.
 
- A product-specific minimum generation number only applies to the instance of
- that component that is signed with that product name. Another product's
- instance of the same component may be installed on the same system and would
- not be subject to the other product-specific minimum generation number.
- However, both of those components will need to meet the global minimum
- generation number for that component. A very likely scenario would be that a
- product is shipped with an incomplete fix required for a specific minimum
- generation number, but is labeled with that number. Rather than having the
- entire industry that uses that component re-release, just that product's
- minimum generation number is incremented and that product's component is
- re-released along with a UEFI variable update that specifies that requirement.
+ A product-specific minimum generation number only applies to the
+instance of that component that is signed with that product
+name. Another product's instance of the same component may be
+installed on the same system and would not be subject to the other
+product's product-specific minimum generation number. However, both of
+those components will need to meet the global minimum generation
+number for that component. A very likely scenario would be that a
+product is shipped with an incomplete fix required for a specific
+minimum generation number, but is labeled with that number. Rather
+than having the entire industry that uses that component re-release,
+just that product's minimum generation number would be incremented and
+that product's component re-released along with a UEFI variable update
+specifying that requirement.
 
  The global and product-specific generation number name spaces are not
 tied to each other. The global number is managed externally, and the vast
@@ -110,17 +112,17 @@ a rare event, and that the generation number for the upstream code base will
 suffice in most cases.
 
 A product-specific generation number is needed if a CVE is fixed in
-code that **only** exists in a specific products branch. This would either
-be something like product-specific patches, or a miss-merge that only
+code that **only** exists in a specific product's branch. This would either
+be something like product-specific patches, or a mis-merge that only
 occurred in that product. Setting a product-specific generation number
 for such an event eliminates the need for other vendors to have to
 re-release the binaries for their products with an incremented global
 number.
 
-However once the global number is bumped for the next upstream CVE fix
-there is no need to carry it any longer since satisfying the check of
-the global number will also exclude any of the older product-specific
-binaries.
+However, once the global number is bumped for the next upstream CVE
+fix there will be no further need to carry that product-specific
+generation number; satisfying the check of the global number will also
+exclude any of the older product-specific binaries.
 
 For example: There is a global CVE disclosure and all vendors coordinate to
 release fixed components on the disclosure date.  This release bumps the global
@@ -151,9 +153,9 @@ the UEFI revocation variable.
 If this same Vendor C has a similar event after the global number is
 incremented, they would again set their product-specific or version-specific
 number to 1. If they have a second event on with the same component, they would
-set their product or version-specific number to 2.
+set their product- or version-specific number to 2.
 
-In such an event, a vendor would set the product or product version-specific
+In such an event, a vendor would set the product- or product version-specific
 generation number based on whether the mis-merge occurred in all of their
 branches or in just a subset of them. The goal is generally to limit end
 customer impact with as few re-releases as possible, while not creating an
@@ -194,10 +196,11 @@ generation number be incremented past the latest one shown in any
 binary for that product, effectively disabling that product on UEFI
 Secure Boot enabled systems.
 
-A subset of this case are beta-release that may contain eventually
+A subset of this case would be a beta-release that may contain eventually
 abandoned, experimental, kernel code. Such releases should have their
 product-specific generation numbers incremented past the latest one
-shown in any, released or unreleased, production key signed binary.
+shown in any, released or unreleased, binary signed with a production
+key.
 
 Until a release is retired in this manner, vendors are responsible for
 keeping up with fixes for CVEs and ensuring that any known signed
@@ -229,15 +232,16 @@ a private key compromise.
 
 The initial SBAT implementation will add SBAT metadata to Shim and
 GRUB and enforce SBAT on all components labeled with it. Until a
-component like say the Linux kernel gains SBAT metadata it can not be
-revoked via SBAT, but only by revoking the keys signing those
-kernels. These keys will should live in separate, product-specific
-signed PE files that contain **only** the certificate and SBAT metadata for the key
-files. These key files can then be revoked via SBAT in order to invalidate
-and replace a specic key. While certificates built into Shim can be revoked via
-SBAT and Shim introspection, this practice would still result in a proliferation of
+component (e.g. the Linux kernel gains SBAT metadata) it can not be
+revoked via SBAT, but only by revoking the keys signing that
+component. These keys will should live in separate, product-specific
+signed PE files that contain **only** the certificate and SBAT
+metadata for the key files. These key files can then be revoked via
+SBAT in order to invalidate and replace a specific key. While
+certificates built into Shim can be revoked via SBAT and Shim
+introspection, this practice would still result in a proliferation of
 Shim binaries that would need to be revoked via dbx in the event of an
-early Shim code bug. Therefor, SBAT must be used in conjunction with
+early Shim code bug. Therefore, SBAT must be used in conjunction with
 separate Vendor Product Key binaries.
 
 At the time of this writing, revoking a Linux kernel with a
