@@ -1,5 +1,3 @@
-certdb
-shim_cert.h
 *.a
 *.CSV
 *.cer
@@ -26,8 +24,9 @@ shim_cert.h
 *.srl.old
 *.sw?
 *.tar.*
-version.c
-cov-int/
-scan-results/
+/certdb/
+/cov-int/
 /sbat.*.csv
+/scan-results/
 [Ss]creenlog*
+version.c
