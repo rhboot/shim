@@ -13,8 +13,6 @@
 
 #include "shim.h"
 
-#include <string.h>
-
 #define ntohs(x) __builtin_bswap16(x)	/* supported both by GCC and clang */
 #define htons(x) ntohs(x)
 
@@ -174,7 +172,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	// to check against str2ip6() errors
 	memset(ip6inv, 0, sizeof(ip6inv));
 
-	if (strncmp((UINT8 *)url, (UINT8 *)"tftp://", 7)) {
+	if (strncmp((const CHAR8 *)url, (const CHAR8 *)"tftp://", 7)) {
 		console_print(L"URLS MUST START WITH tftp://\n");
 		return FALSE;
 	}
@@ -260,7 +258,7 @@ static EFI_STATUS parseDhcp4()
 			pkt_v4 = &pxe->Mode->PxeReply.Dhcpv4;
 	}
 
-	INTN dir_len = strnlena((CHAR8 *)pkt_v4->BootpBootFile, 127);
+	INTN dir_len = strnlen((CHAR8 *)pkt_v4->BootpBootFile, 127);
 	INTN i;
 	UINT8 *dir = pkt_v4->BootpBootFile;
 
@@ -276,13 +274,13 @@ static EFI_STATUS parseDhcp4()
 		return EFI_OUT_OF_RESOURCES;
 
 	if (dir_len > 0) {
-		strncpya(full_path, (CHAR8 *)dir, dir_len);
+		strncpy(full_path, (CHAR8 *)dir, dir_len);
 		if (full_path[dir_len-1] == '/' && template[0] == '/')
 			full_path[dir_len-1] = '\0';
 	}
 	if (dir_len == 0 && dir[0] != '/' && template[0] == '/')
 		template_ofs++;
-	strcata(full_path, template + template_ofs);
+	strcat(full_path, template + template_ofs);
 	memcpy(&tftp_addr.v4, pkt_v4->BootpSiAddr, 4);
 
 	return EFI_SUCCESS;

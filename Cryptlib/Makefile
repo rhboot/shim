@@ -26,8 +26,7 @@ OBJS = \
        SysCall/CrtWrapper.o \
        SysCall/TimerWrapper.o \
        SysCall/BaseMemAllocation.o \
-       SysCall/BaseStrings.o \
-       SysCall/memset.o
+       SysCall/BaseStrings.o
 
 CFLAGS = -std=gnu89 -ggdb \
 	 $(CONFIGFLAGS) \

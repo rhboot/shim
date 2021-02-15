@@ -9,120 +9,20 @@
 #pragma GCC diagnostic ignored "-Wnonnull-compare"
 #endif
 
-static inline UNUSED NONNULL(1) unsigned long
-strnlena(const CHAR8 *s, unsigned long n)
-{
-	unsigned long i;
-	for (i = 0; i < n; i++)
-		if (s[i] == '\0')
-			break;
-	return i;
-}
-
-static inline UNUSED RETURNS_NONNULL NONNULL(1, 2) CHAR8 *
-strncpya(CHAR8 *dest, const CHAR8 *src, unsigned long n)
-{
-	unsigned long i;
-
-	for (i = 0; i < n && src[i] != '\0'; i++)
-		dest[i] = src[i];
-	for (; i < n; i++)
-		dest[i] = '\0';
-
-	return dest;
-}
-
-static inline UNUSED RETURNS_NONNULL NONNULL(1, 2) CHAR8 *
-strcata(CHAR8 *dest, const CHAR8 *src)
-{
-	unsigned long dest_len = strlena(dest);
-	unsigned long i;
-
-	for (i = 0; src[i] != '\0'; i++)
-		dest[dest_len + i] = src[i];
-	dest[dest_len + i] = '\0';
-
-	return dest;
-}
-
-static inline UNUSED NONNULL(1) CHAR8 *
-strdup(const CHAR8 * const src)
-{
-	UINTN len;
-	CHAR8 *news = NULL;
-
-	len = strlena(src);
-	news = AllocateZeroPool(len + 1);
-	if (news)
-		strncpya(news, src, len);
-	return news;
-}
-
-static inline UNUSED NONNULL(1) CHAR8 *
-strndupa(const CHAR8 * const src, const UINTN srcmax)
-{
-	UINTN len;
-	CHAR8 *news = NULL;
-
-	len = strnlena(src, srcmax);
-	news = AllocateZeroPool(len + 1);
-	if (news)
-		strncpya(news, src, len);
-	return news;
-}
-
-static inline UNUSED RETURNS_NONNULL NONNULL(1, 2) char *
-stpcpy(char *dest, const char * const src)
-{
-	size_t i = 0;
-	for (i = 0; src[i]; i++)
-		dest[i] = src[i];
-	dest[i] = '\000';
-	return &dest[i];
-}
-
-static inline UNUSED CHAR8 *
-translate_slashes(CHAR8 *out, const char *str)
-{
-	int i;
-	int j;
-	if (str == NULL || out == NULL)
-		return NULL;
-
-	for (i = 0, j = 0; str[i] != '\0'; i++, j++) {
-		if (str[i] == '\\') {
-			out[j] = '/';
-			if (str[i+1] == '\\')
-				i++;
-		} else
-			out[j] = str[i];
-	}
-	out[j] = '\0';
-	return out;
-}
-
-static inline UNUSED RETURNS_NONNULL NONNULL(1) CHAR8 *
-strchrnula(const CHAR8 *s, int c)
+static inline __attribute__((__unused__)) char *
+shim_strchrnul_(const char *s, int c)
 {
 	unsigned int i;
+
+	if (s == NULL)
+		return NULL;
 
 	for (i = 0; s[i] != '\000' && s[i] != c; i++)
 		;
 
-	return (CHAR8 *)&s[i];
+	return (char *)&s[i];
 }
-
-static inline UNUSED NONNULL(1) CHAR8 *
-strchra(const CHAR8 *s, int c)
-{
-	const CHAR8 *s1;
-
-	s1 = strchrnula(s, c);
-	if (!s1 || s1[0] == '\000')
-		return NULL;
-
-	return (CHAR8 *)s1;
-}
+#define strchrnul(s, c) shim_strchrnul_(s, c)
 
 static inline UNUSED RETURNS_NONNULL NONNULL(1) char *
 strnchrnul(const char *s, size_t max, int c)

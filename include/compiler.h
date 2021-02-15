@@ -179,5 +179,10 @@
 #define MIN(a, b) ({(a) < (b) ? (a) : (b);})
 #define MAX(a, b) ({(a) <= (b) ? (b) : (a);})
 
+/**
+ * Builtins that don't go in string.h
+ */
+#define unreachable() __builtin_unreachable()
+
 #endif /* !COMPILER_H_ */
 // vim:fenc=utf-8:tw=75:et

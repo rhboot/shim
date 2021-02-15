@@ -121,21 +121,6 @@ QuickSortWorker (
 // -- String Manipulation Routines --
 //
 
-/* Scan a string for the last occurrence of a character */
-char *strrchr (const char *str, int c)
-{
-  char * save;
-
-  for (save = NULL; ; ++str) {
-    if (*str == c) {
-      save = (char *)str;
-    }
-    if (*str == 0) {
-      return (save);
-    }
-  }
-}
-
 /* Read formatted data from a string */
 int sscanf (const char *buffer, const char *format, ...)
 {
@@ -422,11 +407,6 @@ ssize_t read (int f, void *b, size_t c)
 int stat (const char *c, struct stat *s)
 {
   return -1;
-}
-
-int strncasecmp (const char *c, const char *s, size_t l)
-{
-  return 0;
 }
 
 void syslog (int a, const char *c, ...)

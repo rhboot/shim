@@ -5,7 +5,6 @@
  */
 
 #include "shim.h"
-#include "hexdump.h"
 
 static CHAR16 **errs = NULL;
 static UINTN nerrs = 0;

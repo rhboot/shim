@@ -4,7 +4,6 @@
  */
 
 #include "shim.h"
-#include "string.h"
 
 EFI_STATUS
 parse_sbat_section(char *section_base, size_t section_size,
@@ -49,7 +48,7 @@ parse_sbat_section(char *section_base, size_t section_size,
 				efi_status = EFI_INVALID_PARAMETER;
 				goto err;
 			}
-			allocsz += strlena(row->columns[i]) + 1;
+			allocsz += strlen(row->columns[i]) + 1;
 		}
 		n++;
 	}
@@ -227,7 +226,7 @@ parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 				efi_status = EFI_INVALID_PARAMETER;
 				goto err;
 			}
-			allocsz += strlena(row->columns[i]) + 1;
+			allocsz += strlen(row->columns[i]) + 1;
 		}
 		n++;
 	}

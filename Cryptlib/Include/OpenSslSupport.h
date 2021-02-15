@@ -27,6 +27,9 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
  * Include stddef.h to avoid redefining "offsetof"
  */
 #include <stddef.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <string.h>
 
 #define CONST const
 
@@ -60,113 +63,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 // so FILE is mapped to VOID * to pass build
 //
 typedef VOID  *FILE;
-
-//
-// Map all va_xxxx elements to VA_xxx defined in MdePkg/Include/Base.h
-//
-#if !defined(__CC_ARM) || defined(_STDARG_H) // if va_list is not already defined
-/*
- * These are now unconditionally #defined by GNU_EFI's efistdarg.h,
- * so we should #undef them here before providing a new definition.
- */
-#undef va_arg
-#undef va_start
-#undef va_end
-
-#define va_list   VA_LIST
-#define va_arg    VA_ARG
-#define va_start  VA_START
-#define va_end    VA_END
-
-# if !defined(NO_BUILTIN_VA_FUNCS)
-
-typedef __builtin_va_list VA_LIST;
-
-#define VA_START(Marker, Parameter)  __builtin_va_start (Marker, Parameter)
-
-#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
-
-#define VA_END(Marker)               __builtin_va_end (Marker)
-
-#define VA_COPY(Dest, Start)         __builtin_va_copy (Dest, Start)
-
-# else
-
-#define _INT_SIZE_OF(n) ((sizeof (n) + sizeof (UINTN) - 1) &~(sizeof (UINTN) - 1))
-///
-/// Variable used to traverse the list of arguments. This type can vary by
-/// implementation and could be an array or structure.
-///
-typedef CHAR8 *VA_LIST;
-
-/**
-  Retrieves a pointer to the beginning of a variable argument list, based on
-  the name of the parameter that immediately precedes the variable argument list.
-
-  This function initializes Marker to point to the beginning of the variable
-  argument list that immediately follows Parameter.  The method for computing the
-  pointer to the next argument in the argument list is CPU-specific following the
-  EFIAPI ABI.
-
-  @param   Marker       The VA_LIST used to traverse the list of arguments.
-  @param   Parameter    The name of the parameter that immediately precedes
-                        the variable argument list.
-
-  @return  A pointer to the beginning of a variable argument list.
-
-**/
-#define VA_START(Marker, Parameter) (Marker = (VA_LIST) ((UINTN) & (Parameter) + _INT_SIZE_OF (Parameter)))
-
-/**
-  Returns an argument of a specified type from a variable argument list and updates
-  the pointer to the variable argument list to point to the next argument.
-
-  This function returns an argument of the type specified by TYPE from the beginning
-  of the variable argument list specified by Marker.  Marker is then updated to point
-  to the next argument in the variable argument list.  The method for computing the
-  pointer to the next argument in the argument list is CPU-specific following the EFIAPI ABI.
-
-  @param   Marker   VA_LIST used to traverse the list of arguments.
-  @param   TYPE     The type of argument to retrieve from the beginning
-                    of the variable argument list.
-
-  @return  An argument of the type specified by TYPE.
-
-**/
-#define VA_ARG(Marker, TYPE)   (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE)) - _INT_SIZE_OF (TYPE)))
-
-/**
-  Terminates the use of a variable argument list.
-
-  This function initializes Marker so it can no longer be used with VA_ARG().
-  After this macro is used, the only way to access the variable argument list is
-  by using VA_START() again.
-
-  @param   Marker   VA_LIST used to traverse the list of arguments.
-
-**/
-#define VA_END(Marker)      (Marker = (VA_LIST) 0)
-
-/**
-  Initializes a VA_LIST as a copy of an existing VA_LIST.
-
-  This macro initializes Dest as a copy of Start, as if the VA_START macro had been applied to Dest
-  followed by the same sequence of uses of the VA_ARG macro as had previously been used to reach
-  the present state of Start.
-
-  @param   Dest   VA_LIST used to traverse the list of arguments.
-  @param   Start  VA_LIST used to traverse the list of arguments.
-
-**/
-#define VA_COPY(Dest, Start)  ((void)((Dest) = (Start)))
-
-# endif
-
-#else // __CC_ARM
-#define va_start(Marker, Parameter)   __va_start(Marker, Parameter)
-#define va_arg(Marker, TYPE)          __va_arg(Marker, TYPE)
-#define va_end(Marker)                ((void)0)
-#endif
 
 //
 // #defines from EFI Application Toolkit required to buiild Open SSL
@@ -296,23 +192,13 @@ void           *memset     (void *, int, size_t);
 void           *memchr     (const void *, int, size_t);
 int            memcmp      (const void *, const void *, size_t);
 void           *memmove    (void *, const void *, size_t);
-int            strcmp      (const char *, const char *);
 int            strncmp     (const char *, const char *, size_t);
-char           *strcpy     (char *, const char *);
 char           *strncpy    (char *, const char *, size_t);
-size_t         strlen      (const char *);
-char           *strcat     (char *, const char *);
-char           *strchr     (const char *, int);
-int            strcasecmp  (const char *, const char *);
-int            strncasecmp (const char *, const char *, size_t);
 char           *strncpy    (char *, const char *, size_t);
 int            strncmp     (const char *, const char *, size_t);
-char           *strrchr    (const char *, int);
 unsigned long  strtoul     (const char *, char **, int);
 long           strtol      (const char *, char **, int);
 char           *strerror   (int);
-size_t         strspn      (const char *, const char *);
-size_t         strcspn     (const char *, const char *);
 int            printf      (const char *, ...);
 int            sscanf      (const char *, const char *, ...);
 int            open        (const char *, int, ...);
@@ -328,7 +214,7 @@ size_t         fwrite      (const void *, size_t, size_t, FILE *);
 char           *fgets      (char *, int, FILE *);
 int            fputs       (const char *, FILE *);
 int            fprintf     (FILE *, const char *, ...);
-int            vfprintf    (FILE *, const char *, VA_LIST);
+int            vfprintf    (FILE *, const char *, va_list);
 int            fflush      (FILE *);
 int            fclose      (FILE *);
 DIR            *opendir    (const char *);
@@ -348,7 +234,6 @@ gid_t          getegid     (void);
 void           qsort       (void *, size_t, size_t, int (*)(const void *, const void *));
 char           *getenv     (const char *);
 void           exit        (int);
-void           abort       (void);
 __sighandler_t *signal     (int, __sighandler_t *);
 
 //
@@ -358,28 +243,16 @@ extern FILE  *stderr;
 extern FILE  *stdin;
 extern FILE  *stdout;
 
-#define AsciiStrLen(x) strlena(x)
+#define AsciiStrLen(x) strlen(x)
 #define AsciiStrnCmp(s1, s2, len) strncmpa((CHAR8 *)s1, (CHAR8 *)s2, len)
 
 //
 // Macros that directly map functions to BaseLib, BaseMemoryLib, and DebugLib functions
 //
-#define memcpy(dest,source,count)         ( {CopyMem(dest,source,(UINTN)(count)); dest; })
-#define memset(dest,ch,count)             SetMem(dest,(UINTN)(count),(UINT8)(ch))
-#define memchr(buf,ch,count)              ScanMem8((CHAR8 *)buf,(UINTN)(count),ch)
-#define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
-#define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
-#define strlen(str)                       (size_t)(AsciiStrLen((CHAR8 *)str))
-#define strcpy(strDest,strSource)         AsciiStrCpy(strDest,strSource)
-#define strncpy(strDest,strSource,count)  AsciiStrnCpy(strDest,strSource,(UINTN)count)
-#define strcat(strDest,strSource)         AsciiStrCat(strDest,strSource)
-#define strchr(str,ch)                    (char *)(ScanMem8((CHAR8 *)str,AsciiStrSize((CHAR8 *)str),ch))
-#define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
 #define localtime(timer)                  NULL
 #define assert(expression)
 #define atoi(nptr)                        AsciiStrDecimalToUintn(nptr)
 #define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
 #define gmtime_r(timer,result)            (result = NULL)
-#define abort()
 
 #endif

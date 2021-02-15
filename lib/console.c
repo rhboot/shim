@@ -5,8 +5,6 @@
  */
 #include <efi.h>
 #include <efilib.h>
-#include <stdarg.h>
-#include <stdbool.h>
 
 #include "shim.h"
 

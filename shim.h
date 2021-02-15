@@ -34,8 +34,12 @@
 #include <efiip.h>
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <string.h>
+#include <strings.h>
 
 #ifdef SHIM_UNIT_TEST
 #include "include/test.h"
@@ -158,8 +162,13 @@
 #include "include/tpm.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
+#include "include/hexdump.h"
 
 #include "version.h"
+
+#ifndef SHIM_UNIT_TEST
+#include "Cryptlib/Include/OpenSslSupport.h"
+#endif
 
 INTERFACE_DECL(_SHIM_LOCK);
 
@@ -244,5 +253,25 @@ verify_buffer (char *data, int datasize,
 #define perror(fmt, ...)
 #define LogError(fmt, ...)
 #endif
+
+static inline UNUSED CHAR8 *
+translate_slashes(CHAR8 *out, const char *str)
+{
+	int i;
+	int j;
+	if (str == NULL || out == NULL)
+		return NULL;
+
+	for (i = 0, j = 0; str[i] != '\0'; i++, j++) {
+		if (str[i] == '\\') {
+			out[j] = '/';
+			if (str[i + 1] == '\\')
+				i++;
+		} else
+			out[j] = str[i];
+	}
+	out[j] = '\0';
+	return out;
+}
 
 #endif /* SHIM_H_ */

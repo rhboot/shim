@@ -3,7 +3,8 @@
 #ifndef STATIC_HEXDUMP_H
 #define STATIC_HEXDUMP_H
 
-#include <stdint.h>
+#include "shim.h"
+#include "include/console.h"
 
 static inline unsigned long UNUSED
 prepare_hex(const void *data, size_t size, char *buf, unsigned int position)

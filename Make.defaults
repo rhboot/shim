@@ -94,7 +94,8 @@ ifeq ($(ARCH),arm)
 	TIMESTAMP_LOCATION	:= 72
 endif
 
-SYSTEM_INCLUDES ?= -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include)
+SYSTEM_INCLUDES ?= -isystem $(TOPDIR)/include/system \
+		   -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include)
 
 EFI_INCLUDE ?= /usr/include/efi
 EFI_INCLUDES ?= -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
@@ -110,6 +111,7 @@ GLOBAL_FEATURE_FLAGS = \
 		       $(if $(filter-out undefined,$(FANALYZER)),-fanalyzer,) \
 		       $(if $(filter-out undefined,$(COLOR)),-fdiagnostics-color=always,) \
 		       -ffreestanding \
+		       -fkeep-inline-functions \
 		       -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)' \
 		       -fno-stack-protector \
 		       -fno-strict-aliasing \
@@ -130,6 +132,8 @@ WARNINGS = $(GLOBAL_WARNIGNS)
 
 GLOBAL_DEFINES = "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		 "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
+		 -DGNU_EFI_USE_EXTERNAL_STDARG \
+		 $(MACRO_PREFIX_MAP) \
 		 "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" \
 		 "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
 
