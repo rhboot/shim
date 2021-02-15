@@ -3,12 +3,11 @@
 #ifndef SHIM_STR_H
 #define SHIM_STR_H
 
-static inline
-__attribute__((unused))
-unsigned long strnlena(const CHAR8 *s, unsigned long n)
+static inline __attribute__((unused)) unsigned long
+strnlena(const CHAR8 *s, unsigned long n)
 {
 	unsigned long i;
-	for (i = 0; i <= n; i++)
+	for (i = 0; i < n; i++)
 		if (s[i] == '\0')
 			break;
 	return i;
