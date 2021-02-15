@@ -95,6 +95,10 @@
 #endif
 #endif
 
+#ifndef DEBUGSRC
+#define DEBUGSRC L"/usr/src/debug/shim-" VERSIONSTR "." EFI_ARCH
+#endif
+
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
