@@ -24,9 +24,11 @@
 *.srl.old
 *.sw?
 *.tar.*
+/build*/
 /certdb/
 /cov-int/
 /sbat.*.csv
 /scan-results/
 [Ss]creenlog*
+shim_cert.h
 version.c
