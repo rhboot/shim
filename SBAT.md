@@ -76,19 +76,17 @@ ask for a product-specific generation number to be published for one
 of their product's components. This avoids triggering an industry wide
 re-publishing of otherwise safe components.
 
- A product-specific minimum generation number only applies to the
-instance of that component that is signed with that product
-name. Another product's instance of the same component may be
-installed on the same system and would not be subject to the other
-product's product-specific minimum generation number. However, both of
-those components will need to meet the global minimum generation
-number for that component. A very likely scenario would be that a
-product is shipped with an incomplete fix required for a specific
-minimum generation number, but is labeled with that number. Rather
-than having the entire industry that uses that component re-release,
-just that product's minimum generation number would be incremented and
-that product's component re-released along with a UEFI variable update
-specifying that requirement.
+ A product-specific minimum generation number only applies to the instance of
+ that component that is signed with that product name. Another product's
+ instance of the same component may be installed on the same system and would
+ not be subject to the other product's product-specific minimum generation number.
+ However, both of those components will need to meet the global minimum
+ generation number for that component. A very likely scenario would be that a
+ product is shipped with an incomplete fix required for a specific minimum
+ generation number, but is labeled with that number. Rather than having the
+ entire industry that uses that component re-release, just that product's
+ minimum generation number would be incremented and that product's component
+ re-released along with a UEFI variable update specifying that requirement.
 
  The global and product-specific generation number name spaces are not
 tied to each other. The global number is managed externally, and the vast
@@ -121,7 +119,7 @@ number.
 
 However, once the global number is bumped for the next upstream CVE
 fix there will be no further need to carry that product-specific
-generation number; satisfying the check of the global number will also
+generation number. Satisfying the check of the global number will also
 exclude any of the older product-specific binaries.
 
 For example: There is a global CVE disclosure and all vendors coordinate to
@@ -153,9 +151,9 @@ the UEFI revocation variable.
 If this same Vendor C has a similar event after the global number is
 incremented, they would again set their product-specific or version-specific
 number to 1. If they have a second event on with the same component, they would
-set their product- or version-specific number to 2.
+set their product-specific or version-specific number to 2.
 
-In such an event, a vendor would set the product- or product version-specific
+In such an event, a vendor would set the product-specific or version-specific
 generation number based on whether the mis-merge occurred in all of their
 branches or in just a subset of them. The goal is generally to limit end
 customer impact with as few re-releases as possible, while not creating an
@@ -199,7 +197,7 @@ Secure Boot enabled systems.
 A subset of this case would be a beta-release that may contain eventually
 abandoned, experimental, kernel code. Such releases should have their
 product-specific generation numbers incremented past the latest one
-shown in any, released or unreleased, binary signed with a production
+shown in any released, or unreleased, binary signed with a production
 key.
 
 Until a release is retired in this manner, vendors are responsible for
