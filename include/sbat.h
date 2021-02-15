@@ -6,8 +6,6 @@
 #ifndef SBAT_H_
 #define SBAT_H_
 
-#include "shim.h"
-
 struct sbat_entry {
 	const CHAR8 *component_name;
 	const CHAR8 *component_generation;

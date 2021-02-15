@@ -3,7 +3,7 @@
  * sbat.c - parse SBAT data from the .sbat section data
  */
 
-#include "sbat.h"
+#include "shim.h"
 
 CHAR8 *
 get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 ** field, char delim)
