@@ -16,17 +16,15 @@ the `.sbat` section has the following fields:
 
 `SBAT` EFI variable
 -----------------
-The SBAT EFI variable (`SBAT-605dab50-e046-4300-abb6-3dd810dd8b23`) is structured as a series of records:
+The SBAT EFI variable (`SBAT-605dab50-e046-4300-abb6-3dd810dd8b23`) is structured as a series ASCII CSV records:
 
 ```
-struct sbat_entry {
-  uint16_t component_generation;
-  uint16_t component_name_size;
-  char component_name[];
-}
+sbat,1
+component_name,component_generation
+component_name,component_generation
 ```
 
-with the first record being our structure version number expressed as: `{ 0, 5, "sbat" }`
+with the first record being our structure version number expressed as: `{'s', 'b', 'a', 't', ',', '1', '\n'}`
 
 Validation Rules
 -----------------
@@ -90,11 +88,19 @@ sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 
 The `SBAT` data we've all agreed on and the UEFI CA has distributed is:
 ```
+sbat,1
+shim,0
+grub,0
+grub.fedora,0
+```
+
+Which is literally the byte array:
+```
 {
-  { 0, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 0, 5, "grub" },
-  { 0, 12, "grub.fedora" },
+  's', 'b', 'a', 't', ',', '1', '\n',
+  's', 'h', 'i', 'm', ',', '0', '\n',
+  'g', 'r', 'u', 'b', ',', '0', '\n',
+  'g', 'r', 'u', 'b', '.', 'f', 'e', 'd', 'o', 'r', 'a', ',', '0', '\n',
 }
 ```
 
@@ -122,12 +128,10 @@ grub.rhel,1,Red Hat Enterprise Linux,grub2,2.02-0.34.el7_2.1,mail:secalert@redha
 
 The UEFI CA issues a new `SBAT` update which looks like:
 ```
-{
-  { 0, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 0, 5, "grub" },
-  { 1, 12, "grub.fedora" },
-}
+sbat,0
+shim,0
+grub,0
+grub.fedora,1
 ```
 
 Along comes bug 1
@@ -164,12 +168,10 @@ grub.acme,0,Acme Corporation,grub,1.96-8192,https://acme.arpa/packages/grub
 
 The UEFI CA issues an update which looks like:
 ```
-{
-  { 0, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 1, 5, "grub" },
-  { 1, 12, "grub.fedora" },
-}
+sbat,1
+shim,0
+grub,1
+grub.fedora,1
 ```
 
 Acme Corp gets with the program
@@ -204,12 +206,10 @@ grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
 
 And the UEFI CA issues an update to SBAT which has:
 ```
-{
-  { 0, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 2, 5, "grub" },
-  { 1, 12, "grub.fedora" },
-}
+sbat,1
+shim,0
+grub,2
+grub.fedora,1
 ```
 
 Two key things here:

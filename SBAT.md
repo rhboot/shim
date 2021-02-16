@@ -396,11 +396,17 @@ grub.acme,0,Acme Corporation,grub,1.96-8192,https://acme.arpa/packages/grub
 
 The UEFI CA issues an update which looks like:
 ```
+sbat,1
+grub,1
+grub.fedora,1
+```
+
+Which is literally the byte array:
+```
 {
-  { 1, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 1, 5, "grub" },
-  { 1, 12, "grub.fedora" },
+  's', 'b', 'a', 't', ',', '1', '\n',
+  'g', 'r', 'u', 'b', ',', '1', '\n',
+  'g', 'r', 'u', 'b', '.', 'f', 'e', 'd', 'o', 'r', 'a', ',', '1', '\n',
 }
 ```
 
@@ -436,12 +442,9 @@ grub.debian,1,Debian,grub2,2.04-13,https://packages.debian.org/source/sid/grub2
 
 And the UEFI CA issues an update to SBAT which has:
 ```
-{
-  { 1, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 2, 5, "grub" },
-  { 1, 12, "grub.fedora" },
-}
+sbat,1
+grub,2
+grub.fedora,1
 ```
 
 The grub.fedora product-specific line could be dropped since a Fedora
@@ -449,11 +452,9 @@ GRUB with a global generation number that also contained the bug that
 prompted the fedora-specific revocation was never published. This
 results in the following reduced UEFI SBAT revocation update:
 ```
-{
-  { 1, 5, "sbat" },
-  { 0, 5, "shim" },
-  { 2, 5, "grub" },
-}
+sbat,1
+shim,0
+grub,2
 ```
 
 Two key things here:
