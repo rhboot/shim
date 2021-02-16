@@ -70,23 +70,18 @@ error:
 EFI_STATUS
 parse_sbat(char *sbat_base, size_t sbat_size, struct sbat *sbat)
 {
-	CHAR8 *current = (CHAR8 *)sbat_base;
-	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size;
+	CHAR8 *current = (CHAR8 *) sbat_base;
+	CHAR8 *end = (CHAR8 *) sbat_base + sbat_size - 1;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_entry *entry;
 	struct sbat_entry **entries;
 	unsigned int i;
 
-	while ((*current == '\r' || *current == '\n') && current < end)
-		current++;
+	if (!sbat_base || !sbat || sbat_size == 0)
+		return EFI_INVALID_PARAMETER;
 
 	if (current == end)
 		return EFI_INVALID_PARAMETER;
-
-	while ((*end == '\r' || *end == '\n') && end < current)
-		end--;
-
-	*(end - 1) = '\0';
 
 	do {
 		entry = NULL;
