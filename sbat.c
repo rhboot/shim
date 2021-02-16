@@ -68,7 +68,7 @@ error:
 }
 
 EFI_STATUS
-parse_sbat(char *sbat_base, size_t sbat_size, char *buffer, struct sbat *sbat)
+parse_sbat(char *sbat_base, size_t sbat_size, struct sbat *sbat)
 {
 	CHAR8 *current = (CHAR8 *)sbat_base;
 	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size;
