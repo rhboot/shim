@@ -6,6 +6,15 @@
 #ifndef SBAT_H_
 #define SBAT_H_
 
+struct sbat_var {
+	const CHAR8 *component_name;
+	const CHAR8 *component_generation;
+	list_t list;
+};
+
+EFI_STATUS parse_sbat_var(list_t *entries);
+void cleanup_sbat_var(list_t *entries);
+
 struct sbat_entry {
 	const CHAR8 *component_name;
 	const CHAR8 *component_generation;
@@ -16,6 +25,8 @@ struct sbat_entry {
 };
 
 EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat);
+
+EFI_STATUS verify_sbat(size_t n, struct sbat_entry **entries, list_t *var_entries);
 
 #endif /* !SBAT_H_ */
 // vim:fenc=utf-8:tw=75:noet
