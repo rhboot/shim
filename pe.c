@@ -1039,8 +1039,8 @@ handle_image (void *data, unsigned int datasize,
 	}
 
 	if (secure_mode ()) {
-		int res;
 		unsigned int i;
+		EFI_STATUS efi_status;
 		struct sbat sbat = { 0 };
 		struct sbat_entry *entry = NULL;
 
@@ -1057,10 +1057,11 @@ handle_image (void *data, unsigned int datasize,
 			CopyMem(sbat_data, SBATBase, SBATSize);
 			sbat_data[SBATSize] = '\0';
 
-			res = parse_sbat(sbat_data, sbat_size, &sbat);
-			if (res < 0) {
-				console_print(L"SBAT data not correct: %r\n", res);
-				return EFI_UNSUPPORTED;
+			efi_status = parse_sbat(sbat_data, sbat_size, &sbat);
+			if (EFI_ERROR(efi_status)) {
+				perror(L"SBAT data not correct: %r\n",
+				       efi_status);
+				return efi_status;
 			}
 
 			dprint(L"SBAT data\n");
