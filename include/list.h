@@ -32,6 +32,12 @@ typedef struct list_head list_t;
 		(ptr)->prev = (ptr); \
 	})
 
+static inline int
+list_empty(const struct list_head *head)
+{
+	return head->next == head;
+}
+
 static inline void
 __list_add(struct list_head *new, struct list_head *prev,
            struct list_head *next)
