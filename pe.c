@@ -1057,7 +1057,7 @@ handle_image (void *data, unsigned int datasize,
 			CopyMem(sbat_data, SBATBase, SBATSize);
 			sbat_data[SBATSize] = '\0';
 
-			res = parse_sbat(sbat_data, sbat_size, buffer, &sbat);
+			res = parse_sbat(sbat_data, sbat_size, &sbat);
 			if (res < 0) {
 				console_print(L"SBAT data not correct: %r\n", res);
 				return EFI_UNSUPPORTED;
