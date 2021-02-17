@@ -823,7 +823,7 @@ read_header(void *data, unsigned int datasize,
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS
+EFI_STATUS
 handle_sbat(char *SBATBase, size_t SBATSize)
 {
 	unsigned int i;

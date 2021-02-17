@@ -15,6 +15,9 @@ read_header(void *data, unsigned int datasize,
 	    PE_COFF_LOADER_IMAGE_CONTEXT *context);
 
 EFI_STATUS
+handle_sbat(char *SBATBase, size_t SBATSize);
+
+EFI_STATUS
 handle_image (void *data, unsigned int datasize,
 	      EFI_LOADED_IMAGE *li,
 	      EFI_IMAGE_ENTRY_POINT *entry_point,
