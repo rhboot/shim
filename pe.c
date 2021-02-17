@@ -823,6 +823,60 @@ read_header(void *data, unsigned int datasize,
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS
+handle_sbat(char *SBATBase, size_t SBATSize)
+{
+	unsigned int i;
+	EFI_STATUS efi_status;
+	size_t n;
+	struct sbat_entry **entries = NULL;
+	char *sbat_data;
+	size_t sbat_size;
+
+	if (list_empty(&sbat_var))
+		return EFI_SUCCESS;
+
+	if (SBATBase == NULL || SBATSize == 0) {
+		dprint(L"No .sbat section data\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+
+	sbat_size = SBATSize + 1;
+	sbat_data = AllocatePool(sbat_size);
+	if (!sbat_data) {
+		console_print(L"Failed to allocate .sbat section buffer\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+	CopyMem(sbat_data, SBATBase, SBATSize);
+	sbat_data[SBATSize] = '\0';
+
+	efi_status = parse_sbat(sbat_data, sbat_size, &n, &entries);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Could not parse .sbat section data: %r\n", efi_status);
+		goto err;
+	}
+
+	dprint(L"SBAT section data\n");
+        for (i = 0; i < n; i++) {
+		dprint(L"%a, %a, %a, %a, %a, %a\n",
+		       entries[i]->component_name,
+		       entries[i]->component_generation,
+		       entries[i]->vendor_name,
+		       entries[i]->vendor_package_name,
+		       entries[i]->vendor_version,
+		       entries[i]->vendor_url);
+	}
+
+	efi_status = verify_sbat(n, entries);
+
+	cleanup_sbat_entries(n, entries);
+
+err:
+	FreePool(sbat_data);
+
+	return efi_status;
+}
+
 /*
  * Once the image has been loaded it needs to be validated and relocated
  */
@@ -1039,60 +1093,12 @@ handle_image (void *data, unsigned int datasize,
 	}
 
 	if (secure_mode ()) {
-		unsigned int i;
-		size_t n;
-		struct sbat_entry **entries = NULL;
-		char *sbat_data;
-		size_t sbat_size;
+		efi_status = handle_sbat(SBATBase, SBATSize);
 
-		if (SBATBase == NULL || SBATSize == 0) {
-			if (list_empty(&sbat_var))
-				return EFI_SUCCESS;
-			dprint(L"No .sbat section data\n");
-			return EFI_SECURITY_VIOLATION;
-		}
+		if (!EFI_ERROR(efi_status))
+			efi_status = verify_buffer(data, datasize,
+						   &context, sha256hash, sha1hash);
 
-		sbat_size = SBATSize + 1;
-		sbat_data = AllocatePool(sbat_size);
-		if (!sbat_data) {
-			console_print(L"Failed to allocate .sbat section buffer\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		CopyMem(sbat_data, SBATBase, SBATSize);
-		sbat_data[SBATSize] = '\0';
-
-		efi_status = parse_sbat(sbat_data, sbat_size, &n, &entries);
-		FreePool(sbat_data);
-		if (EFI_ERROR(efi_status)) {
-			perror(L"Could not parse .sbat section data: %r\n", efi_status);
-			return efi_status;
-		}
-
-		dprint(L"SBAT data\n");
-		for (i = 0; i < n; i++) {
-			dprint(L"%a, %a, %a, %a, %a, %a\n",
-			       entries[i]->component_name,
-			       entries[i]->component_generation,
-			       entries[i]->vendor_name,
-			       entries[i]->vendor_package_name,
-			       entries[i]->vendor_version,
-			       entries[i]->vendor_url);
-		}
-
-		efi_status = verify_sbat(n, entries);
-		if (entries)
-			for (i = 0; i < n; i++)
-				FreePool(entries[i]);
-		if (EFI_ERROR(efi_status)) {
-			if (verbose)
-				console_print(L"Verification failed: %r\n", efi_status);
-			else
-				console_error(L"Verification failed", efi_status);
-			return efi_status;
-		}
-
-		efi_status = verify_buffer(data, datasize,
-					   &context, sha256hash, sha1hash);
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
 				console_print(L"Verification failed: %r\n", efi_status);
