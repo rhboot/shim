@@ -89,7 +89,7 @@ EFI_STATUS
 parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat)
 {
 	CHAR8 *current = (CHAR8 *)sbat_base;
-	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size - 1;
+	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_entry *entry = NULL;
 	struct sbat_entry **entries;
