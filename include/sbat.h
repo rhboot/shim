@@ -6,6 +6,8 @@
 #ifndef SBAT_H_
 #define SBAT_H_
 
+extern UINTN _sbat, _esbat;
+
 struct sbat_var {
 	const CHAR8 *component_name;
 	const CHAR8 *component_generation;
