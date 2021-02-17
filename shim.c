@@ -1858,12 +1858,14 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		L"import_mok_state() failed",
 		L"shim_init() failed",
 		L"import of SBAT data failed",
+		L"SBAT self-check failed",
 		NULL
 	};
 	enum {
 		IMPORT_MOK_STATE,
 		SHIM_INIT,
 		IMPORT_SBAT,
+		SBAT_SELF_CHECK,
 	} msg = IMPORT_MOK_STATE;
 
 	/*
@@ -1906,6 +1908,19 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		       efi_status);
 		msg = IMPORT_SBAT;
 		goto die;
+	}
+
+	if (secure_mode ()) {
+		char *sbat_start = (char *)&_sbat;
+		char *sbat_end = (char *)&_esbat;
+
+		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Verifiying shim SBAT data failed: %r\n",
+			       efi_status);
+			msg = SBAT_SELF_CHECK;;
+			goto die;
+		}
 	}
 
 	init_openssl();
