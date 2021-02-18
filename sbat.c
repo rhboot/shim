@@ -194,20 +194,20 @@ cleanup_sbat_var(list_t *entries)
 }
 
 EFI_STATUS
-verify_sbat(size_t n, struct sbat_entry **entries, list_t *sbat_entries)
+verify_sbat(size_t n, struct sbat_entry **entries)
 {
 	unsigned int i;
 	list_t *pos = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_var *sbat_var_entry;
 
-	if (!entries || list_empty(sbat_entries)) {
-		dprint(L"SBAT variable not present or malformed\n");
-		return EFI_INVALID_PARAMETER;
+	if (list_empty(&sbat_var)) {
+		dprint(L"SBAT variable not present\n");
+		return EFI_SUCCESS;
 	}
 
 	for (i = 0; i < n; i++) {
-		list_for_each(pos, sbat_entries) {
+		list_for_each(pos, &sbat_var) {
 			sbat_var_entry = list_entry(pos, struct sbat_var, list);
 			efi_status = verify_single_entry(entries[i], sbat_var_entry);
 			if (EFI_ERROR(efi_status))
@@ -216,7 +216,6 @@ verify_sbat(size_t n, struct sbat_entry **entries, list_t *sbat_entries)
 	}
 
 	dprint(L"all entries from SBAT section verified\n");
-	cleanup_sbat_var(sbat_entries);
 	return efi_status;
 }
 
