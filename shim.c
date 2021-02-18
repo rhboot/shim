@@ -1909,6 +1909,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		goto die;
 	}
 
+	init_openssl();
+
 	/*
 	 * Before we do anything else, validate our non-volatile,
 	 * boot-services-only state variables are what we think they are.
