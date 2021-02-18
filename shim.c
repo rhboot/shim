@@ -1855,7 +1855,10 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		L"shim_init() failed",
 		NULL
 	};
-	int msg = 0;
+	enum {
+		IMPORT_MOK_STATE,
+		SHIM_INIT,
+	} msg = IMPORT_MOK_STATE;
 
 	/*
 	 * Set up the shim lock protocol so that grub and MokManager can
@@ -1911,7 +1914,7 @@ die:
 
 	efi_status = shim_init();
 	if (EFI_ERROR(efi_status)) {
-		msg = 1;
+		msg = SHIM_INIT;
 		goto die;
 	}
 
