@@ -68,15 +68,34 @@ error:
 	return EFI_INVALID_PARAMETER;
 }
 
+void
+cleanup_sbat_entries(size_t n, struct sbat_entry **entries)
+{
+	size_t i;
+
+	if (!n || !entries)
+		return;
+
+	for (i = 0; i < n; i++) {
+		if (entries[i]) {
+			FreePool(entries[i]);
+			entries[i] = NULL;
+		}
+	}
+	FreePool(entries);
+}
+
 EFI_STATUS
 parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat)
 {
 	CHAR8 *current = (CHAR8 *)sbat_base;
 	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size - 1;
 	EFI_STATUS efi_status = EFI_SUCCESS;
-	struct sbat_entry *entry;
-	struct sbat_entry **entries = NULL;
-	unsigned int i = 0;
+	struct sbat_entry *entry = NULL;
+	struct sbat_entry **entries;
+	size_t i = 0;
+	size_t pages = 1;
+	size_t n = PAGE_SIZE / sizeof(*entry);
 
 	if (!sbat_base || sbat_size == 0 || !sbats || !sbat)
 		return EFI_INVALID_PARAMETER;
@@ -86,6 +105,10 @@ parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry *
 
 	*sbats = 0;
 	*sbat = 0;
+
+	entries = AllocateZeroPool(pages * PAGE_SIZE);
+	if (!entries)
+		return EFI_OUT_OF_RESOURCES;
 
 	do {
 		entry = NULL;
@@ -98,17 +121,22 @@ parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry *
 			goto error;
 		}
 
-		if (entry) {
-			entries = ReallocatePool(
-				entries, i * sizeof(entry),
-				(i + 1) * sizeof(entry));
-			if (!entries) {
+		if (i >= n) {
+			struct sbat_entry **new_entries;
+			unsigned int osize = PAGE_SIZE * pages;
+			unsigned int nsize = osize + PAGE_SIZE;
+
+			new_entries = ReallocatePool(entries, osize, nsize);
+			if (!new_entries) {
 				efi_status = EFI_OUT_OF_RESOURCES;
 				goto error;
 			}
-
-			entries[i++] = entry;
+			entries = new_entries;
+			ZeroMem(&entries[i], PAGE_SIZE);
+			pages += 1;
+			n = nsize / sizeof(entry);
 		}
+		entries[i++] = entry;
 	} while (entry && *current != '\0');
 
 	*sbats = i;
@@ -117,8 +145,7 @@ parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry *
 	return efi_status;
 error:
 	perror(L"Failed to parse SBAT data: %r\n", efi_status);
-	while (i)
-		FreePool(entries[i--]);
+	cleanup_sbat_entries(i, entries);
 	return efi_status;
 }
 
