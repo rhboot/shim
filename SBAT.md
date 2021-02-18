@@ -460,5 +460,5 @@ grub,3
 ```
 
 Two key things here:
-- `grub.debian` still got updated to `2` in their `.sbat` data, because a vuln was fixed that is only covered by that updated number.
+- `grub.debian` still got updated to `2` in their `.sbat` data, because a vulnerability was fixed that is only covered by that updated number.
 - There is still no `SBAT` update for `grub.debian`, because there's no binary that needs it which is not covered by updating `grub` to `3`.
