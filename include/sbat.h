@@ -25,6 +25,7 @@ struct sbat_entry {
 };
 
 EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat);
+void cleanup_sbat_entries(size_t n, struct sbat_entry **entries);
 
 EFI_STATUS verify_sbat(size_t n, struct sbat_entry **entries, list_t *var_entries);
 
