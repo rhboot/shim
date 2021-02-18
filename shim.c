@@ -1887,7 +1887,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	       vendor_authorized, vendor_authorized_size);
 	dprint(L"vendor_deauthorized:0x%08lx vendor_deauthorized_size:%lu\n",
 	       vendor_deauthorized, vendor_deauthorized_size);
-	init_openssl();
 
 	/*
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
@@ -1908,6 +1907,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		msg = IMPORT_SBAT;
 		goto die;
 	}
+
+	init_openssl();
 
 	/*
 	 * Before we do anything else, validate our non-volatile,
