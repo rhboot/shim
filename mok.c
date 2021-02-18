@@ -229,6 +229,22 @@ struct mok_state_variable mok_state_variables[] = {
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
 	 .state = &ignore_db,
 	},
+	{.name = L"SBAT",
+	 .name8 = "SBAT",
+	 .rtname = L"SbatRT",
+	 .rtname8 = "SbatRT",
+	 .guid = &SHIM_LOCK_GUID,
+	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+		     EFI_VARIABLE_NON_VOLATILE,
+	 /*
+	  * we're enforcing that SBAT can't have an RT flag here because
+	  * there's no way to tell whether it's an authenticated variable.
+	  */
+	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+	 .flags = MOK_MIRROR_DELETE_FIRST |
+		  MOK_VARIABLE_MEASURE,
+	 .pcr = 7,
+	},
 	{ NULL, }
 };
 
