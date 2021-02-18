@@ -15,12 +15,7 @@ struct sbat_entry {
 	const CHAR8 *vendor_url;
 };
 
-struct sbat {
-	unsigned int size;
-	struct sbat_entry **entries;
-};
-
-EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, struct sbat *sbat);
+EFI_STATUS parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat);
 
 #endif /* !SBAT_H_ */
 // vim:fenc=utf-8:tw=75:noet

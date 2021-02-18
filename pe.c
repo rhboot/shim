@@ -1041,7 +1041,8 @@ handle_image (void *data, unsigned int datasize,
 	if (secure_mode ()) {
 		unsigned int i;
 		EFI_STATUS efi_status;
-		struct sbat sbat = { 0 };
+		size_t n;
+		struct sbat_entry **entries;
 		struct sbat_entry *entry = NULL;
 
 		if (SBATBase && SBATSize) {
@@ -1057,7 +1058,7 @@ handle_image (void *data, unsigned int datasize,
 			CopyMem(sbat_data, SBATBase, SBATSize);
 			sbat_data[SBATSize] = '\0';
 
-			efi_status = parse_sbat(sbat_data, sbat_size, &sbat);
+			efi_status = parse_sbat(sbat_data, sbat_size, &n, &entries);
 			if (EFI_ERROR(efi_status)) {
 				perror(L"SBAT data not correct: %r\n",
 				       efi_status);
@@ -1065,8 +1066,8 @@ handle_image (void *data, unsigned int datasize,
 			}
 
 			dprint(L"SBAT data\n");
-			for (i = 0; i < sbat.size; i++) {
-				entry = sbat.entries[i];
+			for (i = 0; i < n; i++) {
+				entry = entries[i];
 				dprint(L"%a, %a, %a, %a, %a, %a\n",
 				       entry->component_name,
 				       entry->component_generation,
@@ -1083,9 +1084,9 @@ handle_image (void *data, unsigned int datasize,
 		efi_status = verify_buffer(data, datasize,
 					   &context, sha256hash, sha1hash);
 
-		if (sbat.entries)
-			for (i = 0; i < sbat.size; i++)
-				FreePool(sbat.entries[i]);
+		if (entries)
+			for (i = 0; i < n; i++)
+				FreePool(entries[i]);
 
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
