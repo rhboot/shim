@@ -43,6 +43,8 @@ static CHAR16 *second_stage;
 void *load_options;
 UINT32 load_options_size;
 
+list_t sbat_var;
+
 /*
  * The vendor certificate used for validating the second stage loader
  */
@@ -1751,6 +1753,8 @@ shim_init(void)
 void
 shim_fini(void)
 {
+	cleanup_sbat_var(&sbat_var);
+
 	/*
 	 * Remove our protocols
 	 */
@@ -1853,11 +1857,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	CHAR16 *msgs[] = {
 		L"import_mok_state() failed",
 		L"shim_init() failed",
+		L"import of SBAT data failed",
 		NULL
 	};
 	enum {
 		IMPORT_MOK_STATE,
 		SHIM_INIT,
+		IMPORT_SBAT,
 	} msg = IMPORT_MOK_STATE;
 
 	/*
@@ -1887,6 +1893,21 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
 	 */
 	debug_hook();
+
+	INIT_LIST_HEAD(&sbat_var);
+	efi_status = parse_sbat_var(&sbat_var);
+	/*
+	 * Until a SBAT variable is installed into the systems, it is expected that
+	 * attempting to parse the variable will fail with an EFI_NOT_FOUND error.
+	 *
+	 * Do not consider that error fatal for now.
+	 */
+	if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		perror(L"Parsing SBAT variable failed: %r\n",
+		       efi_status);
+		msg = IMPORT_SBAT;
+		goto die;
+	}
 
 	/*
 	 * Before we do anything else, validate our non-volatile,
