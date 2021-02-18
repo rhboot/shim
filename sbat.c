@@ -68,20 +68,23 @@ error:
 }
 
 EFI_STATUS
-parse_sbat(char *sbat_base, size_t sbat_size, struct sbat *sbat)
+parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat)
 {
 	CHAR8 *current = (CHAR8 *) sbat_base;
 	CHAR8 *end = (CHAR8 *) sbat_base + sbat_size - 1;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_entry *entry;
-	struct sbat_entry **entries;
-	unsigned int i;
+	struct sbat_entry **entries = NULL;
+	unsigned int i = 0;
 
-	if (!sbat_base || !sbat || sbat_size == 0)
+	if (!sbat_base || sbat_size == 0 || !sbats || !sbat)
 		return EFI_INVALID_PARAMETER;
 
 	if (current == end)
 		return EFI_INVALID_PARAMETER;
+
+	*sbats = 0;
+	*sbat = 0;
 
 	do {
 		entry = NULL;
@@ -96,24 +99,25 @@ parse_sbat(char *sbat_base, size_t sbat_size, struct sbat *sbat)
 
 		if (entry) {
 			entries = ReallocatePool(
-				sbat->entries, sbat->size * sizeof(entry),
-				(sbat->size + 1) * sizeof(entry));
+				entries, i * sizeof(entry),
+				(i + 1) * sizeof(entry));
 			if (!entries) {
 				efi_status = EFI_OUT_OF_RESOURCES;
 				goto error;
 			}
 
-			sbat->entries = entries;
-			sbat->entries[sbat->size] = entry;
-			sbat->size++;
+			entries[i++] = entry;
 		}
 	} while (entry && *current != '\0');
+
+	*sbats = i;
+	*sbat = entries;
 
 	return efi_status;
 error:
 	perror(L"Failed to parse SBAT data: %r\n", efi_status);
-	for (i = 0; i < sbat->size; i++)
-		FreePool(sbat->entries[i]);
+	while (i)
+		FreePool(entries[i--]);
 	return efi_status;
 }
 
