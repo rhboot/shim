@@ -396,6 +396,7 @@ grub.acme,1,Acme Corporation,grub,1.96-8192,https://acme.arpa/packages/grub
 The UEFI CA issues an update which looks like:
 ```
 sbat,1
+shim,1
 grub,1
 grub.fedora,1
 ```
