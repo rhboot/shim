@@ -346,7 +346,7 @@ specific generation numbers will be exceptions that will be obsoleted if and
 when the global number for a component is incremented.
 
 Initially the SBAT UEFI variable will set generation numbers for
-components to 1, but is expect to grow as CVEs are discovered and
+components to 1, but is expected to grow as CVEs are discovered and
 fixed. The following show the evolution over a sample set of events:
 
 Starting point
