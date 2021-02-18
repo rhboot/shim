@@ -6,7 +6,6 @@
 #include <efilib.h>
 
 #define TPM_ALG_SHA 0x00000004
-#define EV_IPL      0x0000000d
 
 EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description);
@@ -176,6 +175,7 @@ typedef struct efi_tpm2_protocol efi_tpm2_protocol_t;
 
 typedef UINT32                     TCG_EVENTTYPE;
 
+#define EV_IPL                              0x0000000d
 #define EV_EFI_EVENT_BASE                   ((TCG_EVENTTYPE) 0x80000000)
 #define EV_EFI_VARIABLE_DRIVER_CONFIG       (EV_EFI_EVENT_BASE + 1)
 #define EV_EFI_VARIABLE_BOOT                (EV_EFI_EVENT_BASE + 2)
