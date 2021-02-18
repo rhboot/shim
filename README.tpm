@@ -19,6 +19,7 @@ PCR7:
   - shim_cert - shim's build-time generated allowlist, logged as "Shim"
 - MokSBState will be extended into PCR7 if it is set, logged as
   "MokSBState".
+- SBAT will be extended into PCR7 if it is set, logged as "SBAT"
 
 PCR8:
 - If you're using the grub2 TPM patchset we cary in Fedora, the kernel command
