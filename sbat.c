@@ -17,7 +17,7 @@ get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 **field, char delim)
 	offset = strchrnula(current, delim);
 	*field = current;
 
-	if (!*offset)
+	if (!offset || !*offset)
 		return NULL;
 
 	*offset = '\0';
@@ -137,7 +137,7 @@ parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry *
 			n = nsize / sizeof(entry);
 		}
 		entries[i++] = entry;
-	} while (entry && *current != '\0');
+	} while (entry && current && *current != '\0');
 
 	*sbats = i;
 	*sbat = entries;
