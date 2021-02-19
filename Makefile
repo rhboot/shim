@@ -55,6 +55,9 @@ FALLBACK_SRCS = $(foreach source,$(ORIG_FALLBACK_SRCS),$(TOPDIR)/$(source))
 
 all: $(TARGETS)
 
+update :
+	git submodule update --init --recursive
+
 shim.crt:
 	$(TOPDIR)/make-certs shim shim@xn--u4h.net all codesign 1.3.6.1.4.1.311.10.3.1 </dev/null
 
@@ -105,18 +108,29 @@ $(SHIMNAME) : $(SHIMSONAME)
 $(MMNAME) : $(MMSONAME)
 $(FBNAME) : $(FBSONAME)
 
-$(SHIMSONAME): $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+LIBS = Cryptlib/libcryptlib.a \
+       Cryptlib/OpenSSL/libopenssl.a \
+       lib/lib.a \
+       gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a \
+       gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a
+
+$(SHIMSONAME): $(OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 fallback.o: $(FALLBACK_SRCS)
 
-$(FBSONAME): $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(FBSONAME): $(FALLBACK_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(MOK_SOURCES)
 
-$(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(MMSONAME): $(MOK_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
+
+gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
+	$(MAKE) -C gnu-efi \
+		ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+		lib gnuefi inc
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
@@ -253,6 +267,11 @@ $(patsubst %.c,%,$(wildcard test-*.c)) :
 clean-test-objs:
 	@make -f include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
 
+clean-gnu-efi:
+	$(MAKE) -C gnu-efi \
+		ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+		clean
+
 clean-shim-objs:
 	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
@@ -266,7 +285,7 @@ clean-openssl-objs:
 clean-cryptlib-objs:
 	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
 
-clean: clean-shim-objs clean-test-objs clean-openssl-objs clean-cryptlib-objs
+clean: clean-shim-objs clean-test-objs clean-gnu-efi clean-openssl-objs clean-cryptlib-objs
 
 GITTAG = $(VERSION)
 
