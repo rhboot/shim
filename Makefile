@@ -231,8 +231,8 @@ endif
 ifneq ($(origin ENABLE_SBSIGN),undefined)
 %.efi.signed: %.efi shim.key shim.crt
 	@$(SBSIGN) \
-		--key certdb/shim.key \
-		--cert certdb/shim.crt \
+		--key shim.key \
+		--cert shim.crt \
 		--output $@ $<
 else
 %.efi.signed: %.efi certdb/secmod.db
