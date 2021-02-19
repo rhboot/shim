@@ -21,6 +21,7 @@ include $(TOPDIR)/Make.defaults
 include $(TOPDIR)/Make.rules
 include $(TOPDIR)/include/coverity.mk
 include $(TOPDIR)/include/scan-build.mk
+include $(TOPDIR)/include/fanalyzer.mk
 
 TARGETS	= $(SHIMNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
