@@ -91,6 +91,8 @@ endif
 CFLAGS		= -ggdb $(OPTIMIZATIONS) -fno-stack-protector -fno-strict-aliasing -fpic \
 		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
 		  -Werror=sign-compare -ffreestanding -std=gnu89 \
+		  $(if $(filter-out undefined,$(FANALYZER)),-fanalyzer,) \
+		  $(if $(filter-out undefined,$(COLOR)),-fdiagnostics-color=always,) \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
 		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
