@@ -102,18 +102,21 @@ $(SHIMNAME) : $(SHIMSONAME)
 $(MMNAME) : $(MMSONAME)
 $(FBNAME) : $(FBSONAME)
 
-$(SHIMSONAME): $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(SHIMSONAME): $(OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a gnu-efi/$(ARCH)/gnuefi/libgnuefi.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 fallback.o: $(FALLBACK_SRCS)
 
-$(FBSONAME): $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(FBSONAME): $(FALLBACK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a gnu-efi/$(ARCH)/gnuefi/libgnuefi.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
 
 MokManager.o: $(MOK_SOURCES)
 
-$(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a
+$(MMSONAME): $(MOK_OBJS) Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a lib/lib.a gnu-efi/$(ARCH)/gnuefi/libgnuefi.a
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
+
+gnu-efi/$(ARCH)/gnuefi/libgnuefi.a:
+	$(MAKE) -C gnu-efi
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
@@ -249,6 +252,7 @@ clean-shim-objs:
 clean: clean-shim-objs
 	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
 	$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile clean
+	$(MAKE) -C gnu-efi clean
 
 GITTAG = $(VERSION)
 

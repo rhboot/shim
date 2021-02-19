@@ -31,7 +31,7 @@ OPTIMIZATIONS	?= -Os
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
-EFI_INCLUDE	?= /usr/include/efi
+EFI_INCLUDE	?= $(TOPDIR)/gnu-efi/inc
 EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
 		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
 		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
@@ -111,7 +111,7 @@ endif
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --target efi-app-$(ARCH)
-EFI_PATH	?= $(shell [ -d $(LIBDIR)/gnuefi ] && echo "$(LIBDIR)/gnuefi" || echo "$(LIBDIR)")
+EFI_PATH	?= gnu-efi/$(ARCH)/gnuefi
 
 MMSTEM		?= mm$(ARCH_SUFFIX)
 MMNAME		= $(MMSTEM).efi
