@@ -332,7 +332,7 @@ Components that do not have special code to construct the final PE
 files can simply add this section using objcopy(1):
 
 ```
-objcopy --add-section .sbat=sbat.csv foo.efi
+objcopy --set-section-alignment '.sbat=512' --add-section .sbat=sbat.csv foo.efi
 
 ```
 
