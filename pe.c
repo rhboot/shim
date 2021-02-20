@@ -1043,10 +1043,14 @@ handle_image (void *data, unsigned int datasize,
 				return EFI_UNSUPPORTED;
 			}
 
-			/* If it has nonzero size, and our bounds check made
-			 * sense, sizes match, then we believe it's okay. */
+			/* The virtual size corresponds to the size of the SBAT
+			 * metadata and isn't necessarily a multiple of the file
+			 * alignment. The on-disk size is a multiple of the file
+			 * alignment and is zero padded. Make sure that the
+			 * on-disk size is at least as large as virtual size,
+			 * and ignore the section if it isn't. */
 			if (Section->SizeOfRawData &&
-			    Section->SizeOfRawData == Section->Misc.VirtualSize &&
+			    Section->SizeOfRawData >= Section->Misc.VirtualSize &&
 			    base && end) {
 				SBATBase = base;
 				/* +1 because of size vs last byte location */
