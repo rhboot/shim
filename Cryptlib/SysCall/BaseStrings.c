@@ -1,7 +1,7 @@
 #include <OpenSslSupport.h>
 
-char *
-AsciiStrCat(char *Destination, char *Source)
+CHAR8 *
+AsciiStrCat(CHAR8 *Destination, const CHAR8 *Source)
 {
 	UINTN dest_len = strlena((CHAR8 *)Destination);
 	UINTN i;
@@ -14,7 +14,7 @@ AsciiStrCat(char *Destination, char *Source)
 }
 
 CHAR8 *
-AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
+AsciiStrCpy(CHAR8 *Destination, const CHAR8 *Source)
 {
 	UINTN i;
 
@@ -25,8 +25,8 @@ AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
 	return Destination;
 }
 
-char *
-AsciiStrnCpy(char *Destination, char *Source, UINTN count)
+CHAR8 *
+AsciiStrnCpy(CHAR8 *Destination, const CHAR8 *Source, UINTN count)
 {
 	UINTN i;
 
@@ -59,7 +59,7 @@ WriteUnaligned32(UINT32 *Buffer, UINT32 Value)
 }
 
 UINTN
-AsciiStrSize(CHAR8 *string)
+AsciiStrSize(const CHAR8 *string)
 {
 	return strlena(string) + 1;
 }
@@ -97,7 +97,7 @@ strcasecmp (const char *str1, const char *str2)
 /* Based on AsciiStrDecimalToUintnS() in edk2
  * MdePkg/Library/BaseLib/SafeString.c */
 UINTN
-AsciiStrDecimalToUintn(const char *String)
+AsciiStrDecimalToUintn(const CHAR8 *String)
 {
 	UINTN     Result;
 
