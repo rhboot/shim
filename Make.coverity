@@ -12,7 +12,7 @@ cov-int-all : clean
 
 cov-clean :
 	@rm -vf $(NAME)-coverity-*.tar.*
-	@if [[ -d cov-int ]]; then rm -rf cov-int && echo "removed 'cov-int'"; fi
+	@if [ -d cov-int ]; then rm -rf cov-int && echo "removed 'cov-int'"; fi
 
 cov-file : | $(COV_FILE)
 
@@ -20,9 +20,9 @@ $(COV_FILE) : | cov-int
 	tar caf $@ cov-int
 
 cov-upload :
-	@if [[ -n "$(COV_URL)" ]] &&					\
-	    [[ -n "$(COV_TOKEN)" ]] &&					\
-	    [[ -n "$(COV_EMAIL)" ]] ;					\
+	@if [ -n "$(COV_URL)" ] &&					\
+	    [ -n "$(COV_TOKEN)" ] &&					\
+	    [ -n "$(COV_EMAIL)" ] ;					\
 	then								\
 		echo curl --form token=$(COV_TOKEN) --form email="$(COV_EMAIL)" --form file=@"$(COV_FILE)" --form version=$(VERSION).1 --form description="$(COMMIT_ID)" "$(COV_URL)" ; \
 		curl --form token=$(COV_TOKEN) --form email="$(COV_EMAIL)" --form file=@"$(COV_FILE)" --form version=$(VERSION).1 --form description="$(COMMIT_ID)" "$(COV_URL)" ; \
