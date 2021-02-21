@@ -336,6 +336,11 @@ objcopy --set-section-alignment '.sbat=512' --add-section .sbat=sbat.csv foo.efi
 
 ```
 
+Older versions of objcopy(1) do not support --set-section-alignment
+which is required to force the correct alignment expected from a PE
+file. As long as there is another step, later in the build process,
+such as an linker invocation that forces alignment, objcopy(1) does
+not need to align an intermediate file.
 
 
 #### UEFI SBAT Variable content
