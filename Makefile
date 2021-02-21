@@ -95,7 +95,7 @@ VENDOR_SBATS := $(foreach x,$(wildcard data/sbat.*.csv),$(notdir $(x)))
 sbat_data.o : | $(SBATPATH) $(VENDOR_SBATS)
 sbat_data.o : /dev/null
 	$(CC) $(CFLAGS) -x c -c -o $@ $<
-	$(OBJCOPY) --set-section-alignment '.sbat=512' --add-section .sbat=$(SBATPATH) $@
+	$(OBJCOPY) --add-section .sbat=$(SBATPATH) $@
 	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
 
 $(SHIMNAME) : $(SHIMSONAME)
