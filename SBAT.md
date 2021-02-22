@@ -323,7 +323,7 @@ At the same time, we're all shipping the same `shim-16` codebase, and in our
 `shim` builds, we all have the following in `.sbat`:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
-shim,0,UEFI shim,shim,16,https://github.com/rhboot/shim
+shim,1,UEFI shim,shim,16,https://github.com/rhboot/shim
 ```
 
 How to add .sbat sections
