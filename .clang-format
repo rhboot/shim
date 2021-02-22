@@ -137,7 +137,9 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 SpaceBeforeSquareBrackets: false
 Standard:        c++03
-StatementMacros: []
+StatementMacros:
+  - ALLOCFUNC
+  - NONNULL
 TabWidth:        8
 UseCRLF:         false
 UseTab:          AlignWithSpaces

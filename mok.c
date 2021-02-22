@@ -250,7 +250,7 @@ struct mok_state_variable mok_state_variables[] = {
 
 #define should_mirror_addend(v) (((v)->categorize_addend) && ((v)->categorize_addend(v) != VENDOR_ADDEND_NONE))
 
-static inline BOOLEAN nonnull(1)
+static inline BOOLEAN NONNULL(1)
 should_mirror_build_cert(struct mok_state_variable *v)
 {
 	return (v->build_cert && v->build_cert_size &&
@@ -530,7 +530,7 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 }
 
 
-static EFI_STATUS nonnull(1)
+static EFI_STATUS NONNULL(1)
 mirror_one_mok_variable(struct mok_state_variable *v,
 			BOOLEAN only_first)
 {
@@ -840,7 +840,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
  * Mirror a variable if it has an rtname, and preserve any
  * EFI_SECURITY_VIOLATION status at the same time.
  */
-static EFI_STATUS nonnull(1)
+static EFI_STATUS NONNULL(1)
 maybe_mirror_one_mok_variable(struct mok_state_variable *v,
 			      EFI_STATUS ret, BOOLEAN only_first)
 {

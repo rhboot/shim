@@ -3,6 +3,24 @@
 #ifndef COMPILER_H_
 #define COMPILER_H_
 
+/*
+ * These are special ones that get our unit tests in trouble with the
+ * compiler optimizer dropping out tests...
+ */
+#ifdef NONNULL
+# undef NONNULL
+#endif
+#ifdef RETURNS_NONNULL
+# undef RETURNS_NONNULL
+#endif
+#ifdef SHIM_UNIT_TEST
+# define NONNULL(first, args...)
+# define RETURNS_NONNULL
+#else
+# define NONNULL(first, args...) __attribute__((__nonnull__(first, ## args)))
+# define RETURNS_NONNULL __attribute__((__returns_nonnull__))
+#endif
+
 #ifndef UNUSED
 #define UNUSED __attribute__((__unused__))
 #endif
@@ -11,6 +29,9 @@
 #endif
 #ifndef PUBLIC
 #define PUBLIC __attribute__((__visibility__ ("default")))
+#endif
+#ifndef DEPRECATED
+#define DEPRECATED __attribute__((__deprecated__))
 #endif
 #ifndef DESTRUCTOR
 #define DESTRUCTOR __attribute__((destructor))
@@ -21,11 +42,14 @@
 #ifndef ALIAS
 #define ALIAS(x) __attribute__((weak, alias (#x)))
 #endif
-#ifndef NONNULL
+#ifndef ALLOCFUNC
+#define ALLOCFUNC(dealloc, dealloc_arg) __attribute__((__malloc__(dealloc, dealloc_arg)))
 #endif
-#define NONNULL(first, args...) __attribute__((__nonnull__(first, ## args)))
 #ifndef PRINTF
 #define PRINTF(first, args...) __attribute__((__format__(printf, first, ## args)))
+#endif
+#ifndef PURE
+#define PURE __attribute__((__pure__))
 #endif
 #ifndef FLATTEN
 #define FLATTEN __attribute__((__flatten__))
@@ -56,6 +80,9 @@
 #endif
 
 #ifndef __CONCAT
+#define __CONCAT(a, b) a ## b
+#endif
+#ifndef __CONCAT3
 #define __CONCAT3(a, b, c) a ## b ## c
 #endif
 #ifndef CAT
