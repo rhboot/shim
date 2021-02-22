@@ -214,4 +214,15 @@ strntoken(char *str, size_t max, const char *delims, char **token, char *state)
 	return state_is_delim;
 }
 
+#define UTF8_BOM { 0xef, 0xbb, 0xbf }
+#define UTF8_BOM_SIZE 3
+
+static inline UNUSED NONNULL(1) BOOLEAN
+is_utf8_bom(CHAR8 *buf, size_t bufsize)
+{
+	unsigned char bom[] = UTF8_BOM;
+
+	return CompareMem(buf, bom, MIN(UTF8_BOM_SIZE, bufsize)) == 0;
+}
+
 #endif /* SHIM_STR_H */

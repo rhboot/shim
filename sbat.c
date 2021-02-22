@@ -219,14 +219,6 @@ verify_sbat(size_t n, struct sbat_entry **entries)
 	return efi_status;
 }
 
-static BOOLEAN
-is_utf8_bom(CHAR8 *buf, size_t bufsize)
-{
-	unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
-
-	return CompareMem(buf, bom, MIN(sizeof(bom), bufsize)) == 0;
-}
-
 static struct sbat_var *
 new_entry(const CHAR8 *comp_name, const CHAR8 *comp_gen)
 {
@@ -278,7 +270,7 @@ parse_sbat_var(list_t *entries)
 	CHAR8 *start = (CHAR8 *)data;
 	CHAR8 *end = (CHAR8 *)data + datasize;
 	if (is_utf8_bom(start, datasize))
-		start += 3;
+		start += UTF8_BOM_SIZE;
 
 	dprint(L"SBAT variable data:\n");
 
