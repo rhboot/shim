@@ -2094,7 +2094,7 @@ static void free_menu(mok_menu_item * menu_item, CHAR16 ** menu_strings)
 		FreePool(menu_item);
 }
 
-static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle,
+static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle UNUSED,
 				 void *MokNew, UINTN MokNewSize,
 				 void *MokDel, UINTN MokDelSize,
 				 void *MokSB, UINTN MokSBSize,

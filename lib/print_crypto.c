@@ -15,7 +15,7 @@
 #include <console.h>
 
 static int
-print_errors_cb(const char *str, size_t len, void *u)
+print_errors_cb(const char *str, size_t len, void *u UNUSED)
 {
 	console_print(L"%a", str);
 

@@ -600,7 +600,7 @@ err:
 }
 
 EFI_STATUS
-populate_stanza(CHAR16 *dirname, CHAR16 *filename, CHAR16 *csv)
+populate_stanza(CHAR16 *dirname, CHAR16 *filename UNUSED, CHAR16 *csv)
 {
 	CHAR16 *file = csv;
 	VerbosePrint(L"CSV data: \"%s\"\n", csv);
