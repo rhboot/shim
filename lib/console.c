@@ -124,6 +124,30 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 	return ret;
 }
 
+static struct {
+	WCHAR up_left;
+	WCHAR up_right;
+	WCHAR down_left;
+	WCHAR down_right;
+	WCHAR horizontal;
+	WCHAR vertical;
+} boxdraw[2] = {
+	{
+		BOXDRAW_UP_LEFT,
+		BOXDRAW_UP_RIGHT,
+		BOXDRAW_DOWN_LEFT,
+		BOXDRAW_DOWN_RIGHT,
+		BOXDRAW_HORIZONTAL,
+		BOXDRAW_VERTICAL
+	}, {
+		'+',
+		'+',
+		'+',
+		'+',
+		'-',
+		'|'
+	}
+};
 
 void
 console_print_box_at(CHAR16 *str_arr[], int highlight,
@@ -135,6 +159,7 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
 	UINTN rows, cols;
 	CHAR16 *Line;
+	bool char_set;
 
 	if (lines == 0)
 		return;
@@ -180,10 +205,16 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 		return;
 	}
 
-	SetMem16 (Line, size_cols * 2, BOXDRAW_HORIZONTAL);
+	/* test if boxdraw characters work */
+	co->SetCursorPosition(co, start_col, start_row);
+	Line[0] = boxdraw[0].up_left;
+	Line[1] = L'\0';
+	char_set = co->OutputString(co, Line) == 0 ? 0 : 1;
 
-	Line[0] = BOXDRAW_DOWN_RIGHT;
-	Line[size_cols - 1] = BOXDRAW_DOWN_LEFT;
+	SetMem16 (Line, size_cols * 2, boxdraw[char_set].horizontal);
+
+	Line[0] = boxdraw[char_set].down_right;
+	Line[size_cols - 1] = boxdraw[char_set].down_left;
 	Line[size_cols] = L'\0';
 	co->SetCursorPosition(co, start_col, start_row);
 	co->OutputString(co, Line);
@@ -203,8 +234,8 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 		int line = i - start;
 
 		SetMem16 (Line, size_cols*2, L' ');
-		Line[0] = BOXDRAW_VERTICAL;
-		Line[size_cols - 1] = BOXDRAW_VERTICAL;
+		Line[0] = boxdraw[char_set].vertical;
+		Line[size_cols - 1] = boxdraw[char_set].vertical;
 		Line[size_cols] = L'\0';
 		if (line >= 0 && line < lines) {
 			CHAR16 *s = str_arr[line];
@@ -226,9 +257,9 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 					       EFI_BACKGROUND_BLUE);
 
 	}
-	SetMem16 (Line, size_cols * 2, BOXDRAW_HORIZONTAL);
-	Line[0] = BOXDRAW_UP_RIGHT;
-	Line[size_cols - 1] = BOXDRAW_UP_LEFT;
+	SetMem16 (Line, size_cols * 2, boxdraw[char_set].horizontal);
+	Line[0] = boxdraw[char_set].up_right;
+	Line[size_cols - 1] = boxdraw[char_set].up_left;
 	Line[size_cols] = L'\0';
 	co->SetCursorPosition(co, start_col, i);
 	co->OutputString(co, Line);
