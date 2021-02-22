@@ -287,6 +287,9 @@ parse_sbat_var(list_t *entries)
 			NULL,
 		};
 		for (i = 0; i < 3; i++) {
+			if (!start) {
+				goto error;
+			}
 			const CHAR8 *tmp;
 			/*
 			 * on third iteration we check if we had extra stuff on line while parsing
@@ -294,7 +297,7 @@ parse_sbat_var(list_t *entries)
 			 * we have comments after component_name. get_sbat_field in this if condition
 			 * parses comments, if they are present and drops them.
 			 */
-			if (i == 2 && start) {
+			if (i == 2) {
 				if (delim == ',') {
 					start = get_sbat_field(start, end, &tmp,
 					                       '\n');
@@ -309,9 +312,6 @@ parse_sbat_var(list_t *entries)
 				delim = '\n';
 				if (i == 0)
 					goto error;
-			}
-			if (!start) {
-				goto error;
 			}
 			start = get_sbat_field(start, end, &tmp, delim);
 			/*   to be replaced when we have strdupa()
