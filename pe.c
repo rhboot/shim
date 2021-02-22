@@ -188,7 +188,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 
 EFI_STATUS
 get_section_vma (UINTN section_num,
-		 char *buffer, size_t bufsz,
+		 char *buffer, size_t bufsz UNUSED,
 		 PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		 char **basep, size_t *sizep,
 		 EFI_IMAGE_SECTION_HEADER **sectionp)

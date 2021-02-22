@@ -66,8 +66,8 @@ simple_file_open(EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 }
 
 EFI_STATUS
-simple_dir_read_all_by_handle(EFI_HANDLE image, EFI_FILE *file, CHAR16* name, EFI_FILE_INFO **entries,
-		    int *count)
+simple_dir_read_all_by_handle(EFI_HANDLE image UNUSED, EFI_FILE *file,
+			      CHAR16* name, EFI_FILE_INFO **entries, int *count)
 {
 	EFI_STATUS efi_status;
 	char buf[4096];

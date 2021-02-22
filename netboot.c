@@ -288,7 +288,7 @@ static EFI_STATUS parseDhcp4()
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle)
+EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED)
 {
 
 	EFI_STATUS efi_status;
@@ -309,7 +309,7 @@ EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle)
 	return efi_status;
 }
 
-EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle, VOID **buffer, UINT64 *bufsiz)
+EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle UNUSED, VOID **buffer, UINT64 *bufsiz)
 {
 	EFI_STATUS efi_status;
 	EFI_PXE_BASE_CODE_TFTP_OPCODE read = EFI_PXE_BASE_CODE_TFTP_READ_FILE;

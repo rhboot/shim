@@ -404,7 +404,7 @@ set_ip4(EFI_HANDLE *nic, IPv4_DEVICE_PATH *ip4node)
 }
 
 static VOID EFIAPI
-httpnotify (EFI_EVENT Event, VOID *Context)
+httpnotify (EFI_EVENT Event UNUSED, VOID *Context)
 {
 	*((BOOLEAN *) Context) = TRUE;
 }
