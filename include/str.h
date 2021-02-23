@@ -225,4 +225,35 @@ is_utf8_bom(CHAR8 *buf, size_t bufsize)
 	return CompareMem(buf, bom, MIN(UTF8_BOM_SIZE, bufsize)) == 0;
 }
 
+/**
+ * parse CSV data from data to end.
+ * *data	points to the first byte of the data
+ * end		points to a NUL byte at the end of the data
+ * n_columns	number of columns per entry
+ * list		the list head we're adding to
+ *
+ * On success, list will be populated with individually allocate a list of
+ * struct csv_list objects, with one column per entry of the "columns" array,
+ * filled left to right with up to n_columns elements, or NULL when a csv line
+ * does not have enough elements.
+ *
+ * Note that the data will be modified; all comma, linefeed, and newline
+ * characters will be set to '\000'.  Additionally, consecutive linefeed and
+ * newline characters will not result in rows in the results.
+ *
+ * On failure, list will be empty and all entries on it will have been freed,
+ * using free_csv_list(), whether they were there before calling
+ * parse_csv_data or not.
+ */
+
+struct csv_row {
+	list_t list;		/* this is a linked list */
+	size_t n_columns;	/* this is how many columns are actually populated */
+	char *columns[0];	/* these are pointers to columns */
+};
+
+EFI_STATUS parse_csv_data(char *data, char *end, size_t n_columns,
+                          list_t *list);
+void free_csv_list(list_t *list);
+
 #endif /* SHIM_STR_H */
