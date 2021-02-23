@@ -8,13 +8,22 @@
 
 extern UINTN _sbat, _esbat;
 
-struct sbat_var {
+struct sbat_var_entry {
 	const CHAR8 *component_name;
 	const CHAR8 *component_generation;
+	/*
+	 * This column is only actually on the "sbat" version entry
+	 */
+	const CHAR8 *sbat_datestamp;
 	list_t list;
 };
 extern list_t sbat_var;
+#define SBAT_VAR_COLUMNS ((sizeof (struct sbat_var_entry) - sizeof(list_t)) / sizeof(CHAR8 *))
+#define SBAT_VAR_REQUIRED_COLUMNS (SBAT_VAR_COLUMNS - 1)
 
+#ifdef SHIM_UNIT_TEST
+EFI_STATUS parse_sbat_var_data(list_t *entries, UINT8 *data, UINTN datasize);
+#endif
 EFI_STATUS parse_sbat_var(list_t *entries);
 void cleanup_sbat_var(list_t *entries);
 
