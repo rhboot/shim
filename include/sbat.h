@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
- * sbat.c - parse SBAT data from the .rsrc section data
+ * sbat.c - parse SBAT data from the .sbat section data
  */
 
 #ifndef SBAT_H_

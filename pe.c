@@ -1033,7 +1033,7 @@ handle_image (void *data, unsigned int datasize,
 			}
 		} else if (CompareMem(Section->Name, ".sbat\0\0\0", 8) == 0) {
 			if (SBATBase || SBATSize) {
-				perror(L"Image has multiple resource sections\n");
+				perror(L"Image has multiple SBAT sections\n");
 				return EFI_UNSUPPORTED;
 			}
 
