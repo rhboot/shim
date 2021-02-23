@@ -34,6 +34,8 @@ test-random.h:
 	dd if=/dev/urandom bs=512 count=17 of=random.bin
 	xxd -i random.bin test-random.h
 
+test-sbat_FILES = csv.c
+
 tests := $(patsubst %.c,%,$(wildcard test-*.c))
 
 $(tests) :: test-% : test.c test-%.c $(test-%_FILES)

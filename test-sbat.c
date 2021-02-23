@@ -185,208 +185,249 @@ free_mock_sbat_entries(list_t *entries)
 		FreePool(entries);
 	}
 }
+#endif
 
 /*
- * parse_sbat() tests
+ * parse_sbat_section() tests
  */
-void
-test_parse_sbat_null_sbat_base(void)
+int
+test_parse_sbat_section_null_sbat_base(void)
 {
-	size_t sbat_size = 20;
-	struct sbat sbat = { 0, NULL };
+	char *section_base = NULL;
+	size_t section_size = 20;
+	struct sbat_section_entry **entries;
+	size_t n = 0;
 	EFI_STATUS status;
 
-	status = parse_sbat(NULL, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
-void
-test_parse_sbat_zero_sbat_size(void)
+int
+test_parse_sbat_section_zero_sbat_size(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n";
-	size_t sbat_size = 0;
-	struct sbat sbat = { 0, NULL };
+	char section_base[] = "test1,1,SBAT test1,acme,1,testURL\n";
+	size_t section_size = 0;
+	struct sbat_section_entry **entries;
+	size_t n = 0;
 	EFI_STATUS status;
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
-void
-test_parse_sbat_null_sbat(void)
+int
+test_parse_sbat_section_null_entries(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n";
-	size_t sbat_size = sizeof(sbat_base);
+	char section_base[] = "test1,1,SBAT test1,acme,1,testURL\n";
+	/* intentionally not NUL terminated */
+	size_t section_size = sizeof(section_base) - 1;
+	size_t n = 0;
 	EFI_STATUS status;
 
-	status = parse_sbat(sbat_base, sbat_size, NULL);
+	status = parse_sbat_section(section_base, section_size, &n, NULL);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
-void
-test_parse_sbat_no_newline(void)
+int
+test_parse_sbat_section_null_count(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
+	char section_base[] = "test1,1,SBAT test1,acme,1,testURL\n";
+	/* intentionally not NUL terminated */
+	size_t section_size = sizeof(section_base) - 1;
+	struct sbat_section_entry **entries;
 	EFI_STATUS status;
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, NULL, &entries);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
-void
-test_parse_sbat_too_few_elem(void)
+int
+test_parse_sbat_section_no_newline(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1\n";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
+	char section_base[] = "test1,1,SBAT test1,acme,1,testURL";
+	/* intentionally not NUL terminated */
+	size_t section_size = sizeof(section_base) - 1;
+	struct sbat_section_entry **entries;
+	size_t n = 0;
 	EFI_STATUS status;
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	cleanup_sbat_section_entries(n, entries);
+	assert_equal_return(status, EFI_SUCCESS, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
-void
-test_parse_sbat_too_many_elem(void)
+int
+test_parse_sbat_section_no_commas(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL,testURL2\n";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
+	char section_base[] = "test1";
+	/* intentionally not NUL terminated */
+	size_t section_size = sizeof(section_base) - 1;
+	struct sbat_section_entry **entries;
+	size_t n = 0;
 	EFI_STATUS status;
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_SUCCESS);
-	assert(sbat.size == 1);
-	assert(strncmp(sbat.entries[0]->component_name, "test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->component_generation, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_name, "SBAT test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_package_name, "acme", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_version, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_url, "testURL,testURL2", MAX_SIZE) == 0);
+	return 0;
 }
 
-void
-test_parse_sbat_no_newline_multiple_entries(void)
+int
+test_parse_sbat_section_too_few_elem(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n" \
-			   "test2,2,SBAT test2,acme2,2,testURL2";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
+	char section_base[] = "test1,1,acme";
+	/* intentionally not NUL terminated */
+	size_t section_size = sizeof(section_base) - 1;
+	struct sbat_section_entry **entries;
+	size_t n = 0;
 	EFI_STATUS status;
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
-void
-test_parse_sbat_too_few_elem_multiple_entries(void)
+int
+test_parse_sbat_section_too_many_elem(void)
 {
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n" \
-			   "test2,2,SBAT test2,acme2,2\n";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
+	char section_base[] = "test1,1,SBAT test1,acme1,1,testURL1,other1,stuff,is,here\n"
+			      "test2,2,SBAT test2,acme2,2,testURL2,other2";
+	/* intentionally not NUL terminated */
+	size_t section_size = sizeof(section_base) - 1;
+	struct sbat_section_entry **entries;
+	size_t n = 0, i;
+	list_t *pos = NULL;
 	EFI_STATUS status;
+	struct sbat_section_entry test_section_entry1 = {
+		"test1", "1", "SBAT test1", "acme1", "1", "testURL1"
+	};
+	struct sbat_section_entry test_section_entry2 = {
+		"test2", "2", "SBAT test2", "acme2", "2", "testURL2"
+	};
+	struct sbat_section_entry *test_entries[] = {
+		&test_section_entry1, &test_section_entry2,
+	};
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	assert_equal_return(status, EFI_SUCCESS, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
-}
+	for (i = 0; i < n; i++) {
+		struct sbat_section_entry *entry = entries[i];
+		struct sbat_section_entry *test_entry = test_entries[i];
 
-void
-test_parse_sbat_too_many_elem_multiple_entries(void)
-{
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n" \
-			   "test2,2,SBAT test2,acme2,2,testURL2,test3\n";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
-	EFI_STATUS status;
+#define mkassert(a) \
+	assert_equal_goto(strcmp(entry-> a, test_entry-> a), 0, fail, \
+		"got %zu expected %d\n")
 
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
+		mkassert(component_name);
+		mkassert(component_generation);
+		mkassert(vendor_name);
+		mkassert(vendor_package_name);
+		mkassert(vendor_version);
+		mkassert(vendor_url);
 
-	assert(status == EFI_SUCCESS);
-	assert(sbat.size == 2);
-	assert(strncmp(sbat.entries[0]->component_name, "test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->component_generation, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_name, "SBAT test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_package_name, "acme", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_version, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_url, "testURL", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->component_name, "test2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->component_generation, "2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_name, "SBAT test2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_package_name, "acme2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_version, "2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_url, "testURL2,test3", MAX_SIZE) == 0);
-}
-
-void
-test_parse_sbat_single_entry(void)
-{
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
-	EFI_STATUS status;
-
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
-
-	assert(status == EFI_SUCCESS);
-	assert(sbat.size == 1);
-	assert(strncmp(sbat.entries[0]->component_name, "test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->component_generation, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_name, "SBAT test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_package_name, "acme", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_version, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_url, "testURL", MAX_SIZE) == 0);
-}
-
-void
-test_parse_sbat_multiple_entries(void)
-{
-	char sbat_base[] = "test1,1,SBAT test1,acme,1,testURL\n" \
-			   "test2,2,SBAT test2,acme2,2,testURL2\n";
-	size_t sbat_size = sizeof(sbat_base);
-	struct sbat sbat = { 0 };
-	EFI_STATUS status;
-
-	status = parse_sbat(sbat_base, sbat_size, &sbat);
-
-	assert(status == EFI_SUCCESS);
-	assert(sbat.size == 2);
-	assert(strncmp(sbat.entries[0]->component_name, "test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->component_generation, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_name, "SBAT test1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_package_name, "acme", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_version, "1", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[0]->vendor_url, "testURL", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->component_name, "test2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->component_generation, "2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_name, "SBAT test2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_package_name, "acme2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_version, "2", MAX_SIZE) == 0);
-	assert(strncmp(sbat.entries[1]->vendor_url, "testURL2", MAX_SIZE) == 0);
+#undef mkassert
+	}
+	assert_equal_goto(n, 2, fail, "got %zu expected %d\n");
+	return 0;
+fail:
+	cleanup_sbat_section_entries(n, entries);
+	return -1;
 }
 
 /*
  * parse_sbat_var() tests
  */
-void
-test_parse_sbat_var_invalid_list(void)
+int
+test_parse_sbat_var_null_list(void)
 {
 	EFI_STATUS status;
 
+	INIT_LIST_HEAD(&sbat_var);
 	status = parse_sbat_var(NULL);
+	cleanup_sbat_var(&sbat_var);
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	return 0;
 }
 
+int
+test_parse_sbat_var_data_null_list(void)
+{
+	char sbat_var_data[] = "test1,1,2021022400";
+	/*
+	 * intentionally including the NUL termination, because
+	 * get_variable() will always include it.
+	 */
+	size_t sbat_var_data_size = sizeof(sbat_var_data);
+	EFI_STATUS status;
+
+	INIT_LIST_HEAD(&sbat_var);
+	status = parse_sbat_var_data(NULL, sbat_var_data, sbat_var_data_size);
+	cleanup_sbat_var(&sbat_var);
+
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
+
+	return 0;
+}
+
+int
+test_parse_sbat_var_data_null_data(void)
+{
+	size_t sbat_var_data_size = 4;
+	EFI_STATUS status;
+
+	INIT_LIST_HEAD(&sbat_var);
+	status = parse_sbat_var_data(&sbat_var, NULL, sbat_var_data_size);
+	cleanup_sbat_var(&sbat_var);
+
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
+
+	return 0;
+}
+
+int
+test_parse_sbat_var_data_zero_size(void)
+{
+	char sbat_var_data[] = "test1,1,2021022400";
+	EFI_STATUS status;
+
+	INIT_LIST_HEAD(&sbat_var);
+	status = parse_sbat_var_data(&sbat_var, sbat_var_data, 0);
+	cleanup_sbat_var(&sbat_var);
+
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
+
+	return 0;
+}
+
+int
+test_parse_sbat_var_data(void)
+{
+	char sbat_var_data[] = "test1,1,2021022400";
+	EFI_STATUS status;
+
+	INIT_LIST_HEAD(&sbat_var);
+	status = parse_sbat_var_data(&sbat_var, sbat_var_data, 0);
+
+	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
+
+	return 0;
+}
+
+#if 0
 /*
  * verify_sbat() tests
  * Note: verify_sbat also frees the underlying "sbat_entries" memory.
@@ -841,25 +882,94 @@ test_verify_sbat_reject_diff_name_mixed(void)
 #endif
 
 int
+test_parse_and_verify(void)
+{
+	EFI_STATUS status;
+	char sbat_section[] =
+		"test1,1,SBAT test1,acme1,1,testURL1\n"
+		"test2,2,SBAT test2,acme2,2,testURL2\n";
+	struct sbat_section_entry **section_entries = NULL;
+	size_t n_section_entries = 0, i;
+	struct sbat_section_entry test_section_entry1 = {
+		"test1", "1", "SBAT test1", "acme1", "1", "testURL1"
+	};
+	struct sbat_section_entry test_section_entry2 = {
+		"test2", "2", "SBAT test2", "acme2", "2", "testURL2"
+	};
+	struct sbat_section_entry *test_entries[] = {
+		&test_section_entry1, &test_section_entry2,
+	};
+
+	status = parse_sbat_section(sbat_section, sizeof(sbat_section)-1,
+	                            &n_section_entries, &section_entries);
+	eassert(status == EFI_SUCCESS, "expected %d got %d\n",
+		EFI_SUCCESS, status);
+	eassert(section_entries != NULL, "expected non-NULL got NULL\n");
+
+	for (i = 0; i < n_section_entries; i++) {
+		struct sbat_section_entry *entry = section_entries[i];
+		struct sbat_section_entry *test_entry = test_entries[i];
+
+#define mkassert(a) \
+	eassert(strcmp(entry-> a, test_entry-> a) == 0, \
+		"expected \"%s\" got \"%s\"\n", \
+		test_entry-> a, entry-> a )
+
+		mkassert(component_name);
+		mkassert(component_generation);
+		mkassert(vendor_name);
+		mkassert(vendor_package_name);
+		mkassert(vendor_version);
+		mkassert(vendor_url);
+
+#undef mkassert
+	}
+
+	eassert(n_section_entries == 2, "expected %d got %d\n",
+		2, n_section_entries);
+
+	char sbat_var_data[] = "test1,5\nbar,2\n";
+	size_t sbat_var_data_size = sizeof(sbat_var_data);
+	char *sbat_var_alloced = calloc(1, sbat_var_data_size);
+	if (!sbat_var_alloced)
+		return -1;
+	memcpy(sbat_var_alloced, sbat_var_data, sbat_var_data_size);
+
+	INIT_LIST_HEAD(&sbat_var);
+	status = parse_sbat_var_data(&sbat_var, sbat_var_alloced, sbat_var_data_size);
+	if (status != EFI_SUCCESS || list_empty(&sbat_var))
+		return -1;
+
+	status = verify_sbat(n_section_entries, section_entries);
+
+	assert_equal_return(status, EFI_SECURITY_VIOLATION, -1, "expected %#x got %#x\n");
+	cleanup_sbat_var(&sbat_var);
+	cleanup_sbat_section_entries(n_section_entries, section_entries);
+
+	return 0;
+}
+
+int
 main(void)
 {
-#if 0
-	// parse_sbat tests
-	test_parse_sbat_null_sbat_base();
-	test_parse_sbat_zero_sbat_size();
-	test_parse_sbat_null_sbat();
-	//test_parse_sbat_no_newline();
-	test_parse_sbat_too_few_elem();
-	test_parse_sbat_too_many_elem();
-	//test_parse_sbat_no_newline_multiple_entries();
-	test_parse_sbat_too_few_elem_multiple_entries();
-	test_parse_sbat_too_many_elem_multiple_entries();
-	test_parse_sbat_single_entry();
-	test_parse_sbat_multiple_entries();
+	int status = 0;
+	// parse_sbat section tests
+	test(test_parse_sbat_section_null_sbat_base);
+	test(test_parse_sbat_section_zero_sbat_size);
+	test(test_parse_sbat_section_null_entries);
+	test(test_parse_sbat_section_null_count);
+	test(test_parse_sbat_section_no_newline);
+	test(test_parse_sbat_section_no_commas);
+	test(test_parse_sbat_section_too_few_elem);
+	test(test_parse_sbat_section_too_many_elem);
 
 	// parse_sbat_var tests
-	test_parse_sbat_var_invalid_list();
+	test(test_parse_sbat_var_null_list);
+	test(test_parse_sbat_var_data_null_list);
+	test(test_parse_sbat_var_data_null_data);
+	test(test_parse_sbat_var_data_zero_size);
 
+#if 0
 	// verify_sbat tests
 	//test_verify_sbat_null_sbat();
 	test_verify_sbat_null_sbat_entries();
@@ -874,6 +984,7 @@ main(void)
 	test_verify_sbat_match_diff_name_mixed();
 	test_verify_sbat_reject_diff_name_mixed();
 #endif
+	test_parse_and_verify();
 
 	return 0;
 }
