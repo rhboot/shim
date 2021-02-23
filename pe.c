@@ -829,7 +829,7 @@ handle_sbat(char *SBATBase, size_t SBATSize)
 	unsigned int i;
 	EFI_STATUS efi_status;
 	size_t n;
-	struct sbat_entry **entries = NULL;
+	struct sbat_section_entry **entries = NULL;
 	char *sbat_data;
 	size_t sbat_size;
 
@@ -850,7 +850,7 @@ handle_sbat(char *SBATBase, size_t SBATSize)
 	CopyMem(sbat_data, SBATBase, SBATSize);
 	sbat_data[SBATSize] = '\0';
 
-	efi_status = parse_sbat(sbat_data, sbat_size, &n, &entries);
+	efi_status = parse_sbat_section(sbat_data, sbat_size, &n, &entries);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not parse .sbat section data: %r\n", efi_status);
 		goto err;
@@ -869,7 +869,7 @@ handle_sbat(char *SBATBase, size_t SBATSize)
 
 	efi_status = verify_sbat(n, entries);
 
-	cleanup_sbat_entries(n, entries);
+	cleanup_sbat_section_entries(n, entries);
 
 err:
 	FreePool(sbat_data);
