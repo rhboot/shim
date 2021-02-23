@@ -6,24 +6,6 @@
 #include "shim.h"
 #include "string.h"
 
-CHAR8 *
-get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 **field, char delim)
-{
-	CHAR8 *offset;
-
-	if (!field || !current || !end || current >= end)
-		return NULL;
-
-	offset = strchrnula(current, delim);
-	*field = current;
-
-	if (!offset || !*offset)
-		return NULL;
-
-	*offset = '\0';
-	return offset + 1;
-}
-
 EFI_STATUS
 parse_sbat_section(char *section_base, size_t section_size,
 		   size_t *n_entries,
@@ -116,22 +98,14 @@ err:
 void
 cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries)
 {
-	size_t i;
-
 	if (!n || !entries)
 		return;
 
-	for (i = 0; i < n; i++) {
-		if (entries[i]) {
-			FreePool(entries[i]);
-			entries[i] = NULL;
-		}
-	}
 	FreePool(entries);
 }
 
 EFI_STATUS
-verify_single_entry(struct sbat_section_entry *entry, struct sbat_var *sbat_var_entry)
+verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sbat_var_entry)
 {
 	UINT16 sbat_gen, sbat_var_gen;
 
@@ -160,18 +134,19 @@ void
 cleanup_sbat_var(list_t *entries)
 {
 	list_t *pos = NULL, *tmp = NULL;
-	struct sbat_var *entry;
+	struct sbat_var_entry *entry;
+	void *first = NULL;
 
 	list_for_each_safe(pos, tmp, entries) {
-		entry = list_entry(pos, struct sbat_var, list);
-		list_del(&entry->list);
+		entry = list_entry(pos, struct sbat_var_entry, list);
 
-		if (entry->component_generation)
-			FreePool((CHAR8 *)entry->component_name);
-		if (entry->component_name)
-			FreePool((CHAR8 *)entry->component_generation);
-		FreePool(entry);
+		if ((uintptr_t)entry < (uintptr_t)first && entry != NULL)
+			first = entry;
+
+		list_del(&entry->list);
 	}
+	if (first)
+		FreePool(first);
 }
 
 EFI_STATUS
@@ -180,7 +155,7 @@ verify_sbat(size_t n, struct sbat_section_entry **entries)
 	unsigned int i;
 	list_t *pos = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
-	struct sbat_var *sbat_var_entry;
+	struct sbat_var_entry *sbat_var_entry;
 
 	if (list_empty(&sbat_var)) {
 		dprint(L"SBAT variable not present\n");
@@ -189,7 +164,7 @@ verify_sbat(size_t n, struct sbat_section_entry **entries)
 
 	for (i = 0; i < n; i++) {
 		list_for_each(pos, &sbat_var) {
-			sbat_var_entry = list_entry(pos, struct sbat_var, list);
+			sbat_var_entry = list_entry(pos, struct sbat_var_entry, list);
 			efi_status = verify_single_entry(entries[i], sbat_var_entry);
 			if (EFI_ERROR(efi_status))
 				return efi_status;
@@ -200,112 +175,113 @@ verify_sbat(size_t n, struct sbat_section_entry **entries)
 	return efi_status;
 }
 
-static struct sbat_var *
-new_entry(const CHAR8 *comp_name, const CHAR8 *comp_gen)
-{
-	struct sbat_var *new_entry = AllocatePool(sizeof(*new_entry));
-
-	if (!new_entry)
-		return NULL;
-
-	INIT_LIST_HEAD(&new_entry->list);
-	new_entry->component_name = comp_name;
-	new_entry->component_generation = comp_gen;
-
-	return new_entry;
-}
-
 EFI_STATUS
-add_entry(list_t *list, const CHAR8 *comp_name, const CHAR8 *comp_gen)
+parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 {
-	struct sbat_var *new;
+	struct sbat_var_entry *entry = NULL, **entries;
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	list_t csv, *pos = NULL;
+	char * start = (char *)data;
+	char * end = (char *)data + datasize - 1;
+	size_t allocsz = 0;
+	size_t n;
+	char *strtab;
 
-	new = new_entry(comp_name, comp_gen);
-	if (!new)
-		return EFI_OUT_OF_RESOURCES;
+	if (!entry_list|| !data || datasize == 0)
+		return EFI_INVALID_PARAMETER;
 
-	list_add_tail(&new->list, list);
-	return EFI_SUCCESS;
+	INIT_LIST_HEAD(&csv);
+
+	efi_status = parse_csv_data(start, end, SBAT_VAR_COLUMNS, &csv);
+	if (EFI_ERROR(efi_status)) {
+		return efi_status;
+	}
+
+	n = 0;
+	list_for_each(pos, &csv) {
+		struct csv_row * row;
+		size_t i;
+
+		row = list_entry(pos, struct csv_row, list);
+
+		if (row->n_columns < SBAT_VAR_REQUIRED_COLUMNS) {
+			efi_status = EFI_INVALID_PARAMETER;
+			goto err;
+		}
+
+
+		allocsz += sizeof(struct sbat_var_entry *);
+		allocsz += sizeof(struct sbat_var_entry);
+		for (i = 0; i < row->n_columns; i++) {
+			if (row->columns[i][0]) {
+				efi_status = EFI_INVALID_PARAMETER;
+				goto err;
+			}
+			allocsz += strlena(row->columns[i]) + 1;
+		}
+		n++;
+	}
+
+	strtab = AllocateZeroPool(allocsz);
+	if (!strtab) {
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto err;
+	}
+
+	INIT_LIST_HEAD(entry_list);
+
+	entries = (struct sbat_var_entry **)strtab;
+	strtab += sizeof(struct sbat_var_entry *) * n;
+	entry = (struct sbat_var_entry *)strtab;
+	strtab += sizeof(struct sbat_var_entry) * n;
+	n = 0;
+
+	list_for_each(pos, &csv) {
+		struct csv_row * row;
+		size_t i;
+		const char **ptrs[] = {
+			&entry->component_name,
+			&entry->component_generation,
+			&entry->sbat_datestamp,
+		};
+
+		row = list_entry(pos, struct csv_row, list);
+		for (i = 0; i < row->n_columns; i++) {
+			*(ptrs[i]) = strtab;
+			strtab = stpcpy(strtab, row->columns[i]) + 1;
+		}
+		INIT_LIST_HEAD(&entry->list);
+		list_add_tail(&entry->list, entry_list);
+		entries[n] = entry;
+		entry++;
+		n++;
+	}
+err:
+	free_csv_list(&csv);
+	return efi_status;
 }
 
 EFI_STATUS
 parse_sbat_var(list_t *entries)
 {
 	UINT8 *data = 0;
-	UINTN datasize, i;
+	UINTN datasize;
 	EFI_STATUS efi_status;
-	char delim;
 
 	if (!entries)
 		return EFI_INVALID_PARAMETER;
 
-	INIT_LIST_HEAD(entries);
-
 	efi_status = get_variable(L"SBAT", &data, &datasize, SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
-		LogError(L"Failed to read SBAT variable\n",
-			 efi_status);
+		LogError(L"Failed to read SBAT variable\n", efi_status);
 		return efi_status;
 	}
 
-	CHAR8 *start = (CHAR8 *)data;
-	CHAR8 *end = (CHAR8 *)data + datasize;
-	if (is_utf8_bom(start, datasize))
-		start += UTF8_BOM_SIZE;
-
-	dprint(L"SBAT variable data:\n");
-
-	while (start[0] != '\0') {
-		const CHAR8 *fields[2] = {
-			NULL,
-		};
-		for (i = 0; i < 3; i++) {
-			const CHAR8 *tmp;
-			/*
-			 * on third iteration we check if we had extra stuff on line while parsing
-			 * component_name. If delimeter on 2nd iteration was ',', this means that
-			 * we have comments after component_name. get_sbat_field in this if condition
-			 * parses comments, if they are present and drops them.
-			 */
-			if (i == 2 && start) {
-				if (delim == ',') {
-					start = get_sbat_field(start, end, &tmp,
-					                       '\n');
-				}
-				break;
-			}
-			delim = ',';
-			/* we do not want to jump to next line and grab stuff from that
-			 */
-			if ((strchrnula(start, '\n') - start + 1) <=
-			    (strchrnula(start, ',') - start + 1)) {
-				delim = '\n';
-				if (i == 0)
-					goto error;
-			}
-			if (!start) {
-				goto error;
-			}
-			start = get_sbat_field(start, end, &tmp, delim);
-			/*   to be replaced when we have strdupa()
-			 */
-			fields[i] = strndupa(tmp, strlen(tmp));
-			if (!fields[i]) {
-				goto error;
-			}
-		}
-		dprint(L"component %a with generation %a\n", fields[0], fields[1]);
-		efi_status =
-			add_entry(entries, fields[0], fields[1]);
-		if (EFI_ERROR(efi_status))
-			goto error;
-	}
-	FreePool(data);
-	return EFI_SUCCESS;
-error:
-	perror(L"failed to parse SBAT variable\n");
-	cleanup_sbat_var(entries);
-	FreePool(data);
-	return EFI_INVALID_PARAMETER;
+	/*
+	 * We've intentionally made sure there's a NUL byte on all variable
+	 * allocations, so use that here.
+	 */
+	return parse_sbat_var_data(entries, data, datasize+1);
 }
+
 // vim:fenc=utf-8:tw=75:noet
