@@ -28,10 +28,12 @@
 /build*/
 /certdb/
 /cov-int/
+/random.bin
 /sbat.*.csv
 /scan-results/
 [Ss]creenlog*
 shim_cert.h
-test-*
-!test-*.c
+/test-*
+!/test-*.c
+/test-random.h
 version.c

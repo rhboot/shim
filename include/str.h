@@ -256,4 +256,9 @@ EFI_STATUS parse_csv_data(char *data, char *end, size_t n_columns,
                           list_t *list);
 void free_csv_list(list_t *list);
 
+#ifdef SHIM_UNIT_TEST
+void NONNULL(1, 3, 4)
+parse_csv_line(char * line, size_t max, size_t *n_columns, const char *columns[]);
+#endif
+
 #endif /* SHIM_STR_H */
