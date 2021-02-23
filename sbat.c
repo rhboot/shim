@@ -25,51 +25,96 @@ get_sbat_field(CHAR8 *current, CHAR8 *end, const CHAR8 **field, char delim)
 }
 
 EFI_STATUS
-parse_sbat_entry(CHAR8 **current, CHAR8 *end, struct sbat_entry **sbat_entry)
+parse_sbat_section(char *section_base, size_t section_size,
+		   size_t *n_entries,
+		   struct sbat_section_entry ***entriesp)
 {
-	struct sbat_entry *entry = NULL;
+	struct sbat_section_entry *entry = NULL, **entries;
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	list_t csv, *pos = NULL;
+	char * end = section_base + section_size - 1;
+	size_t allocsz = 0;
+	size_t n;
+	char *strtab;
 
-	entry = AllocateZeroPool(sizeof(*entry));
-	if (!entry)
-		return EFI_OUT_OF_RESOURCES;
+	if (!section_base || !section_size || !n_entries || !entriesp)
+		return EFI_INVALID_PARAMETER;
 
-	*current = get_sbat_field(*current, end, &entry->component_name, ',');
-	if (!entry->component_name)
-		goto error;
+	INIT_LIST_HEAD(&csv);
 
-	*current = get_sbat_field(*current, end, &entry->component_generation,
-	                          ',');
-	if (!entry->component_generation)
-		goto error;
+	efi_status =
+		parse_csv_data(section_base, end, SBAT_SECTION_COLUMNS, &csv);
+	if (EFI_ERROR(efi_status)) {
+		return efi_status;
+	}
 
-	*current = get_sbat_field(*current, end, &entry->vendor_name, ',');
-	if (!entry->vendor_name)
-		goto error;
+	n = 0;
+	list_for_each(pos, &csv) {
+		struct csv_row * row;
+		size_t i;
 
-	*current =
-		get_sbat_field(*current, end, &entry->vendor_package_name, ',');
-	if (!entry->vendor_package_name)
-		goto error;
+		row = list_entry(pos, struct csv_row, list);
 
-	*current = get_sbat_field(*current, end, &entry->vendor_version, ',');
-	if (!entry->vendor_version)
-		goto error;
+		if (row->n_columns < SBAT_SECTION_COLUMNS) {
+			efi_status = EFI_INVALID_PARAMETER;
+			goto err;
+		}
 
-	*current = get_sbat_field(*current, end, &entry->vendor_url, '\n');
-	if (!entry->vendor_url)
-		goto error;
+		allocsz += sizeof(struct sbat_section_entry *);
+		allocsz += sizeof(struct sbat_section_entry);
+		for (i = 0; i < row->n_columns; i++) {
+			if (row->columns[i][0] == '\000') {
+				efi_status = EFI_INVALID_PARAMETER;
+				goto err;
+			}
+			allocsz += strlena(row->columns[i]) + 1;
+		}
+		n++;
+	}
 
-	*sbat_entry = entry;
+	strtab = AllocateZeroPool(allocsz);
+	if (!strtab) {
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto err;
+	}
 
-	return EFI_SUCCESS;
+	entries = (struct sbat_section_entry **)strtab;
+	strtab += sizeof(struct sbat_section_entry *) * n;
+	entry = (struct sbat_section_entry *)strtab;
+	strtab += sizeof(struct sbat_section_entry) * n;
+	n = 0;
 
-error:
-	FreePool(entry);
-	return EFI_INVALID_PARAMETER;
+	list_for_each(pos, &csv) {
+		struct csv_row * row;
+		size_t i;
+		const char **ptrs[] = {
+			&entry->component_name,
+			&entry->component_generation,
+			&entry->vendor_name,
+			&entry->vendor_package_name,
+			&entry->vendor_version,
+			&entry->vendor_url,
+		};
+
+
+		row = list_entry(pos, struct csv_row, list);
+		for (i = 0; i < row->n_columns; i++) {
+			*(ptrs[i]) = strtab;
+			strtab = stpcpy(strtab, row->columns[i]) + 1;
+		}
+		entries[n] = entry;
+		entry++;
+		n++;
+	}
+	*entriesp = entries;
+	*n_entries = n;
+err:
+	free_csv_list(&csv);
+	return efi_status;
 }
 
 void
-cleanup_sbat_entries(size_t n, struct sbat_entry **entries)
+cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries)
 {
 	size_t i;
 
@@ -86,71 +131,7 @@ cleanup_sbat_entries(size_t n, struct sbat_entry **entries)
 }
 
 EFI_STATUS
-parse_sbat(char *sbat_base, size_t sbat_size, size_t *sbats, struct sbat_entry ***sbat)
-{
-	CHAR8 *current = (CHAR8 *)sbat_base;
-	CHAR8 *end = (CHAR8 *)sbat_base + sbat_size;
-	EFI_STATUS efi_status = EFI_SUCCESS;
-	struct sbat_entry *entry = NULL;
-	struct sbat_entry **entries;
-	size_t i = 0;
-	size_t pages = 1;
-	size_t n = PAGE_SIZE / sizeof(*entry);
-
-	if (!sbat_base || sbat_size == 0 || !sbats || !sbat)
-		return EFI_INVALID_PARAMETER;
-
-	if (current == end)
-		return EFI_INVALID_PARAMETER;
-
-	*sbats = 0;
-	*sbat = 0;
-
-	entries = AllocateZeroPool(pages * PAGE_SIZE);
-	if (!entries)
-		return EFI_OUT_OF_RESOURCES;
-
-	do {
-		entry = NULL;
-		efi_status = parse_sbat_entry(&current, end, &entry);
-		if (EFI_ERROR(efi_status))
-			goto error;
-
-		if (end < current) {
-			efi_status = EFI_INVALID_PARAMETER;
-			goto error;
-		}
-
-		if (i >= n) {
-			struct sbat_entry **new_entries;
-			unsigned int osize = PAGE_SIZE * pages;
-			unsigned int nsize = osize + PAGE_SIZE;
-
-			new_entries = ReallocatePool(entries, osize, nsize);
-			if (!new_entries) {
-				efi_status = EFI_OUT_OF_RESOURCES;
-				goto error;
-			}
-			entries = new_entries;
-			ZeroMem(&entries[i], PAGE_SIZE);
-			pages += 1;
-			n = nsize / sizeof(entry);
-		}
-		entries[i++] = entry;
-	} while (entry && current && *current != '\0');
-
-	*sbats = i;
-	*sbat = entries;
-
-	return efi_status;
-error:
-	perror(L"Failed to parse SBAT data: %r\n", efi_status);
-	cleanup_sbat_entries(i, entries);
-	return efi_status;
-}
-
-EFI_STATUS
-verify_single_entry(struct sbat_entry *entry, struct sbat_var *sbat_var_entry)
+verify_single_entry(struct sbat_section_entry *entry, struct sbat_var *sbat_var_entry)
 {
 	UINT16 sbat_gen, sbat_var_gen;
 
@@ -194,7 +175,7 @@ cleanup_sbat_var(list_t *entries)
 }
 
 EFI_STATUS
-verify_sbat(size_t n, struct sbat_entry **entries)
+verify_sbat(size_t n, struct sbat_section_entry **entries)
 {
 	unsigned int i;
 	list_t *pos = NULL;
