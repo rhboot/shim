@@ -102,5 +102,16 @@ list_del(struct list_head *entry)
 	for (pos = (head)->prev, n = pos->prev; pos != (head); \
 	     pos = n, n = pos->prev)
 
+static inline size_t
+list_size(struct list_head *entry)
+{
+	list_t *pos;
+	size_t i = 0;
+	list_for_each(pos, entry) {
+		i++;
+	}
+	return i;
+}
+
 #endif /* !LIST_H_ */
 // vim:fenc=utf-8:tw=75:noet
