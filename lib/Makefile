@@ -1,9 +1,17 @@
+# include $(TOPDIR)/Make.defaults
+
 TARGET = lib.a
+LIBFILES = $(patsubst %.c,%.o,$(wildcard *.c))
+INCLUDES += -I$(TOPDIR)/include/
 
-LIBFILES = $(foreach x,$(wildcard *.c),$(patsubst %.c,%.o,$(x)))
-
-EFI_INCLUDES    = -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol -I$(TOPDIR)/../include \
-		  -I$(TOPDIR)/CryptLib/Include/openssl/
+CFLAGS = -std=gnu89 -ggdb -nostdinc \
+	 $(CONFIGFLAGS) \
+	 $(OPTIMIZATIONS) \
+	 $(FEATURE_FLAGS) \
+	 $(WARNINGS) \
+	 $(ARCH_CFLAGS) \
+	 $(INCLUDES) \
+	 $(DEFINES)
 
 lib.a: $(LIBFILES)
 	$(AR) rcs lib.a $(LIBFILES)

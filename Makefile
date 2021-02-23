@@ -16,6 +16,7 @@ override TOPDIR := $(shell pwd)
 endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
+export TOPDIR
 
 include $(TOPDIR)/Make.defaults
 include $(TOPDIR)/Make.rules
@@ -42,6 +43,7 @@ ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildca
 FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o
 ORIG_FALLBACK_SRCS = fallback.c
 SBATPATH = data/sbat.csv
+
 
 ifeq ($(SOURCE_DATE_EPOCH),)
 	UNAME=$(shell uname -s -m -p -i -o)
@@ -77,6 +79,15 @@ certdb/secmod.db: shim.crt
 	-mkdir certdb
 	$(PK12UTIL) -d certdb/ -i shim.p12 -W "" -K ""
 	$(CERTUTIL) -d certdb/ -A -i shim.crt -n shim -t u
+
+CFLAGS = -std=gnu89 -ggdb -nostdinc \
+	 $(CONFIGFLAGS) \
+	 $(OPTIMIZATIONS) \
+	 $(FEATURE_FLAGS) \
+	 $(WARNINGS) \
+	 $(ARCH_CFLAGS) \
+	 $(INCLUDES) \
+	 $(DEFINES)
 
 shim.o: $(SOURCES)
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
@@ -126,7 +137,7 @@ Cryptlib/OpenSSL/libopenssl.a:
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	if [ ! -d lib ]; then mkdir lib ; fi
-	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile lib.a
+	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) -C lib -f $(TOPDIR)/lib/Makefile lib.a
 
 buildid : $(TOPDIR)/buildid.c
 	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
@@ -290,5 +301,3 @@ archive: tag
 	@echo "The archive is in shim-$(VERSION).tar.bz2"
 
 .PHONY : install-deps shim.key
-
-export ARCH CC LD OBJCOPY EFI_INCLUDE OPTIMIZATIONS

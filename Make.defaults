@@ -31,24 +31,21 @@ OPTIMIZATIONS	?= -Os
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
-EFI_INCLUDE	?= /usr/include/efi
-EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
-		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
-
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
-
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
 
 ifeq ($(ARCH),x86_64)
-	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-				   $(CLANG_BUGS) -m64 \
-				   -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-				   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64 \
+	ARCH_DEFINES		?= \
+				   -DEFI_FUNCTION_WRAPPER \
+				   -DGNU_EFI_USE_MS_ABI \
+				   -DNO_BUILTIN_VA_FUNCS \
+				   -DMDE_CPU_X64 \
 				   -DPAGE_SIZE=4096
+	ARCH_CLANG_BUGS = $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
+	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -m64 \
+				   $(ARCH_CLANG_BUGS)
 	LIBDIR			?= $(prefix)/lib64
 	ARCH_SUFFIX		?= x64
 	ARCH_SUFFIX_UPPER	?= X64
@@ -56,9 +53,12 @@ ifeq ($(ARCH),x86_64)
 	TIMESTAMP_LOCATION	:= 136
 endif
 ifeq ($(ARCH),ia32)
-	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-				   $(CLANG_BUGS) -m32 \
-				   -DMDE_CPU_IA32 -DPAGE_SIZE=4096
+	ARCH_DEFINES		?= \
+				   -DMDE_CPU_IA32 \
+				   -DPAGE_SIZE=4096
+	ARCH_CLANG_BUGS = $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
+	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -m32 \
+				   $(ARCH_CLANG_BUGS)
 	LIBDIR			?= $(prefix)/lib
 	ARCH_SUFFIX		?= ia32
 	ARCH_SUFFIX_UPPER	?= IA32
@@ -67,7 +67,10 @@ ifeq ($(ARCH),ia32)
 	TIMESTAMP_LOCATION	:= 136
 endif
 ifeq ($(ARCH),aarch64)
-	ARCH_CFLAGS		?= -DMDE_CPU_AARCH64 -DPAGE_SIZE=4096 -mstrict-align
+	ARCH_DEFINES		?= \
+				   -DMDE_CPU_AARCH64 \
+				   -DPAGE_SIZE=4096
+	ARCH_CFLAGS		?= -mstrict-align
 	LIBDIR			?= $(prefix)/lib64
 	ARCH_SUFFIX		?= aa64
 	ARCH_SUFFIX_UPPER	?= AA64
@@ -78,7 +81,10 @@ ifeq ($(ARCH),aarch64)
 	TIMESTAMP_LOCATION	:= 72
 endif
 ifeq ($(ARCH),arm)
-	ARCH_CFLAGS		?= -DMDE_CPU_ARM -DPAGE_SIZE=4096 -mno-unaligned-access
+	ARCH_DEFINES		?= \
+				   -DMDE_CPU_ARM \
+				   -DPAGE_SIZE=4096
+	ARCH_CFLAGS		?= -mno-unaligned-access
 	LIBDIR			?= $(prefix)/lib
 	ARCH_SUFFIX		?= arm
 	ARCH_SUFFIX_UPPER	?= ARM
@@ -88,28 +94,59 @@ ifeq ($(ARCH),arm)
 	TIMESTAMP_LOCATION	:= 72
 endif
 
-MACRO_PREFIX_MAP := -fmacro-prefix-map="$(TOPDIR)/"="$(DEBUGSRC)"
-CFLAGS		= -ggdb $(OPTIMIZATIONS) -fno-stack-protector -fno-strict-aliasing -fpic \
-		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
-		  -Werror=sign-compare -ffreestanding -std=gnu89 \
-		  $(if $(filter-out undefined,$(FANALYZER)),-fanalyzer,) \
-		  $(if $(filter-out undefined,$(COLOR)),-fdiagnostics-color=always,) \
-		  $(MACRO_PREFIX_MAP) \
-		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
-		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
-		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
-		  $(EFI_INCLUDES) $(ARCH_CFLAGS)
+SYSTEM_INCLUDES ?= -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include)
+
+EFI_INCLUDE ?= /usr/include/efi
+EFI_INCLUDES ?= -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
+
+CRYPTLIB_INCLUDES = -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include -iquote $(TOPDIR)/Cryptlib
+
+SHIM_INCLUDES := -iquote $(TOPDIR) -iquote $(TOPDIR)/include
+
+GLOBAL_INCLUDES = $(SYSTEM_INCLUDES) $(EFI_INCLUDES) $(CRYPTLIB_INCLUDES) $(SHIM_INCLUDES)
+INCLUDES = $(GLOBAL_INCLUDES)
+
+GLOBAL_FEATURE_FLAGS = \
+		       $(if $(filter-out undefined,$(FANALYZER)),-fanalyzer,) \
+		       $(if $(filter-out undefined,$(COLOR)),-fdiagnostics-color=always,) \
+		       -ffreestanding \
+		       -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)' \
+		       -fno-stack-protector \
+		       -fno-strict-aliasing \
+		       -fpic \
+		       -fshort-wchar
+FEATURE_FLAGS = $(GLOBAL_FEATURE_FLAGS)
+
+GLOBAL_WARNINGS = \
+		  -Wall \
+		  -Wextra \
+		  -Wno-deprecated-declarations \
+		  -Wno-missing-field-initializers \
+		  -Wno-nonnull-compare \
+		  -Werror \
+		  -Wno-error=deprecated
+
+WARNINGS = $(GLOBAL_WARNIGNS)
+
+GLOBAL_DEFINES = "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
+		 "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
+		 "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" \
+		 "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
+
+DEFINES = $(ARCH_DEFINES) $(GLOBAL_DEFINES) 
+
+CONFIGFLAGS =
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
-	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
+	CONFIGFLAGS	+= -DOVERRIDE_SECURITY_POLICY
 endif
 
 ifneq ($(origin REQUIRE_TPM), undefined)
-	CFLAGS  += -DREQUIRE_TPM
+	CONFIGFLAGS  += -DREQUIRE_TPM
 endif
 
 ifneq ($(origin DISABLE_EBS_PROTECTION), undefined)
-	CFLAGS  += -DDISABLE_EBS_PROTECTION
+	CONFIGFLAGS  += -DDISABLE_EBS_PROTECTION
 endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
@@ -130,16 +167,26 @@ SHIMHASHNAME	= $(SHIMSTEM).hash
 BOOTEFINAME	?= BOOT$(ARCH_SUFFIX_UPPER).EFI
 BOOTCSVNAME	?= BOOT$(ARCH_SUFFIX_UPPER).CSV
 
-CFLAGS += "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
-
 ifneq ($(origin VENDOR_DB_FILE), undefined)
-	CFLAGS += -DVENDOR_DB_FILE=\"$(VENDOR_DB_FILE)\"
+	CONFIGFLAGS += -DVENDOR_DB_FILE=\"$(VENDOR_DB_FILE)\"
 endif
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
-	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
+	CONFIGFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
 ifneq ($(origin VENDOR_DBX_FILE), undefined)
-	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
+	CONFIGFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+
+export ARCH ARCH_CFLAGS ARCH_DEFINES
+export CC LD OBJCOPY
+export OPTIMIZATIONS
+export FEATURE_FLAGS
+export WARNINGS
+export SYSTEM_INCLUDES EFI_INCLUDES CRYPTLIB_INCLUDES LOCAL_INCLUDES INCLUDES
+export DEFINES
+export CONFIGFLAGS
+#
+# vim:ft=make
+#
