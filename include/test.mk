@@ -28,6 +28,12 @@ CFLAGS = -O2 -ggdb -std=gnu11 \
 	 -DSHIM_UNIT_TEST \
 	 "-DDEFAULT_DEBUG_PRINT_STATE=$(DEBUG_PRINTS)"
 
+$(wildcard test-*.c) :: %.c : test-random.h
+
+test-random.h:
+	dd if=/dev/urandom bs=512 count=17 of=random.bin
+	xxd -i random.bin test-random.h
+
 tests := $(patsubst %.c,%,$(wildcard test-*.c))
 
 $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
@@ -36,10 +42,12 @@ $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
 
 test : $(tests)
 
-all : test
-
 clean :
+	@rm -vf test-random.h random.bin
+
+all : clean test
 
 .PHONY: $(tests) all test clean
+.SECONDARY: random.bin
 
 # vim:ft=make
