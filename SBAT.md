@@ -30,7 +30,7 @@ The background section identified 2 opportunities for improvement:
 Microsoft has brainstormed with partners possible solutions for evaluation and feedback:
 
 1. To improve revocation when there are many versions of vulnerable boot images, shim, GRUB, or otherwise, investigate methods of revoking by image metadata that includes generation numbers. Once targeting data is established (e.g. Company foo, product bar, boot component zed), each revocation event ideally edits an existing entry, increasing the trusted minimum security generation.
-2. To improve revocation when there is a shim vulnerability, and there are many shim images, standardize on a single image shared by authorities. Each release of bug fixes and features result in 1 shim being signed, compressing the number by dozens. This has the stellar additional benefit of reducing the number of shim reviews, which should result in much rejoicing. The certificates used by a vendor to sign individual boot components would be picked up from additional PE files that are signed either by a shim-specific key controlled by Microsoft, or controlled by a vendor, but used only to sign additional key files. This key built into shim is functionally similar so a CA certificate.
+2. To improve revocation when there is a shim vulnerability, and there are many shim images, standardize on a single image shared by authorities. Each release of bug fixes and features result in 1 shim being signed, compressing the number by dozens. This has the stellar additional benefit of reducing the number of shim reviews, which should result in much rejoicing. The certificates used by a vendor to sign individual boot components would be picked up from additional PE files that are signed either by a shim-specific key controlled by Microsoft, or controlled by a vendor, but used only to sign additional key files. This key built into shim is functionally similar to a CA certificate.
 The certificates built into shim can be revoked by placing the image hash into dbx, similar to the many shim solution we have today.
 
 ## Proposals
@@ -375,7 +375,7 @@ in upstream grub-0.94 and every version after that, and is shipped by all
 vendors.
 
 At this point, each vendor updates their grub builds, and updates the
-`component_generation` in `.sbat` to `1`.  The GRUB upstream build now looks like:
+`component_generation` in `.sbat` to `2`.  The GRUB upstream build now looks like:
 ```
 sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
 grub,2,Free Software Foundation,grub,2.05,https://www.gnu.org/software/grub/
@@ -404,8 +404,8 @@ The UEFI CA issues an update which looks like:
 ```
 sbat,1
 shim,1
-grub,1
-grub.fedora,1
+grub,2
+grub.fedora,2
 ```
 
 Which is literally the byte array:
@@ -453,7 +453,7 @@ And the UEFI CA issues an update to SBAT which has:
 sbat,1
 shim,1
 grub,3
-grub.fedora,1
+grub.fedora,2
 ```
 
 The grub.fedora product-specific line could be dropped since a Fedora
