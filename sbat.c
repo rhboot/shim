@@ -293,4 +293,85 @@ parse_sbat_var(list_t *entries)
 	return parse_sbat_var_data(entries, data, datasize+1);
 }
 
+EFI_STATUS
+set_sbat_uefi_variable(void)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	UINT32 attributes = 0;
+
+	UINT8 *sbat = NULL;
+	UINTN sbatsize = 0;
+
+	efi_status = get_variable_size(L"SBAT", SHIM_LOCK_GUID, &sbatsize);
+	if (EFI_ERROR(efi_status))
+		dprint(L"SBAT size probe failed %r\n", efi_status);
+
+	if (sbatsize != 0) {
+		sbat = AllocateZeroPool(sbatsize + 1);
+		if (!sbat)
+			return EFI_OUT_OF_RESOURCES;
+
+		efi_status = get_variable_attr(L"SBAT", &sbat, &sbatsize,
+				SHIM_LOCK_GUID, &attributes);
+	}
+
+	/*
+	 * Always set the SBAT UEFI variable if it fails to read.
+	 *
+	 * Don't try to set the SBAT UEFI variable if attributes match, the
+	 * signature matches and it has the same or newer version.
+	 */
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"SBAT read failed %r\n", efi_status);
+	} else if ((attributes == UEFI_VAR_NV_BS ||
+				attributes == UEFI_VAR_NV_BS_TIMEAUTH) &&
+                   strncmp(sbat, SBAT_VAR_SIG, strlen(SBAT_VAR_SIG)) == 0) {
+		FreePool(sbat);
+		return EFI_SUCCESS;
+	}
+
+	/* delete previous variable */
+	efi_status = set_variable(L"SBAT", SHIM_LOCK_GUID, attributes, 0, "");
+	if (EFI_ERROR(efi_status))
+		dprint(L"SBAT variable delete failed %r\n", efi_status);
+
+	/* verify that it's gone */
+	efi_status = get_variable(L"SBAT", &sbat, &sbatsize, SHIM_LOCK_GUID);
+	if (EFI_ERROR(efi_status) || (sbatsize != 0))
+		dprint(L"SBAT variable clearing failed %r\n", efi_status);
+
+	/* set variable */
+	efi_status = set_variable(L"SBAT", SHIM_LOCK_GUID,
+			UEFI_VAR_NV_BS, sizeof (SBAT_VAR), SBAT_VAR);
+	if (EFI_ERROR(efi_status))
+		dprint(L"SBAT variable writing failed %r\n", efi_status);
+
+	FreePool(sbat);
+
+	/* verify that the expected data is there */
+	efi_status = get_variable_size(L"SBAT", SHIM_LOCK_GUID, &sbatsize);
+	if (EFI_ERROR(efi_status) || sbatsize == 0) {
+		dprint(L"SBAT read failed %r\n", efi_status);
+		return EFI_INVALID_PARAMETER;
+	}
+
+	sbat = AllocateZeroPool(sbatsize);
+	if (!sbat)
+		return EFI_OUT_OF_RESOURCES;
+
+	efi_status = get_variable(L"SBAT", &sbat, &sbatsize, SHIM_LOCK_GUID);
+	if (EFI_ERROR(efi_status))
+		dprint(L"SBAT read failed %r\n", efi_status);
+
+	if (strncmp(sbat, SBAT_VAR, strlen(SBAT_VAR)) != 0) {
+		efi_status = EFI_INVALID_PARAMETER;
+	} else {
+		dprint(L"SBAT variable initialization succeeded\n");
+		efi_status = EFI_SUCCESS;
+	}
+
+	FreePool(sbat);
+	return efi_status;
+}
+
 // vim:fenc=utf-8:tw=75:noet
