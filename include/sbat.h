@@ -21,9 +21,6 @@ extern list_t sbat_var;
 #define SBAT_VAR_COLUMNS ((sizeof (struct sbat_var_entry) - sizeof(list_t)) / sizeof(CHAR8 *))
 #define SBAT_VAR_REQUIRED_COLUMNS (SBAT_VAR_COLUMNS - 1)
 
-#ifdef SHIM_UNIT_TEST
-EFI_STATUS parse_sbat_var_data(list_t *entries, UINT8 *data, UINTN datasize);
-#endif
 EFI_STATUS parse_sbat_var(list_t *entries);
 void cleanup_sbat_var(list_t *entries);
 
@@ -44,5 +41,10 @@ void cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries)
 
 EFI_STATUS verify_sbat(size_t n, struct sbat_section_entry **entries);
 
+#ifdef SHIM_UNIT_TEST
+EFI_STATUS parse_sbat_var_data(list_t *entries, UINT8 *data, UINTN datasize);
+EFI_STATUS verify_sbat_helper(list_t *sbat_var, size_t n,
+                              struct sbat_section_entry **entries);
+#endif /* !SHIM_UNIT_TEST */
 #endif /* !SBAT_H_ */
 // vim:fenc=utf-8:tw=75:noet
