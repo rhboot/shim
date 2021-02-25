@@ -1753,7 +1753,8 @@ shim_init(void)
 void
 shim_fini(void)
 {
-	cleanup_sbat_var(&sbat_var);
+	if (secure_mode())
+		cleanup_sbat_var(&sbat_var);
 
 	/*
 	 * Remove our protocols
@@ -1859,6 +1860,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		L"shim_init() failed",
 		L"import of SBAT data failed",
 		L"SBAT self-check failed",
+		L"SBAT UEFI variable setting failed",
 		NULL
 	};
 	enum {
@@ -1866,6 +1868,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		SHIM_INIT,
 		IMPORT_SBAT,
 		SBAT_SELF_CHECK,
+		SET_SBAT,
 	} msg = IMPORT_MOK_STATE;
 
 	/*
@@ -1895,24 +1898,27 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
-	INIT_LIST_HEAD(&sbat_var);
-	efi_status = parse_sbat_var(&sbat_var);
-	/*
-	 * Until a SBAT variable is installed into the systems, it is expected that
-	 * attempting to parse the variable will fail with an EFI_NOT_FOUND error.
-	 *
-	 * Do not consider that error fatal for now.
-	 */
-	if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
-		perror(L"Parsing SBAT variable failed: %r\n",
-		       efi_status);
-		msg = IMPORT_SBAT;
-		goto die;
-	}
-
-	if (secure_mode ()) {
+	if (secure_mode()) {
 		char *sbat_start = (char *)&_sbat;
 		char *sbat_end = (char *)&_esbat;
+
+		INIT_LIST_HEAD(&sbat_var);
+		efi_status = parse_sbat_var(&sbat_var);
+		if (EFI_ERROR(efi_status)) {
+			efi_status = set_sbat_uefi_variable();
+			if (efi_status == EFI_INVALID_PARAMETER) {
+				perror(L"SBAT variable initialization failed\n");
+				msg = SET_SBAT;
+				goto die;
+			}
+			efi_status = parse_sbat_var(&sbat_var);
+			if (EFI_ERROR(efi_status)) {
+				perror(L"Parsing SBAT variable failed: %r\n",
+					efi_status);
+				msg = IMPORT_SBAT;
+				goto die;
+			}
+		}
 
 		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start);
 		if (EFI_ERROR(efi_status)) {
@@ -1921,6 +1927,14 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			msg = SBAT_SELF_CHECK;;
 			goto die;
 		}
+	}
+
+	efi_status = set_sbat_uefi_variable();
+	if (efi_status == EFI_INVALID_PARAMETER) {
+		perror(L"SBAT variable initialization failed\n");
+		msg = SET_SBAT;
+		if (secure_mode())
+                        goto die;
 	}
 
 	init_openssl();

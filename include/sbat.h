@@ -6,6 +6,16 @@
 #ifndef SBAT_H_
 #define SBAT_H_
 
+#define SBAT_VAR_SIG "sbat,"
+#define SBAT_VAR_VERSION "1,"
+#define SBAT_VAR_DATE "2021030218"
+#define SBAT_VAR SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_DATE "\n"
+
+#define UEFI_VAR_NV_BS \
+	(EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS)
+#define UEFI_VAR_NV_BS_TIMEAUTH \
+	(UEFI_VAR_NV_BS | EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS)
+
 extern UINTN _sbat, _esbat;
 
 struct sbat_var_entry {
@@ -23,6 +33,7 @@ extern list_t sbat_var;
 
 EFI_STATUS parse_sbat_var(list_t *entries);
 void cleanup_sbat_var(list_t *entries);
+EFI_STATUS set_sbat_uefi_variable(void);
 
 struct sbat_section_entry {
 	const CHAR8 *component_name;

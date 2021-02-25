@@ -256,7 +256,6 @@ get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
 EFI_STATUS
 get_variable(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner)
 {
-	UINT32 attrs = 0;
 	return get_variable_attr(var, data, len, owner, NULL);
 }
 
