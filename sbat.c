@@ -223,7 +223,7 @@ parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 		allocsz += sizeof(struct sbat_var_entry *);
 		allocsz += sizeof(struct sbat_var_entry);
 		for (i = 0; i < row->n_columns; i++) {
-			if (row->columns[i][0]) {
+			if (!row->columns[i][0]) {
 				efi_status = EFI_INVALID_PARAMETER;
 				goto err;
 			}
