@@ -22,6 +22,7 @@ CFLAGS = -O2 -ggdb -std=gnu11 \
 	 -Werror \
 	 -Werror=nonnull \
 	 -Werror=nonnull-compare \
+	 -Wno-error=cpp \
 	 $(ARCH_DEFINES) \
 	 -DEFI_FUNCTION_WRAPPER \
 	 -DGNU_EFI_USE_MS_ABI -DPAGE_SIZE=4096 \
