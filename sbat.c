@@ -150,28 +150,38 @@ cleanup_sbat_var(list_t *entries)
 }
 
 EFI_STATUS
-verify_sbat(size_t n, struct sbat_section_entry **entries)
+verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry **entries)
 {
 	unsigned int i;
 	list_t *pos = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_var_entry *sbat_var_entry;
 
-	if (list_empty(&sbat_var)) {
+	if (list_empty(local_sbat_var)) {
 		dprint(L"SBAT variable not present\n");
 		return EFI_SUCCESS;
 	}
 
 	for (i = 0; i < n; i++) {
-		list_for_each(pos, &sbat_var) {
+		list_for_each(pos, local_sbat_var) {
 			sbat_var_entry = list_entry(pos, struct sbat_var_entry, list);
 			efi_status = verify_single_entry(entries[i], sbat_var_entry);
 			if (EFI_ERROR(efi_status))
-				return efi_status;
+				goto out;
 		}
 	}
 
-	dprint(L"all entries from SBAT section verified\n");
+out:
+	dprint(L"finished verifying SBAT data: %r\n", efi_status);
+	return efi_status;
+}
+
+EFI_STATUS
+verify_sbat(size_t n, struct sbat_section_entry **entries)
+{
+	EFI_STATUS efi_status;
+
+	efi_status = verify_sbat_helper(&sbat_var, n, entries);
 	return efi_status;
 }
 
