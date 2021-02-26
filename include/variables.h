@@ -40,6 +40,12 @@ get_variable(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner)
 EFI_STATUS
 get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner, UINT32 *attributes);
 EFI_STATUS
+get_variable_size(const CHAR16 * const var, EFI_GUID owner, UINTN *lenp);
+EFI_STATUS
+set_variable(CHAR16 *var, EFI_GUID owner, UINT32 attributes, UINTN datasize, void *data);
+EFI_STATUS
+del_variable(CHAR16 *var, EFI_GUID owner);
+EFI_STATUS
 find_in_esl(UINT8 *Data, UINTN DataSize, UINT8 *key, UINTN keylen);
 EFI_STATUS
 find_in_variable_esl(const CHAR16 * const var, EFI_GUID owner, UINT8 *key, UINTN keylen);
