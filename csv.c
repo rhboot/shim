@@ -21,8 +21,8 @@ parse_csv_line(char * line, size_t max, size_t *n_columns, const char *columns[]
 			valid = strntoken(next, max, delims, &token, &state);
 		}
 		if (valid) {
-			next += strlena(token) + 1;
-			max -= strlena(token) + 1;
+			next += strlena((CHAR8 *)token) + 1;
+			max -= strlena((CHAR8 *)token) + 1;
 			columns[n] = token;
 			new_n = n + 1;
 		} else {
@@ -60,7 +60,7 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 
 	max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
 
-	if (line && is_utf8_bom(line, max))
+	if (line && is_utf8_bom((CHAR8 *)line, max))
 		line += UTF8_BOM_SIZE;
 
 	while (line && line <= data_end) {
