@@ -57,6 +57,7 @@ jobs:
         id: build
         run: |
           make update || :
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test 
           make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
           make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
