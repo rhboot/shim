@@ -62,9 +62,3 @@ jobs:
           make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
           find /destdir -type f
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
