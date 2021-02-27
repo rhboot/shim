@@ -8,79 +8,54 @@ on:
     - cron: '0 3 * * *'
 
 jobs:
-  push-f34-x64:
+  push-request-intel:
     runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f34
-    name: f34 build
+    container: vathpela/efi-ci:f34-x64
+    name: ${{ matrix.distro }} ${{ matrix.efiarch }} build
+
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: efi-ci-f34
+            libdir: /usr/lib64
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: efi-ci-f33
+            libdir: /usr/lib64
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: efi-ci-f32
+            libdir: /usr/lib64
+          - arch: amd64
+            efiarch: ia32
+            makearch: ia32
+            distro: efi-ci-f34
+            libdir: /usr/lib
+          - arch: amd64
+            efiarch: ia32
+            makearch: ia32
+            distro: efi-ci-f33
+            libdir: /usr/lib
+          - arch: amd64
+            efiarch: ia32
+            makearch: ia32
+            distro: efi-ci-f32
+            libdir: /usr/lib
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Do the build
+      - name: Do the build on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: build
         run: |
           make update || :
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
-  push-f33-x64:
-    runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f33
-    name: f33 build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Do the build
-        id: build
-        run: |
-          make update || :
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
-  push-f32-x64:
-    runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f32
-    name: f32 build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Do the build
-        id: build
-        run: |
-          make update || :
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
-  push-f31-x64:
-    runs-on: ubuntu-20.04
-    container: vathpela/efi-ci:f31
-    name: f31 build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Do the build
-        id: build
-        run: |
-          make update || :
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
-          make -s PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make PREFIX=/usr LIBDIR=/usr/lib64 DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
-#      - name: Archive production artifacts
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: shim
-#          path: |
-#            /destdir
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test 
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
+          echo 'results:'
+          find /destdir -type f
