@@ -6,3 +6,33 @@ define add-vendor-sbat
 $(OBJCOPY) --add-section ".$(patsubst %.csv,%,$(1))=$(1)" $(2)
 
 endef
+
+# true if the strings are the same
+define str-eq
+$(if $(subst $(1),,$(2)),,$(1))
+endef
+
+# true if 1 is in 2
+define has-flag
+$(if $(findstring $(space)$(1)$(space),$(space)$(2)$(space)),$(1))
+endef
+
+# true if 1 is not in 2
+define has-not-flag
+$(if $(call has-flag,$(1),$(2)),,$(1))
+endef
+
+# if 1 is set and 2 isn't in the thing named by 3,
+# add 4 to the thing named by 3
+define conditional-add-flag
+$(if $(and $(strip $(1)),$(strip $(call has-not-flag,$(2),$($(3))))),$(eval override $(value 3) += $(4)))
+endef
+
+# Add everything from DEFAULT_$(1) to $(1) if it isn't there (in whole)
+define update-variable
+$(strip $(foreach x,$(DEFAULT_$(1)),
+	$(if $(call has-flag,$(x),$($(1))),,
+		$(eval override $(1)+=$(x)))))
+endef
+
+# vim:filetype=make

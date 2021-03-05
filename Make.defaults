@@ -32,10 +32,8 @@ OPTIMIZATIONS	?= -Os
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
 EFI_INCLUDE	?= /usr/include/efi
-EFI_INCLUDES	= -nostdinc -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
-		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
-		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
-
+EFI_INCLUDES	= -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
+override EFI_INCLUDES := $(EFI_INCLUDES)
 EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH).o
 EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
 
@@ -88,28 +86,58 @@ ifeq ($(ARCH),arm)
 	TIMESTAMP_LOCATION	:= 72
 endif
 
-MACRO_PREFIX_MAP := -fmacro-prefix-map="$(TOPDIR)/"="$(DEBUGSRC)"
-CFLAGS		= -ggdb $(OPTIMIZATIONS) -fno-stack-protector -fno-strict-aliasing -fpic \
-		  -fshort-wchar -Wall -Wsign-compare -Werror -fno-builtin \
-		  -Werror=sign-compare -ffreestanding -std=gnu89 \
-		  $(if $(filter-out undefined,$(FANALYZER)),-fanalyzer,) \
-		  $(if $(filter-out undefined,$(COLOR)),-fdiagnostics-color=always,) \
-		  $(MACRO_PREFIX_MAP) \
+DEFINES		= -DDEFAULT_LOADER='L"$(DEFAULT_LOADER)"' \
+		  -DDEFAULT_LOADER_CHAR='"$(DEFAULT_LOADER)"'
+
+INCLUDES	= -nostdinc \
 		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
-		  "-DDEFAULT_LOADER=L\"$(DEFAULT_LOADER)\"" \
-		  "-DDEFAULT_LOADER_CHAR=\"$(DEFAULT_LOADER)\"" \
-		  $(EFI_INCLUDES) $(ARCH_CFLAGS)
+		  -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
+		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
+		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
+
+
+override DEFAULT_FEATUREFLAGS = \
+		-std=gnu89 \
+		-ggdb \
+		-fno-builtin \
+		-ffreestanding \
+		-fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)' \
+		-fno-stack-protector \
+		-fno-strict-aliasing \
+		-fpic \
+		-fshort-wchar
+$(call update-variable,FEATUREFLAGS)
+$(call conditional-add-flag,$(FANALYZER),analyzer,FEATUREFLAGS,-fanalyzer)
+$(call conditional-add-flag,$(COLOR),diagnostics-color,FEATUREFLAGS,-fdiagnostics-color=always)
+
+override DEFAULT_WARNFLAGS = \
+		-Wall \
+		-Wsign-compare
+$(call update-variable,WARNFLAGS)
+
+override DEFAULT_WERRFLAGS = \
+		-Werror \
+		-Werror=sign-compare
+$(call update-variable,WERRFLAGS)
+
+CFLAGS		= $(FEATUREFLAGS) \
+		  $(OPTIMIZATIONS) \
+		  $(WARNFLAGS) \
+		  $(ARCH_CFLAGS) \
+		  $(WERRFLAGS) \
+		  $(INCLUDES) \
+		  $(DEFINES)
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
-	CFLAGS	+= -DOVERRIDE_SECURITY_POLICY
+	DEFINES	+= -DOVERRIDE_SECURITY_POLICY
 endif
 
 ifneq ($(origin REQUIRE_TPM), undefined)
-	CFLAGS  += -DREQUIRE_TPM
+	DEFINES  += -DREQUIRE_TPM
 endif
 
 ifneq ($(origin DISABLE_EBS_PROTECTION), undefined)
-	CFLAGS  += -DDISABLE_EBS_PROTECTION
+	DEFINES  += -DDISABLE_EBS_PROTECTION
 endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
@@ -130,16 +158,17 @@ SHIMHASHNAME	= $(SHIMSTEM).hash
 BOOTEFINAME	?= BOOT$(ARCH_SUFFIX_UPPER).EFI
 BOOTCSVNAME	?= BOOT$(ARCH_SUFFIX_UPPER).CSV
 
-CFLAGS += "-DEFI_ARCH=L\"$(ARCH_SUFFIX)\"" "-DDEBUGDIR=L\"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/\""
+DEFINES		+= -DEFI_ARCH='L"$(ARCH_SUFFIX)"' \
+		   -DDEBUGDIR='L"/usr/lib/debug/usr/share/shim/$(ARCH_SUFFIX)-$(VERSION)$(DASHRELEASE)/"'
 
 ifneq ($(origin VENDOR_DB_FILE), undefined)
-	CFLAGS += -DVENDOR_DB_FILE=\"$(VENDOR_DB_FILE)\"
+DEFINES		+= -DVENDOR_DB_FILE=\"$(VENDOR_DB_FILE)\"
 endif
 ifneq ($(origin VENDOR_CERT_FILE), undefined)
-	CFLAGS += -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
+DEFINES		+= -DVENDOR_CERT_FILE=\"$(VENDOR_CERT_FILE)\"
 endif
 ifneq ($(origin VENDOR_DBX_FILE), undefined)
-	CFLAGS += -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
+DEFINES		+= -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
