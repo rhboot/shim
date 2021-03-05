@@ -17,8 +17,8 @@ endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
 
-include $(TOPDIR)/Make.defaults
 include $(TOPDIR)/Make.rules
+include $(TOPDIR)/Make.defaults
 include $(TOPDIR)/include/coverity.mk
 include $(TOPDIR)/include/scan-build.mk
 include $(TOPDIR)/include/fanalyzer.mk
@@ -260,9 +260,13 @@ clean-shim-objs:
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
-clean: clean-shim-objs clean-test-objs
-	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
+clean-openssl-objs:
 	$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile clean
+
+clean-cryptlib-objs:
+	$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean
+
+clean: clean-shim-objs clean-test-objs clean-openssl-objs clean-cryptlib-objs
 
 GITTAG = $(VERSION)
 
@@ -293,4 +297,5 @@ archive: tag
 
 .PHONY : install-deps shim.key
 
-export ARCH CC LD OBJCOPY EFI_INCLUDE OPTIMIZATIONS
+export ARCH CC LD OBJCOPY EFI_INCLUDE EFI_INCLUDES OPTIMIZATIONS
+export FEATUREFLAGS WARNFLAGS WERRFLAGS

@@ -1,27 +1,32 @@
 
-EFI_INCLUDES	= -I$(TOPDIR)/Include -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
+INCLUDES	= -I$(TOPDIR) -iquote $(TOPDIR) -I$(TOPDIR)/Include \
+		  $(EFI_INCLUDES) -I$(shell $(CC) -print-file-name=include)
 
-CFLAGS		= -ggdb $(OPTIMIZATIONS) -I$(TOPDIR) -iquote $(TOPDIR) -fno-stack-protector -fno-strict-aliasing -fpic -fshort-wchar \
-		  -Wall $(EFI_INCLUDES) -std=gnu89 \
-		  -ffreestanding -I$(shell $(CC) -print-file-name=include)
+CFLAGS		= $(FEATUREFLAGS) \
+		  $(OPTIMIZATIONS) \
+		  $(WARNFLAGS) \
+		  $(WERRFLAGS) \
+		  $(INCLUDES) \
+		  $(DEFINES)
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 ifeq ($(ARCH),x86_64)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS) \
-		   -m64 -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
+FEATUREFLAGS	+= -m64 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
+DEFINES		+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
 		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
-	CFLAGS	+= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-		   $(CLANG_BUGS) -m32 -DMDE_CPU_IA32
+FEATUREFLAGS	+= -m32 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
+DEFINES		+= -DMDE_CPU_IA32
 endif
 ifeq ($(ARCH),aarch64)
-	CFLAGS	+= -DMDE_CPU_AARCH64
+DEFINES		+= -DMDE_CPU_AARCH64
 endif
 ifeq ($(ARCH),arm)
-	CFLAGS	+= -DMDE_CPU_ARM
+DEFINES		+= -DMDE_CPU_ARM
 endif
+
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libcryptlib.a
