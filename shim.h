@@ -201,6 +201,7 @@ extern EFI_STATUS VLogError(const char *file, int line, const char *func, const 
 extern VOID LogHexdump_(const char *file, int line, const char *func, const void *data, size_t sz);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
+extern VOID restore_loaded_image(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
 extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
 
