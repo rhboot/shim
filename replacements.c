@@ -133,6 +133,8 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 
 	shim_fini();
 
+	restore_loaded_image();
+
 	efi_status = gBS->Exit(ImageHandle, ExitStatus,
 			       ExitDataSize, ExitData);
 	if (EFI_ERROR(efi_status)) {
