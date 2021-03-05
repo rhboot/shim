@@ -572,7 +572,7 @@ console_mode_handle(VOID)
 /* Copy of gnu-efi-3.0 with the added secure boot strings */
 static struct {
     EFI_STATUS      Code;
-    WCHAR	    *Desc;
+    CHAR16	   *Desc;
 } error_table[] = {
 	{  EFI_SUCCESS,                L"Success"},
 	{  EFI_LOAD_ERROR,             L"Load Error"},
