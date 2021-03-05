@@ -104,11 +104,9 @@ INCLUDES	= -nostdinc \
 		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol \
 		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd)
 
-
 override DEFAULT_FEATUREFLAGS = \
 		-std=gnu89 \
 		-ggdb \
-		-fno-builtin \
 		-ffreestanding \
 		-fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)' \
 		-fno-stack-protector \
@@ -181,3 +179,10 @@ DEFINES		+= -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+
+ifneq ($(DEBUG),)
+export DEBUG
+endif
+ifneq ($(VERBOSE),)
+export VERBOSE
+endif

@@ -38,11 +38,9 @@ FEATUREFLAGS	+= -m32 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_IA32
 endif
 ifeq ($(ARCH),aarch64)
-OPTIMIZATIONS	+= -O2
 DEFINES		+= -DMDE_CPU_AARCH64
 endif
 ifeq ($(ARCH),arm)
-OPTIMIZATIONS	+= -O2
 DEFINES		+= -DMDE_CPU_ARM
 endif
 
