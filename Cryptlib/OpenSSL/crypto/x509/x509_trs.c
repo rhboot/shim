@@ -131,6 +131,8 @@ int X509_check_trust(X509 *x, int id, int flags)
     if (idx == -1)
         return default_trust(id, x, flags);
     pt = X509_TRUST_get0(idx);
+    if (!pt)
+        return default_trust(id, x, flags);
     return pt->check_trust(pt, x, flags);
 }
 
@@ -195,8 +197,10 @@ int X509_TRUST_add(int id, int flags, int (*ck) (X509_TRUST *, X509 *, int),
             return 0;
         }
         trtmp->flags = X509_TRUST_DYNAMIC;
-    } else
-        trtmp = X509_TRUST_get0(idx);
+    } else if (!(trtmp = X509_TRUST_get0(idx))) {
+        X509err(X509_F_X509_TRUST_ADD, ERR_R_MALLOC_FAILURE);
+        return 0;
+    }
 
     /* OPENSSL_free existing name if dynamic */
     if (trtmp->flags & X509_TRUST_DYNAMIC_NAME)

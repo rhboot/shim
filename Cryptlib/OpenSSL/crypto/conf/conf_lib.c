@@ -340,6 +340,9 @@ int NCONF_get_number_e(const CONF *conf, const char *group, const char *name,
         return 0;
     }
 
+    if (conf == NULL)
+        return 0;
+
     str = NCONF_get_string(conf, group, name);
 
     if (str == NULL)

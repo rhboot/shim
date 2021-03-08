@@ -843,6 +843,10 @@ static int mime_hdr_addparam(MIME_HEADER *mhdr, char *name, char *value)
     char *tmpname, *tmpval, *p;
     int c;
     MIME_PARAM *mparam;
+
+    if (!mhdr)
+        return 0;
+
     if (name) {
         tmpname = BUF_strdup(name);
         if (!tmpname)
