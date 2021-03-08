@@ -3,25 +3,37 @@ GCC_BINARY ?= $(shell x=$$(which --skip-alias --skip-functions gcc 2>/dev/null) 
 fanalyzer-test : ; $(if $(findstring /,$(GCC_BINARY)),,$(error gcc not found))
 
 define prop
-$(if $(filter-out undefined,$(origin $(1))),$(1)=$($1),)
+$(if $(findstring undefined,$(origin $(1))),,$(eval export $(1)))
 endef
 
-MAKEARGS := \
-	    $(call prop,ARCH) \
-	    $(call prop,COLOR) \
-	    $(call prop,CROSS_COMPILE)
+override CCACHE_DISABLE := 1
+export CCACHE_DISABLE
+override COMPILER := gcc
+export COMPILER
+
+PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR COMPILER CROSS_COMPILE DASHJ
+
+MAKEARGS = $(foreach x,$(PROPOGATE_MAKE_FLAGS),$(call prop,$(x)))
 
 fanalyzer : | fanalyzer-test
-fanalyzer : clean-shim-objs fanalyzer-build
+fanalyzer : fanalyzer-no-openssl
 
-fanalyzer-build :
-	make CC=gcc $(MAKEARGS) $(DASHJ) Cryptlib/OpenSSL/libopenssl.a Cryptlib/libcryptlib.a
-	make CC=gcc $(MAKEARGS) FANALYZER=true all
+fanalyzer-build-unchecked-cryptlib : Cryptlib/libcryptlib.a
+
+fanalyzer-build-unchecked-openssl : Cryptlib/OpenSSL/libopenssl.a
+
+fanalyzer-build-all : CCACHE_DISABLE=1
+fanalyzer-build-all : FEATUREFLAGS+=-fanalyzer
+fanalyzer-build-all : WERRFLAGS=-Werror=analyzer-null-dereference
+fanalyzer-build-all : all
+
+fanalyzer-no-openssl : | fanalyzer-test
+fanalyzer-no-openssl : clean-shim-objs clean-cryptlib-objs fanalyzer-build-unchecked-openssl fanalyzer-build-all
+
+fanalyzer-no-cryptlib : | fanalyzer-test
+fanalyzer-no-cryptlib : clean-shim-objs fanalyzer-build-unchecked-openssl fanalyzer-build-unchecked-cryptlib fanalyzer-build-all
 
 fanalyzer-all : | fanalyzer-test
 fanalyzer-all : clean fanalyzer-build-all
-
-fanalyzer-build-all :
-	make CC=gcc $(MAKEARGS) FANALYZER=true all
 
 .PHONY : fanalyzer fanalyzer-build fanalyzer-all fanalyzer-build-all fanalyzer-clean
