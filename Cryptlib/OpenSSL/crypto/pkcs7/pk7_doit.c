@@ -654,7 +654,7 @@ BIO *PKCS7_dataDecode(PKCS7 *p7, EVP_PKEY *pkey, BIO *in_bio, X509 *pcert)
         if (data_body->length > 0)
             BIO_write(bio, (char *)data_body->data, data_body->length);
 # else
-        if (data_body->length > 0)
+        if (data_body != NULL && data_body->length > 0)
             bio = BIO_new_mem_buf(data_body->data, data_body->length);
         else {
             bio = BIO_new(BIO_s_mem());

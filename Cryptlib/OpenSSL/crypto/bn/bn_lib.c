@@ -496,6 +496,9 @@ BIGNUM *BN_copy(BIGNUM *a, const BIGNUM *b)
     if (bn_wexpand(a, b->top) == NULL)
         return (NULL);
 
+    if (!a || !b || !a->d || !b->d)
+        return (NULL);
+
 #if 1
     A = a->d;
     B = b->d;

@@ -640,8 +640,13 @@ static void print_leak_doall_arg(const MEM *m, MEM_LEAK *l)
     if (m->addr == (char *)l->bio)
         return;
 
+    if (!bufp)
+        return;
+
     if (options & V_CRYPTO_MDEBUG_TIME) {
         lcl = localtime(&m->time);
+	if (!lcl)
+		return;
 
         BIO_snprintf(bufp, BUF_REMAIN, "[%02d:%02d:%02d] ",
                      lcl->tm_hour, lcl->tm_min, lcl->tm_sec);
