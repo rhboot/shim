@@ -1,3 +1,6 @@
+ifneq ($(CCACHE_DISABLE),)
+export CCACHE_DISABLE
+endif
 
 INCLUDES	= -I$(TOPDIR) -iquote $(TOPDIR) -I$(TOPDIR)/Include \
 		  $(EFI_INCLUDES) -I$(shell $(CC) -print-file-name=include)

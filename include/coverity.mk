@@ -3,12 +3,18 @@ COV_TOKEN=$(call get-config,coverity.token)
 COV_URL=$(call get-config,coverity.url)
 COV_FILE=$(NAME)-coverity-$(VERSION)-$(COMMIT_ID).tar.bz2
 
-cov-int : clean-shim-objs
-	make $(DASHJ) Cryptlib/OpenSSL/libopenssl.a Cryptlib/libcryptlib.a
-	cov-build --dir cov-int make $(DASHJ) all
+include $(TOPDIR)/Make.rules
 
-cov-int-all : clean
-	cov-build --dir cov-int make $(DASHJ) all
+define prop
+$(if $(findstring undefined,$(origin $(1))),,$(1)="$($1)")
+endef
+
+override CCACHE_DISABLE := 1
+export CCACHE_DISABLE
+
+PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR COMPILER CROSS_COMPILE
+
+MAKEARGS = $(foreach x,$(PROPOGATE_MAKE_FLAGS),$(call prop,$(x)))
 
 cov-clean :
 	@rm -vf $(NAME)-coverity-*.tar.*
@@ -19,7 +25,7 @@ cov-file : | $(COV_FILE)
 $(COV_FILE) : | cov-int
 	tar caf $@ cov-int
 
-cov-upload :
+cov-upload : | cov-file
 	@if [ -n "$(COV_URL)" ] &&					\
 	    [ -n "$(COV_TOKEN)" ] &&					\
 	    [ -n "$(COV_EMAIL)" ] ;					\
@@ -30,11 +36,26 @@ cov-upload :
 		echo Coverity output is in $(COV_FILE) ;		\
 	fi
 
+cov-build-unchecked-cryptlib :  | clean-cryptlib-objs
+cov-build-unchecked-cryptlib : Cryptlib/libcryptlib.a
+
+cov-build-unchecked-openssl : | clean-openssl-objs
+cov-build-unchecked-openssl : Cryptlib/OpenSSL/libopenssl.a
+
+cov-build-all : | clean clean-shim-objs clean-cryptlib-objs clean-openssl-objs
+	+cov-build --dir cov-int $(MAKE) $(MAKEARGS) CCACHE_DISABLE=1 all
+
+coverity-no-openssl : | cov-test
+coverity-no-openssl : clean-shim-objs clean-cryptlib-objs cov-build-unchecked-openssl cov-build-all cov-file cov-upload
+
+coverity-no-cryptlib : | cov-test
+coverity-no-cryptlib : clean-shim-objs cov-build-unchecked-openssl cov-build-unchecked-cryptlib cov-build-all cov-file cov-upload
+
 coverity : | cov-test
-coverity : cov-int cov-file cov-upload
+coverity : coverity-no-openssl cov-file cov-upload
 
 coverity-all : | cov-test
-coverity-all : cov-int-all cov-file cov-upload
+coverity-all : clean cov-build-all cov-file cov-upload
 
 clean : | cov-clean
 

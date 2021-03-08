@@ -1,3 +1,6 @@
+ifneq ($(CCACHE_DISABLE),)
+export CCACHE_DISABLE
+endif
 
 DEFINES		= -DL_ENDIAN \
 		  -D_CRT_SECURE_NO_DEPRECATE \
