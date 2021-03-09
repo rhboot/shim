@@ -5,6 +5,23 @@
 #define SHIM_STRING_C_
 #include "shim.h"
 
+#ifdef SHIM_UNIT_TEST
+#define strlen shim_strlen
+#define strcmp shim_strcmp
+#define strncmp shim_strncmp
+#define strncasecmp shim_strncasecmp
+#define strcasecmp shim_strcasecmp
+#define strrchr shim_strrchr
+#define strlen shim_strlen
+#define strcpy shim_strcpy
+#define strncpy shim_strncpy
+#define strdup shim_strdup
+#define strndup shim_strndup
+#define stpcpy shim_stpcpy
+#define strchrnul shim_strchrnul
+#define strchr shim_strchr
+#endif
+
 size_t
 strlen(const char *s1)
 {

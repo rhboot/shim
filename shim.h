@@ -3,6 +3,10 @@
 #ifndef SHIM_H_
 #define SHIM_H_
 
+#ifdef SHIM_UNIT_TEST
+#define _GNU_SOURCE
+#endif
+
 #if defined __GNUC__ && defined __GNUC_MINOR__
 # define GNUC_PREREQ(maj, min) \
         ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
