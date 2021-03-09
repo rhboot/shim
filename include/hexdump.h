@@ -48,8 +48,6 @@ prepare_hex(const void *data, size_t size, char *buf, unsigned int position)
 	return ret;
 }
 
-#define isprint(c) ((c) >= 0x20 && (c) <= 0x7e)
-
 static inline void UNUSED
 prepare_text(const void *data, size_t size, char *buf, unsigned int position)
 {

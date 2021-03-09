@@ -288,34 +288,21 @@ extern int errno;
 void           *malloc     (size_t);
 void           *realloc    (void *, size_t);
 void           free        (void *);
-int            isdigit     (int);
-int            isspace     (int);
-int            tolower     (int);
-int            isupper     (int);
-int            isxdigit    (int);
-int            isalnum     (int);
 void           *memcpy     (void *, const void *, size_t);
 void           *memset     (void *, int, size_t);
 void           *memchr     (const void *, int, size_t);
 int            memcmp      (const void *, const void *, size_t);
 void           *memmove    (void *, const void *, size_t);
-int            strcmp      (const char *, const char *);
-int            strncmp     (const char *, const char *, size_t);
 char           *strcpy     (char *, const char *);
 char           *strncpy    (char *, const char *, size_t);
-size_t         strlen      (const char *);
 char           *strcat     (char *, const char *);
 char           *strchr     (const char *, int);
 int            strcasecmp  (const char *, const char *);
 int            strncasecmp (const char *, const char *, size_t);
 char           *strncpy    (char *, const char *, size_t);
-int            strncmp     (const char *, const char *, size_t);
-char           *strrchr    (const char *, int);
 unsigned long  strtoul     (const char *, char **, int);
 long           strtol      (const char *, char **, int);
 char           *strerror   (int);
-size_t         strspn      (const char *, const char *);
-size_t         strcspn     (const char *, const char *);
 int            printf      (const char *, ...);
 int            sscanf      (const char *, const char *, ...);
 int            open        (const char *, int, ...);
@@ -351,7 +338,6 @@ gid_t          getegid     (void);
 void           qsort       (void *, size_t, size_t, int (*)(const void *, const void *));
 char           *getenv     (const char *);
 void           exit        (int);
-void           abort       (void);
 __sighandler_t *signal     (int, __sighandler_t *);
 
 //
@@ -361,7 +347,7 @@ extern FILE  *stderr;
 extern FILE  *stdin;
 extern FILE  *stdout;
 
-#define AsciiStrLen(x) strlena(x)
+#define AsciiStrLen(x) strlen(x)
 #define AsciiStrnCmp(s1, s2, len) strncmpa((CHAR8 *)s1, (CHAR8 *)s2, len)
 
 //
@@ -372,17 +358,10 @@ extern FILE  *stdout;
 #define memchr(buf,ch,count)              ScanMem8((CHAR8 *)buf,(UINTN)(count),ch)
 #define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
 #define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
-#define strlen(str)                       (size_t)(AsciiStrLen((CHAR8 *)str))
-#define strcpy(strDest,strSource)         AsciiStrCpy((CHAR8 *)strDest,(const CHAR8 *)strSource)
-#define strncpy(strDest,strSource,count)  AsciiStrnCpy((CHAR8 *)strDest,(const CHAR8 *)strSource,(UINTN)count)
-#define strcat(strDest,strSource)         AsciiStrCat((CHAR8 *)strDest,(const CHAR8 *)strSource)
-#define strchr(str,ch)                    (char *)(ScanMem8((CHAR8 *)str,AsciiStrSize((CHAR8 *)str),ch))
-#define strncmp(string1,string2,count)    (int)(AsciiStrnCmp((const CHAR8 *)string1, (const CHAR8 *)string2,(UINTN)(count)))
 #define localtime(timer)                  NULL
 #define assert(expression)
 #define atoi(nptr)                        AsciiStrDecimalToUintn((const CHAR8 *)nptr)
 #define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
 #define gmtime_r(timer,result)            (result = NULL)
-#define abort()
 
 #endif
