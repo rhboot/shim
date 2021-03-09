@@ -20,10 +20,11 @@ INCLUDES	= -I$(OSSLDIR) -I$(CRYPTDIR) -I$(OSSLDIR)/Include/ \
 
 FEATUREFLAGS	+= -nostdinc
 
-WERRFLAGS	+= -Wno-error=discarded-qualifiers \
-		   -Wno-error=maybe-uninitialized \
-		   -Wno-error=unused-function \
-		   -Wno-error=unused-but-set-variable
+WARNFLAGS	+= -Wno-empty-body \
+		   -Wno-implicit-fallthrough \
+		   -Wno-old-style-declaration \
+		   -Wno-unused-but-set-variable \
+		   -Wno-unused-parameter
 
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \

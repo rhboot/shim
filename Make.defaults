@@ -118,12 +118,12 @@ $(call conditional-add-flag,$(COLOR),diagnostics-color,FEATUREFLAGS,-fdiagnostic
 
 override DEFAULT_WARNFLAGS = \
 		-Wall \
-		-Wsign-compare
+		-Wextra \
+		-Wno-missing-field-initializers
 $(call update-variable,WARNFLAGS)
 
 override DEFAULT_WERRFLAGS = \
-		-Werror \
-		-Werror=sign-compare
+		-Werror
 $(call update-variable,WERRFLAGS)
 
 CFLAGS		= $(FEATUREFLAGS) \
@@ -186,3 +186,5 @@ endif
 ifneq ($(VERBOSE),)
 export VERBOSE
 endif
+
+# vim:filetype=make
