@@ -6,6 +6,7 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <OpenSslSupport.h>
 
 #include "shim.h"
 
@@ -417,10 +418,9 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	cursor += DevicePathSize(dp);
 	StrCpy((CHAR16 *)cursor, arguments);
 
-	int i = 0;
-	CHAR16 varname[] = L"Boot0000";
-	CHAR16 hexmap[] = L"0123456789ABCDEF";
+	CHAR16 varname[256];
 	EFI_STATUS efi_status;
+	EFI_GUID vendor_guid = NullGuid;
 
 	UINTN max_candidate_size = calc_masked_boot_option_size(size);
 	CHAR8 *candidate = AllocateZeroPool(max_candidate_size);
@@ -429,11 +429,18 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	for(i = 0; i < nbootorder && i < 0x10000; i++) {
-		varname[4] = hexmap[(bootorder[i] & 0xf000) >> 12];
-		varname[5] = hexmap[(bootorder[i] & 0x0f00) >> 8];
-		varname[6] = hexmap[(bootorder[i] & 0x00f0) >> 4];
-		varname[7] = hexmap[(bootorder[i] & 0x000f) >> 0];
+	varname[0] = 0;
+	while (1) {
+		UINTN varname_size = sizeof(varname);
+		efi_status = gRT->GetNextVariableName(&varname_size, varname,
+						      &vendor_guid);
+		if (EFI_ERROR(efi_status))
+			break;
+
+		if (StrLen(varname) != 8 || StrnCmp(varname, L"Boot", 4) ||
+		    !isxdigit(varname[4]) || !isxdigit(varname[5]) ||
+		    !isxdigit(varname[6]) || !isxdigit(varname[7]))
+			continue;
 
 		UINTN candidate_size = max_candidate_size;
 		efi_status = gRT->GetVariable(varname, &GV_GUID, NULL,
@@ -458,7 +465,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 			first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 		}
 
-		*optnum = i;
+		*optnum = xtoi(varname + 4);
 		FreePool(candidate);
 		FreePool(data);
 		return EFI_SUCCESS;
