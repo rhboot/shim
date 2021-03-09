@@ -394,8 +394,9 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
                  CHAR16 *filename, CHAR16 *label, CHAR16 *arguments,
                  UINT16 *optnum)
 {
+	unsigned int label_size = StrLen(label)*2 + 2;
 	unsigned int size = sizeof(UINT32) + sizeof (UINT16) +
-		StrLen(label)*2 + 2 + DevicePathSize(dp) +
+		label_size + DevicePathSize(dp) +
 		StrLen(arguments) * 2;
 
 	CHAR8 *data = AllocateZeroPool(size + 2);
@@ -407,7 +408,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	*(UINT16 *)cursor = DevicePathSize(dp);
 	cursor += sizeof (UINT16);
 	StrCpy((CHAR16 *)cursor, label);
-	cursor += StrLen(label)*2 + 2;
+	cursor += label_size;
 	CopyMem(cursor, dp, DevicePathSize(dp));
 	cursor += DevicePathSize(dp);
 	StrCpy((CHAR16 *)cursor, arguments);
