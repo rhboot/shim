@@ -36,8 +36,7 @@ CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 ifeq ($(ARCH),x86_64)
 FEATUREFLAGS	+= -m64 -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS)
-DEFINES		+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
-		   -UNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
+DEFINES		+= -DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
 FEATUREFLAGS	+= -m32 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
