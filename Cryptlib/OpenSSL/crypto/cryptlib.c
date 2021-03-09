@@ -866,7 +866,7 @@ int OPENSSL_isservice(void)
 }
 # endif
 
-void OPENSSL_showfatal(const char *fmta, ...)
+void EFIAPI OPENSSL_showfatal(const char *fmta, ...)
 {
     va_list ap;
     TCHAR buf[256];
@@ -979,7 +979,7 @@ void OPENSSL_showfatal(const char *fmta, ...)
         MessageBox(NULL, buf, _T("OpenSSL: FATAL"), MB_OK | MB_ICONERROR);
 }
 #else
-void OPENSSL_showfatal(const char *fmta, ...)
+void EFIAPI OPENSSL_showfatal(const char *fmta, ...)
 {
 #ifndef OPENSSL_NO_STDIO
     va_list ap;

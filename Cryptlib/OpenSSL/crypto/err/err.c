@@ -1075,7 +1075,7 @@ void ERR_set_error_data(char *data, int flags)
     es->err_data_flags[i] = flags;
 }
 
-void ERR_add_error_data(int num, ...)
+void EFIAPI ERR_add_error_data(int num, ...)
 {
     va_list args;
     va_start(args, num);
@@ -1083,7 +1083,7 @@ void ERR_add_error_data(int num, ...)
     va_end(args);
 }
 
-void ERR_add_error_vdata(int num, va_list args)
+void EFIAPI ERR_add_error_vdata(int num, va_list args)
 {
     int i, n, s;
     char *str, *p, *a;
