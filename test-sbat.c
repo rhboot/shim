@@ -427,26 +427,29 @@ test_parse_sbat_var_data(void)
 	return 0;
 }
 
-#if 0
 /*
  * verify_sbat() tests
  * Note: verify_sbat also frees the underlying "sbat_entries" memory.
  */
 int
-test_verify_sbat_null_sbat(void)
+test_verify_sbat_null_sbat_section(void)
 {
-	list_t *test_sbat_entries;
-	test_sbat_entries = create_mock_sbat_entries_one_entry("test1", "1");
-	if (!test_sbat_entries)
-		return -1;
+	char sbat_var_data[] = "test1,1";
 	EFI_STATUS status;
+	list_t test_sbat_var;
+	size_t n = 0;
+	struct sbat_section_entry **entries = NULL;
 
-	status = verify_sbat(NULL, test_sbat_entries);
+	INIT_LIST_HEAD(&test_sbat_var);
+	status = parse_sbat_var_data(&test_sbat_var, sbat_var_data, sizeof(sbat_var_data));
+	assert_equal_return(status, EFI_SUCCESS, -1, "got %#x expected %#x\n");
 
-	assert(status == EFI_INVALID_PARAMETER);
+	status = verify_sbat_helper(&sbat_var, n, entries);
+	assert_equal_return(status, EFI_SUCCESS, -1, "got %#x expected %#x\n");
 	return 0;
 }
 
+#if 0
 int
 test_verify_sbat_null_sbat_entries(void)
 {
@@ -969,22 +972,22 @@ main(void)
 	test(test_parse_sbat_var_data_null_data);
 	test(test_parse_sbat_var_data_zero_size);
 
-#if 0
 	// verify_sbat tests
-	//test_verify_sbat_null_sbat();
-	test_verify_sbat_null_sbat_entries();
-	test_verify_sbat_match_one_exact();
-	test_verify_sbat_match_one_higher();
-	test_verify_sbat_reject_one();
-	test_verify_sbat_reject_many();
-	test_verify_sbat_match_many_higher();
-	test_verify_sbat_match_many_exact();
-	test_verify_sbat_reject_many_all();
-	test_verify_sbat_match_diff_name();
-	test_verify_sbat_match_diff_name_mixed();
-	test_verify_sbat_reject_diff_name_mixed();
+	test(test_verify_sbat_null_sbat_section);
+#if 0
+	test(test_verify_sbat_null_sbat_entries);
+	test(test_verify_sbat_match_one_exact);
+	test(test_verify_sbat_match_one_higher);
+	test(test_verify_sbat_reject_one);
+	test(test_verify_sbat_reject_many);
+	test(test_verify_sbat_match_many_higher);
+	test(test_verify_sbat_match_many_exact);
+	test(test_verify_sbat_reject_many_all);
+	test(test_verify_sbat_match_diff_name);
+	test(test_verify_sbat_match_diff_name_mixed);
+	test(test_verify_sbat_reject_diff_name_mixed);
 #endif
-	test_parse_and_verify();
+	test(test_parse_and_verify);
 
 	return 0;
 }

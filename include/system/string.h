@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #ifdef SHIM_UNIT_TEST
 #include_next <string.h>
+
+__typeof__(strlen) shim_strlen;
+__typeof__(strcmp) shim_strcmp;
+__typeof__(strncmp) shim_strncmp;
+__typeof__(strncasecmp) shim_strncasecmp;
+__typeof__(strcasecmp) shim_strcasecmp;
+__typeof__(strrchr) shim_strrchr;
+__typeof__(strrchr) shim_strrchr;
+__typeof__(strnlen) shim_strnlen;
+__typeof__(strcpy) shim_strcpy;
+__typeof__(strncpy) shim_strncpy;
+__typeof__(strdup) shim_strdup;
+__typeof__(strndup) shim_strndup;
+__typeof__(stpcpy) shim_stpcpy;
+__typeof__(strchrnul) shim_strchrnul;
+__typeof__(strchr) shim_strchr;
+
 #else
 #ifndef _STRING_H
 #define _STRING_H

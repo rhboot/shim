@@ -63,6 +63,53 @@ extern int debug;
 		assert(cond);                                    \
 	})
 
+#define assert_true_return(a, status, fmt, ...)                            \
+	({                                                                 \
+		if (!(a)) {                                                \
+			printf("%s:%d:got %lld, expected nonzero " fmt,    \
+			       __func__, __LINE__, (long long)(a),         \
+			       ##__VA_ARGS__);                             \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__, \
+			       __LINE__, __stringify(!(a)));               \
+			return status;                                     \
+		}                                                          \
+	})
+#define assert_nonzero_return(a, ...) assert_true_return(a, ##__VA_ARGS__)
+
+#define assert_false_return(a, status, fmt, ...)                               \
+	({                                                                     \
+		if (a) {                                                       \
+			printf("%s:%d:got %lld, expected zero " fmt, __func__, \
+			       __LINE__, (long long)(a), ##__VA_ARGS__);       \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__,     \
+			       __LINE__, __stringify(a));                      \
+			return status;                                         \
+		}                                                              \
+	})
+#define assert_zero_return(a, ...) assert_false_return(a, ##__VA_ARGS__)
+
+#define assert_positive_return(a, status, fmt, ...)                           \
+	({                                                                    \
+		if ((a) <= 0) {                                               \
+			printf("%s:%d:got %lld, expected > 0 " fmt, __func__, \
+			       __LINE__, (long long)(a), ##__VA_ARGS__);      \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__,    \
+			       __LINE__, __stringify((a) <= 0));              \
+			return status;                                        \
+		}                                                             \
+	})
+
+#define assert_negative_return(a, status, fmt, ...)                           \
+	({                                                                    \
+		if ((a) >= 0) {                                               \
+			printf("%s:%d:got %lld, expected < 0 " fmt, __func__, \
+			       __LINE__, (long long)(a), ##__VA_ARGS__);      \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__,    \
+			       __LINE__, __stringify((a) >= 0));              \
+			return status;                                        \
+		}                                                             \
+	})
+
 #define assert_equal_return(a, b, status, fmt, ...)                        \
 	({                                                                 \
 		if (!((a) == (b))) {                                       \

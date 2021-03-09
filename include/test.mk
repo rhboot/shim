@@ -35,6 +35,7 @@ test-random.h:
 	xxd -i random.bin test-random.h
 
 test-sbat_FILES = csv.c
+test-str_FILES = lib/string.c
 
 tests := $(patsubst %.c,%,$(wildcard test-*.c))
 

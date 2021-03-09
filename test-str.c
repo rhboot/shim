@@ -13,15 +13,39 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic error "-Wnonnull"
 
+/*
+ * copy-pasta from gnu-efi
+ */
+static inline UINTN
+strncmpa (
+    IN CONST CHAR8    *s1,
+    IN CONST CHAR8    *s2,
+    IN UINTN    len
+    )
+// compare strings
+{
+    while (*s1  &&  len) {
+        if (*s1 != *s2) {
+            break;
+        }
+
+        s1  += 1;
+        s2  += 1;
+        len -= 1;
+    }
+
+    return len ? *s1 - *s2 : 0;
+}
+
 int
 test_strchrnul(void)
 {
 	const char s0[] = "abcd\0fghi";
 
-	assert_equal_return(strchrnul(s0, 'a'), &s0[0], -1, "got %p expected %p\n");
-	assert_equal_return(strchrnul(s0, 'd'), &s0[3], -1, "got %p expected %p\n");
-	assert_equal_return(strchrnul(s0, '\000'), &s0[4], -1, "got %p expected %p\n");
-	assert_equal_return(strchrnul(s0, 'i'), &s0[4], -1, "got %p expected %p\n");
+	assert_equal_return(shim_strchrnul(s0, 'a'), &s0[0], -1, "got %p expected %p\n");
+	assert_equal_return(shim_strchrnul(s0, 'd'), &s0[3], -1, "got %p expected %p\n");
+	assert_equal_return(shim_strchrnul(s0, '\000'), &s0[4], -1, "got %p expected %p\n");
+	assert_equal_return(shim_strchrnul(s0, 'i'), &s0[4], -1, "got %p expected %p\n");
 
 	assert_equal_return(strnchrnul(s0, 0, 'b'), &s0[0], -1, "got %p expected %p\n");
 	assert_equal_return(strnchrnul(s0, -1, 'b'), &s0[1], 1, "got %p expected %p\n");
@@ -33,6 +57,143 @@ test_strchrnul(void)
 	assert_equal_return(strnchrnul(&s0[4], 1, 'f'), &s0[4], -1, "got %p expected %p\n");
 
 	return 0;
+}
+
+int
+test_strncmp(void)
+{
+	/*
+	 * these are constants so that the failures are readable if you get
+	 * it wrong.
+	 */
+#define s0 "sbat,"
+#define s0sz 6
+#define s0len 5
+#define s1 "sbat,1,2021030218"
+#define s1sz 18
+#define s1len 17
+#define s2 "sbat,1,20210302"
+#define s2sz 16
+#define s2len 15
+#define s3 "sbat,1,20210303"
+#define s3sz 16
+#define s3len 15
+
+	int diff;
+
+	assert_zero_return(strncmp(s0, s0, s0len), -1, "\n");
+	assert_zero_return(strncmp(s0, s0, s0sz), -1, "\n");
+
+	assert_zero_return(strncmp(s0, s1, s0len), -1, "\n");
+	assert_negative_return(strncmp(s0, s1, s0sz), -1, "\n");
+	assert_equal_return(strncmp(s0, s1, s0sz), s0[s0len] - s1[s0len] , -1, "expected %d got %d\n");
+	assert_positive_return(strncmp(s1, s0, s0sz), -1, "\n");
+	assert_equal_return(strncmp(s1, s0, s0sz), s1[s0len] - s0[s0len] , -1, "expected %d got %d\n");
+
+	assert_positive_return(strncmp(s1, s2, s1sz), -1, "\n");
+	assert_equal_return(strncmp(s1, s2, s2sz), s1[s2len] - s2[s2len] , -1, "expected %d got %d\n");
+	assert_positive_return(strncmp(s1, s2, s1len), -1, "\n");
+	assert_equal_return(strncmp(s1, s2, s2len), s1[s2len-1] - s2[s2len-1] , -1, "expected %d got %d\n");
+	assert_negative_return(strncmp(s2, s1, s1sz), -1, "\n");
+	assert_equal_return(strncmp(s2, s1, s1sz), s2[s2len] - s1[s2len] , -1, "expected %d got %d\n");
+
+	assert_zero_return(strncmp(s1, s2, s2len), -1, "\n");
+	assert_positive_return(strncmp(s1, s2, s2sz), -1, "\n");
+	assert_equal_return(strncmp(s1, s2, s2sz), s1[s2len] - s2[s2len] , -1, "expected %d got %d\n");
+
+	assert_negative_return(strncmp(s2, s3, s2sz), -1, "\n");
+	assert_equal_return(strncmp(s2, s3, s2sz), s2[s2len-1] - s3[s2len-1] , -1, "expected %d got %d\n");
+	assert_equal_return(strncmp(s2, s3, s2len), s2[s2len-1] - s3[s2len-1] , -1, "expected %d got %d\n");
+	assert_negative_return(strncmp(s2, s3, s2len), -1, "\n");
+	assert_zero_return(strncmp(s2, s3, s2len - 1), -1, "\n");
+	assert_false_return(strncmp(s1, s2, s2len), -1, "\n");
+
+	/*
+	 * Now test gnu-efi's version, but with a cast back to a sane type
+	 */
+#define strncmpa(a, b, c) ((INTN)strncmpa(a, b, c))
+
+	assert_zero_return(strncmpa(s0, s0, s0len), -1, "\n");
+	assert_zero_return(strncmpa(s0, s0, s0sz), -1, "\n");
+
+	assert_zero_return(strncmpa(s0, s1, s0len), -1, "\n");
+	assert_negative_return(strncmpa(s0, s1, s0sz), -1, "\n");
+	assert_equal_return(strncmpa(s0, s1, s0sz), s0[s0len] - s1[s0len] , -1, "expected %d got %d\n");
+	assert_positive_return(strncmpa(s1, s0, s0sz), -1, "\n");
+	assert_equal_return(strncmpa(s1, s0, s0sz), s1[s0len] - s0[s0len] , -1, "expected %d got %d\n");
+
+	assert_positive_return(strncmpa(s1, s2, s1sz), -1, "\n");
+	assert_equal_return(strncmpa(s1, s2, s2sz), s1[s2len] - s2[s2len] , -1, "expected %d got %d\n");
+	assert_positive_return(strncmpa(s1, s2, s1len), -1, "\n");
+	assert_equal_return(strncmpa(s1, s2, s2len), s1[s2len-1] - s2[s2len-1] , -1, "expected %d got %d\n");
+	assert_negative_return(strncmpa(s2, s1, s1sz), -1, "\n");
+	assert_equal_return(strncmpa(s2, s1, s1sz), s2[s2len] - s1[s2len] , -1, "expected %d got %d\n");
+
+	assert_zero_return(strncmpa(s1, s2, s2len), -1, "\n");
+	assert_positive_return(strncmpa(s1, s2, s2sz), -1, "\n");
+	assert_equal_return(strncmpa(s1, s2, s2sz), s1[s2len] - s2[s2len] , -1, "expected %d got %d\n");
+
+	assert_negative_return(strncmpa(s2, s3, s2sz), -1, "\n");
+	assert_equal_return(strncmpa(s2, s3, s2sz), s2[s2len-1] - s3[s2len-1] , -1, "expected %d got %d\n");
+	assert_equal_return(strncmpa(s2, s3, s2len), s2[s2len-1] - s3[s2len-1] , -1, "expected %d got %d\n");
+	assert_negative_return(strncmpa(s2, s3, s2len), -1, "\n");
+	assert_zero_return(strncmpa(s2, s3, s2len - 1), -1, "\n");
+	assert_false_return(strncmpa(s1, s2, s2len), -1, "\n");
+
+
+	/*
+	 * Once more, but with the casting /and the warnings/ turned off
+	 *
+	 * The ones marked with XXX I've inverted the test to make it work
+	 * "correctly", because UINTN is what makes positive.
+	 */
+#undef strncmpa
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
+	assert_zero_return(strncmpa(s0, s0, s0len), -1, "\n");
+	assert_zero_return(strncmpa(s0, s0, s0sz), -1, "\n");
+
+	assert_zero_return(strncmpa(s0, s1, s0len), -1, "\n");
+	/*XXX*/assert_positive_return(strncmpa(s0, s1, s0sz), -1, "\n");/*XXX*/
+	assert_equal_return(strncmpa(s0, s1, s0sz), s0[s0len] - s1[s0len] , -1, "expected %d got %d\n");
+	assert_positive_return(strncmpa(s1, s0, s0sz), -1, "\n");
+	assert_equal_return(strncmpa(s1, s0, s0sz), s1[s0len] - s0[s0len] , -1, "expected %d got %d\n");
+
+	assert_positive_return(strncmpa(s1, s2, s1sz), -1, "\n");
+	assert_equal_return(strncmpa(s1, s2, s2sz), s1[s2len] - s2[s2len] , -1, "expected %d got %d\n");
+	assert_positive_return(strncmpa(s1, s2, s1len), -1, "\n");
+	assert_equal_return(strncmpa(s1, s2, s2len), s1[s2len-1] - s2[s2len-1] , -1, "expected %d got %d\n");
+	/*XXX*/ assert_positive_return(strncmpa(s2, s1, s1sz), -1, "\n");/*XXX*/
+	assert_equal_return(strncmpa(s2, s1, s1sz), s2[s2len] - s1[s2len] , -1, "expected %d got %d\n");
+
+	assert_zero_return(strncmpa(s1, s2, s2len), -1, "\n");
+	assert_positive_return(strncmpa(s1, s2, s2sz), -1, "\n");
+	assert_equal_return(strncmpa(s1, s2, s2sz), s1[s2len] - s2[s2len] , -1, "expected %d got %d\n");
+
+	assert_positive_return(strncmpa(s2, s3, s2sz), -1, "\n");
+	assert_equal_return(strncmpa(s2, s3, s2sz), s2[s2len-1] - s3[s2len-1] , -1, "expected %d got %d\n");
+	assert_equal_return(strncmpa(s2, s3, s2len), s2[s2len-1] - s3[s2len-1] , -1, "expected %d got %d\n");
+	/*XXX*/assert_positive_return(strncmpa(s2, s3, s2len), -1,"\n");/*XXX*/
+	assert_zero_return(strncmpa(s2, s3, s2len - 1), -1, "\n");
+	assert_false_return(strncmpa(s1, s2, s2len), -1, "\n");
+
+#pragma GCC diagnostic error "-Wsign-compare"
+#pragma GCC diagnostic error "-Wtype-limits"
+	return 0;
+
+#undef s0
+#undef s0sz
+#undef s0len
+#undef s1
+#undef s1sz
+#undef s1len
+#undef s2
+#undef s2sz
+#undef s2len
+#undef s3
+#undef s3sz
+#undef s3len
 }
 
 int
@@ -416,6 +577,7 @@ main(void)
 {
 	int status = 0;
 	test(test_strchrnul);
+	test(test_strncmp);
 	test(test_strntoken_null);
 	test(test_strntoken_size_0);
 	test(test_strntoken_empty_size_1);
