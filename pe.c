@@ -51,12 +51,12 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	EFI_IMAGE_BASE_RELOCATION *RelocBase, *RelocBaseEnd;
 	UINT64 Adjust;
 	UINT16 *Reloc, *RelocEnd;
-	char *Fixup, *FixupBase;
+	CHAR8 *Fixup, *FixupBase;
 	UINT16 *Fixup16;
 	UINT32 *Fixup32;
 	UINT64 *Fixup64;
 	int size = context->ImageSize;
-	void *ImageEnd = (char *)orig + size;
+	void *ImageEnd = (CHAR8 *)orig + size;
 	int n = 0;
 
 	/* Alright, so here's how this works:
@@ -104,7 +104,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 		return EFI_SUCCESS;
 
 	while (RelocBase < RelocBaseEnd) {
-		Reloc = (UINT16 *) ((char *) RelocBase + sizeof (EFI_IMAGE_BASE_RELOCATION));
+		Reloc = (UINT16 *) ((CHAR8 *) RelocBase + sizeof (EFI_IMAGE_BASE_RELOCATION));
 
 		if (RelocBase->SizeOfBlock == 0) {
 			perror(L"Reloc %d block size 0 is invalid\n", n);
@@ -117,7 +117,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 			return EFI_UNSUPPORTED;
 		}
 
-		RelocEnd = (UINT16 *) ((char *) RelocBase + RelocBase->SizeOfBlock);
+		RelocEnd = (UINT16 *) ((CHAR8 *) RelocBase + RelocBase->SizeOfBlock);
 		if ((void *)RelocEnd < orig || (void *)RelocEnd > ImageEnd) {
 			perror(L"Reloc %d entry overflows binary\n", n);
 			return EFI_UNSUPPORTED;
@@ -188,14 +188,14 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 
 EFI_STATUS
 get_section_vma (UINTN section_num,
-		 char *buffer, size_t bufsz UNUSED,
+		 CHAR8 *buffer, size_t bufsz UNUSED,
 		 PE_COFF_LOADER_IMAGE_CONTEXT *context,
-		 char **basep, size_t *sizep,
+		 CHAR8 **basep, size_t *sizep,
 		 EFI_IMAGE_SECTION_HEADER **sectionp)
 {
 	EFI_IMAGE_SECTION_HEADER *sections = context->FirstSection;
 	EFI_IMAGE_SECTION_HEADER *section;
-	char *base = NULL, *end = NULL;
+	CHAR8 *base = NULL, *end = NULL;
 
 	if (section_num >= context->NumberOfSections)
 		return EFI_NOT_FOUND;
@@ -241,14 +241,14 @@ get_section_vma (UINTN section_num,
 }
 
 EFI_STATUS
-get_section_vma_by_name (char *name, size_t namesz,
-			 char *buffer, size_t bufsz,
+get_section_vma_by_name (CHAR8 *name, size_t namesz,
+			 CHAR8 *buffer, size_t bufsz,
 			 PE_COFF_LOADER_IMAGE_CONTEXT *context,
-			 char **basep, size_t *sizep,
+			 CHAR8 **basep, size_t *sizep,
 			 EFI_IMAGE_SECTION_HEADER **sectionp)
 {
 	UINTN i;
-	char namebuf[9];
+	CHAR8 namebuf[9];
 
 	if (!name || namesz == 0 || !buffer || bufsz < namesz || !context
 	    || !basep || !sizep || !sectionp)
@@ -271,7 +271,7 @@ get_section_vma_by_name (char *name, size_t namesz,
 	for (i = 0; i < context->NumberOfSections; i++) {
 		EFI_STATUS status;
 		EFI_IMAGE_SECTION_HEADER *section = NULL;
-		char *base = NULL;
+		CHAR8 *base = NULL;
 		size_t size = 0;
 
 		status = get_section_vma(i, buffer, bufsz, context, &base, &size, &section);
@@ -299,14 +299,14 @@ get_section_vma_by_name (char *name, size_t namesz,
  */
 
 EFI_STATUS
-generate_hash(char *data, unsigned int datasize_in,
+generate_hash(CHAR8 *data, unsigned int datasize_in,
 	      PE_COFF_LOADER_IMAGE_CONTEXT *context, UINT8 *sha256hash,
 	      UINT8 *sha1hash)
 {
 	unsigned int sha256ctxsize, sha1ctxsize;
 	unsigned int size = datasize_in;
 	void *sha256ctx = NULL, *sha1ctx = NULL;
-	char *hashbase;
+	CHAR8 *hashbase;
 	unsigned int hashsize;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
 	unsigned int index, pos;
@@ -345,7 +345,7 @@ generate_hash(char *data, unsigned int datasize_in,
 
 	/* Hash start to checksum */
 	hashbase = data;
-	hashsize = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum -
+	hashsize = (CHAR8 *)&context->PEHdr->Pe32.OptionalHeader.CheckSum -
 		hashbase;
 	check_size(data, datasize_in, hashbase, hashsize);
 
@@ -357,9 +357,9 @@ generate_hash(char *data, unsigned int datasize_in,
 	}
 
 	/* Hash post-checksum to start of certificate table */
-	hashbase = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum +
+	hashbase = (CHAR8 *)&context->PEHdr->Pe32.OptionalHeader.CheckSum +
 		sizeof (int);
-	hashsize = (char *)context->SecDir - hashbase;
+	hashsize = (CHAR8 *)context->SecDir - hashbase;
 	check_size(data, datasize_in, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
@@ -371,8 +371,8 @@ generate_hash(char *data, unsigned int datasize_in,
 
 	/* Hash end of certificate table to end of image header */
 	EFI_IMAGE_DATA_DIRECTORY *dd = context->SecDir + 1;
-	hashbase = (char *)dd;
-	hashsize = context->SizeOfHeaders - (unsigned long)((char *)dd - data);
+	hashbase = (CHAR8 *)dd;
+	hashsize = context->SizeOfHeaders - (unsigned long)((CHAR8 *)dd - data);
 	if (hashsize > datasize_in) {
 		perror(L"Data Directory size %d is invalid\n", hashsize);
 		efi_status = EFI_INVALID_PARAMETER;
@@ -454,7 +454,7 @@ generate_hash(char *data, unsigned int datasize_in,
 	Section = context->FirstSection;
 	for (index = 0; index < context->NumberOfSections; index++) {
 		EFI_IMAGE_SECTION_HEADER *SectionPtr;
-		char *base;
+		CHAR8 *base;
 		size_t size;
 
 		efi_status = get_section_vma(index, data, datasize, context,
@@ -707,7 +707,7 @@ read_header(void *data, unsigned int datasize,
 	}
 
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
-		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
+		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((CHAR8 *)data + DosHdr->e_lfanew);
 
 	if (!image_is_loadable(PEHdr)) {
 		perror(L"Platform does not support this image\n");
@@ -801,7 +801,7 @@ read_header(void *data, unsigned int datasize,
 		context->SecDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
 	}
 
-	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
+	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((CHAR8 *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
 
 	if (context->ImageSize < context->SizeOfHeaders) {
 		perror(L"Invalid image\n");
@@ -824,13 +824,13 @@ read_header(void *data, unsigned int datasize,
 }
 
 EFI_STATUS
-handle_sbat(char *SBATBase, size_t SBATSize)
+handle_sbat(CHAR8 *SBATBase, size_t SBATSize)
 {
 	unsigned int i;
 	EFI_STATUS efi_status;
 	size_t n;
 	struct sbat_section_entry **entries = NULL;
-	char *sbat_data;
+	CHAR8 *sbat_data;
 	size_t sbat_size;
 
 	if (list_empty(&sbat_var))
@@ -888,10 +888,10 @@ handle_image (void *data, unsigned int datasize,
 	      UINTN *alloc_pages)
 {
 	EFI_STATUS efi_status;
-	char *buffer;
+	CHAR8 *buffer;
 	int i;
 	EFI_IMAGE_SECTION_HEADER *Section;
-	char *base, *end;
+	CHAR8 *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	unsigned int alignment, alloc_size;
 	int found_entry_point = 0;
@@ -968,7 +968,7 @@ handle_image (void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	char *RelocBase, *RelocBaseEnd;
+	CHAR8 *RelocBase, *RelocBaseEnd;
 	/*
 	 * These are relative virtual addresses, so we have to check them
 	 * against the image size, not the data size.
@@ -984,7 +984,7 @@ handle_image (void *data, unsigned int datasize,
 
 	EFI_IMAGE_SECTION_HEADER *RelocSection = NULL;
 
-	char *SBATBase = NULL;
+	CHAR8 *SBATBase = NULL;
 	size_t SBATSize = 0;
 
 	/*

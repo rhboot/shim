@@ -71,8 +71,8 @@ strndupa(const CHAR8 * const src, const UINTN srcmax)
 	return news;
 }
 
-static inline UNUSED RETURNS_NONNULL NONNULL(1, 2) char *
-stpcpy(char *dest, const char * const src)
+static inline UNUSED RETURNS_NONNULL NONNULL(1, 2) CHAR8 *
+stpcpy(CHAR8 *dest, const CHAR8 * const src)
 {
 	size_t i = 0;
 	for (i = 0; src[i]; i++)
@@ -81,8 +81,24 @@ stpcpy(char *dest, const char * const src)
 	return &dest[i];
 }
 
+
+static inline UNUSED RETURNS_NONNULL NONNULL(1) CHAR8 *
+strrchra(CHAR8 *str, int c)
+{
+	CHAR8 * save;
+
+	for (save = NULL; ; ++str) {
+		if (*str == c) {
+			save = str;
+		}
+		if (*str == 0) {
+			return save;
+		}
+	}
+}
+
 static inline UNUSED CHAR8 *
-translate_slashes(CHAR8 *out, const char *str)
+translate_slashes(CHAR8 *out, const CHAR8 *str)
 {
 	int i;
 	int j;
@@ -124,13 +140,13 @@ strchra(const CHAR8 *s, int c)
 	return (CHAR8 *)s1;
 }
 
-static inline UNUSED RETURNS_NONNULL NONNULL(1) char *
-strnchrnul(const char *s, size_t max, int c)
+static inline UNUSED RETURNS_NONNULL NONNULL(1) CHAR8 *
+strnchrnul(CHAR8 *s, size_t max, int c)
 {
 	unsigned int i;
 
 	if (!s || !max)
-		return (char *)s;
+		return s;
 
 	for (i = 0; i < max && s[i] != '\0' && s[i] != c; i++)
 		;
@@ -138,7 +154,7 @@ strnchrnul(const char *s, size_t max, int c)
 	if (i == max)
 		i--;
 
-	return (char *)&s[i];
+	return &s[i];
 }
 
 /**
@@ -150,14 +166,14 @@ strnchrnul(const char *s, size_t max, int c)
  * state: a pointer to one char of state for between calls
  *
  * Ensure that both token and state are preserved across calls.  Do:
- *   char state = 0;
- *   char *token = NULL;
+ *   CHAR8 state = 0;
+ *   CHAR8 *token = NULL;
  *   for (...) {
  *     valid = strntoken(...)
  * not:
- *   char state = 0;
+ *   CHAR8 state = 0;
  *   for (...) {
- *     char *token = NULL;
+ *     CHAR8 *token = NULL;
  *     valid = strntoken(...)
  *
  * - it will not test bytes beyond str[max-1]
@@ -173,10 +189,10 @@ strnchrnul(const char *s, size_t max, int c)
  * false means it got to a NUL or str[max-1] and token is invalid
  */
 static inline UNUSED NONNULL(1, 3, 4) int
-strntoken(char *str, size_t max, const char *delims, char **token, char *state)
+strntoken(CHAR8 *str, size_t max, const CHAR8 *delims, CHAR8 **token, CHAR8 *state)
 {
-	char *tokend;
-	const char *delim;
+	CHAR8 *tokend;
+	const CHAR8 *delim;
 	int isdelim = 0;
 	int state_is_delim = 0;
 
@@ -196,7 +212,7 @@ strntoken(char *str, size_t max, const char *delims, char **token, char *state)
 	}
 
 	for (delim = delims; *delim; delim++) {
-		char *tmp = NULL;
+		CHAR8 *tmp = NULL;
 		if (*token && *delim == *state)
 			state_is_delim = 1;
 		tmp = strnchrnul(str, max, *delim);
@@ -220,7 +236,7 @@ strntoken(char *str, size_t max, const char *delims, char **token, char *state)
 static inline UNUSED NONNULL(1) BOOLEAN
 is_utf8_bom(CHAR8 *buf, size_t bufsize)
 {
-	unsigned char bom[] = UTF8_BOM;
+	CHAR8 bom[] = UTF8_BOM;
 
 	return CompareMem(buf, bom, MIN(UTF8_BOM_SIZE, bufsize)) == 0;
 }
@@ -249,16 +265,16 @@ is_utf8_bom(CHAR8 *buf, size_t bufsize)
 struct csv_row {
 	list_t list;		/* this is a linked list */
 	size_t n_columns;	/* this is how many columns are actually populated */
-	char *columns[0];	/* these are pointers to columns */
+	CHAR8 *columns[0];	/* these are pointers to columns */
 };
 
-EFI_STATUS parse_csv_data(char *data, char *end, size_t n_columns,
+EFI_STATUS parse_csv_data(CHAR8 *data, CHAR8 *end, size_t n_columns,
                           list_t *list);
 void free_csv_list(list_t *list);
 
 #ifdef SHIM_UNIT_TEST
 void NONNULL(1, 3, 4)
-parse_csv_line(char * line, size_t max, size_t *n_columns, const char *columns[]);
+parse_csv_line(CHAR8 * line, size_t max, size_t *n_columns, const CHAR8 *columns[]);
 #endif
 
 #endif /* SHIM_STR_H */

@@ -6,13 +6,13 @@
 #include "shim.h"
 
 void NONNULL(1, 3, 4)
-parse_csv_line(char * line, size_t max, size_t *n_columns, const char *columns[])
+parse_csv_line(CHAR8 * line, size_t max, size_t *n_columns, const CHAR8 *columns[])
 {
-	char *next = line;
+	CHAR8 *next = line;
 	size_t n = 0, new_n = n;
-	const char * const delims = ",";
-	char state = 0;
-	char *token = NULL;
+	const CHAR8 * const delims = (CHAR8 *)",";
+	CHAR8 state = 0;
+	CHAR8 *token = NULL;
 
 	bool valid = true;
 	for (n = 0; n < *n_columns; n++) {
@@ -47,13 +47,13 @@ free_csv_list(list_t *list)
 }
 
 EFI_STATUS
-parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
+parse_csv_data(CHAR8 *data, CHAR8 *data_end, size_t n_columns, list_t *list)
 {
 	EFI_STATUS efi_status = EFI_OUT_OF_RESOURCES;
-	char delims[] = "\r\n";
-	char *line = data;
+	CHAR8 delims[] = "\r\n";
+	CHAR8 *line = data;
 	size_t max = 0;
-	char *end = data_end;
+	CHAR8 *end = data_end;
 
 	if (!data || !end || end <= data || !n_columns || !list)
 		return EFI_INVALID_PARAMETER;
@@ -64,10 +64,10 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 		line += UTF8_BOM_SIZE;
 
 	while (line && line <= data_end) {
-		size_t entrysz = sizeof(char *) * n_columns + sizeof(struct csv_row);
+		size_t entrysz = sizeof(CHAR8 *) * n_columns + sizeof(struct csv_row);
 		struct csv_row *entry;
 		size_t m_columns = n_columns;
-		char *delim;
+		CHAR8 *delim;
 		bool found = true;
 
 		end = data_end;
@@ -83,7 +83,7 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 			}
 		}
 		for (delim = &delims[0]; *delim; delim++) {
-			char *tmp = strnchrnul(line, max, *delim);
+			CHAR8 *tmp = strnchrnul(line, max, *delim);
 			if (tmp < end)
 				end = tmp;
 		}
@@ -105,12 +105,12 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 		list_add_tail(&entry->list, list);
 
 		for (delim = &delims[0]; *delim; delim++) {
-			char *tmp = strnchrnul((const char *)line, max, *delim);
+			CHAR8 *tmp = strnchrnul(line, max, *delim);
 			if (tmp < end)
 				end = tmp;
 		}
 
-		parse_csv_line(line, max, &m_columns, (const char **)entry->columns);
+		parse_csv_line(line, max, &m_columns, (const CHAR8 **)entry->columns);
 		entry->n_columns = m_columns;
 		line = end + 1;
 	}

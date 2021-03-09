@@ -35,7 +35,7 @@ struct sbat_section_entry {
 #define SBAT_SECTION_COLUMNS (sizeof (struct sbat_section_entry) / sizeof(CHAR8 *))
 
 EFI_STATUS
-parse_sbat_section(char *section_base, size_t section_size, size_t *n,
+parse_sbat_section(CHAR8 *section_base, size_t section_size, size_t *n,
 		   struct sbat_section_entry ***entriesp);
 void cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries);
 

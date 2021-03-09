@@ -7,17 +7,17 @@
 #include "string.h"
 
 EFI_STATUS
-parse_sbat_section(char *section_base, size_t section_size,
+parse_sbat_section(CHAR8 *section_base, size_t section_size,
 		   size_t *n_entries,
 		   struct sbat_section_entry ***entriesp)
 {
 	struct sbat_section_entry *entry = NULL, **entries;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	list_t csv, *pos = NULL;
-	char * end = section_base + section_size - 1;
+	CHAR8 * end = section_base + section_size - 1;
 	size_t allocsz = 0;
 	size_t n;
-	char *strtab;
+	CHAR8 *strtab;
 
 	if (!section_base || !section_size || !n_entries || !entriesp)
 		return EFI_INVALID_PARAMETER;
@@ -69,7 +69,7 @@ parse_sbat_section(char *section_base, size_t section_size,
 	list_for_each(pos, &csv) {
 		struct csv_row * row;
 		size_t i;
-		const char **ptrs[] = {
+		const CHAR8 **ptrs[] = {
 			&entry->component_name,
 			&entry->component_generation,
 			&entry->vendor_name,
@@ -109,7 +109,7 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 {
 	UINT16 sbat_gen, sbat_var_gen;
 
-	if (strcmp((const char *)entry->component_name, (const char *)sbat_var_entry->component_name) == 0) {
+	if (strcmpa(entry->component_name, sbat_var_entry->component_name) == 0) {
 		dprint(L"component %a has a matching SBAT variable entry, verifying\n",
 			entry->component_name);
 
@@ -191,11 +191,11 @@ parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 	struct sbat_var_entry *entry = NULL, **entries;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	list_t csv, *pos = NULL;
-	char * start = (char *)data;
-	char * end = (char *)data + datasize - 1;
+	CHAR8 * start = (CHAR8 *)data;
+	CHAR8 * end = (CHAR8 *)data + datasize - 1;
 	size_t allocsz = 0;
 	size_t n;
-	char *strtab;
+	CHAR8 *strtab;
 
 	if (!entry_list|| !data || datasize == 0)
 		return EFI_INVALID_PARAMETER;
@@ -249,7 +249,7 @@ parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 	list_for_each(pos, &csv) {
 		struct csv_row * row;
 		size_t i;
-		const char **ptrs[] = {
+		const CHAR8 **ptrs[] = {
 			&entry->component_name,
 			&entry->component_generation,
 			&entry->sbat_datestamp,

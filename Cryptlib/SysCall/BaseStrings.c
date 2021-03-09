@@ -13,8 +13,8 @@ AsciiStrCat(char *Destination, char *Source)
 	return Destination;
 }
 
-CHAR8 *
-AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
+char *
+AsciiStrCpy(char *Destination, const char *Source)
 {
 	UINTN i;
 
@@ -26,7 +26,7 @@ AsciiStrCpy(CHAR8 *Destination, CHAR8 *Source)
 }
 
 char *
-AsciiStrnCpy(char *Destination, char *Source, UINTN count)
+AsciiStrnCpy(char *Destination, const char *Source, UINTN count)
 {
 	UINTN i;
 

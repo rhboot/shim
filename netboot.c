@@ -169,7 +169,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	CHAR8 ip6inv[16];
 	CHAR8 template[sizeof DEFAULT_LOADER_CHAR];
 
-	translate_slashes(template, DEFAULT_LOADER_CHAR);
+	translate_slashes(template, (CHAR8 *)DEFAULT_LOADER_CHAR);
 
 	// to check against str2ip6() errors
 	memset(ip6inv, 0, sizeof(ip6inv));
@@ -207,9 +207,9 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	if (!full_path)
 		return FALSE;
 	memcpy(full_path, end, strlen(end));
-	end = (CHAR8 *)strrchr((char *)full_path, '/');
+	end = strrchra(full_path, '/');
 	if (!end)
-		end = (CHAR8 *)full_path;
+		end = full_path;
 	memcpy(end, template, strlen(template));
 	end[strlen(template)] = '\0';
 
@@ -239,7 +239,7 @@ static EFI_STATUS parseDhcp4()
 	UINTN template_ofs = 0;
 	EFI_PXE_BASE_CODE_DHCPV4_PACKET* pkt_v4 = (EFI_PXE_BASE_CODE_DHCPV4_PACKET *)&pxe->Mode->DhcpAck.Dhcpv4;
 
-	translate_slashes(template, DEFAULT_LOADER_CHAR);
+	translate_slashes(template, (CHAR8 *)DEFAULT_LOADER_CHAR);
 	template_len = strlen(template) + 1;
 
 	if(pxe->Mode->ProxyOfferReceived) {

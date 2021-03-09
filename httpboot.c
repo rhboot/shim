@@ -727,7 +727,7 @@ httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
 	if (!uri)
 		return EFI_NOT_READY;
 
-	translate_slashes(next_loader, DEFAULT_LOADER_CHAR);
+	translate_slashes(next_loader, (CHAR8 *)DEFAULT_LOADER_CHAR);
 
 	/* Create the URI for the next loader based on the original URI */
 	efi_status = generate_next_uri(uri, next_loader, &next_uri);

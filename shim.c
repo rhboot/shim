@@ -586,6 +586,7 @@ verify_buffer (char *data, int datasize,
 	size_t size = datasize;
 	size_t offset = 0;
 	unsigned int i = 0;
+	CHAR8 *datap = (CHAR8 *)data;
 
 	if (datasize < 0)
 		return EFI_INVALID_PARAMETER;
@@ -597,7 +598,7 @@ verify_buffer (char *data, int datasize,
 	 */
 	drain_openssl_errors();
 
-	ret_efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
+	ret_efi_status = generate_hash(datap, datasize, context, sha256hash, sha1hash);
 	if (EFI_ERROR(ret_efi_status)) {
 		dprint(L"generate_hash: %r\n", ret_efi_status);
 		PrintErrors();
@@ -656,7 +657,7 @@ verify_buffer (char *data, int datasize,
 		WIN_CERTIFICATE_EFI_PKCS *sig = NULL;
 		size_t sz;
 
-		sig = ImageAddress(data, size,
+		sig = ImageAddress(datap, size,
 				   context->SecDir->VirtualAddress + offset);
 		if (!sig)
 			break;
@@ -1052,7 +1053,7 @@ static EFI_STATUS shim_hash (char *data, int datasize,
 		return EFI_INVALID_PARAMETER;
 
 	in_protocol = 1;
-	efi_status = generate_hash(data, datasize, context,
+	efi_status = generate_hash((CHAR8 *)data, datasize, context,
 				   sha256hash, sha1hash);
 	in_protocol = 0;
 
@@ -1918,8 +1919,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	}
 
 	if (secure_mode ()) {
-		char *sbat_start = (char *)&_sbat;
-		char *sbat_end = (char *)&_esbat;
+		CHAR8 *sbat_start = (CHAR8 *)&_sbat;
+		CHAR8 *sbat_end = (CHAR8 *)&_esbat;
 
 		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start);
 		if (EFI_ERROR(efi_status)) {
