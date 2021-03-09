@@ -18,11 +18,6 @@
  *      National Security Policy and Scientific Developments, November 20,
  *      1969.
  */
-
-#include <efi.h>
-#include <efiapi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 static EFI_SYSTEM_TABLE *systab;

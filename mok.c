@@ -6,10 +6,6 @@
 
 #include "shim.h"
 
-#include <stdint.h>
-
-#include "hexdump.h"
-
 /*
  * Check if a variable exists
  */

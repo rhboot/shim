@@ -4,9 +4,6 @@
  *
  * read some platform configuration tables
  */
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 void *

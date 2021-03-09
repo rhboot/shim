@@ -3,7 +3,8 @@
 #ifndef STATIC_HEXDUMP_H
 #define STATIC_HEXDUMP_H
 
-#include <stdint.h>
+#include "shim.h"
+#include "include/console.h"
 
 static inline unsigned long UNUSED
 prepare_hex(const void *data, size_t size, char *buf, unsigned int position)
@@ -80,8 +81,9 @@ prepare_text(const void *data, size_t size, char *buf, unsigned int position)
  * variadic hexdump formatted
  * think of it as: printf("%s%s\n", vformat(fmt, ap), hexdump(data,size));
  */
-static inline void UNUSED
-vhexdumpf(const char *file, int line, const char *func, const CHAR16 * const fmt, const void *data, unsigned long size, size_t at, va_list ap)
+static inline void UNUSED EFIAPI
+vhexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
+          const void *data, unsigned long size, size_t at, elf_va_list ap)
 {
 	unsigned long display_offset = at;
 	unsigned long offset = 0;
@@ -115,13 +117,14 @@ vhexdumpf(const char *file, int line, const char *func, const CHAR16 * const fmt
  * think of it as: printf("%s%s", format(fmt, ...), hexdump(data,size)[lineN]);
  */
 static inline void UNUSED
-hexdumpf(const char *file, int line, const char *func, const CHAR16 * const fmt, const void *data, unsigned long size, size_t at, ...)
+hexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
+         const void *data, unsigned long size, size_t at, ...)
 {
-	va_list ap;
+	elf_va_list ap;
 
-	va_start(ap, at);
+	elf_va_start(ap, at);
 	vhexdumpf(file, line, func, fmt, data, size, at, ap);
-	va_end(ap);
+	elf_va_end(ap);
 }
 
 static inline void UNUSED

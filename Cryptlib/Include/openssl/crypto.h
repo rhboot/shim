@@ -117,6 +117,7 @@
 #ifndef HEADER_CRYPTO_H
 # define HEADER_CRYPTO_H
 
+# include <string.h>
 # include <stdlib.h>
 
 # include <openssl/e_os2.h>

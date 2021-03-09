@@ -1,10 +1,4 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
-
-#include <efi.h>
-#include <efilib.h>
-#include <string.h>
-#include <stdint.h>
-
 #include "shim.h"
 
 typedef struct {

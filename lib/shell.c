@@ -4,9 +4,6 @@
  *
  * misc shell helper functions
  */
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 EFI_STATUS

@@ -13,8 +13,6 @@
 
 #include "shim.h"
 
-#include <string.h>
-
 #define ntohs(x) __builtin_bswap16(x)	/* supported both by GCC and clang */
 #define htons(x) ntohs(x)
 

@@ -4,7 +4,6 @@
  */
 
 #include "shim.h"
-#include "string.h"
 
 EFI_STATUS
 parse_sbat_section(char *section_base, size_t section_size,

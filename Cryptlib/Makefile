@@ -2,8 +2,14 @@ ifneq ($(CCACHE_DISABLE),)
 export CCACHE_DISABLE
 endif
 
-INCLUDES	= -I$(TOPDIR) -iquote $(TOPDIR) -I$(TOPDIR)/Include \
-		  $(EFI_INCLUDES) -I$(shell $(CC) -print-file-name=include)
+CRYPTDIR	= $(TOPDIR)/Cryptlib
+
+FEATUREFLAGS	+= -nostdinc
+
+INCLUDES	= -I$(CRYPTDIR) -I$(CRYPTDIR)/Include \
+		  $(EFI_INCLUDES) \
+		  -isystem $(TOPDIR)/include/system \
+		  -isystem $(shell $(CC) -print-file-name=include)
 
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
@@ -15,12 +21,12 @@ CFLAGS		= $(FEATUREFLAGS) \
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 ifeq ($(ARCH),x86_64)
-FEATUREFLAGS	+= -m64 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
+FEATUREFLAGS	+= -m64 -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS)
 DEFINES		+= -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI \
 		   -DNO_BUILTIN_VA_FUNCS -DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
-FEATUREFLAGS	+= -m32 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
+FEATUREFLAGS	+= -m32 -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_IA32
 endif
 ifeq ($(ARCH),aarch64)

@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
+#include "shim.h"
 
-#include <efi.h>
-#include <efilib.h>
-#include <stdarg.h>
 #include <Library/BaseCryptLib.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
-
-#include "shim.h"
-
-#include "hexdump.h"
 
 #define PASSWORD_MAX 256
 #define PASSWORD_MIN 1

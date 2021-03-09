@@ -2,11 +2,6 @@
 /*
  * Copyright 2019 SUSE LLC <glin@suse.com>
  */
-
-#include <efi.h>
-#include <efilib.h>
-#include <stdarg.h>
-
 #include "shim.h"
 
 #include <Library/BaseCryptLib.h>

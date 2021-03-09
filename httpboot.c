@@ -7,10 +7,6 @@
  * (http://tianocore.sf.net) and are Copyright 2009-2012 Intel
  * Corporation.
  */
-
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 static UINTN

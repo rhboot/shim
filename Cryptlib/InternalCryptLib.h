@@ -15,6 +15,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __INTERNAL_CRYPT_LIB_H__
 #define __INTERNAL_CRYPT_LIB_H__
 
+#include <stdarg.h>
+
 #include "Library/BaseLib.h"
 #include "Library/BaseMemoryLib.h"
 #include "Library/MemoryAllocationLib.h"

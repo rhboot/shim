@@ -4,10 +4,6 @@
  *
  * Install and remove a platform security2 override policy
  */
-
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 #if defined(OVERRIDE_SECURITY_POLICY)
