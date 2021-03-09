@@ -63,8 +63,7 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    SysCall/CrtWrapper.o \
 		    SysCall/TimerWrapper.o \
 		    SysCall/BaseMemAllocation.o \
-		    SysCall/BaseStrings.o \
-		    SysCall/memset.o
+		    SysCall/BaseStrings.o
 
 all: $(TARGET)
 

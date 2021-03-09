@@ -121,21 +121,6 @@ QuickSortWorker (
 // -- String Manipulation Routines --
 //
 
-/* Scan a string for the last occurrence of a character */
-char *strrchr (const char *str, int c)
-{
-  char * save;
-
-  for (save = NULL; ; ++str) {
-    if (*str == c) {
-      save = (char *)str;
-    }
-    if (*str == 0) {
-      return (save);
-    }
-  }
-}
-
 /* Read formatted data from a string */
 int sscanf (const char *buffer, const char *format, ...)
 {
@@ -144,59 +129,6 @@ int sscanf (const char *buffer, const char *format, ...)
   // no direct functionality logic dependency in present UEFI cases.
   //
   return 0;
-}
-
-//
-// -- Character Classification Routines --
-//
-
-/* Determines if a particular character is a decimal-digit character */
-int isdigit (int c)
-{
-  //
-  // <digit> ::= [0-9]
-  //
-  return (('0' <= (c)) && ((c) <= '9'));
-}
-
-/* Determine if an integer represents character that is a hex digit */
-int isxdigit (int c)
-{
-  //
-  // <hexdigit> ::= [0-9] | [a-f] | [A-F]
-  //
-  return ((('0' <= (c)) && ((c) <= '9')) ||
-          (('a' <= (c)) && ((c) <= 'f')) ||
-          (('A' <= (c)) && ((c) <= 'F')));
-}
-
-/* Determines if a particular character represents a space character */
-int isspace (int c)
-{
-  //
-  // <space> ::= [ ]
-  //
-  return ((c) == ' ');
-}
-
-/* Determine if a particular character is an alphanumeric character */
-int isalnum (int c)
-{
-  //
-  // <alnum> ::= [0-9] | [a-z] | [A-Z]
-  //
-  return ((('0' <= (c)) && ((c) <= '9')) ||
-          (('a' <= (c)) && ((c) <= 'z')) ||
-          (('A' <= (c)) && ((c) <= 'Z')));
-}
-
-/* Determines if a particular character is in upper case */
-int isupper (int c)
-{
-  //
-  // <uppercase letter> := [A-Z]
-  //
-  return (('A' <= (c)) && ((c) <= 'Z'));
 }
 
 //
@@ -221,15 +153,6 @@ unsigned long strtoul (const char *nptr, char **endptr, int base)
   // no direct functionality logic dependency in present UEFI cases.
   //
   return 0;
-}
-
-/* Convert character to lowercase */
-int tolower (int c)
-{
-  if (('A' <= (c)) && ((c) <= 'Z')) {
-    return (c - ('A' - 'a'));
-  }
-  return (c);
 }
 
 //
@@ -422,11 +345,6 @@ ssize_t read (int f, void *b, size_t c)
 int stat (const char *c, struct stat *s)
 {
   return -1;
-}
-
-int strncasecmp (const char *c, const char *s, size_t l)
-{
-  return 0;
 }
 
 void syslog (int a, const char *c, ...)

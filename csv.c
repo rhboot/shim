@@ -21,8 +21,8 @@ parse_csv_line(char * line, size_t max, size_t *n_columns, const char *columns[]
 			valid = strntoken(next, max, delims, &token, &state);
 		}
 		if (valid) {
-			next += strlena(token) + 1;
-			max -= strlena(token) + 1;
+			next += strlen(token) + 1;
+			max -= strlen(token) + 1;
 			columns[n] = token;
 			new_n = n + 1;
 		} else {

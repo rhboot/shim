@@ -11,6 +11,18 @@
  */
 #include <stddef.h>
 
+static inline void abort(void) { }
+
+#include <builtins_begin_.h>
+mkbi1_(int, abs, int, j)
+mkbi1_(long int, labs, long int, j)
+mkbi1_(long long int, llabs, long long int, j)
+
+#ifdef _INTTYPES_H
+mkbi1_(intmax_t, imaxabs, intmax_t, j)
+#endif /* _INTTYPES_H */
+#include <builtins_end_.h>
+
 #endif /* !_STDLIB_H */
 #endif
 // vim:fenc=utf-8:tw=75:noet

@@ -259,4 +259,6 @@ verify_buffer (char *data, int datasize,
 #define LogError(fmt, ...)
 #endif
 
+char *translate_slashes(char *out, const char *str);
+
 #endif /* SHIM_H_ */

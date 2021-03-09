@@ -116,12 +116,12 @@ LIBS = Cryptlib/libcryptlib.a \
        gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a
 
 $(SHIMSONAME): $(OBJS) $(LIBS)
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 fallback.o: $(FALLBACK_SRCS)
 
 $(FBSONAME): $(FALLBACK_OBJS) $(LIBS)
-	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS)
+	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 MokManager.o: $(MOK_SOURCES)
 
