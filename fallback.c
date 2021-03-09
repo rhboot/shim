@@ -481,8 +481,15 @@ set_boot_order(void)
 
 	oldbootorder = LibGetVariableAndSize(L"BootOrder", &GV_GUID, &size);
 	if (oldbootorder) {
+		int i;
 		nbootorder = size / sizeof (CHAR16);
 		bootorder = oldbootorder;
+
+		VerbosePrint(L"Original nbootorder: %d\nOriginal BootOrder: ",
+			     nbootorder);
+		for (i = 0 ; i < nbootorder ; i++)
+			VerbosePrintUnprefixed(L"%04x ", bootorder[i]);
+		VerbosePrintUnprefixed(L"\n");
 	}
 	return EFI_SUCCESS;
 
