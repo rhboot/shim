@@ -243,9 +243,9 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			cursor += DevicePathSize(hddp);
 			StrCpy((CHAR16 *)cursor, arguments);
 
-			console_print(L"Creating boot entry \"%s\" with label \"%s\" "
-				      L"for file \"%s\"\n",
-				      varname, label, filename);
+			VerbosePrint(L"Creating boot entry \"%s\" with label \"%s\" "
+				     L"for file \"%s\"\n",
+				     varname, label, filename);
 
 			if (!first_new_option) {
 				first_new_option = DuplicateDevicePath(fulldp);
@@ -506,7 +506,7 @@ update_boot_order(void)
 	UINTN j;
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
-	console_print(L"\n");
+	VerbosePrintUnprefixed(L"\n");
 	efi_status = gRT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &GV_GUID);
@@ -1088,7 +1088,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		return efi_status;
 	}
 
-	console_print(L"System BootOrder not found.  Initializing defaults.\n");
+	VerbosePrint(L"System BootOrder not found.  Initializing defaults.\n");
 
 	set_boot_order();
 
