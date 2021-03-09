@@ -276,13 +276,11 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			}
 			bootorder = newbootorder;
 			nbootorder += 1;
-#ifdef DEBUG_FALLBACK
-			console_print(L"nbootorder: %d\nBootOrder: ",
+			VerbosePrint(L"nbootorder: %d\nBootOrder: ",
 				      nbootorder);
 			for (j = 0 ; j < nbootorder ; j++)
-				console_print(L"%04x ", bootorder[j]);
-			console_print(L"\n");
-#endif
+				VerbosePrintUnprefixed(L"%04x ", bootorder[j]);
+			VerbosePrintUnprefixed(L"\n");
 
 			return EFI_SUCCESS;
 		}
