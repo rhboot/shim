@@ -59,6 +59,7 @@
 #ifndef HEADER_BIO_H
 # define HEADER_BIO_H
 
+# include <OpenSslSupport.h>
 # include <openssl/e_os2.h>
 
 # ifndef OPENSSL_NO_FP_API
@@ -791,13 +792,13 @@ void BIO_copy_next_retry(BIO *b);
 # else
 #  define __bio_h__attr__(x)
 # endif
-int BIO_printf(BIO *bio, const char *format, ...)
+int EFIAPI BIO_printf(BIO *bio, const char *format, ...)
 __bio_h__attr__((__format__(__printf__, 2, 3)));
-int BIO_vprintf(BIO *bio, const char *format, va_list args)
+int EFIAPI BIO_vprintf(BIO *bio, const char *format, va_list args)
 __bio_h__attr__((__format__(__printf__, 2, 0)));
-int BIO_snprintf(char *buf, size_t n, const char *format, ...)
+int EFIAPI BIO_snprintf(char *buf, size_t n, const char *format, ...)
 __bio_h__attr__((__format__(__printf__, 3, 4)));
-int BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
+int EFIAPI BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
 __bio_h__attr__((__format__(__printf__, 3, 0)));
 # undef __bio_h__attr__
 
