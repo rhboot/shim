@@ -81,7 +81,7 @@ prepare_text(const void *data, size_t size, char *buf, unsigned int position)
  */
 static inline void UNUSED EFIAPI
 vhexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
-          const void *data, unsigned long size, size_t at, elf_va_list ap)
+          const void *data, unsigned long size, size_t at, va_list ap)
 {
 	unsigned long display_offset = at;
 	unsigned long offset = 0;
@@ -114,15 +114,15 @@ vhexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
  * hexdump formatted
  * think of it as: printf("%s%s", format(fmt, ...), hexdump(data,size)[lineN]);
  */
-static inline void UNUSED
+static inline void UNUSED EFIAPI
 hexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
          const void *data, unsigned long size, size_t at, ...)
 {
-	elf_va_list ap;
+	va_list ap;
 
-	elf_va_start(ap, at);
+	va_start(ap, at);
 	vhexdumpf(file, line, func, fmt, data, size, at, ap);
-	elf_va_end(ap);
+	va_end(ap);
 }
 
 static inline void UNUSED

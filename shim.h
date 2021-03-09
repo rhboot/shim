@@ -17,12 +17,21 @@
 #endif
 
 #if defined(__x86_64__)
-#if !defined(GNU_EFI_USE_MS_ABI)
-#error On x86_64 you must use ms_abi (GNU_EFI_USE_MS_ABI) in gnu-efi and shim.
-#endif
 /* gcc 4.5.4 is the first documented release with -mabi=ms */
 #if !GNUC_PREREQ(4, 7) && !CLANG_PREREQ(3, 4)
 #error On x86_64 you must have a compiler new enough to support __attribute__((__ms_abi__))
+#endif
+
+#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
+#define GNU_EFI_USE_EXTERNAL_STDARG
+#endif
+
+#if !defined(GNU_EFI_USE_MS_ABI)
+#define GNU_EFI_USE_MS_ABI
+#endif
+
+#ifdef NO_BUILTIN_VA_FUNCS
+#undef NO_BUILTIN_VA_FUNCS
 #endif
 #endif
 
@@ -30,7 +39,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <system/stdarg.h>
+#include <stdarg.h>
 #include <string.h>
 #include <strings.h>
 
@@ -40,6 +49,10 @@
 #undef uefi_call_wrapper
 #include <efierr.h>
 #include <efiip.h>
+
+#if defined(__x86_64__) && !defined(HAVE_USE_MS_ABI)
+#error something has gone wrong with the gnu-efi includes and defines
+#endif
 #endif
 
 #ifdef SHIM_UNIT_TEST
@@ -209,7 +222,7 @@ extern void shim_fini(void);
 extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
                                    const CHAR16 *fmt, ...);
 extern EFI_STATUS EFIAPI VLogError(const char *file, int line, const char *func,
-                                   const CHAR16 *fmt, elf_va_list args);
+                                   const CHAR16 *fmt, va_list args);
 extern VOID LogHexdump_(const char *file, int line, const char *func,
                         const void *data, size_t sz);
 extern VOID PrintErrors(VOID);
