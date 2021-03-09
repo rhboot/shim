@@ -3,10 +3,6 @@
  * Copyright Red Hat, Inc.
  * Copyright Peter Jones <pjones@redhat.com>
  */
-
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 #define NO_REBOOT L"FB_NO_REBOOT"

@@ -10,9 +10,6 @@
  * Copyright (c) 2011 - 2012, Intel Corporation. All rights reserved.<BR>
  *
  */
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 EFI_STATUS

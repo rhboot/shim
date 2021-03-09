@@ -26,6 +26,14 @@
 #endif
 #endif
 
+#include <ctype.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <system/stdarg.h>
+#include <string.h>
+#include <strings.h>
+
 #ifndef SHIM_UNIT_TEST
 #include <efi.h>
 #include <efilib.h>
@@ -33,9 +41,6 @@
 #include <efierr.h>
 #include <efiip.h>
 #endif
-
-#include <stddef.h>
-#include <stdint.h>
 
 #ifdef SHIM_UNIT_TEST
 #include "include/test.h"
@@ -158,8 +163,13 @@
 #include "include/tpm.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
+#include "include/hexdump.h"
 
 #include "version.h"
+
+#ifndef SHIM_UNIT_TEST
+#include "Cryptlib/Include/OpenSslSupport.h"
+#endif
 
 INTERFACE_DECL(_SHIM_LOCK);
 
@@ -196,9 +206,12 @@ typedef struct _SHIM_LOCK {
 
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
-extern EFI_STATUS LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...);
-extern EFI_STATUS VLogError(const char *file, int line, const char *func, const CHAR16 *fmt, va_list args);
-extern VOID LogHexdump_(const char *file, int line, const char *func, const void *data, size_t sz);
+extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
+                                   const CHAR16 *fmt, ...);
+extern EFI_STATUS EFIAPI VLogError(const char *file, int line, const char *func,
+                                   const CHAR16 *fmt, elf_va_list args);
+extern VOID LogHexdump_(const char *file, int line, const char *func,
+                        const void *data, size_t sz);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
 extern VOID restore_loaded_image(VOID);

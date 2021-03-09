@@ -12,7 +12,8 @@
 UINT8 in_protocol = 0;
 int debug = DEFAULT_DEBUG_PRINT_STATE;
 
-EFI_STATUS LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
+EFI_STATUS EFIAPI
+LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
 {
 	assert(0);
 	return EFI_SUCCESS;

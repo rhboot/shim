@@ -134,9 +134,9 @@ static int fmtfp(char **, char **, size_t *, size_t *,
                  LDOUBLE, int, int, int);
 #endif
 static int doapr_outch(char **, char **, size_t *, size_t *, int);
-static int _dopr(char **sbuffer, char **buffer,
-                 size_t *maxlen, size_t *retlen, int *truncated,
-                 const char *format, va_list args);
+static int EFIAPI _dopr(char **sbuffer, char **buffer,
+			size_t *maxlen, size_t *retlen, int *truncated,
+			const char *format, va_list args);
 
 /* format read states */
 #define DP_S_DEFAULT    0
@@ -167,7 +167,7 @@ static int _dopr(char **sbuffer, char **buffer,
 #define char_to_int(p) (p - '0')
 #define OSSL_MAX(p,q) ((p >= q) ? p : q)
 
-static int
+static int EFIAPI
 _dopr(char **sbuffer,
       char **buffer,
       size_t *maxlen,

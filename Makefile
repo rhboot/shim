@@ -16,6 +16,7 @@ override TOPDIR := $(shell pwd)
 endif
 override TOPDIR	:= $(abspath $(TOPDIR))
 VPATH		= $(TOPDIR)
+export TOPDIR
 
 include $(TOPDIR)/Make.rules
 include $(TOPDIR)/Make.defaults
@@ -134,15 +135,15 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
-	$(MAKE) VPATH=$(TOPDIR)/Cryptlib TOPDIR=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile
+	$(MAKE) VPATH=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile
 
 Cryptlib/OpenSSL/libopenssl.a:
 	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
-	$(MAKE) VPATH=$(TOPDIR)/Cryptlib/OpenSSL TOPDIR=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile
+	$(MAKE) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	if [ ! -d lib ]; then mkdir lib ; fi
-	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) CFLAGS="$(CFLAGS)" -C lib -f $(TOPDIR)/lib/Makefile lib.a
+	$(MAKE) VPATH=$(TOPDIR)/lib -C lib -f $(TOPDIR)/lib/Makefile lib.a
 
 buildid : $(TOPDIR)/buildid.c
 	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf

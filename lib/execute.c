@@ -3,10 +3,6 @@
  * Copyright 2012 <James.Bottomley@HansenPartnership.com>
  * Code Copyright 2012 Red Hat, Inc <mjg@redhat.com>
  */
-
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 EFI_STATUS

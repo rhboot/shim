@@ -3,11 +3,6 @@
  * Copyright 2012 <James.Bottomley@HansenPartnership.com>
  * Copyright 2013 Red Hat Inc. <pjones@redhat.com>
  */
-#include <efi.h>
-#include <efilib.h>
-#include <stdarg.h>
-#include <stdbool.h>
-
 #include "shim.h"
 
 static UINT8 console_text_mode = 0;
@@ -88,27 +83,27 @@ VOID console_fini(VOID)
 		setup_console(0);
 }
 
-UINTN
+UINTN EFIAPI
 console_print(const CHAR16 *fmt, ...)
 {
-	va_list args;
+	elf_va_list args;
 	UINTN ret;
 
 	if (!console_text_mode)
 		setup_console(1);
 
-	va_start(args, fmt);
+	elf_va_start(args, fmt);
 	ret = VPrint(fmt, args);
-	va_end(args);
+	elf_va_end(args);
 
 	return ret;
 }
 
-UINTN
+UINTN EFIAPI
 console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-	va_list args;
+	elf_va_list args;
 	UINTN ret;
 
 	if (!console_text_mode)
@@ -116,9 +111,9 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 
 	co->SetCursorPosition(co, col, row);
 
-	va_start(args, fmt);
+	elf_va_start(args, fmt);
 	ret = VPrint(fmt, args);
-	va_end(args);
+	elf_va_end(args);
 
 	return ret;
 }

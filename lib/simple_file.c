@@ -2,10 +2,6 @@
 /*
  * Copyright 2012 <James.Bottomley@HansenPartnership.com>
  */
-
-#include <efi.h>
-#include <efilib.h>
-
 #include "shim.h"
 
 EFI_STATUS

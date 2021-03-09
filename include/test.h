@@ -11,13 +11,13 @@
 #include <stdarg.h>
 
 #if defined(__aarch64__)
-#include <aa64/efibind.h>
+#include <aarch64/efibind.h>
 #elif defined(__arm__)
 #include <arm/efibind.h>
 #elif defined(__i386__) || defined(__i486__) || defined(__i686__)
 #include <ia32/efibind.h>
 #elif defined(__x86_64__)
-#include <x64/efibind.h>
+#include <x86_64/efibind.h>
 #else
 #error what arch is this
 #endif

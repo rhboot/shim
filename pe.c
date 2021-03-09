@@ -5,7 +5,6 @@
  */
 
 #include "shim.h"
-#include "hexdump.h"
 
 #include <openssl/err.h>
 #include <openssl/bn.h>

@@ -12,7 +12,6 @@
  */
 
 #include "shim.h"
-#include "hexdump.h"
 #if defined(ENABLE_SHIM_CERT)
 #include "shim_cert.h"
 #endif /* defined(ENABLE_SHIM_CERT) */

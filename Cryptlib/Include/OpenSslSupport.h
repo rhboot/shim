@@ -15,6 +15,14 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #ifndef __OPEN_SSL_SUPPORT_H__
 #define __OPEN_SSL_SUPPORT_H__
 
+/*
+ * Include stddef.h to avoid redefining "offsetof"
+ */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <string.h>
+
 #include <efi.h>
 #include <efilib.h>
 #include "Base.h"
@@ -22,11 +30,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include "Library/BaseMemoryLib.h"
 #include "Library/MemoryAllocationLib.h"
 #include "Library/DebugLib.h"
-
-/*
- * Include stddef.h to avoid redefining "offsetof"
- */
-#include <stddef.h>
 
 #define CONST const
 

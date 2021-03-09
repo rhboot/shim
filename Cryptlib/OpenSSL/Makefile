@@ -2,17 +2,23 @@ ifneq ($(CCACHE_DISABLE),)
 export CCACHE_DISABLE
 endif
 
+CRYPTDIR	= $(TOPDIR)/Cryptlib
+OSSLDIR		= $(TOPDIR)/Cryptlib/OpenSSL
+
 DEFINES		= -DL_ENDIAN \
 		  -D_CRT_SECURE_NO_DEPRECATE \
 		  -D_CRT_NONSTDC_NO_DEPRECATE \
 		  -DOPENSSL_SMALL_FOOTPRINT \
 		  -DPEDANTIC
 
-INCLUDES	= -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDIR)/crypto \
-		  -I$(shell $(CC) -print-file-name=include) \
-		  -I$(TOPDIR)/../Include $(EFI_INCLUDES) \
-		  -I$(TOPDIR)/crypto/asn1 -I$(TOPDIR)/crypto/evp \
-		  -I$(TOPDIR)/crypto/modes -I$(TOPDIR)/crypto/include
+INCLUDES	= -I$(OSSLDIR) -I$(CRYPTDIR) -I$(OSSLDIR)/Include/ \
+		  -I$(OSSLDIR)/crypto -I$(CRYPTDIR)/Include $(EFI_INCLUDES) \
+		  -I$(OSSLDIR)/crypto/asn1 -I$(OSSLDIR)/crypto/evp \
+		  -I$(OSSLDIR)/crypto/modes -I$(OSSLDIR)/crypto/include \
+		  -isystem $(TOPDIR)/include/system \
+		  -isystem $(shell $(CC) -print-file-name=include)
+
+FEATUREFLAGS	+= -nostdinc
 
 WERRFLAGS	+= -Wno-error=discarded-qualifiers \
 		   -Wno-error=maybe-uninitialized \
