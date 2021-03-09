@@ -11,6 +11,8 @@ INCLUDES	= -I$(CRYPTDIR) -I$(CRYPTDIR)/Include \
 		  -isystem $(TOPDIR)/include/system \
 		  -isystem $(shell $(CC) -print-file-name=include)
 
+WARNFLAGS	+= -Wno-unused-parameter
+
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
 		  $(WARNFLAGS) \
