@@ -947,8 +947,14 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	EFI_HANDLE image_handle;
 
 	if (get_fallback_verbose()) {
-		console_print(L"Verbose enabled, sleeping for half a second\n");
-		msleep(500000);
+		int fallback_verbose_wait = 500000; /* default to 0.5s */
+#ifdef FALLBACK_VERBOSE_WAIT
+		fallback_verbose_wait = FALLBACK_VERBOSE_WAIT;
+#endif
+		console_print(L"Verbose enabled, sleeping for %d mseconds... "
+			      L"Press the Pause key now to hold for longer.\n",
+			      fallback_verbose_wait);
+		msleep(fallback_verbose_wait);
 	}
 
 	if (!first_new_option) {
@@ -1142,8 +1148,14 @@ reset:
 	console_print(L"Reset System\n");
 
 	if (get_fallback_verbose()) {
-		console_print(L"Verbose enabled, sleeping for half a second\n");
-		msleep(500000);
+		int fallback_verbose_wait = 500000; /* default to 0.5s */
+#ifdef FALLBACK_VERBOSE_WAIT
+		fallback_verbose_wait = FALLBACK_VERBOSE_WAIT;
+#endif
+		console_print(L"Verbose enabled, sleeping for %d mseconds... "
+			      L"Press the Pause key now to hold for longer.\n",
+			      fallback_verbose_wait);
+		msleep(fallback_verbose_wait);
 	}
 
 	gRT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
