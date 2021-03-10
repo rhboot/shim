@@ -3,10 +3,12 @@
 #ifndef SHIM_STR_H
 #define SHIM_STR_H
 
+#if __GNUC__ > 6
 #ifdef SHIM_UNIT_TEST
 #pragma GCC diagnostic error "-Wnonnull-compare"
 #else
 #pragma GCC diagnostic ignored "-Wnonnull-compare"
+#endif
 #endif
 
 static inline UNUSED RETURNS_NONNULL NONNULL(1)

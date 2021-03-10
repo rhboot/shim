@@ -107,7 +107,7 @@ override DEFAULT_FEATUREFLAGS = \
 		-std=gnu11 \
 		-ggdb \
 		-ffreestanding \
-		-fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)' \
+		$(shell $(CC) -fmacro-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)') \
 		-fno-stack-protector \
 		-fno-strict-aliasing \
 		-fpic \

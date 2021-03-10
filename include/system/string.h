@@ -64,7 +64,11 @@ mkbi3_(int, strncasecmp, const char *, s1, const char *, s2, size_t, n)
 mkbi3_(char *, strncat, char *, dest, const char *, src, size_t, n)
 mkbi3_(int, strncmp, const char *, s1, const char *, s2, size_t, n)
 mkbi3_(char *, strncpy, char *, dest, const char *, src, size_t, n)
-mkbi2_(int, strnlen, const char *, s1, size_t, n)
+#if defined(__GNUC__) && __GNUC__ >= 9
+mkbi2_(size_t, strnlen, const char *, s1, size_t, n)
+#else
+size_t strnlen(const char * s1, size_t n);
+#endif
 mkdepbi2_(char *, strpbrk, const char *, s, const char *, accept)
 mkdepbi2_(char *, strrchr, const char *, s, int, c)
 mkdepbi2_(size_t, strspn, const char *, s, const char *, accept)

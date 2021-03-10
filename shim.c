@@ -1095,7 +1095,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
 	void *data = NULL;
-	int datasize;
+	int datasize = 0;
 
 	/*
 	 * We need to refer to the loaded image protocol on the running
