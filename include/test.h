@@ -213,6 +213,20 @@ extern int debug;
 		}                                                          \
 	})
 
+#define assert_negative_goto(a, label, fmt, ...)                              \
+	({                                                                    \
+		int rc_ = assert_negative_as_expr(a, -1, fmt, ##__VA_ARGS__); \
+		if (rc_ != 0)                                                 \
+			goto label;                                           \
+	})
+
+#define assert_positive_goto(a, label, fmt, ...)                              \
+	({                                                                    \
+		int rc_ = assert_positive_as_expr(a, -1, fmt, ##__VA_ARGS__); \
+		if (rc_ != 0)                                                 \
+			goto label;                                           \
+	})
+
 #define test(x, ...)                                    \
 	({                                              \
 		int rc;                                 \
