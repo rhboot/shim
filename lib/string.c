@@ -13,6 +13,7 @@
 #define strcasecmp shim_strcasecmp
 #define strrchr shim_strrchr
 #define strlen shim_strlen
+#define strnlen shim_strnlen
 #define strcpy shim_strcpy
 #define strncpy shim_strncpy
 #define strdup shim_strdup
@@ -93,7 +94,7 @@ strncasecmp(const char *s1p, const char *s2p, size_t n)
 int
 strcasecmp(const char *str1, const char *str2)
 {
-	char c1, c2;
+	uint8_t c1, c2;
 
 	c1 = toupper(*str1);
 	c2 = toupper(*str2);
@@ -155,7 +156,7 @@ strncpy(char *dest, const char *src, size_t n)
 
 	for (i = 0; i < n && src[i] != '\0'; i++)
 		dest[i] = src[i];
-	for (; i < n; i++)
+	if (i < n)
 		dest[i] = '\0';
 
 	return dest;
