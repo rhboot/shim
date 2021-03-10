@@ -1904,6 +1904,16 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
+	efi_status = set_sbat_uefi_variable();
+	if (EFI_ERROR(efi_status) && secure_mode()) {
+		perror(L"SBAT variable initialization failed\n");
+		msg = SET_SBAT;
+		goto die;
+	} else if (EFI_ERROR(efi_status)) {
+		dprint(L"SBAT variable initialization failed: %r\n",
+		       efi_status);
+	}
+
 	if (secure_mode()) {
 		char *sbat_start = (char *)&_sbat;
 		char *sbat_end = (char *)&_esbat;
@@ -1911,36 +1921,19 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		INIT_LIST_HEAD(&sbat_var);
 		efi_status = parse_sbat_var(&sbat_var);
 		if (EFI_ERROR(efi_status)) {
-			efi_status = set_sbat_uefi_variable();
-			if (efi_status == EFI_INVALID_PARAMETER) {
-				perror(L"SBAT variable initialization failed\n");
-				msg = SET_SBAT;
-				goto die;
-			}
-			efi_status = parse_sbat_var(&sbat_var);
-			if (EFI_ERROR(efi_status)) {
-				perror(L"Parsing SBAT variable failed: %r\n",
-					efi_status);
-				msg = IMPORT_SBAT;
-				goto die;
-			}
+			perror(L"Parsing SBAT variable failed: %r\n",
+				efi_status);
+			msg = IMPORT_SBAT;
+			goto die;
 		}
 
 		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Verifiying shim SBAT data failed: %r\n",
 			       efi_status);
-			msg = SBAT_SELF_CHECK;;
+			msg = SBAT_SELF_CHECK;
 			goto die;
 		}
-	}
-
-	efi_status = set_sbat_uefi_variable();
-	if (efi_status == EFI_INVALID_PARAMETER) {
-		perror(L"SBAT variable initialization failed\n");
-		msg = SET_SBAT;
-		if (secure_mode())
-                        goto die;
 	}
 
 	init_openssl();
