@@ -14,7 +14,7 @@ INCLUDES	= -I$(TOPDIR) -I$(TOPDIR)/.. -I$(TOPDIR)/../Include/ -I$(TOPDIR)/crypto
 		  -I$(TOPDIR)/crypto/asn1 -I$(TOPDIR)/crypto/evp \
 		  -I$(TOPDIR)/crypto/modes -I$(TOPDIR)/crypto/include
 
-WERRFLAGS	+= -Wno-error=discarded-qualifiers \
+WERRFLAGS	+= $(shell $(CC) -Wno-error=discarded-qualifiers -E -x c /dev/null >/dev/null 2>&1 && echo -Wno-error=discarded-qualifiers) \
 		   -Wno-error=maybe-uninitialized \
 		   -Wno-error=unused-function \
 		   -Wno-error=unused-but-set-variable

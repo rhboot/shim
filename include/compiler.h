@@ -18,7 +18,11 @@
 # define RETURNS_NONNULL
 #else
 # define NONNULL(first, args...) __attribute__((__nonnull__(first, ## args)))
+#if (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)))
 # define RETURNS_NONNULL __attribute__((__returns_nonnull__))
+#else
+# define RETURNS_NONNULL
+#endif
 #endif
 
 #ifndef UNUSED
