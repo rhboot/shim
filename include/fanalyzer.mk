@@ -6,12 +6,7 @@ define prop
 $(if $(findstring undefined,$(origin $(1))),,$(eval export $(1)))
 endef
 
-override CCACHE_DISABLE := 1
-export CCACHE_DISABLE
-override COMPILER := gcc
-export COMPILER
-
-PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR COMPILER CROSS_COMPILE DASHJ
+PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR CC COMPILER CROSS_COMPILE DASHJ
 
 MAKEARGS = $(foreach x,$(PROPOGATE_MAKE_FLAGS),$(call prop,$(x)))
 
@@ -22,6 +17,7 @@ fanalyzer-build-unchecked-cryptlib : Cryptlib/libcryptlib.a
 
 fanalyzer-build-unchecked-openssl : Cryptlib/OpenSSL/libopenssl.a
 
+fanalyzer-build-all : COMPILER=gcc
 fanalyzer-build-all : CCACHE_DISABLE=1
 fanalyzer-build-all : FEATUREFLAGS+=-fanalyzer
 fanalyzer-build-all : WERRFLAGS=-Werror=analyzer-null-dereference

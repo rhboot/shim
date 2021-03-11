@@ -6,11 +6,7 @@ define prop
 $(if $(findstring undefined,$(origin $(1))),,$(1)="$($1)")
 endef
 
-override CCACHE_DISABLE := 1
-export CCACHE_DISABLE
-override COMPILER = clang
-
-PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR COMPILER CROSS_COMPILE DASHJ
+PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR CC COMPILER CROSS_COMPILE DASHJ
 
 MAKEARGS = $(foreach x,$(PROPOGATE_MAKE_FLAGS),$(call prop,$(x)))
 
@@ -24,6 +20,8 @@ scan-build-unchecked-cryptlib : Cryptlib/libcryptlib.a
 
 scan-build-unchecked-openssl : Cryptlib/OpenSSL/libopenssl.a
 
+scan-build-all : CCACHE_DISABLE=1
+scan-build-all : COMPILER=clang
 scan-build-all : | scan-test
 scan-build-all :
 	+scan-build -o scan-results make $(MAKEARGS) $(DASHJ) CCACHE_DISABLE=1 all

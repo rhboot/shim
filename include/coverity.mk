@@ -9,10 +9,7 @@ define prop
 $(if $(findstring undefined,$(origin $(1))),,$(1)="$($1)")
 endef
 
-override CCACHE_DISABLE := 1
-export CCACHE_DISABLE
-
-PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR COMPILER CROSS_COMPILE
+PROPOGATE_MAKE_FLAGS = ARCH ARCH_SUFFIX COLOR CC COMPILER CROSS_COMPILE
 
 MAKEARGS = $(foreach x,$(PROPOGATE_MAKE_FLAGS),$(call prop,$(x)))
 
@@ -42,6 +39,7 @@ cov-build-unchecked-cryptlib : Cryptlib/libcryptlib.a
 cov-build-unchecked-openssl : | clean-openssl-objs
 cov-build-unchecked-openssl : Cryptlib/OpenSSL/libopenssl.a
 
+cov-build-all : CCACHE_DISABLE=1
 cov-build-all : | clean clean-shim-objs clean-cryptlib-objs clean-openssl-objs
 	+cov-build --dir cov-int $(MAKE) $(MAKEARGS) CCACHE_DISABLE=1 all
 
