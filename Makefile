@@ -29,6 +29,9 @@ TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 TARGETS += $(SHIMHASHNAME)
 endif
+ifneq ($(origin ENABLE_SHIM_DEVEL),undefined)
+CFLAGS += -DENABLE_SHIM_DEVEL
+endif
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 TARGETS	+= $(MMNAME).signed $(FBNAME).signed
 CFLAGS += -DENABLE_SHIM_CERT

@@ -1846,6 +1846,35 @@ debug_hook(void)
 	x = 1;
 }
 
+typedef enum {
+	COLD_RESET,
+	EXIT_FAILURE,
+	EXIT_SUCCESS,	// keep this one last
+} devel_egress_action;
+
+void
+devel_egress(devel_egress_action action UNUSED)
+{
+#ifdef ENABLE_SHIM_DEVEL
+	char *reasons[] = {
+		[COLD_RESET] = "reset",
+		[EXIT_FAILURE] = "exit",
+	};
+	if (action == EXIT_SUCCESS)
+		return;
+
+	console_print(L"Waiting to %a...", reasons[action]);
+	for (size_t sleepcount = 0; sleepcount < 10; sleepcount++) {
+		console_print(L"%d...", 10 - sleepcount);
+		msleep(1000000);
+	}
+	console_print(L"\ndoing %a\n", action);
+
+	if (action == COLD_RESET)
+		gRT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION, 0, NULL);
+#endif
+}
+
 EFI_STATUS
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
@@ -1961,9 +1990,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 die:
 		console_print(L"Something has gone seriously wrong: %s: %r\n",
 			      msgs[msg], efi_status);
+#if defined(ENABLE_SHIM_DEVEL)
+		devel_egress(COLD_RESET);
+#else
 		msleep(5000000);
 		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				 0, NULL);
+#endif
 	}
 
 	efi_status = shim_init();
@@ -1986,5 +2019,6 @@ die:
 	efi_status = init_grub(image_handle);
 
 	shim_fini();
+	devel_egress(EFI_ERROR(efi_status) ? EXIT_FAILURE : EXIT_SUCCESS);
 	return efi_status;
 }

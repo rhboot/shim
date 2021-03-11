@@ -236,7 +236,11 @@ struct mok_state_variable mok_state_variables[] = {
 	  * we're enforcing that SBAT can't have an RT flag here because
 	  * there's no way to tell whether it's an authenticated variable.
 	  */
+#if !defined(ENABLE_SHIM_DEVEL)
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+#else
+	 .no_attr = 0,
+#endif
 	 .flags = MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_MEASURE,
 	 .pcr = 7,
