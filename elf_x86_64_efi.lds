@@ -61,14 +61,6 @@ SECTIONS
    *(.vendor_cert)
   }
   . = ALIGN(4096);
-  .sbat :
-  {
-    _sbat = .;
-    *(.sbat)
-    *(.sbat.*)
-    _esbat = .;
-  }
-  . = ALIGN(4096);
   .dynamic  : { *(.dynamic) }
   . = ALIGN(4096);
   .rela :
@@ -79,6 +71,15 @@ SECTIONS
   }
   _edata = .;
   _data_size = . - _data;
+  . = ALIGN(4096);
+  .sbat :
+  {
+    _sbat = .;
+    *(.sbat)
+    *(.sbat.*)
+  }
+  _esbat = .;
+  _sbat_size = . - _sbat;
 
   . = ALIGN(4096);
   .dynsym   : { *(.dynsym) }
