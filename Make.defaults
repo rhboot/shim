@@ -97,11 +97,11 @@ DEFINES		= -DDEFAULT_LOADER='L"$(DEFAULT_LOADER)"' \
 		  -DDEFAULT_LOADER_CHAR='"$(DEFAULT_LOADER)"'
 
 INCLUDES	= -nostdinc \
-		  -I$(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 		  -I$(TOPDIR)/Cryptlib -I$(TOPDIR)/Cryptlib/Include \
 		  -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH_GNUEFI) -I$(EFI_INCLUDE)/protocol \
 		  -I$(TOPDIR)/include -iquote $(TOPDIR) -iquote $(shell pwd) \
-		  -isystem $(TOPDIR)/include/system
+		  -isystem $(TOPDIR)/include/system \
+		  -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include)
 
 override DEFAULT_FEATUREFLAGS = \
 		-std=gnu11 \
