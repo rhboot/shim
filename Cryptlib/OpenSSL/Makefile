@@ -22,8 +22,8 @@ FEATUREFLAGS	+= -nostdinc
 
 WARNFLAGS	+= -Wno-empty-body \
 		   -Wno-implicit-fallthrough \
-		   -Wno-old-style-declaration \
-		   -Wno-unused-but-set-variable \
+		   $(if $(findstring gcc,$(CC)),-Wno-old-style-declaration) \
+		   $(if $(findstring gcc,$(CC)),-Wno-unused-but-set-variable) \
 		   -Wno-unused-parameter
 
 CFLAGS		= $(FEATUREFLAGS) \
