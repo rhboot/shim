@@ -14,6 +14,15 @@
 # define vendor_authorized_size_end vendor_cert_size_end
 #endif
 
+#if defined(SHIM_DB_FILE)
+#if !defined(VENDOR_DB_FILE)
+# error ENABLE_SHIM_DB requires VENDOR_DB_FILE
+#endif
+#if defined(ENABLE_SHIM_CERT)
+# error both ENABLE_SHIM_CERT and ENABLE_SHIM_DB have been configured
+#endif
+#endif
+
 #if defined(VENDOR_DBX_FILE)
 # define vendor_deauthorized vendor_dbx
 # define vendor_deauthorized_end vendor_dbx_end
@@ -40,6 +49,9 @@ vendor_authorized:
 .incbin VENDOR_DB_FILE
 #elif defined(VENDOR_CERT_FILE)
 .incbin VENDOR_CERT_FILE
+#endif
+#if defined(SHIM_DB_FILE)
+.incbin SHIM_DB_FILE
 #endif
 .Lvendor_authorized_end:
 	.balign	1, 0

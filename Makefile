@@ -35,6 +35,11 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
+ifneq ($(origin ENABLE_SHIM_DB),undefined)
+SHIM_DB_FILE:=shim-db.esl
+cert.o : $(SHIM_DB_FILE)
+CFLAGS += -DSHIM_DB_FILE=\"$(SHIM_DB_FILE)\"
+endif
 OBJS	= shim.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o pe.o httpboot.o csv.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c mok.c netboot.c replacements.c tpm.c errlog.c sbat.c pe.c httpboot.c shim.h version.h $(wildcard include/*.h)
@@ -95,6 +100,9 @@ ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
 endif
 shim.o: $(wildcard $(TOPDIR)/*.h)
+
+$(SHIM_DB_FILE): $(MMNAME) $(FBNAME)
+	hash-to-efi-sig-list $^ $@
 
 cert.o : $(TOPDIR)/cert.S
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -285,6 +293,7 @@ clean-shim-objs:
 	$(MAKE) -C lib -f $(TOPDIR)/lib/Makefile clean
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
 	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
+	@rm -vf $(SHIM_DB_FILE)
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
