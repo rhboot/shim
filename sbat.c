@@ -280,7 +280,7 @@ parse_sbat_var(list_t *entries)
 	if (!entries)
 		return EFI_INVALID_PARAMETER;
 
-	efi_status = get_variable(L"SBAT", &data, &datasize, SHIM_LOCK_GUID);
+	efi_status = get_variable(SBAT_VAR_NAME, &data, &datasize, SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		LogError(L"Failed to read SBAT variable\n", efi_status);
 		return efi_status;
@@ -293,6 +293,17 @@ parse_sbat_var(list_t *entries)
 	return parse_sbat_var_data(entries, data, datasize+1);
 }
 
+static bool
+check_sbat_var_attributes(UINT32 attributes)
+{
+#ifdef ENABLE_SHIM_DEVEL
+	return attributes == UEFI_VAR_NV_BS_RT;
+#else
+	return attributes == UEFI_VAR_NV_BS ||
+	       attributes == UEFI_VAR_NV_BS_TIMEAUTH;
+#endif
+}
+
 EFI_STATUS
 set_sbat_uefi_variable(void)
 {
@@ -302,7 +313,7 @@ set_sbat_uefi_variable(void)
 	UINT8 *sbat = NULL;
 	UINTN sbatsize = 0;
 
-	efi_status = get_variable_attr(L"SBAT", &sbat, &sbatsize,
+	efi_status = get_variable_attr(SBAT_VAR_NAME, &sbat, &sbatsize,
 				       SHIM_LOCK_GUID, &attributes);
 	/*
 	 * Always set the SBAT UEFI variable if it fails to read.
@@ -312,8 +323,7 @@ set_sbat_uefi_variable(void)
 	 */
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
-	} else if ((attributes == UEFI_VAR_NV_BS ||
-	            attributes == UEFI_VAR_NV_BS_TIMEAUTH) &&
+	} else if (check_sbat_var_attributes(attributes) &&
 	           sbatsize >= strlen(SBAT_VAR_SIG "1") &&
 	           strncmp((const char *)sbat, SBAT_VAR_SIG,
 	                   strlen(SBAT_VAR_SIG))) {
@@ -323,7 +333,8 @@ set_sbat_uefi_variable(void)
 		FreePool(sbat);
 
 		/* delete previous variable */
-		efi_status = set_variable(L"SBAT", SHIM_LOCK_GUID, attributes, 0, "");
+		efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID,
+		                          attributes, 0, "");
 		if (EFI_ERROR(efi_status)) {
 			dprint(L"SBAT variable delete failed %r\n", efi_status);
 			return efi_status;
@@ -331,7 +342,7 @@ set_sbat_uefi_variable(void)
 	}
 
 	/* set variable */
-	efi_status = set_variable(L"SBAT", SHIM_LOCK_GUID, UEFI_VAR_NV_BS,
+	efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID, SBAT_VAR_ATTRS,
 	                          sizeof(SBAT_VAR), SBAT_VAR);
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT variable writing failed %r\n", efi_status);
@@ -339,7 +350,8 @@ set_sbat_uefi_variable(void)
 	}
 
 	/* verify that the expected data is there */
-	efi_status = get_variable(L"SBAT", &sbat, &sbatsize, SHIM_LOCK_GUID);
+	efi_status = get_variable(SBAT_VAR_NAME, &sbat, &sbatsize,
+				  SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
 		return efi_status;
