@@ -224,6 +224,9 @@ get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
 {
 	EFI_STATUS efi_status;
 
+	if (!len)
+		return EFI_INVALID_PARAMETER;
+
 	*len = 0;
 
 	efi_status = gRT->GetVariable((CHAR16 *)var, &owner, NULL, len, NULL);
@@ -232,6 +235,9 @@ get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
 			return EFI_PROTOCOL_ERROR;
 		return efi_status;
 	}
+
+	if (!data)
+		return EFI_INVALID_PARAMETER;
 
 	/*
 	 * Add three zero pad bytes; at least one correctly aligned UCS-2
