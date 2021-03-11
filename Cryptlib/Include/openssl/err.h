@@ -345,7 +345,7 @@ void ERR_print_errors_fp(FILE *fp);
 void ERR_print_errors(BIO *bp);
 # endif
 void EFIAPI ERR_add_error_data(int num, ...);
-void EFIAPI ERR_add_error_vdata(int num, va_list args);
+void EFIAPI ERR_add_error_vdata(int num, ms_va_list args);
 void ERR_load_strings(int lib, ERR_STRING_DATA str[]);
 void ERR_unload_strings(int lib, ERR_STRING_DATA str[]);
 void ERR_load_ERR_strings(void);

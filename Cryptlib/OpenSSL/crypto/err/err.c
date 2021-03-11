@@ -1077,13 +1077,13 @@ void ERR_set_error_data(char *data, int flags)
 
 void EFIAPI ERR_add_error_data(int num, ...)
 {
-    va_list args;
-    va_start(args, num);
+    ms_va_list args;
+    ms_va_start(args, num);
     ERR_add_error_vdata(num, args);
-    va_end(args);
+    ms_va_end(args);
 }
 
-void EFIAPI ERR_add_error_vdata(int num, va_list args)
+void EFIAPI ERR_add_error_vdata(int num, ms_va_list args)
 {
     int i, n, s;
     char *str, *p, *a;
@@ -1096,7 +1096,7 @@ void EFIAPI ERR_add_error_vdata(int num, va_list args)
 
     n = 0;
     for (i = 0; i < num; i++) {
-        a = va_arg(args, char *);
+        a = ms_va_arg(args, char *);
         /* ignore NULLs, thanks to Bob Beck <beck@obtuse.com> */
         if (a != NULL) {
             n += strlen(a);

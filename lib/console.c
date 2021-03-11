@@ -86,15 +86,15 @@ VOID console_fini(VOID)
 UINTN EFIAPI
 console_print(const CHAR16 *fmt, ...)
 {
-	va_list args;
+	ms_va_list args;
 	UINTN ret;
 
 	if (!console_text_mode)
 		setup_console(1);
 
-	va_start(args, fmt);
+	ms_va_start(args, fmt);
 	ret = VPrint(fmt, args);
-	va_end(args);
+	ms_va_end(args);
 
 	return ret;
 }
@@ -103,7 +103,7 @@ UINTN EFIAPI
 console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-	va_list args;
+	ms_va_list args;
 	UINTN ret;
 
 	if (!console_text_mode)
@@ -111,9 +111,9 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 
 	co->SetCursorPosition(co, col, row);
 
-	va_start(args, fmt);
+	ms_va_start(args, fmt);
 	ret = VPrint(fmt, args);
-	va_end(args);
+	ms_va_end(args);
 
 	return ret;
 }

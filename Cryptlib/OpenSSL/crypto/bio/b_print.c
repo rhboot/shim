@@ -136,7 +136,7 @@ static int fmtfp(char **, char **, size_t *, size_t *,
 static int doapr_outch(char **, char **, size_t *, size_t *, int);
 static int EFIAPI _dopr(char **sbuffer, char **buffer,
 			size_t *maxlen, size_t *retlen, int *truncated,
-			const char *format, va_list args);
+			const char *format, ms_va_list args);
 
 /* format read states */
 #define DP_S_DEFAULT    0
@@ -171,7 +171,7 @@ static int EFIAPI
 _dopr(char **sbuffer,
       char **buffer,
       size_t *maxlen,
-      size_t *retlen, int *truncated, const char *format, va_list args)
+      size_t *retlen, int *truncated, const char *format, ms_va_list args)
 {
     char ch;
     LLONG value;
@@ -236,7 +236,7 @@ _dopr(char **sbuffer,
                 min = 10 * min + char_to_int(ch);
                 ch = *format++;
             } else if (ch == '*') {
-                min = va_arg(args, int);
+                min = ms_va_arg(args, int);
                 ch = *format++;
                 state = DP_S_DOT;
             } else
@@ -256,7 +256,7 @@ _dopr(char **sbuffer,
                 max = 10 * max + char_to_int(ch);
                 ch = *format++;
             } else if (ch == '*') {
-                max = va_arg(args, int);
+                max = ms_va_arg(args, int);
                 ch = *format++;
                 state = DP_S_MOD;
             } else
@@ -297,16 +297,16 @@ _dopr(char **sbuffer,
             case 'i':
                 switch (cflags) {
                 case DP_C_SHORT:
-                    value = (short int)va_arg(args, int);
+                    value = (short int)ms_va_arg(args, int);
                     break;
                 case DP_C_LONG:
-                    value = va_arg(args, long int);
+                    value = ms_va_arg(args, long int);
                     break;
                 case DP_C_LLONG:
-                    value = va_arg(args, LLONG);
+                    value = ms_va_arg(args, LLONG);
                     break;
                 default:
-                    value = va_arg(args, int);
+                    value = ms_va_arg(args, int);
                     break;
                 }
                 if (!fmtint(sbuffer, buffer, &currlen, maxlen, value, 10, min,
@@ -322,16 +322,16 @@ _dopr(char **sbuffer,
                 flags |= DP_F_UNSIGNED;
                 switch (cflags) {
                 case DP_C_SHORT:
-                    value = (unsigned short int)va_arg(args, unsigned int);
+                    value = (unsigned short int)ms_va_arg(args, unsigned int);
                     break;
                 case DP_C_LONG:
-                    value = (LLONG) va_arg(args, unsigned long int);
+                    value = (LLONG) ms_va_arg(args, unsigned long int);
                     break;
                 case DP_C_LLONG:
-                    value = va_arg(args, unsigned LLONG);
+                    value = ms_va_arg(args, unsigned LLONG);
                     break;
                 default:
-                    value = (LLONG) va_arg(args, unsigned int);
+                    value = (LLONG) ms_va_arg(args, unsigned int);
                     break;
                 }
                 if (!fmtint(sbuffer, buffer, &currlen, maxlen, value,
@@ -342,9 +342,9 @@ _dopr(char **sbuffer,
 #ifndef OPENSSL_SYS_UEFI
             case 'f':
                 if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
+                    fvalue = ms_va_arg(args, LDOUBLE);
                 else
-                    fvalue = va_arg(args, double);
+                    fvalue = ms_va_arg(args, double);
                 if (!fmtfp(sbuffer, buffer, &currlen, maxlen, fvalue, min, max,
                            flags))
                     return 0;
@@ -353,26 +353,26 @@ _dopr(char **sbuffer,
                 flags |= DP_F_UP;
             case 'e':
                 if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
+                    fvalue = ms_va_arg(args, LDOUBLE);
                 else
-                    fvalue = va_arg(args, double);
+                    fvalue = ms_va_arg(args, double);
                 break;
             case 'G':
                 flags |= DP_F_UP;
             case 'g':
                 if (cflags == DP_C_LDOUBLE)
-                    fvalue = va_arg(args, LDOUBLE);
+                    fvalue = ms_va_arg(args, LDOUBLE);
                 else
-                    fvalue = va_arg(args, double);
+                    fvalue = ms_va_arg(args, double);
                 break;
 #endif
             case 'c':
                 if(!doapr_outch(sbuffer, buffer, &currlen, maxlen,
-                            va_arg(args, int)))
+                            ms_va_arg(args, int)))
                     return 0;
                 break;
             case 's':
-                strvalue = va_arg(args, char *);
+                strvalue = ms_va_arg(args, char *);
                 if (max < 0) {
                     if (buffer)
                         max = INT_MAX;
@@ -384,7 +384,7 @@ _dopr(char **sbuffer,
                     return 0;
                 break;
             case 'p':
-                value = (long)va_arg(args, void *);
+                value = (long)ms_va_arg(args, void *);
                 if (!fmtint(sbuffer, buffer, &currlen, maxlen,
                             value, 16, min, max, flags | DP_F_NUM))
                     return 0;
@@ -392,19 +392,19 @@ _dopr(char **sbuffer,
             case 'n':          /* XXX */
                 if (cflags == DP_C_SHORT) {
                     short int *num;
-                    num = va_arg(args, short int *);
+                    num = ms_va_arg(args, short int *);
                     *num = currlen;
                 } else if (cflags == DP_C_LONG) { /* XXX */
                     long int *num;
-                    num = va_arg(args, long int *);
+                    num = ms_va_arg(args, long int *);
                     *num = (long int)currlen;
                 } else if (cflags == DP_C_LLONG) { /* XXX */
                     LLONG *num;
-                    num = va_arg(args, LLONG *);
+                    num = ms_va_arg(args, LLONG *);
                     *num = (LLONG) currlen;
                 } else {
                     int *num;
-                    num = va_arg(args, int *);
+                    num = ms_va_arg(args, int *);
                     *num = currlen;
                 }
                 break;
@@ -799,18 +799,18 @@ doapr_outch(char **sbuffer,
 
 int EFIAPI BIO_printf(BIO *bio, const char *format, ...)
 {
-    va_list args;
+    ms_va_list args;
     int ret;
 
-    va_start(args, format);
+    ms_va_start(args, format);
 
     ret = BIO_vprintf(bio, format, args);
 
-    va_end(args);
+    ms_va_end(args);
     return (ret);
 }
 
-int EFIAPI BIO_vprintf(BIO *bio, const char *format, va_list args)
+int EFIAPI BIO_vprintf(BIO *bio, const char *format, ms_va_list args)
 {
     int ret;
     size_t retlen;
@@ -847,18 +847,18 @@ int EFIAPI BIO_vprintf(BIO *bio, const char *format, va_list args)
  */
 int EFIAPI BIO_snprintf(char *buf, size_t n, const char *format, ...)
 {
-    va_list args;
+    ms_va_list args;
     int ret;
 
-    va_start(args, format);
+    ms_va_start(args, format);
 
     ret = BIO_vsnprintf(buf, n, format, args);
 
-    va_end(args);
+    ms_va_end(args);
     return (ret);
 }
 
-int EFIAPI BIO_vsnprintf(char *buf, size_t n, const char *format, va_list args)
+int EFIAPI BIO_vsnprintf(char *buf, size_t n, const char *format, ms_va_list args)
 {
     size_t retlen;
     int truncated;

@@ -22,6 +22,7 @@
 
 #if defined(__x86_64__)
 /* gcc 4.5.4 is the first documented release with -mabi=ms */
+/* gcc 4.7.1 is the first one with __builtin_ms_va_list */
 #if !GNUC_PREREQ(4, 7) && !CLANG_PREREQ(3, 4)
 #error On x86_64 you must have a compiler new enough to support __attribute__((__ms_abi__))
 #endif
@@ -226,7 +227,7 @@ extern void shim_fini(void);
 extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
                                    const CHAR16 *fmt, ...);
 extern EFI_STATUS EFIAPI VLogError(const char *file, int line, const char *func,
-                                   const CHAR16 *fmt, va_list args);
+                                   const CHAR16 *fmt, ms_va_list args);
 extern VOID LogHexdump_(const char *file, int line, const char *func,
                         const void *data, size_t sz);
 extern VOID PrintErrors(VOID);
