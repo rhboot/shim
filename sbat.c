@@ -324,8 +324,8 @@ set_sbat_uefi_variable(void)
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
 	} else if (check_sbat_var_attributes(attributes) &&
-	           sbatsize >= strlen(SBAT_VAR_SIG "1") &&
-	           strncmp((const char *)sbat, SBAT_VAR_SIG,
+		   sbatsize >= strlen(SBAT_VAR_SIG "1") &&
+		   strncmp((const char *)sbat, SBAT_VAR_SIG,
 	                   strlen(SBAT_VAR_SIG))) {
 		dprint("SBAT variable is %d bytes, attributes are 0x%08x\n",
 		       sbatsize, attributes);
@@ -348,7 +348,7 @@ set_sbat_uefi_variable(void)
 
 	/* set variable */
 	efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID, SBAT_VAR_ATTRS,
-	                          sizeof(SBAT_VAR), SBAT_VAR);
+	                          sizeof(SBAT_VAR)-1, SBAT_VAR);
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT variable writing failed %r\n", efi_status);
 		return efi_status;
