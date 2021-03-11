@@ -327,12 +327,17 @@ set_sbat_uefi_variable(void)
 	           sbatsize >= strlen(SBAT_VAR_SIG "1") &&
 	           strncmp((const char *)sbat, SBAT_VAR_SIG,
 	                   strlen(SBAT_VAR_SIG))) {
+		dprint("SBAT variable is %d bytes, attributes are 0x%08x\n",
+		       sbatsize, attributes);
 		FreePool(sbat);
 		return EFI_SUCCESS;
 	} else {
 		FreePool(sbat);
 
 		/* delete previous variable */
+		dprint("%s variable is %d bytes, attributes are 0x%08x\n",
+		       SBAT_VAR_NAME, sbatsize, attributes);
+		dprint("Deleting %s variable.\n", SBAT_VAR_NAME);
 		efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID,
 		                          attributes, 0, "");
 		if (EFI_ERROR(efi_status)) {
@@ -359,6 +364,8 @@ set_sbat_uefi_variable(void)
 
 	if (sbatsize != strlen(SBAT_VAR) ||
 	    strncmp((const char *)sbat, SBAT_VAR, strlen(SBAT_VAR)) != 0) {
+		dprint("new sbatsize is %d, expected %d\n", sbatsize,
+		       strlen(SBAT_VAR));
 		efi_status = EFI_INVALID_PARAMETER;
 	} else {
 		dprint(L"SBAT variable initialization succeeded\n");
