@@ -29,6 +29,8 @@ CFLAGS = -O2 -ggdb -std=gnu11 \
 	 "-DDEFAULT_DEBUG_PRINT_STATE=$(DEBUG_PRINTS)"
 
 $(wildcard test-*.c) :: %.c : test-random.h
+$(patsubst %.c,%,$(wildcard test-*.c)) :: | test-random.h
+$(patsubst %.c,%.o,$(wildcard test-*.c)) : | test-random.h
 
 test-random.h:
 	dd if=/dev/urandom bs=512 count=17 of=random.bin
