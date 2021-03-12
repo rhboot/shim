@@ -1,15 +1,49 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 /**
- * macros to build builtin wrappers
+ * macros to build function declarations with the same types as builtins
+ * that we apparently really cannot depend on.
  */
+
+/*
+ * Clang's __builtin_whatever and __typeof__ are broken thusly:
+ * In file included from MokManager.c:2:
+ * In file included from shim.h:47:
+ * include/system/string.h:29:1: error: builtin functions must be directly called
+ * mkbi1_(long int, ffsl, long int, x)
+ * ^
+ */
+#if defined(__clang__)
+
+#ifndef mkbi1_
+#define mkbi1_(rtype, x, typea, a) rtype x(typea a);
+#endif
+
+#ifndef mkbi2_
+#define mkbi2_(rtype, x, typea, a, typeb, b) rtype x(typea a, typeb b);
+#endif
+
+#ifndef mkbi3_
+#define mkbi3_(rtype, x, typea, a, typeb, b, typec, c) rtype x(typea a, typeb b, typec c);
+#endif
+
+#ifndef mkdepbi1_
+#define mkdepbi1_(rtype, x, typea, a) rtype x(typea a);
+#endif
+
+#ifndef mkdepbi2_
+#define mkdepbi2_(rtype, x, typea, a, typeb, b) rtype x(typea a, typeb b);
+#endif
+
+#else /* !__clang__ */
+
 #ifndef mkbi_cat_
 #define mkbi_cat_(a, b) a##b
 #endif
-#ifdef SHIM_STRING_C_
 
 #ifndef mkbi1_
 #define mkbi1_(rtype, x, typea, a) __typeof__(mkbi_cat_(__builtin_, x)) x;
 #endif
+
 #ifndef mkbi2_
 #define mkbi2_(rtype, x, typea, a, typeb, b) __typeof__(mkbi_cat_(__builtin_, x)) x;
 #endif
@@ -26,69 +60,6 @@
 #define mkdepbi2_(rtype, x, typea, a, typeb, b) __typeof__(mkbi_cat_(__builtin_, x)) x;
 #endif
 
-#else /* ! SHIM_STRING_C_ */
-
-#ifndef mkbi1_
-#define mkbi1_(rtype, x, typea, a)			\
-	static inline __attribute__((__unused__))	\
-	rtype						\
-        x(typea a)					\
-	{						\
-		return mkbi_cat_(__builtin_, x)(a);	\
-	}
-#endif
-
-#ifndef mkbi2_
-#define mkbi2_(rtype, x, typea, a, typeb, b)            \
-	static inline __attribute__((__unused__))	\
-	rtype						\
-        x(typea a, typeb b)                             \
-	{                                               \
-		return mkbi_cat_(__builtin_, x)(a, b);	\
-	}
-#endif
-
-#ifndef mkbi3_
-#define mkbi3_(rtype, x, typea, a, typeb, b, typec, c)		\
-	static inline __attribute__((__unused__))		\
-	rtype							\
-        x(typea a, typeb b, typec c)				\
-	{							\
-		return mkbi_cat_(__builtin_, x)(a, b,c);	\
-	}
-#endif
-
-#ifdef SHIM_DEPRECATE_STRLEN
-#ifndef mkdepbi_dep_
-#define mkdepbi_dep_ __attribute__((__deprecated__))
-#endif
-#else /* !SHIM_DEPRECATE_STRLEN */
-#ifndef mkdepbi_dep_
-#define mkdepbi_dep_
-#endif
-#endif /* SHIM_DEPRECATE_STRLEN */
-
-#ifndef mkdepbi1_
-#define mkdepbi1_(rtype, x, typea, a)			\
-	static inline __attribute__((__unused__))	\
-	mkdepbi_dep_					\
-	rtype						\
-        x(typea a)					\
-	{						\
-		return mkbi_cat_(__builtin_, x)(a);	\
-	}
-#endif
-
-#ifndef mkdepbi2_
-#define mkdepbi2_(rtype, x, typea, a, typeb, b)         \
-	static inline __attribute__((__unused__))	\
-	mkdepbi_dep_					\
-	rtype						\
-        x(typea a, typeb b)                             \
-	{                                               \
-		return mkbi_cat_(__builtin_, x)(a, b);	\
-	}
-#endif
-#endif /* SHIM_STRING_C_ */
+#endif /* !__clang__ */
 
 // vim:fenc=utf-8:tw=75:noet
