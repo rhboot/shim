@@ -707,11 +707,13 @@ test_strncmp(void)
 	status = MIN(rc, status);
 #pragma GCC diagnostic pop
 
+#ifndef __aarch64__
 	/*
 	 * gnu-efi's broken strncmpa with the return type fixed
 	 */
 	rc = test_strncmp_helper(gnuefi_signed_strncmp, true, false, true);
 	status = MIN(rc, status);
+#endif
 
 	/*
 	 * gnu-efi's strncmpa with the return type fixed and unsigned
