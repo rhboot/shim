@@ -65,7 +65,12 @@ ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE_WAIT=$(FALLBACK_VERBOSE_WAIT)
 endif
 
-all: $(TARGETS)
+all: confcheck $(TARGETS)
+
+confcheck:
+ifneq ($(origin EFI_PATH),undefined)
+	$(error EFI_PATH is no longer supported, you must build using the supplied copy of gnu-efi)
+endif
 
 update :
 	git submodule update --init --recursive

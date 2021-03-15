@@ -43,7 +43,7 @@ SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 EFI_INCLUDE	?= $(TOPDIR)/gnu-efi/inc
 EFI_INCLUDES	= -I$(EFI_INCLUDE) -I$(EFI_INCLUDE)/$(ARCH) -I$(EFI_INCLUDE)/protocol
 override EFI_INCLUDES := $(EFI_INCLUDES)
-EFI_CRT_OBJS 	= $(EFI_PATH)/crt0-efi-$(ARCH_GNUEFI).o
+EFI_CRT_OBJS 	= $(LOCAL_EFI_PATH)/crt0-efi-$(ARCH_GNUEFI).o
 EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
@@ -149,8 +149,8 @@ endif
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --target efi-app-$(ARCH)
-EFI_PATH	?= gnu-efi/$(ARCH_GNUEFI)/gnuefi
-LIBDIR		?= gnu-efi/$(ARCH_GNUEFI)/lib
+LOCAL_EFI_PATH	= gnu-efi/$(ARCH_GNUEFI)/gnuefi
+LIBDIR		= gnu-efi/$(ARCH_GNUEFI)/lib
 
 MMSTEM		?= mm$(ARCH_SUFFIX)
 MMNAME		= $(MMSTEM).efi
@@ -178,7 +178,7 @@ ifneq ($(origin VENDOR_DBX_FILE), undefined)
 DEFINES		+= -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
 
-LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
+LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(LOCAL_EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
 
 ifneq ($(DEBUG),)
 export DEBUG
