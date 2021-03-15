@@ -1520,7 +1520,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	 * case.
 	 */
 	if (strings == 1) {
-		UINT16 *cur = li->LoadOptions;
+		UINT16 *cur = start = li->LoadOptions;
 
 		/* replace L' ' with L'\0' if we find any */
 		for (i = 0; i < li->LoadOptionsSize / 2; i++) {
