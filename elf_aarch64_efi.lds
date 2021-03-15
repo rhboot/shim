@@ -77,6 +77,7 @@ SECTIONS
   }
   _esbat = .;
   _sbat_size = . - _sbat;
+  _alldata_size = . - _data;
 
   . = ALIGN(4096);
   .dynsym   : { *(.dynsym) }
