@@ -1545,11 +1545,8 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 							   li->LoadOptionsSize,
 							   (UINT8 **)&start,
 							   &loader_len);
-		if (EFI_ERROR(efi_status)) {
-			/* maybe this is just a single string? */
-			start = li->LoadOptions;
-			loader_len = li->LoadOptionsSize;
-		}
+		if (EFI_ERROR(efi_status))
+			return EFI_SUCCESS;
 
 		remaining_size = 0;
 	} else if (strings >= 2) {
