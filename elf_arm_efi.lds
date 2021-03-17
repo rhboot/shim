@@ -74,6 +74,8 @@ SECTIONS
     *(.sbat.*)
   }
   _esbat = .;
+  _sbat_vsize = . - _sbat;
+  . = ALIGN(4096);
   _sbat_size = . - _sbat;
   _alldata_size = . - _data;
 
