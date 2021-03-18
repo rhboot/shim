@@ -303,8 +303,8 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	       UINTN *newsz, SIZE_T maxsz)
 {
 	EFI_STATUS efi_status;
-	SIZE_T howmany, varsz = 0, esdsz;
-	UINT8 *var, *data;
+	SIZE_T howmany, varsz = 0;
+	UINT8 *var;
 
 	howmany = MIN((maxsz - sizeof(*esl)) / esl->SignatureSize,
 		      (esl->SignatureListSize - sizeof(*esl)) / esl->SignatureSize);
@@ -316,8 +316,6 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	 * We always assume esl->SignatureHeaderSize is 0 (and so far,
 	 * that's true as per UEFI 2.8)
 	 */
-	esdsz = howmany * esl->SignatureSize;
-	data = (UINT8 *)esd;
 	dprint(L"Trying to add %lx signatures to \"%s\" of size %lx\n",
 	       howmany, name, esl->SignatureSize);
 
@@ -327,10 +325,9 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	 *
 	 * Compensate here.
 	 */
-	efi_status = variable_create_esl(data + sizeof(EFI_GUID),
-					 esdsz - sizeof(EFI_GUID),
+	efi_status = variable_create_esl(esd, howmany,
 					 &esl->SignatureType,
-					 &esd->SignatureOwner,
+					 esl->SignatureSize,
 					 &var, &varsz);
 	if (EFI_ERROR(efi_status) || !var || !varsz) {
 		LogError(L"Couldn't allocate %lu bytes for mok variable \"%s\": %r\n",
@@ -349,7 +346,7 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 		return efi_status;
 	}
 
-	*newsz = esdsz;
+	*newsz = howmany * esl->SignatureSize;
 
 	return efi_status;
 }
@@ -507,7 +504,7 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 		UINT8 *var;
 		UINTN varsz;
 
-		efi_status = variable_create_esl(
+		efi_status = variable_create_esl_with_one_signature(
 				null_sha256, sizeof(null_sha256),
 				&EFI_CERT_SHA256_GUID, &SHIM_LOCK_GUID,
 				&var, &varsz);
@@ -592,10 +589,12 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			       FullDataSize, FullData);
 			break;
 		case VENDOR_ADDEND_X509:
-			efi_status = fill_esl(*v->addend, *v->addend_size,
-					      &EFI_CERT_TYPE_X509_GUID,
-					      &SHIM_LOCK_GUID,
-					      NULL, &addend_esl_sz);
+			efi_status = fill_esl_with_one_signature(*v->addend,
+								 *v->addend_size,
+								 &EFI_CERT_TYPE_X509_GUID,
+								 &SHIM_LOCK_GUID,
+								 NULL,
+								 &addend_esl_sz);
 			if (efi_status != EFI_BUFFER_TOO_SMALL) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
@@ -616,11 +615,11 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 		 * then the build cert if it's there
 		 */
 		if (should_mirror_build_cert(v)) {
-			efi_status = fill_esl(*v->build_cert,
-					      *v->build_cert_size,
-					      &EFI_CERT_TYPE_X509_GUID,
-					      &SHIM_LOCK_GUID,
-					      NULL, &build_cert_esl_sz);
+			efi_status = fill_esl_with_one_signature(*v->build_cert,
+								 *v->build_cert_size,
+								 &EFI_CERT_TYPE_X509_GUID,
+								 &SHIM_LOCK_GUID,
+								 NULL, &build_cert_esl_sz);
 			if (efi_status != EFI_BUFFER_TOO_SMALL) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
@@ -703,10 +702,11 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
 			break;
 		case VENDOR_ADDEND_X509:
-			efi_status = fill_esl(*v->addend, *v->addend_size,
-					      &EFI_CERT_TYPE_X509_GUID,
-					      &SHIM_LOCK_GUID,
-					      p, &addend_esl_sz);
+			efi_status = fill_esl_with_one_signature(*v->addend,
+								 *v->addend_size,
+								 &EFI_CERT_TYPE_X509_GUID,
+								 &SHIM_LOCK_GUID,
+								 p, &addend_esl_sz);
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
@@ -729,11 +729,11 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 		dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
 		       FullDataSize, FullData, p, p-(uintptr_t)FullData);
 		if (should_mirror_build_cert(v)) {
-			efi_status = fill_esl(*v->build_cert,
-					      *v->build_cert_size,
-					      &EFI_CERT_TYPE_X509_GUID,
-					      &SHIM_LOCK_GUID,
-					      p, &build_cert_esl_sz);
+			efi_status = fill_esl_with_one_signature(*v->build_cert,
+								 *v->build_cert_size,
+								 &EFI_CERT_TYPE_X509_GUID,
+								 &SHIM_LOCK_GUID,
+								 p, &build_cert_esl_sz);
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
@@ -765,7 +765,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 	 * need a dummy entry
 	 */
 	if ((v->flags & MOK_MIRROR_KEYDB) && FullDataSize == 0) {
-		efi_status = variable_create_esl(
+		efi_status = variable_create_esl_with_one_signature(
 				null_sha256, sizeof(null_sha256),
 				&EFI_CERT_SHA256_GUID, &SHIM_LOCK_GUID,
 				&FullData, &FullDataSize);
