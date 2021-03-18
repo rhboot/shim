@@ -361,19 +361,19 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	SIZE_T max_var_sz;
 
-	if (only_first) {
-		efi_status = get_max_var_sz(attrs, &max_var_sz);
-		if (EFI_ERROR(efi_status)) {
-			LogError(L"Could not get maximum variable size: %r",
-				 efi_status);
-			return efi_status;
-		}
+	efi_status = get_max_var_sz(attrs, &max_var_sz);
+	if (EFI_ERROR(efi_status)) {
+		LogError(L"Could not get maximum variable size: %r",
+			 efi_status);
+		return efi_status;
+	}
 
-		if (FullDataSize <= max_var_sz) {
+	if (FullDataSize <= max_var_sz) {
+		if (only_first)
 			efi_status = SetVariable(name, guid, attrs,
 						 FullDataSize, FullData);
-			return efi_status;
-		}
+
+		return efi_status;
 	}
 
 	CHAR16 *namen;
