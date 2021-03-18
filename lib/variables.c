@@ -13,18 +13,24 @@
 #include "shim.h"
 
 EFI_STATUS
-fill_esl(const uint8_t *data, const size_t data_len,
-	 const EFI_GUID *type, const EFI_GUID *owner,
+fill_esl(const EFI_SIGNATURE_DATA *first_sig, const size_t howmany,
+	 const EFI_GUID *type, const UINT32 sig_size,
 	 uint8_t *out, size_t *outlen)
 {
 	EFI_SIGNATURE_LIST *sl;
 	EFI_SIGNATURE_DATA *sd;
 	size_t needed = 0;
+	size_t data_len = howmany * sig_size;
 
-	if (!data || !data_len || !type || !outlen)
+	dprint(L"fill_esl: data=%p, data_len=%lu", first_sig, data_len);
+
+	if ((out && !first_sig) || !howmany || !type || !sig_size || !outlen)
 		return EFI_INVALID_PARAMETER;
 
-	needed = sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID) + data_len;
+	if (howmany > (UINT32_MAX - sizeof(EFI_SIGNATURE_LIST)) / sig_size)
+		return EFI_INVALID_PARAMETER;
+
+	needed = sizeof(EFI_SIGNATURE_LIST) + data_len;
 	if (!out || *outlen < needed) {
 		*outlen = needed;
 		return EFI_BUFFER_TOO_SMALL;
@@ -35,27 +41,50 @@ fill_esl(const uint8_t *data, const size_t data_len,
 
 	sl->SignatureHeaderSize = 0;
 	sl->SignatureType = *type;
-	sl->SignatureSize = sizeof(EFI_GUID) + data_len;
+	sl->SignatureSize = sig_size;
 	sl->SignatureListSize = needed;
 
 	sd = (EFI_SIGNATURE_DATA *)(out + sizeof(EFI_SIGNATURE_LIST));
-	if (owner)
-		sd->SignatureOwner = *owner;
-
-	CopyMem(sd->SignatureData, data, data_len);
+	CopyMem(sd, first_sig, data_len);
 
 	return EFI_SUCCESS;
 }
 
 EFI_STATUS
-variable_create_esl(const uint8_t *data, const size_t data_len,
-		    const EFI_GUID *type, const EFI_GUID *owner,
+fill_esl_with_one_signature(const uint8_t *data, const uint32_t data_len,
+			    const EFI_GUID *type, const EFI_GUID *owner,
+			    uint8_t *out, size_t *outlen)
+{
+	EFI_STATUS efi_status;
+	EFI_SIGNATURE_DATA *sd = NULL;
+	UINT32 sig_size = sizeof(EFI_SIGNATURE_DATA) - 1 + data_len;
+
+	if (data_len > UINT32_MAX - sizeof(EFI_SIGNATURE_DATA) + 1)
+		return EFI_INVALID_PARAMETER;
+
+	if (out) {
+		sd = AllocateZeroPool(sig_size);
+		if (owner)
+			CopyMem(sd, owner, sizeof(EFI_GUID));
+		CopyMem(sd->SignatureData, data, data_len);
+	}
+
+	efi_status = fill_esl(sd, 1, type, sig_size, out, outlen);
+
+	if (out)
+		FreePool(sd);
+	return efi_status;
+}
+
+EFI_STATUS
+variable_create_esl(const EFI_SIGNATURE_DATA *first_sig, const size_t howmany,
+		    const EFI_GUID *type, const UINT32 sig_size,
 		    uint8_t **out, size_t *outlen)
 {
 	EFI_STATUS efi_status;
 
 	*outlen = 0;
-	efi_status = fill_esl(data, data_len, type, owner, NULL, outlen);
+	efi_status = fill_esl(first_sig, howmany, type, sig_size, NULL, outlen);
 	if (efi_status != EFI_BUFFER_TOO_SMALL)
 		return efi_status;
 
@@ -63,7 +92,28 @@ variable_create_esl(const uint8_t *data, const size_t data_len,
 	if (!*out)
 		return EFI_OUT_OF_RESOURCES;
 
-	return fill_esl(data, data_len, type, owner, *out, outlen);
+	return fill_esl(first_sig, howmany, type, sig_size, *out, outlen);
+}
+
+EFI_STATUS
+variable_create_esl_with_one_signature(const uint8_t* data, const size_t data_len,
+				       const EFI_GUID *type, const EFI_GUID *owner,
+				       uint8_t **out, size_t *outlen)
+{
+	EFI_STATUS efi_status;
+
+	*outlen = 0;
+	efi_status = fill_esl_with_one_signature(data, data_len, type, owner,
+						 NULL, outlen);
+	if (efi_status != EFI_BUFFER_TOO_SMALL)
+		return efi_status;
+
+	*out = AllocateZeroPool(*outlen);
+	if (!*out)
+		return EFI_OUT_OF_RESOURCES;
+
+	return fill_esl_with_one_signature(data, data_len, type, owner, *out,
+					   outlen);
 }
 
 EFI_STATUS
@@ -153,8 +203,9 @@ SetSecureVariable(const CHAR16 * const var, UINT8 *Data, UINTN len,
 
 	if (createtimebased) {
 		size_t ds;
-		efi_status = variable_create_esl(Data, len, &X509_GUID, NULL,
-						 (uint8_t **)&Cert, &ds);
+		efi_status = variable_create_esl_with_one_signature(
+			Data, len, &X509_GUID, NULL,
+			(uint8_t **)&Cert, &ds);
 		if (EFI_ERROR(efi_status)) {
 			console_print(L"Failed to create %s certificate %d\n",
 				      var, efi_status);
