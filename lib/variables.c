@@ -22,7 +22,7 @@ fill_esl(const EFI_SIGNATURE_DATA *first_sig, const size_t howmany,
 	size_t needed = 0;
 	size_t data_len = howmany * sig_size;
 
-	dprint(L"fill_esl: data=%p, data_len=%lu", first_sig, data_len);
+	dprint(L"fill_esl: first_sig=0x%llx, data_len=%lu\n", first_sig, data_len);
 
 	if ((out && !first_sig) || !howmany || !type || !sig_size || !outlen)
 		return EFI_INVALID_PARAMETER;

@@ -300,17 +300,11 @@ get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 static EFI_STATUS
 mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	       EFI_SIGNATURE_LIST *esl, EFI_SIGNATURE_DATA *esd,
-	       UINTN *newsz, SIZE_T maxsz)
+	       SIZE_T howmany)
 {
 	EFI_STATUS efi_status;
-	SIZE_T howmany, varsz = 0;
+	SIZE_T varsz = 0;
 	UINT8 *var;
-
-	howmany = MIN((maxsz - sizeof(*esl)) / esl->SignatureSize,
-		      (esl->SignatureListSize - sizeof(*esl)) / esl->SignatureSize);
-	if (howmany < 1) {
-		return EFI_BUFFER_TOO_SMALL;
-	}
 
 	/*
 	 * We always assume esl->SignatureHeaderSize is 0 (and so far,
@@ -345,8 +339,6 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 			 varsz, var, efi_status);
 		return efi_status;
 	}
-
-	*newsz = howmany * esl->SignatureSize;
 
 	return efi_status;
 }
@@ -459,12 +451,25 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 			return efi_status;
 		}
 
+		/* The name counts towards the size of the variable */
+		max_var_sz -= (StrLen(namen) + 1) * 2;
+		dprint(L"max_var_sz - name: %lx\n", max_var_sz);
+
 		SIZE_T howmany;
-		UINTN adj = 0;
 		howmany = MIN((max_var_sz - sizeof(*esl)) / esl->SignatureSize,
-			      (esl->SignatureListSize - sizeof(*esl)) / esl->SignatureSize);
-		if (!only_first && i == 0 && howmany >= 1) {
-			adj = howmany * esl->SignatureSize;
+			      (esl_end_pos - pos) / esl->SignatureSize);
+		if (howmany == 0) {
+			/* No signatures from this ESL can be mirrored in to a
+			 * single variable, so skip it.
+			 */
+			dprint(L"skipping esl, pos:0x%llx->0x%llx\n", pos, esl_end_pos);
+			pos = esl_end_pos;
+			continue;
+		}
+
+		UINTN adj = howmany * esl->SignatureSize;
+
+		if (!only_first && i == 0) {
 			dprint(L"pos:0x%llx->0x%llx\n", pos, pos + adj);
 			pos += adj;
 			i++;
@@ -473,25 +478,25 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 		}
 
 		efi_status = mirror_one_esl(namen, guid, attrs,
-					    esl, esd, &adj, max_var_sz);
+					    esl, esd, howmany);
 		dprint(L"esd:0x%llx adj:0x%llx\n", esd, adj);
-		if (EFI_ERROR(efi_status) && efi_status != EFI_BUFFER_TOO_SMALL) {
+		if (EFI_ERROR(efi_status)) {
 			LogError(L"Could not mirror mok variable \"%s\": %r\n",
 				 namen, efi_status);
 			break;
 		}
 
-		if (!EFI_ERROR(efi_status)) {
-			did_one = TRUE;
-			if (only_first)
-				break;
-			dprint(L"pos:0x%llx->0x%llx\n", pos, pos + adj);
-			pos += adj;
-			i++;
-		}
+		dprint(L"pos:0x%llx->0x%llx\n", pos, pos + adj);
+		pos += adj;
+		did_one = TRUE;
+		if (only_first)
+			break;
+		i++;
 	}
 
-	if (only_first && !did_one) {
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to set %s: %r\n", name, efi_status);
+	} else if (only_first && !did_one) {
 		/*
 		 * In this case we're going to try to create a
 		 * dummy variable so that there's one there.  It
@@ -513,15 +518,12 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 		 * doesn't.
 		 */
 		if (!EFI_ERROR(efi_status) && var && varsz) {
-			SetVariable(name, guid,
+			efi_status = SetVariable(name, guid,
 				    EFI_VARIABLE_BOOTSERVICE_ACCESS
 				    | EFI_VARIABLE_RUNTIME_ACCESS,
 				    varsz, var);
 			FreePool(var);
 		}
-		efi_status = EFI_INVALID_PARAMETER;
-	} else if (EFI_ERROR(efi_status)) {
-		perror(L"Failed to set %s: %r\n", name, efi_status);
 	}
 	return efi_status;
 }
