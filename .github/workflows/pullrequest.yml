@@ -19,32 +19,26 @@ jobs:
             efiarch: x64
             makearch: x86_64
             distro: efi-ci-f34
-            libdir: /usr/lib64
           - arch: amd64
             efiarch: x64
             makearch: x86_64
             distro: efi-ci-f33
-            libdir: /usr/lib64
           - arch: amd64
             efiarch: x64
             makearch: x86_64
             distro: efi-ci-f32
-            libdir: /usr/lib64
           - arch: amd64
             efiarch: ia32
             makearch: ia32
             distro: efi-ci-f34
-            libdir: /usr/lib
           - arch: amd64
             efiarch: ia32
             makearch: ia32
             distro: efi-ci-f33
-            libdir: /usr/lib
           - arch: amd64
             efiarch: ia32
             makearch: ia32
             distro: efi-ci-f32
-            libdir: /usr/lib
 
     steps:
       - name: Checkout
@@ -57,8 +51,8 @@ jobs:
         id: build
         run: |
           make update || :
-          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test 
-          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
-          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make ARCH=${{ matrix.makearch }} PREFIX=/usr LIBDIR=${{ matrix.libdir }} DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test || make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
+          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
           find /destdir -type f
