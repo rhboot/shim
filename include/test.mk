@@ -21,7 +21,7 @@ CFLAGS = -O2 -ggdb -std=gnu11 \
 	 -Wno-unused \
 	 -Werror \
 	 -Werror=nonnull \
-	 -Werror=nonnull-compare \
+	 $(shell $(CC) -Werror=nonnull-compare -E -x c /dev/null >/dev/null 2>&1 && echo -Werror=nonnull-compare) \
 	 $(ARCH_DEFINES) \
 	 -DEFI_FUNCTION_WRAPPER \
 	 -DGNU_EFI_USE_MS_ABI -DPAGE_SIZE=4096 \

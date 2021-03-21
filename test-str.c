@@ -6,6 +6,8 @@
 #pragma GCC diagnostic error "-Wnonnull"
 #pragma GCC diagnostic error "-Wunused-function"
 
+#pragma GCC diagnostic warning "-Wcpp"
+
 #ifndef SHIM_UNIT_TEST
 #define SHIM_UNIT_TEST
 #endif
@@ -1046,8 +1048,29 @@ test_strcat(void)
 
 	memset(s1, 0, 4096);
 	assert_equal_return(strcat(s1, s0), s1, -1, "got %p expected %p\n");
+	/* For unknown reasons, gcc 4.8.5 gives us this here:
+	 * | In file included from shim.h:64:0,
+	 * |                  from test-str.c:14:
+	 * | test-str.c: In function 'test_strcat':
+	 * | include/test.h:85:10: warning: array subscript is below array bounds [-Warray-bounds]
+	 * |     printf("%s:%d:got %lld, expected zero " fmt, __func__, \
+	 * |           ^
+	 * | include/test.h:112:10: warning: array subscript is below array bounds [-Warray-bounds]
+	 * |     printf("%s:%d:got %lld, expected < 0 " fmt, __func__, \
+	 * |           ^
+	 *
+	 * This clearly isn't a useful error message, as it doesn't tell us
+	 * /anything about the problem/, but also it isn't reported on
+	 * later compilers, and it isn't clear that there's any problem
+	 * when examining these functions.
+	 *
+	 * I don't know.
+	 */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic warning "-Warray-bounds"
 	assert_zero_return(strncmp(s1, s0, sizeof(s)-1), 0, -1, "\n");
 	assert_negative_return(memcmp(s1, s0, sizeof(s)), 0, -1, "\n");
+#pragma GCC diagnostic pop
 
 	memset(s1, 0, 4096);
 	assert_equal_return(strcat(s1, s0), s1, -1, "got %p expected %p\n");
