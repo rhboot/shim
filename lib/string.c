@@ -7,7 +7,13 @@
 
 #ifdef SHIM_UNIT_TEST
 #define strlen shim_strlen
+#ifdef strcmp
+#undef strcmp
+#endif
 #define strcmp shim_strcmp
+#ifdef strncmp
+#undef strncmp
+#endif
 #define strncmp shim_strncmp
 #define strncasecmp shim_strncasecmp
 #define strcasecmp shim_strcasecmp
@@ -15,11 +21,26 @@
 #define strlen shim_strlen
 #define strnlen shim_strnlen
 #define strcpy shim_strcpy
+#ifdef strncpy
+#undef strncpy
+#endif
 #define strncpy shim_strncpy
+#ifdef strdup
+#undef strdup
+#endif
 #define strdup shim_strdup
+#ifdef strndup
+#undef strndup
+#endif
 #define strndup shim_strndup
+#ifdef stpcpy
+#undef stpcpy
+#endif
 #define stpcpy shim_stpcpy
 #define strchrnul shim_strchrnul
+#ifdef strchr
+#undef strchr
+#endif
 #define strchr shim_strchr
 #endif
 

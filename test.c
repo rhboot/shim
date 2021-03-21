@@ -12,6 +12,9 @@
 UINT8 in_protocol = 0;
 int debug = DEFAULT_DEBUG_PRINT_STATE;
 
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 EFI_STATUS EFIAPI
 LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
 {
