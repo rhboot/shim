@@ -163,7 +163,7 @@ lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	$(MAKE) VPATH=$(TOPDIR)/lib -C lib -f $(TOPDIR)/lib/Makefile lib.a
 
 buildid : $(TOPDIR)/buildid.c
-	$(CC) -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
+	$(HOSTCC) -I/usr/include -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
 
 $(BOOTCSVNAME) :
 	@echo Making $@
@@ -334,5 +334,5 @@ archive: tag
 
 .PHONY : install-deps shim.key
 
-export ARCH CC LD OBJCOPY EFI_INCLUDE EFI_INCLUDES OPTIMIZATIONS
+export ARCH CC CROSS_COMPILE LD OBJCOPY EFI_INCLUDE EFI_INCLUDES OPTIMIZATIONS
 export FEATUREFLAGS WARNFLAGS WERRFLAGS
