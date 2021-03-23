@@ -308,29 +308,14 @@ clean: clean-shim-objs clean-test-objs clean-gnu-efi clean-openssl-objs clean-cr
 GITTAG = $(VERSION)
 
 test-archive:
-	@rm -rf /tmp/shim-$(VERSION) /tmp/shim-$(VERSION)-tmp
-	@mkdir -p /tmp/shim-$(VERSION)-tmp
-	@git archive --format=tar $(shell git branch | awk '/^*/ { print $$2 }') | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
-	@git diff | ( cd /tmp/shim-$(VERSION)-tmp/ ; patch -s -p1 -b -z .gitdiff )
-	@mv /tmp/shim-$(VERSION)-tmp/ /tmp/shim-$(VERSION)/
-	@git log -1 --pretty=format:%H > /tmp/shim-$(VERSION)/commit
-	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
-	@rm -rf /tmp/shim-$(VERSION)
-	@echo "The archive is in shim-$(VERSION).tar.bz2"
+	@./make-archive $(if $(call get-config,shim.origin),--origin "$(call get-config,shim.origin)") --test "$(VERSION)"
 
 tag:
-	git tag --sign $(GITTAG) refs/heads/master
+	git tag --sign $(GITTAG) refs/heads/main
 	git tag -f latest-release $(GITTAG)
 
 archive: tag
-	@rm -rf /tmp/shim-$(VERSION) /tmp/shim-$(VERSION)-tmp
-	@mkdir -p /tmp/shim-$(VERSION)-tmp
-	@git archive --format=tar $(GITTAG) | ( cd /tmp/shim-$(VERSION)-tmp/ ; tar x )
-	@mv /tmp/shim-$(VERSION)-tmp/ /tmp/shim-$(VERSION)/
-	@git log -1 --pretty=format:%H > /tmp/shim-$(VERSION)/commit
-	@dir=$$PWD; cd /tmp; tar -c --bzip2 -f $$dir/shim-$(VERSION).tar.bz2 shim-$(VERSION)
-	@rm -rf /tmp/shim-$(VERSION)
-	@echo "The archive is in shim-$(VERSION).tar.bz2"
+	@./make-archive $(if $(call get-config,shim.origin),--origin "$(call get-config,shim.origin)") --release "$(VERSION)" "$(GITTAG)" "shim-$(GITTAG)"
 
 .PHONY : install-deps shim.key
 
