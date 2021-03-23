@@ -1,0 +1,102 @@
+#!/bin/sh
+set -e
+
+usage() {
+	status="${1}"
+	if [ "${status}" -eq 0 ] ; then
+		out=/dev/stdout
+	else
+		out=/dev/stderr
+	fi
+	{
+	echo "usage: make-archive [--origin ORIGIN] \\"
+	echo "                    [--test VERSION [GNUEFI_GIT_TAG]"
+	echo "                    |--release VERSION SHIM_GIT_TAG GNUEFI_GIT_TAG]"
+	} >>"${out}"
+	exit "${status}"
+}
+
+main() {
+	VERSION=""
+	SHIM_GIT_TAG=""
+	GNUEFI_GIT_TAG=""
+	ORIGIN="origin"
+	while [ $# -ne 0 ] ; do
+		case "$1" in
+			--help|--usage|-h|"-?")
+				usage 0
+				;;
+			--origin)
+				if [ $# -lt 2 ] ; then
+					echo "error: missing origin" >>/dev/stderr
+					usage 1
+				fi
+				ORIGIN="${2}"
+				shift
+				;;
+			--test)
+				if [ $# -lt 2 ] ; then
+					echo "error: missing version" >>/dev/stderr
+					usage 1
+				fi
+				VERSION="${2}"
+				if [ $# -gt 2 ] ; then
+					GNUEFI_GIT_TAG="${3}"
+					shift
+				fi
+				shift
+				;;
+			--release)
+				if [ $# -lt 2 ] ; then
+					echo "error: missing version" >>/dev/stderr
+					usage 1
+				fi
+				if [ $# -lt 3 ] ; then
+					echo "error: missing shim git tag" >>/dev/stderr
+					usage 1
+				fi
+				if [ $# -lt 4 ] ; then
+					echo "error: missing gnuefi git tag" >>/dev/stderr
+					usage 1
+				fi
+				VERSION="${2}"
+				SHIM_GIT_TAG="${3}"
+				GNUEFI_GIT_TAG="${4}"
+				shift
+				shift
+				shift
+				;;
+			*)
+				echo unknown argument "\"$1\"" >>/dev/stderr
+				usage 1
+				;;
+		esac
+		shift
+	done
+
+	ARCHIVE_DIR="$(mktemp -d)"
+	rm -rf "${ARCHIVE_DIR}/shim-${VERSION}" "${ARCHIVE_DIR}/shim-${VERSION}"
+	mkdir -p "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi"
+	cd gnu-efi || exit 1
+	if [ "x" = "x${GNUEFI_GIT_TAG}" ] ; then
+		git archive --format=tar "$(git log -1 --pretty=format:%h)" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi" ; tar x )
+	else
+		git archive --format=tar "${ORIGIN}/${GNUEFI_GIT_TAG}" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi" ; tar x )
+	fi
+	cd ..
+	if [ "x" = "x${SHIM_GIT_TAG}" ] ; then
+		git archive --format=tar "$(git log -1 --pretty=format:%h)" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}" ; tar x )
+	else
+		# ORIGIN doesn't yet have this tag
+		git archive --format=tar "${SHIM_GIT_TAG}" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}" ; tar x )
+	fi
+	git log -1 --pretty=format:%H > "${ARCHIVE_DIR}/shim-${VERSION}/commit"
+	DIR="$PWD"
+	cd "${ARCHIVE_DIR}"
+	tar -c --bzip2 -f "${DIR}/shim-${VERSION}.tar.bz2" "shim-${VERSION}"
+	rm -rf "${ARCHIVE_DIR}"
+	echo "The archive is in shim-${VERSION}.tar.bz2"
+	exit 0
+}
+
+main "${@}"
