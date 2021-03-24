@@ -110,14 +110,18 @@ jobs:
         id: update-submodules
         run: |
           make update
+      - name: Do 'make clean' on ${{ matrix.distro }} for ${{ matrix.efiarch }}
+        id: clean
+        run: |
+          make CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean
       - name: Do the build on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: build
         run: |
-          make -s CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
+          make CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
       - name: Install on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: install
         run: |
-          make -s CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
+          make CROSS_COMPILE=${{ matrix.gccarch }}-linux-gnu- ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
           find /destdir -type f
 
@@ -190,17 +194,21 @@ jobs:
         id: update-submodules
         run: |
           make update
+      - name: Do 'make clean' on ${{ matrix.distro }} for ${{ matrix.efiarch }}
+        id: clean
+        run: |
+          make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean
       - name: Run tests on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: test
         run: |
-          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test || make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test
+          make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true test
       - name: Do the build on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: build
         run: |
-          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all || make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean all
+          make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true all
       - name: Install on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: install
         run: |
-          make -s ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install || make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
+          make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
           find /destdir -type f
