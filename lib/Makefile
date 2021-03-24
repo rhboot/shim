@@ -1,6 +1,6 @@
 TARGET = lib.a
 
-LIBFILES_UNSORTED := $(foreach x,$(wildcard *.c),$(patsubst %.c,%.o,$(x)))
+LIBFILES_UNSORTED := $(patsubst %.c,%.o,$(subst $(TOPDIR)/lib/,,$(wildcard $(TOPDIR)/lib/*.c)))
 LIBFILES := $(sort $(LIBFILES_UNSORTED))
 
 CRYPTDIR	= $(TOPDIR)/Cryptlib
