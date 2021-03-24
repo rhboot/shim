@@ -1,6 +1,7 @@
 
 # load the local configuration if it exists
 -include Make.local
+-include $(TOPDIR)/Make.local
 
 COMPILER	?= gcc
 CC		= $(CROSS_COMPILE)$(COMPILER)
