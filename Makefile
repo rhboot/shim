@@ -225,6 +225,7 @@ endif
 install-as-data : install-deps
 	$(INSTALL) -d -m 0755 $(DESTDIR)/$(DATATARGETDIR)
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(DATATARGETDIR)/
+	$(INSTALL) -m 0644 $(BOOTCSVNAME) $(DESTDIR)/$(DATATARGETDIR)/
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 	$(INSTALL) -m 0644 $(SHIMHASHNAME) $(DESTDIR)/$(DATATARGETDIR)/
 endif
