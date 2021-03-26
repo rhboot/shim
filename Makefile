@@ -111,7 +111,7 @@ sbat.%.csv : data/sbat.%.csv
 	$(DOS2UNIX) $(D2UFLAGS) $< $@
 	tail -c1 $@ | read -r _ || echo >> $@ # ensure a trailing newline
 
-VENDOR_SBATS := $(foreach x,$(wildcard data/sbat.*.csv),$(notdir $(x)))
+VENDOR_SBATS := $(foreach x,$(wildcard $(TOPDIR)/data/sbat.*.csv),$(notdir $(x)))
 
 sbat_data.o : | $(SBATPATH) $(VENDOR_SBATS)
 sbat_data.o : /dev/null
