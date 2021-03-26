@@ -9,22 +9,12 @@ SECTIONS
     *(.text)
     *(.text.*)
     *(.gnu.linkonce.t.*)
-    *(.srodata)
-    *(.rodata*)
-    . = ALIGN(16);
-    _etext = .;
+    _evtext = .;
+    . = ALIGN(4096);
   }
-  .dynamic  : { *(.dynamic) }
-
-  . = ALIGN(4096);
-  .note.gnu.build-id : {
-    *(.note.gnu.build-id)
-  }
-
-  . = ALIGN(4096);
-  .data.ident : {
-    *(.data.ident)
-  }
+  _etext = .;
+  _text_size = . - _text;
+  _text_vsize = _evtext - _text;
 
   . = ALIGN(4096);
   .data :
@@ -33,9 +23,11 @@ SECTIONS
    *(.sdata)
    *(.data)
    *(.data1)
-   *(.data*)
+   *(.data.*)
    *(.got.plt)
    *(.got)
+
+   *(.dynamic)
 
    /* the EFI loader doesn't seem to like a .bss section, so we stick
       it all into .data: */
@@ -46,53 +38,61 @@ SECTIONS
    *(.dynbss)
    *(.bss)
    *(COMMON)
+   _evdata = .;
    . = ALIGN(4096);
    _bss_end = .;
   }
   _edata = .;
+  _data_vsize = _evdata - _data;
   _data_size = . - _data;
 
+  /*
+   * Note that _sbat must be the beginning of the data, and _esbat must be the
+   * end and must be before any section padding.  The sbat self-check uses
+   * _esbat to find the bounds of the data, and if the padding is included, the
+   * CSV parser (correctly) rejects the data as having NUL values in one of the
+   * required columns.
+   */
   . = ALIGN(4096);
   .sbat :
   {
     _sbat = .;
     *(.sbat)
     *(.sbat.*)
+    _esbat = .;
     . = ALIGN(4096);
+    _epsbat = .;
   }
-  _esbat = .;
-  _sbat_vsize = . - _sbat;
-  . = ALIGN(4096);
-  _sbat_size = . - _sbat;
+  _sbat_size = _epsbat - _sbat;
+  _sbat_vsize = _esbat - _sbat;
 
   . = ALIGN(4096);
-  .vendor_cert :
+  .rodata :
   {
-    _vendor_cert = .;
-    *(.vendor_cert)
-    _evirt_vendor_cert = .;
-    . = ALIGN(4096);
-  }
-  _evendor_cert = .;
-  _vendor_cert_vsize = _evirt_vendor_cert - _vendor_cert;
-  _vendor_cert_size = . - _vendor_cert;
-  _alldata_size = . - _data;
-
-  . = ALIGN(4096);
-  .rel :
-  {
+    _rodata = .;
     *(.rel.dyn)
     *(.rel.plt)
     *(.rel.got)
     *(.rel.data)
     *(.rel.data*)
-  }
 
-  . = ALIGN(4096);
-  .dynsym   : { *(.dynsym) }
-  . = ALIGN(4096);
-  .dynstr   : { *(.dynstr) }
-  . = ALIGN(4096);
+    *(.rodata*)
+    *(.srodata)
+    *(.dynsym)
+    *(.dynstr)
+    . = ALIGN(16);
+    *(.note.gnu.build-id)
+    . = ALIGN(4096);
+    *(.vendor_cert)
+    *(.data.ident)
+    _evrodata = .;
+    . = ALIGN(4096);
+  }
+  _erodata = .;
+  _rodata_size = . - _rodata;
+  _rodata_vsize = _evrodata - _rodata;
+  _alldata_size = . - _data;
+
   /DISCARD/ :
   {
     *(.rel.reloc)

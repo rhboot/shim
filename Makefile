@@ -242,7 +242,7 @@ ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
-		-j .dynamic -j .dynsym -j .rel* \
+		-j .dynamic -j .rodata -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat \
 		$(FORMAT) $< $@
@@ -259,7 +259,7 @@ ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data \
-		-j .dynamic -j .dynsym -j .rel* \
+		-j .dynamic -j .rodata -j .rel* \
 		-j .rela* -j .reloc -j .eh_frame -j .sbat \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
