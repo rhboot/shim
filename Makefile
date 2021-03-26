@@ -308,7 +308,7 @@ clean-shim-objs:
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
 clean-openssl-objs:
-	@if [ -d Cryptlib/Openssl ] ; then \
+	@if [ -d Cryptlib/OpenSSL ] ; then \
 		$(MAKE) -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile clean ; \
 	fi
 
