@@ -325,8 +325,8 @@ set_sbat_uefi_variable(void)
 		dprint(L"SBAT read failed %r\n", efi_status);
 	} else if (check_sbat_var_attributes(attributes) &&
 		   sbatsize >= strlen(SBAT_VAR_SIG "1") &&
-		   strncmp((const char *)sbat, SBAT_VAR_SIG,
-	                   strlen(SBAT_VAR_SIG))) {
+		   (strncmp((const char *)sbat, SBAT_VAR_SIG,
+	                   strlen(SBAT_VAR_SIG)) == 0)) {
 		dprint("SBAT variable is %d bytes, attributes are 0x%08x\n",
 		       sbatsize, attributes);
 		FreePool(sbat);
