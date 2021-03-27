@@ -120,8 +120,8 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 		sbat_var_gen = atoi((const char *)sbat_var_entry->component_generation);
 
 		if (sbat_gen < sbat_var_gen) {
-			dprint(L"component %a, generation %d, was revoked by SBAT variable",
-			       entry->component_name, sbat_gen);
+			dprint(L"component %a, generation %d, was revoked by %s variable",
+			       entry->component_name, sbat_gen, SBAT_VAR_NAME);
 			LogError(L"image did not pass SBAT verification\n");
 			return EFI_SECURITY_VIOLATION;
 		}
@@ -157,7 +157,7 @@ verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry *
 	struct sbat_var_entry *sbat_var_entry;
 
 	if (list_empty(local_sbat_var)) {
-		dprint(L"SBAT variable not present\n");
+		dprint(L"%s variable not present\n", SBAT_VAR_NAME);
 		return EFI_SUCCESS;
 	}
 
@@ -316,32 +316,34 @@ set_sbat_uefi_variable(void)
 	efi_status = get_variable_attr(SBAT_VAR_NAME, &sbat, &sbatsize,
 				       SHIM_LOCK_GUID, &attributes);
 	/*
-	 * Always set the SBAT UEFI variable if it fails to read.
+	 * Always set the SbatLevel UEFI variable if it fails to read.
 	 *
-	 * Don't try to set the SBAT UEFI variable if attributes match and
-	 * the signature matches.
+	 * Don't try to set the SbatLevel UEFI variable if attributes match
+	 * and the signature matches.
 	 */
 	if (EFI_ERROR(efi_status)) {
-		dprint(L"SBAT read failed %r\n", efi_status);
+		dprint(L"%s variable read failed %r\n", SBAT_VAR_NAME,
+				efi_status);
 	} else if (check_sbat_var_attributes(attributes) &&
 		   sbatsize >= strlen(SBAT_VAR_SIG "1") &&
 		   (strncmp((const char *)sbat, SBAT_VAR_SIG,
 	                   strlen(SBAT_VAR_SIG)) == 0)) {
-		dprint("SBAT variable is %d bytes, attributes are 0x%08x\n",
-		       sbatsize, attributes);
+		dprint(L"%s variable is %d bytes, attributes are 0x%08x\n",
+		       SBAT_VAR_NAME, sbatsize, attributes);
 		FreePool(sbat);
 		return EFI_SUCCESS;
 	} else {
 		FreePool(sbat);
 
 		/* delete previous variable */
-		dprint("%s variable is %d bytes, attributes are 0x%08x\n",
+		dprint(L"%s variable is %d bytes, attributes are 0x%08x\n",
 		       SBAT_VAR_NAME, sbatsize, attributes);
-		dprint("Deleting %s variable.\n", SBAT_VAR_NAME);
+		dprint(L"Deleting %s variable.\n", SBAT_VAR_NAME);
 		efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID,
 		                          attributes, 0, "");
 		if (EFI_ERROR(efi_status)) {
-			dprint(L"SBAT variable delete failed %r\n", efi_status);
+			dprint(L"%s variable delete failed %r\n", SBAT_VAR_NAME,
+					efi_status);
 			return efi_status;
 		}
 	}
@@ -350,7 +352,8 @@ set_sbat_uefi_variable(void)
 	efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID, SBAT_VAR_ATTRS,
 	                          sizeof(SBAT_VAR)-1, SBAT_VAR);
 	if (EFI_ERROR(efi_status)) {
-		dprint(L"SBAT variable writing failed %r\n", efi_status);
+		dprint(L"%s variable writing failed %r\n", SBAT_VAR_NAME,
+				efi_status);
 		return efi_status;
 	}
 
@@ -358,7 +361,7 @@ set_sbat_uefi_variable(void)
 	efi_status = get_variable(SBAT_VAR_NAME, &sbat, &sbatsize,
 				  SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
-		dprint(L"SBAT read failed %r\n", efi_status);
+		dprint(L"%s read failed %r\n", SBAT_VAR_NAME, efi_status);
 		return efi_status;
 	}
 
@@ -368,7 +371,7 @@ set_sbat_uefi_variable(void)
 		       strlen(SBAT_VAR));
 		efi_status = EFI_INVALID_PARAMETER;
 	} else {
-		dprint(L"SBAT variable initialization succeeded\n");
+		dprint(L"%s variable initialization succeeded\n", SBAT_VAR_NAME);
 	}
 
 	FreePool(sbat);
