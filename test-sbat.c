@@ -953,6 +953,70 @@ test_parse_and_verify(void)
 }
 
 int
+test_preserve_sbat_uefi_variable_good(void)
+{
+	char sbat[] = "sbat,1,\ncomponent,2,\n";
+	size_t sbat_size = sizeof(sbat);
+#ifdef ENABLE_SHIM_DEVEL
+	UINT32 attributes = UEFI_VAR_NV_BS_RT;
+#else
+	UINT32 attributes = UEFI_VAR_NV_BS;
+#endif
+
+	if (preserve_sbat_uefi_variable(sbat, sbat_size, attributes))
+		return 0;
+	else
+		return -1;
+}
+
+int
+test_preserve_sbat_uefi_variable_bad_sig(void)
+{
+	char sbat[] = "bad_sig,1,\ncomponent,2,\n";
+	size_t sbat_size = sizeof(sbat);
+#ifdef ENABLE_SHIM_DEVEL
+	UINT32 attributes = UEFI_VAR_NV_BS_RT;
+#else
+	UINT32 attributes = UEFI_VAR_NV_BS;
+#endif
+
+	if (preserve_sbat_uefi_variable(sbat, sbat_size, attributes))
+		return -1;
+	else
+		return 0;
+}
+
+int
+test_preserve_sbat_uefi_variable_bad_attr(void)
+{
+	char sbat[] = "sbat,1,\ncomponent,2,\n";
+	size_t sbat_size = sizeof(sbat);
+	UINT32 attributes = 0;
+
+	if (preserve_sbat_uefi_variable(sbat, sbat_size, attributes))
+		return -1;
+	else
+		return 0;
+}
+
+int
+test_preserve_sbat_uefi_variable_bad_short(void)
+{
+	char sbat[] = "sba";
+	size_t sbat_size = sizeof(sbat);
+#ifdef ENABLE_SHIM_DEVEL
+	UINT32 attributes = UEFI_VAR_NV_BS_RT;
+#else
+	UINT32 attributes = UEFI_VAR_NV_BS;
+#endif
+
+	if (preserve_sbat_uefi_variable(sbat, sbat_size, attributes))
+		return -1;
+	else
+		return 0;
+}
+
+int
 main(void)
 {
 	int status = 0;
@@ -988,6 +1052,11 @@ main(void)
 	test(test_verify_sbat_reject_diff_name_mixed);
 #endif
 	test(test_parse_and_verify);
+
+	test(test_preserve_sbat_uefi_variable_good);
+	test(test_preserve_sbat_uefi_variable_bad_sig);
+	test(test_preserve_sbat_uefi_variable_bad_attr);
+	test(test_preserve_sbat_uefi_variable_bad_short);
 
 	return 0;
 }

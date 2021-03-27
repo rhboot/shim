@@ -51,6 +51,7 @@ extern list_t sbat_var;
 EFI_STATUS parse_sbat_var(list_t *entries);
 void cleanup_sbat_var(list_t *entries);
 EFI_STATUS set_sbat_uefi_variable(void);
+bool preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes);
 
 struct sbat_section_entry {
 	const CHAR8 *component_name;
