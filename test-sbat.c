@@ -903,6 +903,7 @@ test_parse_and_verify(void)
 	struct sbat_section_entry *test_entries[] = {
 		&test_section_entry1, &test_section_entry2,
 	};
+	int rc = -1;
 
 	status = parse_sbat_section(sbat_section, sizeof(sbat_section)-1,
 	                            &n_section_entries, &section_entries);
@@ -941,16 +942,19 @@ test_parse_and_verify(void)
 
 	INIT_LIST_HEAD(&sbat_var);
 	status = parse_sbat_var_data(&sbat_var, sbat_var_alloced, sbat_var_data_size);
+	free(sbat_var_alloced);
 	if (status != EFI_SUCCESS || list_empty(&sbat_var))
 		return -1;
 
 	status = verify_sbat(n_section_entries, section_entries);
+	assert_equal_goto(status, EFI_SECURITY_VIOLATION, err, "expected %#x got %#x\n");
 
-	assert_equal_return(status, EFI_SECURITY_VIOLATION, -1, "expected %#x got %#x\n");
-	cleanup_sbat_var(&sbat_var);
+	rc = 0;
+err:
 	cleanup_sbat_section_entries(n_section_entries, section_entries);
+	cleanup_sbat_var(&sbat_var);
 
-	return 0;
+	return rc;
 }
 
 int

@@ -139,7 +139,7 @@ cleanup_sbat_var(list_t *entries)
 	list_for_each_safe(pos, tmp, entries) {
 		entry = list_entry(pos, struct sbat_var_entry, list);
 
-		if ((uintptr_t)entry < (uintptr_t)first && entry != NULL)
+		if (first == NULL || (uintptr_t)entry < (uintptr_t)first)
 			first = entry;
 
 		list_del(&entry->list);
@@ -239,10 +239,10 @@ parse_sbat_var_data(list_t *entry_list, UINT8 *data, UINTN datasize)
 
 	INIT_LIST_HEAD(entry_list);
 
-	entries = (struct sbat_var_entry **)strtab;
-	strtab += sizeof(struct sbat_var_entry *) * n;
 	entry = (struct sbat_var_entry *)strtab;
 	strtab += sizeof(struct sbat_var_entry) * n;
+	entries = (struct sbat_var_entry **)strtab;
+	strtab += sizeof(struct sbat_var_entry *) * n;
 	n = 0;
 
 	list_for_each(pos, &csv) {
