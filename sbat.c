@@ -309,7 +309,7 @@ preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes)
 {
 	return check_sbat_var_attributes(attributes) &&
 	       sbatsize >= strlen(SBAT_VAR_SIG "1") &&
-	       strncmp((const char *)sbat, SBAT_VAR_SIG, strlen(SBAT_VAR_SIG));
+	       !strncmp((const char *)sbat, SBAT_VAR_SIG, strlen(SBAT_VAR_SIG));
 }
 
 EFI_STATUS
