@@ -319,6 +319,7 @@ test_parse_sbat_section_too_many_elem(void)
 	struct sbat_section_entry *test_entries[] = {
 		&test_section_entry1, &test_section_entry2,
 	};
+	int rc = -1;
 
 	status = parse_sbat_section(section_base, section_size, &n, &entries);
 	assert_equal_return(status, EFI_SUCCESS, -1, "got %#hhx expected %#hhx\n");
@@ -341,10 +342,10 @@ test_parse_sbat_section_too_many_elem(void)
 #undef mkassert
 	}
 	assert_equal_goto(n, 2, fail, "got %zu expected %d\n");
-	return 0;
+	rc = 0;
 fail:
 	cleanup_sbat_section_entries(n, entries);
-	return -1;
+	return rc;
 }
 
 /*
