@@ -304,6 +304,15 @@ check_sbat_var_attributes(UINT32 attributes)
 #endif
 }
 
+bool
+preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes)
+{
+	return check_sbat_var_attributes(attributes) &&
+                   sbatsize >= strlen(SBAT_VAR_SIG "1") &&
+                   (strncmp((const char *)sbat, SBAT_VAR_SIG,
+                           strlen(SBAT_VAR_SIG)) ==0);
+}
+
 EFI_STATUS
 set_sbat_uefi_variable(void)
 {
@@ -323,10 +332,7 @@ set_sbat_uefi_variable(void)
 	 */
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
-	} else if (check_sbat_var_attributes(attributes) &&
-		   sbatsize >= strlen(SBAT_VAR_SIG "1") &&
-		   strncmp((const char *)sbat, SBAT_VAR_SIG,
-	                   strlen(SBAT_VAR_SIG))) {
+	} else if (preserve_sbat_uefi_variable(sbat, sbatsize, attributes)) {
 		dprint("SBAT variable is %d bytes, attributes are 0x%08x\n",
 		       sbatsize, attributes);
 		FreePool(sbat);
