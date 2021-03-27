@@ -440,14 +440,19 @@ test_verify_sbat_null_sbat_section(void)
 	list_t test_sbat_var;
 	size_t n = 0;
 	struct sbat_section_entry **entries = NULL;
+	int rc = -1;
 
 	INIT_LIST_HEAD(&test_sbat_var);
 	status = parse_sbat_var_data(&test_sbat_var, sbat_var_data, sizeof(sbat_var_data));
-	assert_equal_return(status, EFI_SUCCESS, -1, "got %#x expected %#x\n");
+	assert_equal_goto(status, EFI_SUCCESS, err, "got %#x expected %#x\n");
 
-	status = verify_sbat_helper(&sbat_var, n, entries);
-	assert_equal_return(status, EFI_SUCCESS, -1, "got %#x expected %#x\n");
-	return 0;
+	status = verify_sbat_helper(&test_sbat_var, n, entries);
+	assert_equal_goto(status, EFI_SUCCESS, err, "got %#x expected %#x\n");
+	rc = 0;
+err:
+	cleanup_sbat_var(&test_sbat_var);
+
+	return rc;
 }
 
 #if 0
