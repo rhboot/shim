@@ -1895,7 +1895,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		L"shim_init() failed",
 		L"import of SBAT data failed",
 		L"SBAT self-check failed",
-		L"SBAT UEFI variable setting failed",
+		SBAT_VAR_NAME L" UEFI variable setting failed",
 		NULL
 	};
 	enum {
@@ -1935,12 +1935,12 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	efi_status = set_sbat_uefi_variable();
 	if (EFI_ERROR(efi_status) && secure_mode()) {
-		perror(L"SBAT variable initialization failed\n");
+		perror(L"%s variable initialization failed\n", SBAT_VAR_NAME);
 		msg = SET_SBAT;
 		goto die;
 	} else if (EFI_ERROR(efi_status)) {
-		dprint(L"SBAT variable initialization failed: %r\n",
-		       efi_status);
+		dprint(L"%s variable initialization failed: %r\n",
+		       SBAT_VAR_NAME, efi_status);
 	}
 
 	if (secure_mode()) {
@@ -1950,8 +1950,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		INIT_LIST_HEAD(&sbat_var);
 		efi_status = parse_sbat_var(&sbat_var);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Parsing SBAT variable failed: %r\n",
-				efi_status);
+			perror(L"Parsing %s variable failed: %r\n",
+				SBAT_VAR_NAME, efi_status);
 			msg = IMPORT_SBAT;
 			goto die;
 		}
