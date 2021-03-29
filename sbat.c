@@ -18,14 +18,20 @@ parse_sbat_section(char *section_base, size_t section_size,
 	size_t n;
 	char *strtab;
 
-	if (!section_base || !section_size || !n_entries || !entriesp)
+	if (!section_base || !section_size || !n_entries || !entriesp) {
+		dprint(L"section_base:0x%lx section_size:0x%lx\n",
+		       section_base, section_size);
+		dprint(L"n_entries:0x%lx entriesp:0x%lx\n",
+		       n_entries, entriesp);
 		return EFI_INVALID_PARAMETER;
+	}
 
 	INIT_LIST_HEAD(&csv);
 
 	efi_status =
 		parse_csv_data(section_base, end, SBAT_SECTION_COLUMNS, &csv);
 	if (EFI_ERROR(efi_status)) {
+		dprint(L"parse_csv_data failed: %r\n", efi_status);
 		return efi_status;
 	}
 
@@ -38,6 +44,8 @@ parse_sbat_section(char *section_base, size_t section_size,
 
 		if (row->n_columns < SBAT_SECTION_COLUMNS) {
 			efi_status = EFI_INVALID_PARAMETER;
+			dprint(L"row->n_columns:%lu SBAT_SECTION_COLUMNS:%lu\n",
+			       row->n_columns, SBAT_SECTION_COLUMNS);
 			goto err;
 		}
 
@@ -45,6 +53,7 @@ parse_sbat_section(char *section_base, size_t section_size,
 		allocsz += sizeof(struct sbat_section_entry);
 		for (i = 0; i < row->n_columns; i++) {
 			if (row->columns[i][0] == '\000') {
+				dprint(L"row[%lu].columns[%lu][0] == '\\000'\n", n, i);
 				efi_status = EFI_INVALID_PARAMETER;
 				goto err;
 			}
@@ -120,7 +129,7 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 		sbat_var_gen = atoi((const char *)sbat_var_entry->component_generation);
 
 		if (sbat_gen < sbat_var_gen) {
-			dprint(L"component %a, generation %d, was revoked by %s variable",
+			dprint(L"component %a, generation %d, was revoked by %s variable\n",
 			       entry->component_name, sbat_gen, SBAT_VAR_NAME);
 			LogError(L"image did not pass SBAT verification\n");
 			return EFI_SECURITY_VIOLATION;
@@ -277,8 +286,10 @@ parse_sbat_var(list_t *entries)
 	UINTN datasize;
 	EFI_STATUS efi_status;
 
-	if (!entries)
+	if (!entries) {
+		dprint(L"entries is NULL\n");
 		return EFI_INVALID_PARAMETER;
+	}
 
 	efi_status = get_variable(SBAT_VAR_NAME, &data, &datasize, SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
