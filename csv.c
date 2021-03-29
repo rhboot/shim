@@ -55,8 +55,11 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 	size_t max = 0;
 	char *end = data_end;
 
-	if (!data || !end || end <= data || !n_columns || !list)
+	if (!data || !end || end <= data || !n_columns || !list) {
+		dprint(L"data:0x%lx end:0x%lx n_columns:%lu list:0x%lx\n",
+		       data, end, n_columns, list);
 		return EFI_INVALID_PARAMETER;
+	}
 
 	max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
 

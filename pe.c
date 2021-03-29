@@ -1054,6 +1054,8 @@ handle_image (void *data, unsigned int datasize,
 				SBATBase = base;
 				/* +1 because of size vs last byte location */
 				SBATSize = end - base + 1;
+				dprint(L"sbat section base:0x%lx size:0x%lx\n",
+				       SBATBase, SBATSize);
 			}
 		}
 

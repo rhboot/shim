@@ -1963,6 +1963,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			msg = SBAT_SELF_CHECK;
 			goto die;
 		}
+		dprint(L"SBAT self-check succeeded\n");
 	}
 
 	init_openssl();
