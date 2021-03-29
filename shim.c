@@ -1956,7 +1956,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			goto die;
 		}
 
-		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start);
+		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start - 1);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Verifiying shim SBAT data failed: %r\n",
 			       efi_status);
