@@ -1806,12 +1806,12 @@ debug_hook(void)
 		L"SHIM_DEBUG";
 #endif
 
-	if (x)
-		return;
-
 	efi_status = get_variable(debug_var_name, &data, &dataSize,
 				  SHIM_LOCK_GUID);
-	if (EFI_ERROR(efi_status)) {
+	if (EFI_ERROR(efi_status) || x) {
+		dprint(L"add-symbol-file "DEBUGDIR
+		       L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
+		       &_text, &_data);
 		return;
 	}
 
