@@ -15,6 +15,7 @@ SECTIONS
    *(.gnu.linkonce.t.*)
    _etext = .;
   }
+  . = ALIGN(4096);
   .reloc :
   {
    *(.reloc)
