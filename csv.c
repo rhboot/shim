@@ -63,7 +63,7 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 
 	max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
 
-	if (line && is_utf8_bom(line, max))
+	if (line && is_utf8_bom((CHAR8 *)line, max))
 		line += UTF8_BOM_SIZE;
 
 	while (line && line <= data_end) {

@@ -135,7 +135,7 @@ static CHAR8 *str2ip6(CHAR8 *str)
 	if (dotcount > MAX_IP6_DOTS)
 		return (CHAR8 *)ip;
 
-	len = strlen(str);
+	len = strlen((char *)str);
 	a = b = str;
 	for (i = p = 0; i < len; i++, b++) {
 		if (*b != ':')
@@ -167,7 +167,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	CHAR8 ip6inv[16];
 	CHAR8 template[sizeof DEFAULT_LOADER_CHAR];
 
-	translate_slashes(template, DEFAULT_LOADER_CHAR);
+	translate_slashes((char *)template, DEFAULT_LOADER_CHAR);
 
 	// to check against str2ip6() errors
 	memset(ip6inv, 0, sizeof(ip6inv));
@@ -201,15 +201,15 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	memcpy(&tftp_addr.v6, str2ip6(ip6str), 16);
 	if (memcmp(&tftp_addr.v6, ip6inv, sizeof(ip6inv)) == 0)
 		return FALSE;
-	full_path = AllocateZeroPool(strlen(end)+strlen(template)+1);
+	full_path = AllocateZeroPool(strlen((char *)end)+strlen((char *)template)+1);
 	if (!full_path)
 		return FALSE;
-	memcpy(full_path, end, strlen(end));
+	memcpy(full_path, end, strlen((char *)end));
 	end = (CHAR8 *)strrchr((char *)full_path, '/');
 	if (!end)
 		end = (CHAR8 *)full_path;
-	memcpy(end, template, strlen(template));
-	end[strlen(template)] = '\0';
+	memcpy(end, template, strlen((char *)template));
+	end[strlen((char *)template)] = '\0';
 
 	return TRUE;
 }
@@ -237,8 +237,8 @@ static EFI_STATUS parseDhcp4()
 	UINTN template_ofs = 0;
 	EFI_PXE_BASE_CODE_DHCPV4_PACKET* pkt_v4 = (EFI_PXE_BASE_CODE_DHCPV4_PACKET *)&pxe->Mode->DhcpAck.Dhcpv4;
 
-	translate_slashes(template, DEFAULT_LOADER_CHAR);
-	template_len = strlen(template) + 1;
+	translate_slashes((char *)template, DEFAULT_LOADER_CHAR);
+	template_len = strlen((char *)template) + 1;
 
 	if(pxe->Mode->ProxyOfferReceived) {
 		/*
@@ -258,7 +258,7 @@ static EFI_STATUS parseDhcp4()
 			pkt_v4 = &pxe->Mode->PxeReply.Dhcpv4;
 	}
 
-	INTN dir_len = strnlen((CHAR8 *)pkt_v4->BootpBootFile, 127);
+	INTN dir_len = strnlen((char *)pkt_v4->BootpBootFile, 127);
 	INTN i;
 	UINT8 *dir = pkt_v4->BootpBootFile;
 
@@ -274,13 +274,13 @@ static EFI_STATUS parseDhcp4()
 		return EFI_OUT_OF_RESOURCES;
 
 	if (dir_len > 0) {
-		strncpy(full_path, (CHAR8 *)dir, dir_len);
+		strncpy((char *)full_path, (char *)dir, dir_len);
 		if (full_path[dir_len-1] == '/' && template[0] == '/')
 			full_path[dir_len-1] = '\0';
 	}
 	if (dir_len == 0 && dir[0] != '/' && template[0] == '/')
 		template_ofs++;
-	strcat(full_path, template + template_ofs);
+	strcat((char *)full_path, (char *)template + template_ofs);
 	memcpy(&tftp_addr.v4, pkt_v4->BootpSiAddr, 4);
 
 	return EFI_SUCCESS;
