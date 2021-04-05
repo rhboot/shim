@@ -24,7 +24,7 @@ typedef __builtin_va_list __builtin_sysv_va_list;
 #endif
 
 #if defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
-	defined(__i486__) || defined(__i686__) || defined(__COVERITY__)
+	defined(__i486__) || defined(__i686__) || defined(__COVERITY__) || defined(__riscv)
 
 typedef __builtin_va_list ms_va_list;
 typedef __builtin_va_list __builtin_ms_va_list;
@@ -38,6 +38,16 @@ typedef __builtin_va_list sysv_va_list;
 #define sysv_va_start(marker, arg) __builtin_va_start(marker, arg)
 #define sysv_va_arg(marker, type)  __builtin_va_arg(marker, type)
 #define sysv_va_end(marker)        __builtin_va_end(marker)
+
+/*
+ * gnu-efi needs this.
+ */
+typedef __builtin_va_list va_list;
+# define va_start(v,l)	__builtin_va_start(v,l)
+# define va_end(v)	__builtin_va_end(v)
+# define va_arg(v,l)	__builtin_va_arg(v,l)
+# define va_copy(d,s)	__builtin_va_copy(d,s)
+
 /*
  * OpenSSL's X509ConstructCertificateStack needs this.
  */
