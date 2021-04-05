@@ -19,6 +19,8 @@ static inline uint64_t read_counter(void)
         __asm__ __volatile__ ("mrs %0, pmccntr_el0" : "=r" (val));
 #elif defined(__arm__)
         __asm__ __volatile__ ("mrc p15, 0, %0, c9, c13, 0" : "=r" (val));
+#elif defined(__riscv) && __riscv_xlen == 64
+	__asm__ __volatile__ ("csrr %0, 0xc01" : "=r" (val) : : "memory");
 #else
 #error unsupported arch
 #endif

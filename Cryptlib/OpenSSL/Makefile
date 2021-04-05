@@ -61,6 +61,11 @@ ARCH_CLANG_BUGS +=
 FEATUREFLAGS	+= $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_ARM
 endif
+ifeq ($(ARCH),riscv64)
+ARCH_CLANG_BUGS +=
+FEATUREFLAGS	+= $(CLANG_BUGS)
+DEFINES		+= -DMDE_CPU_RISCV64
+endif
 
 CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-Wno-error=stringop-overflow,) $(ARCH_CLANG_BUGS)
 

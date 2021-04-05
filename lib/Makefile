@@ -30,6 +30,10 @@ endif
 ifeq ($(ARCH),arm)
 DEFINES		+= -DMDE_CPU_ARM
 endif
+ifeq ($(ARCH),riscv64)
+DEFINES		+= -DMDE_CPU_RISCV64
+LIBFILES		+= riscv64_cache.o
+endif
 
 LDFLAGS		= -nostdlib -znocombreloc
 

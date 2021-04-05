@@ -78,6 +78,21 @@ jobs:
             gccarch: x86_64
             makearch: ia32
             distro: f43
+          - arch: amd64
+            efiarch: riscv64
+            gccarch: riscv64
+            makearch: riscv64
+            distro: f45
+          - arch: amd64
+            efiarch: riscv64
+            gccarch: riscv64
+            makearch: riscv64
+            distro: f44
+          - arch: amd64
+            efiarch: riscv64
+            gccarch: riscv64
+            makearch: riscv64
+            distro: f43
 
     steps:
       - name: Checkout
