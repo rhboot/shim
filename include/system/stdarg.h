@@ -20,7 +20,8 @@ typedef __builtin_va_list __builtin_sysv_va_list;
 #endif
 
 #if defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
-	defined(__i486__) || defined(__i686__) || defined(__COVERITY__)
+	defined(__i486__) || defined(__i686__) || defined(__riscv) || \
+	defined(__COVERITY__)
 
 typedef __builtin_va_list sysv_va_list;
 #define sysv_va_copy(dest, start)  __builtin_va_copy(dest, start)
