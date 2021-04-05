@@ -651,6 +651,8 @@ static const UINT16 machine_type =
 	IMAGE_FILE_MACHINE_I386;
 #elif defined(__ia64__)
 	IMAGE_FILE_MACHINE_IA64;
+#elif defined (__riscv) && __riscv_xlen == 64
+	IMAGE_FILE_MACHINE_RISCV64;
 #else
 #error this architecture is not supported by shim
 #endif
