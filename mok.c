@@ -888,9 +888,6 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 	EFI_STATUS ret = EFI_SUCCESS;
 	EFI_STATUS efi_status;
 
-	user_insecure_mode = 0;
-	ignore_db = 0;
-
 	UINT32 attrs = 0;
 	BOOLEAN delete = FALSE;
 
