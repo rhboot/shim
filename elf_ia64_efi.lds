@@ -27,10 +27,6 @@ SECTIONS
    *(.sbss)
    *(.scommon)
   }
-  . = ALIGN(4096);
-  .note.gnu.build-id : {
-    *(.note.gnu.build-id)
-  }
   .data.ident : {
     *(.data.ident)
   }

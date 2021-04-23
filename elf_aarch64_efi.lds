@@ -80,8 +80,6 @@ SECTIONS
     *(.srodata)
     *(.dynsym)
     *(.dynstr)
-    . = ALIGN(16);
-    *(.note.gnu.build-id)
     . = ALIGN(4096);
     *(.vendor_cert)
     *(.data.ident)
@@ -100,4 +98,5 @@ SECTIONS
     *(.note.GNU-stack)
   }
   .comment 0 : { *(.comment) }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
 }
