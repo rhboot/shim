@@ -364,13 +364,18 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 	SIZE_T max_var_sz;
 
 	efi_status = get_max_var_sz(attrs, &max_var_sz);
-	if (EFI_ERROR(efi_status)) {
+	if (EFI_ERROR(efi_status) && efi_status != EFI_UNSUPPORTED) {
 		LogError(L"Could not get maximum variable size: %r",
 			 efi_status);
 		return efi_status;
 	}
 
-	if (FullDataSize <= max_var_sz) {
+	/* Some UEFI environment such as u-boot doesn't implement
+	 * QueryVariableInfo() and we will only get EFI_UNSUPPORTED when
+	 * querying the available space. In this case, we just mirror
+	 * the variable directly. */
+	if (FullDataSize <= max_var_sz || efi_status == EFI_UNSUPPORTED) {
+		efi_status = EFI_SUCCESS;
 		if (only_first)
 			efi_status = SetVariable(name, guid, attrs,
 						 FullDataSize, FullData);
