@@ -1973,10 +1973,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * boot-services-only state variables are what we think they are.
 	 */
 	efi_status = import_mok_state(image_handle);
-	if (!secure_mode() && efi_status == EFI_INVALID_PARAMETER) {
+	if (!secure_mode() &&
+	    (efi_status == EFI_INVALID_PARAMETER ||
+	     efi_status == EFI_OUT_OF_RESOURCES)) {
 		/*
 		 * Make copy failures fatal only if secure_mode is enabled, or
-		 * the error was anything else than EFI_INVALID_PARAMETER.
+		 * the error was anything else than EFI_INVALID_PARAMETER or
+		 * EFI_OUT_OF_RESOURCES.
 		 * There are non-secureboot firmware implementations that don't
 		 * reserve enough EFI variable memory to fit the variable.
 		 */
