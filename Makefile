@@ -121,9 +121,10 @@ sbat_data.o : /dev/null
 		$@
 	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
 
-$(SHIMNAME) : $(SHIMSONAME)
-$(MMNAME) : $(MMSONAME)
-$(FBNAME) : $(FBSONAME)
+$(SHIMNAME) : $(SHIMSONAME) post-process-pe
+$(MMNAME) : $(MMSONAME) post-process-pe
+$(FBNAME) : $(FBSONAME) post-process-pe
+$(SHIMNAME) $(MMNAME) $(FBNAME) : | post-process-pe
 
 LIBS = Cryptlib/libcryptlib.a \
        Cryptlib/OpenSSL/libopenssl.a \
@@ -163,6 +164,9 @@ Cryptlib/OpenSSL/libopenssl.a:
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	mkdir -p lib
 	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) -C lib -f $(TOPDIR)/lib/Makefile
+
+post-process-pe : $(TOPDIR)/post-process-pe.c
+	$(HOSTCC) -std=gnu11 -Og -g3 -Wall -Wextra -Wno-missing-field-initializers -Werror -o $@ $<
 
 buildid : $(TOPDIR)/buildid.c
 	$(HOSTCC) -I/usr/include -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
@@ -246,8 +250,7 @@ endif
 		-j .rela* -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat \
 		$(FORMAT) $< $@
-	# I am tired of wasting my time fighting binutils timestamp code.
-	dd conv=notrunc bs=1 count=4 seek=$(TIMESTAMP_LOCATION) if=/dev/zero of=$@
+	./post-process-pe -vv $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
