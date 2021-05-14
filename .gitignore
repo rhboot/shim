@@ -29,6 +29,7 @@ Make.local
 /build*/
 /certdb/
 /cov-int/
+/post-process-pe
 /random.bin
 /sbat.*.csv
 /scan-results/
