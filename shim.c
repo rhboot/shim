@@ -1558,13 +1558,20 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		UINT16 *cur = li->LoadOptions;
 		for (i = 1; i < li->LoadOptionsSize / 2; i++) {
 			if (cur[i - 1] == L'\0') {
-				start = &cur[i];
-				remaining_size = li->LoadOptionsSize - (i * 2);
-				break;
+				if (start == li->LoadOptions) {
+					start = &cur[i];
+					loader_len = li->LoadOptionsSize - (i * 2);
+					remaining_size = 0;
+				} else {
+					loader_len = (&cur[i] - start) * 2;
+					remaining_size = li->LoadOptionsSize - (i * 2);
+					break;
+				}
 			}
 		}
-
-		remaining_size -= i * 2 + 2;
+		/* if we didn't find at least one NULL, something is wrong */
+		if (start == li->LoadOptions)
+			return EFI_SUCCESS;
 	} else if (strings == 1 && is_our_path(li, start)) {
 		/*
 		 * And then I found a version of BDS that gives us our own path
