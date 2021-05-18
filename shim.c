@@ -1520,7 +1520,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	 * case.
 	 */
 	if (strings == 1) {
-		UINT16 *cur = start = li->LoadOptions;
+		UINT16 *cur = li->LoadOptions;
 
 		/* replace L' ' with L'\0' if we find any */
 		for (i = 0; i < li->LoadOptionsSize / 2; i++) {
@@ -1534,7 +1534,8 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	}
 
 	/*
-	 * If it's not string data, try it as an EFI_LOAD_OPTION.
+	 * Try to parse the LoadOptions as either a EFI_LOAD_OPTION or as
+	 * a variable number of UCS-2 strings.  Wish us luck.
 	 */
 	if (strings == 0) {
 		/*
@@ -1548,6 +1549,24 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		if (EFI_ERROR(efi_status))
 			return EFI_SUCCESS;
 
+		remaining_size = 0;
+	} else if (strings == 1) {
+		start = li->LoadOptions;
+		if (is_our_path(li, start)) {
+			/*
+			 * I found a version of BDS that gives us our own path
+			 * in LoadOptions:
+77162C58                           5c 00 45 00 46 00 49 00          |\.E.F.I.|
+77162C60  5c 00 42 00 4f 00 4f 00  54 00 5c 00 42 00 4f 00  |\.B.O.O.T.\.B.O.|
+77162C70  4f 00 54 00 58 00 36 00  34 00 2e 00 45 00 46 00  |O.T.X.6.4...E.F.|
+77162C80  49 00 00 00                                       |I...|
+			 * which is just cruel... So yeah, just don't use it.
+			 */
+			return EFI_SUCCESS;
+		}
+
+		/* assume this string is the second stage loader */
+		loader_len = li->LoadOptionsSize;
 		remaining_size = 0;
 	} else if (strings >= 2) {
 		/*
@@ -1572,19 +1591,9 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		/* if we didn't find at least one NULL, something is wrong */
 		if (start == li->LoadOptions)
 			return EFI_SUCCESS;
-	} else if (strings == 1 && is_our_path(li, start)) {
-		/*
-		 * And then I found a version of BDS that gives us our own path
-		 * in LoadOptions:
-
-77162C58                           5c 00 45 00 46 00 49 00          |\.E.F.I.|
-77162C60  5c 00 42 00 4f 00 4f 00  54 00 5c 00 42 00 4f 00  |\.B.O.O.T.\.B.O.|
-77162C70  4f 00 54 00 58 00 36 00  34 00 2e 00 45 00 46 00  |O.T.X.6.4...E.F.|
-77162C80  49 00 00 00                                       |I...|
-
-		* which is just cruel... So yeah, just don't use it.
-		*/
-		return EFI_SUCCESS;
+	} else {
+		/* fallback to the default loader */
+		loader_len = 0;
 	}
 
 	/*
