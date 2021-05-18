@@ -1387,10 +1387,12 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
+	void *opts = NULL;
 	CHAR16 *start = NULL;
 	UINTN remaining_size = 0;
 	CHAR16 *loader_str = NULL;
 	UINTN loader_len = 0;
+	CHAR16 *loader_opts = NULL;
 	unsigned int i;
 	UINTN second_stage_len;
 
@@ -1516,22 +1518,31 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	 * 0016:20 00 6F 00 6E 00 65 00 20 00 74 00 77 00 6F 00 ..o.n.e...t.w.o.
 	 * 0032:20 00 74 00 68 00 72 00 65 00 65 00 00 00       ..t.h.r.e.e...
 	 *
-	 * If so replace it with NULs since the code already handles that
-	 * case.
+	 * If so dup LoadOptions and replace with NULs since the code already
+	 * handles that case.  The LoadOptions buffer is preserved for later
+	 * use (e.g. passing unmunged to the second stage).
 	 */
 	if (strings == 1) {
-		UINT16 *cur = start = li->LoadOptions;
+		UINT16 *cur;
+		UINT16 *cur_dup;
 
-		/* replace L' ' with L'\0' if we find any */
+		/* dup and replace L' ' with L'\0' if we find any */
+		opts = AllocatePool(li->LoadOptionsSize);
+		if (!opts) {
+			perror(L"Failed to duplicate LoadOptions\n");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		cur = li->LoadOptions;
+		cur_dup = opts;
 		for (i = 0; i < li->LoadOptionsSize / 2; i++) {
-			if (cur[i] == L' ')
-				cur[i] = L'\0';
+			cur_dup[i] = (cur[i] == L' ' ? L'\0' : cur[i]);
 		}
 
 		/* redo the string count */
-		strings = count_ucs2_strings(li->LoadOptions,
-					     li->LoadOptionsSize);
-	}
+		strings = count_ucs2_strings(opts, li->LoadOptionsSize);
+	} else
+		/* no changes needed, but set 'opts' so we can use it below */
+		opts = li->LoadOptions;
 
 	/*
 	 * If it's not string data, try it as an EFI_LOAD_OPTION.
@@ -1555,16 +1566,27 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		 * LoadOptions.  We ignore the string before the first L'\0',
 		 * i.e. the name of this program.
 		 */
-		UINT16 *cur = li->LoadOptions;
-		for (i = 1; i < li->LoadOptionsSize / 2; i++) {
+		UINT16 *cur;
+		UINT16 *cur_orig = li->LoadOptions;
+		cur = opts;
+		start = cur_orig;
+		for (i = 1; i < (li->LoadOptionsSize / 2) - 1; i++) {
 			if (cur[i - 1] == L'\0') {
-				start = &cur[i];
-				remaining_size = li->LoadOptionsSize - (i * 2);
-				break;
+				if (start == li->LoadOptions) {
+					start = &cur_orig[i];
+					loader_len = li->LoadOptionsSize - (i * 2);
+					remaining_size = 0;
+				} else {
+					loader_len = (&cur_orig[i] - start) * 2;
+					loader_opts = &cur_orig[i];
+					remaining_size = li->LoadOptionsSize - (i * 2);
+					break;
+				}
 			}
 		}
-
-		remaining_size -= i * 2 + 2;
+		/* if we didn't find at least one NULL, something is wrong */
+		if (start == li->LoadOptions)
+			return EFI_SUCCESS;
 	} else if (strings == 1 && is_our_path(li, start)) {
 		/*
 		 * And then I found a version of BDS that gives us our own path
@@ -1579,6 +1601,11 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		*/
 		return EFI_SUCCESS;
 	}
+
+	/* cleanup if we create a duplicate li->LoadOptions */
+	if (opts != li->LoadOptions)
+		FreePool(opts);
+	opts = NULL;
 
 	/*
 	 * Set up the name of the alternative loader and the LoadOptions for
@@ -1596,8 +1623,13 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 			loader_str[i] = start[i];
 		loader_str[loader_len/2] = L'\0';
 
+		/*
+		 * Free the default second_stage we allocated at the top of
+		 * this function and use our newly parsed loader_str.
+		 */
+		FreePool(second_stage);
 		second_stage = loader_str;
-		load_options = remaining_size ? start + (loader_len/2) : NULL;
+		load_options = remaining_size ? loader_opts : NULL;
 		load_options_size = remaining_size;
 	}
 
