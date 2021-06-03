@@ -1011,6 +1011,7 @@ get_fallback_no_reboot(void)
 	return 0;
 }
 
+#ifndef FALLBACK_NONINTERACTIVE
 static EFI_STATUS
 set_fallback_no_reboot(void)
 {
@@ -1054,6 +1055,7 @@ get_user_choice(void)
 
 	return choice;
 }
+#endif
 
 extern EFI_STATUS
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab);
@@ -1126,6 +1128,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 			try_start_first_option(image);
 		}
 
+#ifndef FALLBACK_NONINTERACTIVE
 		int timeout = draw_countdown();
 		if (timeout == 0)
 			goto reset;
@@ -1141,6 +1144,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		VerbosePrint(L"tpm present, starting the first image\n");
 		try_start_first_option(image);
 reset:
+#endif
 		VerbosePrint(L"tpm present, resetting system\n");
 	}
 
