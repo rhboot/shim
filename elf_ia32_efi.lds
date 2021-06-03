@@ -92,4 +92,5 @@ SECTIONS
     *(.note.GNU-stack)
   }
   .comment 0 : { *(.comment) }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
 }
