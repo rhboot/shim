@@ -1411,9 +1411,16 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		return efi_status;
 	}
 
-	/* Sanity check since we make several assumptions about the length */
+	/* Sanity check since we make several assumptions about the length
+	 * Some firmware feeds the following load option when booting from
+	 * an USB device:
+	 *
+	 *    0x46 0x4a 0x00 |FJ.|
+	 *
+	 * The string is meaningless for shim and so just ignore it.
+	 * */
 	if (li->LoadOptionsSize % 2 != 0)
-		return EFI_INVALID_PARAMETER;
+		return EFI_SUCCESS;
 
 	/* So, load options are a giant pain in the ass.  If we're invoked
 	 * from the EFI shell, we get something like this:
