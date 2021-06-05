@@ -33,7 +33,9 @@ get_active_systab(void)
 static typeof(systab->BootServices->LoadImage) system_load_image;
 static typeof(systab->BootServices->StartImage) system_start_image;
 static typeof(systab->BootServices->Exit) system_exit;
+#if !defined(DISABLE_EBS_PROTECTION)
 static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
+#endif /* !defined(DISABLE_EBS_PROTECTION) */
 
 static EFI_HANDLE last_loaded_image;
 
@@ -45,7 +47,9 @@ unhook_system_services(void)
 
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
+#if !defined(DISABLE_EBS_PROTECTION)
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
+#endif /* !defined(DISABLE_EBS_PROTECTION) */
 	gBS = systab->BootServices;
 }
 
@@ -181,11 +185,8 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 void
 unhook_exit(void)
 {
-#if !defined(DISABLE_EBS_PROTECTION)
 	systab->BootServices->Exit = system_exit;
 	gBS = systab->BootServices;
-#endif /* defined(DISABLE_EBS_PROTECTION) */
-	return;
 }
 
 void
