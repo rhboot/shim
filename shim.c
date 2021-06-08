@@ -1550,7 +1550,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		 * LoadOptions.  We ignore the string before the first L'\0',
 		 * i.e. the name of this program.
 		 */
-		UINT16 *cur = li->LoadOptions;
+		UINT16 *cur = start = li->LoadOptions;
 		for (i = 1; i < li->LoadOptionsSize / 2; i++) {
 			if (cur[i - 1] == L'\0') {
 				start = &cur[i];
