@@ -1028,16 +1028,18 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 	for (i = 0; p && mok_state_variables[i].name != NULL; i++) {
 		struct mok_state_variable *v = &mok_state_variables[i];
 
-		ZeroMem(&config_template, sizeof(config_template));
-		strncpy(config_template.name, (CHAR8 *)v->rtname8, 255);
-		config_template.name[255] = '\0';
+		if (v->data && v->data_size) {
+			ZeroMem(&config_template, sizeof(config_template));
+			strncpy(config_template.name, (CHAR8 *)v->rtname8, 255);
+			config_template.name[255] = '\0';
 
-		config_template.data_size = v->data_size;
+			config_template.data_size = v->data_size;
 
-		CopyMem(p, &config_template, sizeof(config_template));
-		p += sizeof(config_template);
-		CopyMem(p, v->data, v->data_size);
-		p += v->data_size;
+			CopyMem(p, &config_template, sizeof(config_template));
+			p += sizeof(config_template);
+			CopyMem(p, v->data, v->data_size);
+			p += v->data_size;
+		}
 	}
 	if (p) {
 		ZeroMem(&config_template, sizeof(config_template));
