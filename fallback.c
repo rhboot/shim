@@ -415,9 +415,12 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	cursor += DevicePathSize(dp);
 	StrCpy((CHAR16 *)cursor, arguments);
 
-	CHAR16 varname[256];
 	EFI_STATUS efi_status;
 	EFI_GUID vendor_guid = NullGuid;
+	UINTN buffer_size = 256 * sizeof(CHAR16);
+	CHAR16 *varname = AllocateZeroPool(buffer_size);
+	if (!varname)
+		return EFI_OUT_OF_RESOURCES;
 
 	UINTN max_candidate_size = calc_masked_boot_option_size(size);
 	CHAR8 *candidate = AllocateZeroPool(max_candidate_size);
@@ -426,13 +429,40 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	varname[0] = 0;
 	while (1) {
-		UINTN varname_size = sizeof(varname);
+		UINTN varname_size = buffer_size;
 		efi_status = gRT->GetNextVariableName(&varname_size, varname,
 						      &vendor_guid);
-		if (EFI_ERROR(efi_status))
+		if (EFI_ERROR(efi_status)) {
+			if (efi_status == EFI_BUFFER_TOO_SMALL) {
+				VerbosePrint(L"Buffer too small for next var "
+					     L"name, re-allocating it to be %d"
+					     L" chars long and retrying\n",
+					     varname_size);
+				varname = ReallocatePool(varname,
+							 buffer_size,
+							 varname_size);
+				if (!varname)
+					return EFI_OUT_OF_RESOURCES;
+				buffer_size = varname_size;
+				continue;
+			}
+
+			if (efi_status == EFI_DEVICE_ERROR)
+				VerbosePrint(L"The next variable name could "
+					     L"not be retrieved due to a "
+					     L"hardware error\n");
+
+			if (efi_status == EFI_INVALID_PARAMETER)
+				VerbosePrint(L"Invalid parameter to "
+					     L"GetNextVariableName: "
+					     L"varname_size=%d, varname=%s\n",
+					     varname_size, varname);
+
+			/* EFI_NOT_FOUND means we listed all variables */
+			VerbosePrint(L"Checked all boot entries\n");
 			break;
+		}
 
 		if (StrLen(varname) != 8 || StrnCmp(varname, L"Boot", 4) ||
 		    !isxdigit(varname[4]) || !isxdigit(varname[5]) ||
@@ -469,7 +499,8 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	}
 	FreePool(candidate);
 	FreePool(data);
-	return EFI_NOT_FOUND;
+	FreePool(varname);
+	return efi_status;
 }
 
 EFI_STATUS
