@@ -517,13 +517,16 @@ generate_hash(char *data, unsigned int datasize_in,
 		SumOfBytesHashed += Section->SizeOfRawData;
 	}
 
-	/* Hash all remaining data up to SecDir if SecDir->Size is not 0 */
-	if (datasize > SumOfBytesHashed && context->SecDir->Size) {
+	/*
+	 * Hash all remaining bytes, or all remanining bytes up to SecDir if
+	 * SecDir->Size is not 0.
+	 */
+	if (datasize > SumOfBytesHashed) {
 		hashbase = data + SumOfBytesHashed;
 		hashsize = datasize - context->SecDir->Size - SumOfBytesHashed;
 
 		if ((datasize - SumOfBytesHashed < context->SecDir->Size) ||
-		    (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress)) {
+		    (context->SecDir->Size && (SumOfBytesHashed + hashsize != context->SecDir->VirtualAddress))) {
 			perror(L"Malformed binary after Attribute Certificate Table\n");
 			console_print(L"datasize: %u SumOfBytesHashed: %u SecDir->Size: %lu\n",
 				      datasize, SumOfBytesHashed, context->SecDir->Size);
