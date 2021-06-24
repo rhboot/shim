@@ -1241,9 +1241,13 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	return efi_status;
 }
 
+/*
+ * Extract the OptionalData and OptionalData fields from an
+ * EFI_LOAD_OPTION.
+ */
 static inline EFI_STATUS
-get_load_option_optional_data(UINT8 *data, UINTN data_size,
-			      UINT8 **od, UINTN *ods)
+get_load_option_optional_data(VOID *data, UINT32 data_size,
+			      VOID **od, UINT32 *ods)
 {
 	/*
 	 * If it's not at least Attributes + FilePathListLength +
@@ -1253,7 +1257,8 @@ get_load_option_optional_data(UINT8 *data, UINTN data_size,
 	if (data_size < (sizeof(UINT32) + sizeof(UINT16) + 2 + 4))
 		return EFI_INVALID_PARAMETER;
 
-	UINT8 *cur = data + sizeof(UINT32);
+	UINT8 *start = (UINT8 *)data;
+	UINT8 *cur = start + sizeof(UINT32);
 	UINT16 fplistlen = *(UINT16 *)cur;
 	/*
 	 * If there's not enough space for the file path list and the
@@ -1263,8 +1268,8 @@ get_load_option_optional_data(UINT8 *data, UINTN data_size,
 		return EFI_INVALID_PARAMETER;
 
 	cur += sizeof(UINT16);
-	UINTN limit = data_size - (cur - data) - fplistlen;
-	UINTN i;
+	UINT32 limit = data_size - (cur - start) - fplistlen;
+	UINT32 i;
 	for (i = 0; i < limit ; i++) {
 		/* If the description isn't valid UCS2-LE, it's not valid. */
 		if (i % 2 != 0) {
@@ -1381,26 +1386,68 @@ done:
 }
 
 /*
+ * Split the supplied load options in to a NULL terminated
+ * string representing the path of the second stage loader,
+ * and return a pointer to the remaining load options data
+ * and its remaining size.
+ *
+ * This expects the supplied load options to begin with a
+ * string that is either NULL terminated or terminated with
+ * a space and some optional data. It will return NULL if
+ * the supplied load options contains no spaces or NULL
+ * terminators.
+ */
+static CHAR16 *
+split_load_options(VOID *in, UINT32 in_size,
+		   VOID **remaining,
+		   UINT32 *remaining_size) {
+	UINTN i;
+	CHAR16 *arg0 = NULL;
+	CHAR16 *start = (CHAR16 *)in;
+
+	/* Skip spaces */
+	for (i = 0; i < in_size / sizeof(CHAR16); i++) {
+		if (*start != L' ')
+			break;
+
+		start++;
+	}
+
+	in_size -= ((VOID *)start - in);
+
+	/*
+	 * Ensure that the first argument is NULL terminated by
+	 * replacing L' ' with L'\0'.
+	 */
+	for (i = 0; i < in_size / sizeof(CHAR16); i++) {
+		if (start[i] == L' ' || start[i] == L'\0') {
+			start[i] = L'\0';
+			arg0 = (CHAR16 *)start;
+			break;
+		}
+	}
+
+	if (arg0) {
+		UINTN skip = i + 1;
+		*remaining_size = in_size - (skip * sizeof(CHAR16));
+		*remaining = *remaining_size > 0 ? start + skip : NULL;
+	}
+
+	return arg0;
+}
+
+/*
  * Check the load options to specify the second stage loader
  */
 EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
-	CHAR16 *start = NULL;
-	UINTN remaining_size = 0;
+	VOID *remaining = NULL;
+	UINT32 remaining_size;
 	CHAR16 *loader_str = NULL;
-	UINTN loader_len = 0;
-	unsigned int i;
-	UINTN second_stage_len;
 
-	second_stage_len = (StrLen(DEFAULT_LOADER) + 1) * sizeof(CHAR16);
-	second_stage = AllocatePool(second_stage_len);
-	if (!second_stage) {
-		perror(L"Could not allocate %lu bytes\n", second_stage_len);
-		return EFI_OUT_OF_RESOURCES;
-	}
-	StrCpy(second_stage, DEFAULT_LOADER);
+	second_stage = DEFAULT_LOADER;
 	load_options = NULL;
 	load_options_size = 0;
 
@@ -1499,105 +1546,44 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		return EFI_SUCCESS;
 
 	/*
-	 * Check and see if this is just a list of strings.  If it's an
-	 * EFI_LOAD_OPTION, it'll be 0, since we know EndEntire device path
-	 * won't pass muster as UCS2-LE.
-	 *
-	 * If there are 3 strings, we're launched from the shell most likely,
-	 * But we actually only care about the second one.
+	 * See if this is an EFI_LOAD_OPTION and extract the optional
+	 * data if it is. This will return an error if it is not a valid
+	 * EFI_LOAD_OPTION.
 	 */
-	UINTN strings = count_ucs2_strings(li->LoadOptions,
-					   li->LoadOptionsSize);
-
-	/*
-	 * In some cases we get strings == 1 because BDS is using L' ' as the
-	 * delimeter:
-	 * 0000:74 00 65 00 73 00 74 00 2E 00 65 00 66 00 69 00 t.e.s.t...e.f.i.
-	 * 0016:20 00 6F 00 6E 00 65 00 20 00 74 00 77 00 6F 00 ..o.n.e...t.w.o.
-	 * 0032:20 00 74 00 68 00 72 00 65 00 65 00 00 00       ..t.h.r.e.e...
-	 *
-	 * If so replace it with NULs since the code already handles that
-	 * case.
-	 */
-	if (strings == 1) {
-		UINT16 *cur = start = li->LoadOptions;
-
-		/* replace L' ' with L'\0' if we find any */
-		for (i = 0; i < li->LoadOptionsSize / 2; i++) {
-			if (cur[i] == L' ')
-				cur[i] = L'\0';
-		}
-
-		/* redo the string count */
-		strings = count_ucs2_strings(li->LoadOptions,
-					     li->LoadOptionsSize);
-	}
-
-	/*
-	 * If it's not string data, try it as an EFI_LOAD_OPTION.
-	 */
-	if (strings == 0) {
+	efi_status = get_load_option_optional_data(li->LoadOptions,
+						   li->LoadOptionsSize,
+						   &li->LoadOptions,
+						   &li->LoadOptionsSize);
+	if (EFI_ERROR(efi_status)) {
 		/*
-		 * We at least didn't find /enough/ strings.  See if it works
-		 * as an EFI_LOAD_OPTION.
-		 */
-		efi_status = get_load_option_optional_data(li->LoadOptions,
-							   li->LoadOptionsSize,
-							   (UINT8 **)&start,
-							   &loader_len);
-		if (EFI_ERROR(efi_status))
-			return EFI_SUCCESS;
-
-		remaining_size = 0;
-	} else if (strings >= 2) {
-		/*
+		 * it's not an EFI_LOAD_OPTION, so it's probably just a string
+		 * or list of strings.
+		 *
 		 * UEFI shell copies the whole line of the command into
-		 * LoadOptions.  We ignore the string before the first L'\0',
-		 * i.e. the name of this program.
+		 * LoadOptions. We ignore the first string, i.e. the name of this
+		 * program in this case.
 		 */
-		UINT16 *cur = li->LoadOptions;
-		for (i = 1; i < li->LoadOptionsSize / 2; i++) {
-			if (cur[i - 1] == L'\0') {
-				start = &cur[i];
-				remaining_size = li->LoadOptionsSize - (i * 2);
-				break;
-			}
+		CHAR16 *loader_str = split_load_options(li->LoadOptions,
+							li->LoadOptionsSize,
+							&remaining,
+							&remaining_size);
+
+		if (loader_str && is_our_path(li, loader_str)) {
+			li->LoadOptions = remaining;
+			li->LoadOptionsSize = remaining_size;
 		}
-
-		remaining_size -= i * 2 + 2;
-	} else if (strings == 1 && is_our_path(li, start)) {
-		/*
-		 * And then I found a version of BDS that gives us our own path
-		 * in LoadOptions:
-
-77162C58                           5c 00 45 00 46 00 49 00          |\.E.F.I.|
-77162C60  5c 00 42 00 4f 00 4f 00  54 00 5c 00 42 00 4f 00  |\.B.O.O.T.\.B.O.|
-77162C70  4f 00 54 00 58 00 36 00  34 00 2e 00 45 00 46 00  |O.T.X.6.4...E.F.|
-77162C80  49 00 00 00                                       |I...|
-
-		* which is just cruel... So yeah, just don't use it.
-		*/
-		return EFI_SUCCESS;
 	}
+
+	loader_str = split_load_options(li->LoadOptions, li->LoadOptionsSize,
+					&remaining, &remaining_size);
 
 	/*
 	 * Set up the name of the alternative loader and the LoadOptions for
 	 * the loader
 	 */
-	if (loader_len > 0) {
-		/* we might not always have a NULL at the end */
-		loader_str = AllocatePool(loader_len + 2);
-		if (!loader_str) {
-			perror(L"Failed to allocate loader string\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-
-		for (i = 0; i < loader_len / 2; i++)
-			loader_str[i] = start[i];
-		loader_str[loader_len/2] = L'\0';
-
+	if (loader_str) {
 		second_stage = loader_str;
-		load_options = remaining_size ? start + (loader_len/2) : NULL;
+		load_options = remaining;
 		load_options_size = remaining_size;
 	}
 
@@ -1776,12 +1762,6 @@ shim_fini(void)
 	}
 
 	unhook_exit();
-
-	/*
-	 * Free the space allocated for the alternative 2nd stage loader
-	 */
-	if (load_options_size > 0 && second_stage)
-		FreePool(second_stage);
 
 	console_fini();
 }
