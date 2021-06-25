@@ -1034,10 +1034,12 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 		config_template.data_size = v->data_size;
 
-		CopyMem(p, &config_template, sizeof(config_template));
-		p += sizeof(config_template);
-		CopyMem(p, v->data, v->data_size);
-		p += v->data_size;
+		if (v->data && v->data_size) {
+			CopyMem(p, &config_template, sizeof(config_template));
+			p += sizeof(config_template);
+			CopyMem(p, v->data, v->data_size);
+			p += v->data_size;
+		}
 	}
 	if (p) {
 		ZeroMem(&config_template, sizeof(config_template));
