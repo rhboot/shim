@@ -868,7 +868,7 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v,
 	BOOLEAN present = FALSE;
 
 	if (v->rtname) {
-		if (!only_first && (v->flags & MOK_MIRROR_DELETE_FIRST)) {
+		if (only_first && (v->flags & MOK_MIRROR_DELETE_FIRST)) {
 			dprint(L"deleting \"%s\"\n", v->rtname);
 			efi_status = LibDeleteVariable(v->rtname, v->guid);
 			dprint(L"LibDeleteVariable(\"%s\",...) => %r\n", v->rtname, efi_status);
