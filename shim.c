@@ -1817,7 +1817,7 @@ debug_hook(void)
 		if (x > 12000)
 			break;
 #endif
-		pause();
+		wait_for_debug();
 	}
 	x = 1;
 }
