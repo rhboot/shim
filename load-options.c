@@ -415,10 +415,10 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 		 * LoadOptions. We ignore the first string, i.e. the name of this
 		 * program in this case.
 		 */
-		CHAR16 *loader_str = split_load_options(li->LoadOptions,
-							li->LoadOptionsSize,
-							&remaining,
-							&remaining_size);
+		loader_str = split_load_options(li->LoadOptions,
+						li->LoadOptionsSize,
+						&remaining,
+						&remaining_size);
 
 		if (loader_str && is_our_path(li, loader_str)) {
 			li->LoadOptions = remaining;

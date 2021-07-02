@@ -10,7 +10,8 @@ include Make.defaults
 CC = gcc
 VALGRIND ?=
 DEBUG_PRINTS ?= 0
-CFLAGS = -O2 -ggdb -std=gnu11 \
+OPTIMIZATIONS=-O2 -ggdb
+CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
 	 $(EFI_INCLUDES) \
 	 -Iinclude -iquote . \
@@ -50,13 +51,19 @@ libefi-test.a :
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
+test-random.h:
+	dd if=/dev/urandom bs=512 count=17 of=random.bin
+	xxd -i random.bin test-random.h
+
 $(wildcard test-*.c) :: %.c : test-random.h
 $(patsubst %.c,%,$(wildcard test-*.c)) :: | test-random.h
 $(patsubst %.c,%.o,$(wildcard test-*.c)) : | test-random.h
 
-test-random.h:
-	dd if=/dev/urandom bs=512 count=17 of=random.bin
-	xxd -i random.bin test-random.h
+test-load-options_FILES = lib/guid.c \
+			  libefi-test.a \
+			  -lefivar
+test-load-options :: libefi-test.a
+test-load-options : CFLAGS+=-DHAVE_SHIM_LOCK_GUID
 
 test-sbat_FILES = csv.c lib/variables.c lib/guid.c
 test-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
@@ -66,6 +73,7 @@ test-str_FILES = lib/string.c
 tests := $(patsubst %.c,%,$(wildcard test-*.c))
 
 $(tests) :: test-% : | libefi-test.a
+
 $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $^ $(wildcard $*.c) $(test-$*_FILES) libefi-test.a
 	$(VALGRIND) ./$@
