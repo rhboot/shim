@@ -57,6 +57,10 @@ UINTN StrSize(IN CONST CHAR16 *s1);
 VOID StrCat(IN CHAR16 *Dest, IN CONST CHAR16 *Src);
 CHAR16 *DevicePathToStr(EFI_DEVICE_PATH *DevPath);
 
+extern EFI_SYSTEM_TABLE *ST;
+extern EFI_BOOT_SERVICES *BS;
+extern EFI_RUNTIME_SERVICES *RT;
+
 #define CompareGuid(a, b) memcmp(a, b, sizeof(a))
 
 extern int debug;
