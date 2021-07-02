@@ -167,6 +167,7 @@
 #include "include/httpboot.h"
 #include "include/ip4config2.h"
 #include "include/ip6config.h"
+#include "include/load-options.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
 #include "include/peimage.h"
