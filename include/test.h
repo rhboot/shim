@@ -48,6 +48,17 @@
 #define FreePool(x) free(x)
 #define ReallocatePool(old, oldsz, newsz) realloc(old, newsz)
 
+INTN StrnCmp(IN CONST CHAR16 *s1,
+	     IN CONST CHAR16 *s2,
+	     IN UINTN len);
+CHAR16 *StrDuplicate(IN CONST CHAR16 *Src);
+UINTN StrLen(IN CONST CHAR16 *s1);
+UINTN StrSize(IN CONST CHAR16 *s1);
+VOID StrCat(IN CHAR16 *Dest, IN CONST CHAR16 *Src);
+CHAR16 *DevicePathToStr(EFI_DEVICE_PATH *DevPath);
+
+#define CompareGuid(a, b) memcmp(a, b, sizeof(a))
+
 extern int debug;
 #ifdef dprint
 #undef dprint
