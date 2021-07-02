@@ -14,7 +14,7 @@ Make.local
 *.efi.debug
 *.efi.signed
 *.esl
-*.gdbinit
+*.gdb*
 *.hash
 *.key
 *.key
