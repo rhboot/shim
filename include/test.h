@@ -63,24 +63,24 @@ extern int debug;
 		assert(cond);                                    \
 	})
 
-#define assert_true_as_expr(a, status, fmt, ...)                           \
-	({                                                                 \
-		int rc_ = 0;                                               \
-		if (!(a)) {                                                \
-			printf("%s:%d:got %lld, expected nonzero " fmt,    \
-			       __func__, __LINE__, (long long)(a),         \
-			       ##__VA_ARGS__);                             \
-			printf("%s:%d:Assertion `%s' failed.\n", __func__, \
-			       __LINE__, __stringify(!(a)));               \
-			rc_ = status;                                      \
-		}                                                          \
-		rc_;                                                       \
+#define assert_true_as_expr(a, status, fmt, ...)                              \
+	({                                                                    \
+		__typeof__(status) rc_ = 0;                                   \
+		if (!(a)) {                                                   \
+			printf("%s:%d:got %lld, expected nonzero " fmt,       \
+			       __func__, __LINE__, (long long)(uintptr_t)(a), \
+			       ##__VA_ARGS__);                                \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__,    \
+			       __LINE__, __stringify(!(a)));                  \
+			rc_ = status;                                         \
+		}                                                             \
+		rc_;                                                          \
 	})
 #define assert_nonzero_as_expr(a, ...) assert_true_as_expr(a, ##__VA_ARGS__)
 
 #define assert_false_as_expr(a, status, fmt, ...)                              \
 	({                                                                     \
-		int rc_ = 0;                                                   \
+		__typeof__(status) rc_ = (__typeof__(status))0;                \
 		if (a) {                                                       \
 			printf("%s:%d:got %lld, expected zero " fmt, __func__, \
 			       __LINE__, (long long)(a), ##__VA_ARGS__);       \
@@ -94,7 +94,7 @@ extern int debug;
 
 #define assert_positive_as_expr(a, status, fmt, ...)                          \
 	({                                                                    \
-		int rc_ = 0;                                                  \
+		__typeof__(status) rc_ = (__typeof__(status))0;               \
 		if ((a) <= 0) {                                               \
 			printf("%s:%d:got %lld, expected > 0 " fmt, __func__, \
 			       __LINE__, (long long)(a), ##__VA_ARGS__);      \
@@ -107,7 +107,7 @@ extern int debug;
 
 #define assert_negative_as_expr(a, status, fmt, ...)                          \
 	({                                                                    \
-		int rc_ = 0;                                                  \
+		__typeof__(status) rc_ = (__typeof__(status))0;               \
 		if ((a) >= 0) {                                               \
 			printf("%s:%d:got %lld, expected < 0 " fmt, __func__, \
 			       __LINE__, (long long)(a), ##__VA_ARGS__);      \
@@ -120,7 +120,7 @@ extern int debug;
 
 #define assert_equal_as_expr(a, b, status, fmt, ...)                       \
 	({                                                                 \
-		int rc_ = 0;                                               \
+		__typeof__(status) rc_ = (__typeof__(status))0;            \
 		if (!((a) == (b))) {                                       \
 			printf("%s:%d:" fmt, __func__, __LINE__, (a), (b), \
 			       ##__VA_ARGS__);                             \
@@ -133,7 +133,7 @@ extern int debug;
 
 #define assert_as_expr(cond, status, fmt, ...)                             \
 	({                                                                 \
-		int rc_ = 0;                                               \
+		__typeof__(status) rc_ = (__typeof__(status))0;            \
 		if (!(cond)) {                                             \
 			printf("%s:%d:" fmt, __func__, __LINE__,           \
 			       ##__VA_ARGS__);                             \
@@ -144,51 +144,54 @@ extern int debug;
 		rc_;                                                       \
 	})
 
-#define assert_true_return(a, status, fmt, ...)                               \
-	({                                                                    \
-		int rc_ = assert_true_as_expr(a, status, fmt, ##__VA_ARGS__); \
-		if (rc_ != 0)                                                 \
-			return rc_;                                           \
+#define assert_true_return(a, status, fmt, ...)                             \
+	({                                                                  \
+		__typeof__(status) rc_ =                                    \
+			assert_true_as_expr(a, status, fmt, ##__VA_ARGS__); \
+		if (rc_ != 0)                                               \
+			return rc_;                                         \
 	})
 #define assert_nonzero_return(a, ...) assert_true_return(a, ##__VA_ARGS__)
 
-#define assert_false_return(a, status, fmt, ...)                               \
-	({                                                                     \
-		int rc_ = assert_false_as_expr(a, status, fmt, ##__VA_ARGS__); \
-		if (rc_ != 0)                                                  \
-			return rc_;                                            \
+#define assert_false_return(a, status, fmt, ...)                             \
+	({                                                                   \
+		__typeof__(status) rc_ =                                     \
+			assert_false_as_expr(a, status, fmt, ##__VA_ARGS__); \
+		if (rc_ != 0)                                                \
+			return rc_;                                          \
 	})
 #define assert_zero_return(a, ...) assert_false_return(a, ##__VA_ARGS__)
 
 #define assert_positive_return(a, status, fmt, ...)               \
 	({                                                        \
-		int rc_ = assert_positive_as_expr(a, status, fmt, \
-		                                  ##__VA_ARGS__); \
+		__typeof__(status) rc_ = assert_positive_as_expr( \
+			a, status, fmt, ##__VA_ARGS__);           \
 		if (rc_ != 0)                                     \
 			return rc_;                               \
 	})
 
 #define assert_negative_return(a, status, fmt, ...)               \
 	({                                                        \
-		int rc_ = assert_negative_as_expr(a, status, fmt, \
-		                                  ##__VA_ARGS__); \
+		__typeof__(status) rc_ = assert_negative_as_expr( \
+			a, status, fmt, ##__VA_ARGS__);           \
 		if (rc_ != 0)                                     \
 			return rc_;                               \
 	})
 
-#define assert_equal_return(a, b, status, fmt, ...)               \
-	({                                                        \
-		int rc_ = assert_equal_as_expr(a, b, status, fmt, \
-		                               ##__VA_ARGS__);    \
-		if (rc_ != 0)                                     \
-			return rc_;                               \
+#define assert_equal_return(a, b, status, fmt, ...)            \
+	({                                                     \
+		__typeof__(status) rc_ = assert_equal_as_expr( \
+			a, b, status, fmt, ##__VA_ARGS__);     \
+		if (rc_ != 0)                                  \
+			return rc_;                            \
 	})
 
-#define assert_return(cond, status, fmt, ...)                               \
-	({                                                                  \
-		int rc_ = assert_as_expr(cond, status, fmt, ##__VA_ARGS__); \
-		if (rc_ != 0)                                               \
-			return rc_;                                         \
+#define assert_return(cond, status, fmt, ...)                             \
+	({                                                                \
+		__typeof__(status) rc_ =                                  \
+			assert_as_expr(cond, status, fmt, ##__VA_ARGS__); \
+		if (rc_ != 0)                                             \
+			return rc_;                                       \
 	})
 
 #define assert_goto(cond, label, fmt, ...)                                 \
