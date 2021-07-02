@@ -146,6 +146,19 @@ extern int debug;
 		rc_;                                                       \
 	})
 
+#define assert_not_equal_as_expr(a, b, status, fmt, ...)                   \
+	({                                                                 \
+		__typeof__(status) rc_ = (__typeof__(status))0;            \
+		if (!((a) != (b))) {                                       \
+			printf("%s:%d:" fmt, __func__, __LINE__, (a), (b), \
+			       ##__VA_ARGS__);                             \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__, \
+			       __LINE__, __stringify(a != b));             \
+			rc_ = status;                                      \
+		}                                                          \
+		rc_;                                                       \
+	})
+
 #define assert_as_expr(cond, status, fmt, ...)                             \
 	({                                                                 \
 		__typeof__(status) rc_ = (__typeof__(status))0;            \
@@ -201,6 +214,14 @@ extern int debug;
 			return rc_;                            \
 	})
 
+#define assert_not_equal_return(a, b, status, fmt, ...)            \
+	({                                                         \
+		__typeof__(status) rc_ = assert_not_equal_as_expr( \
+			a, b, status, fmt, ##__VA_ARGS__);         \
+		if (rc_ != 0)                                      \
+			return rc_;                                \
+	})
+
 #define assert_return(cond, status, fmt, ...)                             \
 	({                                                                \
 		__typeof__(status) rc_ =                                  \
@@ -230,6 +251,41 @@ extern int debug;
 			goto label;                                        \
 		}                                                          \
 	})
+
+#define assert_not_equal_goto(a, b, label, fmt, ...)                       \
+	({                                                                 \
+		if (!((a) != (b))) {                                       \
+			printf("%s:%d:" fmt, __func__, __LINE__, (a), (b), \
+			       ##__VA_ARGS__);                             \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__, \
+			       __LINE__, __stringify(a != b));             \
+			goto label;                                        \
+		}                                                          \
+	})
+
+#define assert_true_goto(a, label, fmt, ...)                               \
+	({                                                                 \
+		if (!(a)) {                                                \
+			printf("%s:%d:" fmt, __func__, __LINE__, (a),      \
+			       ##__VA_ARGS__);                             \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__, \
+			       __LINE__, __stringify(!(a)));               \
+			goto label;                                        \
+		}                                                          \
+	})
+#define assert_nonzero_goto(a, ...) assert_true_goto(a, ##__VA_ARGS__)
+
+#define assert_false_goto(a, label, fmt, ...)                              \
+	({                                                                 \
+		if (a) {                                                   \
+			printf("%s:%d:" fmt, __func__, __LINE__, (a),      \
+			       ##__VA_ARGS__);                             \
+			printf("%s:%d:Assertion `%s' failed.\n", __func__, \
+			       __LINE__, __stringify(a));                  \
+			goto label;                                        \
+		}                                                          \
+	})
+#define assert_zero_goto(a, ...) assert_false_goto(a, ##__VA_ARGS__)
 
 #define assert_negative_goto(a, label, fmt, ...)                              \
 	({                                                                    \
