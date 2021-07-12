@@ -114,6 +114,8 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	BOOLEAN old_caps;
 	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
 
+	tdx_log_event_raw(buf, size, pcr, log, logsize, type, hash);
+
 	efi_status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
 	if (EFI_ERROR(efi_status)) {
 #ifdef REQUIRE_TPM
