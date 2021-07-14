@@ -69,6 +69,8 @@ extern int debug;
 #define dprint(fmt, ...) {( if (debug) printf("%s:%d:" fmt, __func__, __LINE__, ##__VA_ARGS__); })
 #endif
 
+void print_traceback(int skip);
+
 #define eassert(cond, fmt, ...)                                  \
 	({                                                       \
 		if (!(cond)) {                                   \

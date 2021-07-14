@@ -9,8 +9,34 @@
 #endif
 #include "shim.h"
 
+#include <execinfo.h>
+#include <stdio.h>
+#include <string.h>
+
+#define BT_BUF_SIZE (4096/sizeof(void *))
+
+static void *frames[BT_BUF_SIZE] = { 0, };
+
 UINT8 in_protocol = 0;
 int debug = DEFAULT_DEBUG_PRINT_STATE;
+
+void
+print_traceback(int skip)
+{
+	int nptrs;
+	char **strings;
+
+	nptrs = backtrace(frames, BT_BUF_SIZE);
+	if (nptrs < skip)
+		return;
+
+	strings = backtrace_symbols(frames, nptrs);
+	for (int i = skip; strings != NULL && i < nptrs; i++) {
+		printf("%p %s\n", (void *)frames[i], strings[i]);
+	}
+	if (strings)
+		free(strings);
+}
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wunused-function"
