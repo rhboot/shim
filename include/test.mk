@@ -14,14 +14,25 @@ CFLAGS = -O2 -ggdb -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
 	 $(EFI_INCLUDES) \
 	 -Iinclude -iquote . \
-	 -fshort-wchar -flto -fno-builtin \
-	 -Wall \
-	 -Wextra \
+	 -isystem /usr/include \
+	 -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
+	 $(ARCH_CFLAGS) \
+	 -fshort-wchar \
+	 -flto \
+	 -fno-builtin \
+	 -rdynamic \
+	 -fno-inline \
+	 -fno-eliminate-unused-debug-types \
+	 -fno-eliminate-unused-debug-symbols \
+	 -gpubnames \
+	 -grecord-gcc-switches \
+	 $(DEFAULT_WARNFLAGS) \
 	 -Wsign-compare \
 	 -Wno-deprecated-declarations \
+	 -Wno-unused-but-set-variable \
+	 -Wno-unused-variable \
 	 -Wno-pointer-sign \
-	 -Wno-unused \
-	 -Werror \
+	 $(DEFAULT_WERRFLAGS) \
 	 -Werror=nonnull \
 	 $(shell $(CC) -Werror=nonnull-compare -E -x c /dev/null >/dev/null 2>&1 && echo -Werror=nonnull-compare) \
 	 $(ARCH_DEFINES) \
