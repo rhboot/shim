@@ -6,7 +6,7 @@ In the PC ecosystem, [UEFI Secure Boot](https://docs.microsoft.com/en-us/windows
 is typically configured to trust 2 authorities for signing UEFI boot code, the
 Microsoft UEFI Certificate Authority (CA) and Windows CA. When malicious or
 security compromised code is detected, 2 revocation mechanisms are provided by
-compatible UEFI implementations, signing certificate or image hash. The UEFI
+compatible UEFI implementations: signing certificate or image hash. The UEFI
 Specification does not provides any well tested additional revocation
 mechanisms.
 
@@ -269,7 +269,7 @@ that the global generation numbers will eventually move forward and exclude
 those products from booting on a UEFI Secure Boot enabled system. However a
 product made up of GRUB and a closed source kernel is just as conceivable. In
 that case the kernel version may never move forward once the product reaches
-its end of support. Therefor it is recommended that the product-specific
+its end of support. Therefore it is recommended that the product-specific
 generation number be incremented past the latest one shown in any binary for
 that product, effectively disabling that product on UEFI Secure Boot enabled
 systems.
@@ -309,7 +309,7 @@ compromise.
 
 The initial SBAT implementation will add SBAT metadata to Shim and GRUB and
 enforce SBAT on all components labeled with it. Until a component (e.g. the
-Linux kernel gains SBAT metadata) it can not be revoked via SBAT, but only by
+Linux kernel) gains SBAT metadata it can not be revoked via SBAT, but only by
 revoking the keys signing that component. These keys will should live in
 separate, product-specific signed PE files that contain **only** the
 certificate and SBAT metadata for the key files. These key files can then be
