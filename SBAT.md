@@ -310,7 +310,7 @@ compromise.
 The initial SBAT implementation will add SBAT metadata to Shim and GRUB and
 enforce SBAT on all components labeled with it. Until a component (e.g. the
 Linux kernel) gains SBAT metadata it can not be revoked via SBAT, but only by
-revoking the keys signing that component. These keys will should live in
+revoking the keys signing that component. These keys will live in
 separate, product-specific signed PE files that contain **only** the
 certificate and SBAT metadata for the key files. These key files can then be
 revoked via SBAT in order to invalidate and replace a specific key. While
