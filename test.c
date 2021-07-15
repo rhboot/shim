@@ -22,37 +22,6 @@ LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
 	return EFI_SUCCESS;
 }
 
-#ifndef HAVE_STRCMP
-INTN
-StrCmp(CONST CHAR16 *s1, CONST CHAR16 *s2) {
-	assert(s1 != NULL);
-	assert(s2 != NULL);
-
-	int i;
-	for (i = 0; s1[i] && s2[i]; i++) {
-		if (s1[i] != s2[i])
-			return s2[i] - s1[i];
-	}
-	return 0;
-}
-#endif
-
-#ifndef HAVE_STRNCMP
-INTN
-StrnCmp(CONST CHAR16 *s1, CONST CHAR16 *s2, UINTN len) {
-	assert(s1 != NULL);
-	assert(s2 != NULL);
-
-	UINTN i;
-	for (i = 0; i < len && s1[i] && s2[i]; i++) {
-		if (s1[i] != s2[i])
-			return s2[i] - s1[i];
-
-	}
-	return 0;
-}
-#endif
-
 #ifndef HAVE_GET_VARIABLE_ATTR
 EFI_STATUS
 get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
@@ -73,5 +42,11 @@ get_variable(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner)
 #ifndef HAVE_SHIM_LOCK_GUID
 EFI_GUID SHIM_LOCK_GUID = {0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23 } };
 #endif
+
+UINTN EFIAPI
+console_print(const CHAR16 *fmt, ...)
+{
+	return 0;
+}
 
 // vim:fenc=utf-8:tw=75:noet
