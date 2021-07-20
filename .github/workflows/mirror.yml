@@ -1,0 +1,24 @@
+name: mirror
+
+on:
+  schedule:
+    - branches:
+      - github-mirror
+    - cron: '43 4 * * *'
+
+jobs:
+  mirror-main:
+    runs-on: ubuntu-20.04
+    name: mirror-main
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Mirror main
+        id: mirror-main
+        run: |
+          .github/mirror.sh
