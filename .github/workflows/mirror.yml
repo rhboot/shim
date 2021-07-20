@@ -2,9 +2,8 @@ name: mirror
 
 on:
   schedule:
-    - branches:
-      - github-mirror
-    - cron: '43 4 * * *'
+    branches: github-mirror
+    cron: '43 4 * * *'
 
 jobs:
   mirror-main:
