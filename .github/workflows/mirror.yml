@@ -3,6 +3,7 @@ name: Scheduled github mirror
 on:
   schedule:
     - cron: '50 14 * * *'
+  workflow_dispatch:
 
 jobs:
   mirror-main:
