@@ -2,7 +2,7 @@ name: mirror
 
 on:
   schedule:
-    cron: '43 4 * * *'
+    - cron: '43 4 * * *'
 
 jobs:
   mirror-main:
