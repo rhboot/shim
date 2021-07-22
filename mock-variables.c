@@ -29,6 +29,116 @@ mock_sort_policy_t mock_variable_sort_policy = MOCK_SORT_APPEND;
 
 UINT32 mock_variable_delete_attr_policy;
 
+mock_set_variable_pre_hook_t *mock_set_variable_pre_hook = NULL;
+mock_set_variable_post_hook_t *mock_set_variable_post_hook = NULL;
+mock_get_variable_pre_hook_t *mock_get_variable_pre_hook = NULL;
+mock_get_variable_post_hook_t *mock_get_variable_post_hook = NULL;
+mock_get_next_variable_name_pre_hook_t *mock_get_next_variable_name_pre_hook = NULL;
+mock_get_next_variable_name_post_hook_t *mock_get_next_variable_name_post_hook = NULL;
+mock_query_variable_info_pre_hook_t *mock_query_variable_info_pre_hook = NULL;
+mock_query_variable_info_post_hook_t *mock_query_variable_info_post_hook = NULL;
+
+static EFI_STATUS
+mock_sv_pre_hook(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
+		 VOID *data)
+{
+	EFI_STATUS status = EFI_SUCCESS;
+	if (mock_set_variable_pre_hook)
+		status = mock_set_variable_pre_hook(name, guid,
+						    attrs, size, data);
+	return status;
+}
+
+static void
+mock_sv_post_hook_(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
+		   VOID *data, EFI_STATUS *status, mock_variable_op_t op,
+		   const char * const file, const int line,
+		   const char * const func)
+{
+	if (mock_set_variable_post_hook)
+		mock_set_variable_post_hook(name, guid, attrs, size,
+		                            data, status, op, file, line, func);
+}
+#define mock_sv_post_hook(name, guid, attrs, size, data, status, op) \
+	mock_sv_post_hook_(name, guid, attrs, size, data, status, op,\
+			   __FILE__, __LINE__, __func__)
+
+static EFI_STATUS
+mock_gv_pre_hook(CHAR16 *name, EFI_GUID *guid, UINT32 *attrs, UINTN *size,
+                 VOID *data)
+{
+	EFI_STATUS status = EFI_SUCCESS;
+	if (mock_get_variable_pre_hook)
+		status = mock_get_variable_pre_hook(name, guid,
+						    attrs, size, data);
+	return status;
+}
+
+static void
+mock_gv_post_hook_(CHAR16 *name, EFI_GUID *guid, UINT32 *attrs, UINTN *size,
+		   VOID *data, EFI_STATUS *status, const char * const file,
+		   const int line, const char * const func)
+{
+	if (mock_get_variable_post_hook)
+		mock_get_variable_post_hook(name, guid, attrs, size, data,
+					    status, file, line, func);
+}
+#define mock_gv_post_hook(name, guid, attrs, size, data, status) \
+	mock_gv_post_hook_(name, guid, attrs, size, data, status,\
+			   __FILE__, __LINE__, __func__)
+
+static EFI_STATUS
+mock_gnvn_pre_hook(UINTN *size, CHAR16 *name, EFI_GUID *guid)
+{
+	EFI_STATUS status = EFI_SUCCESS;
+	if (mock_get_next_variable_name_pre_hook)
+		status = mock_get_next_variable_name_pre_hook(size, name, guid);
+	return status;
+}
+
+static void
+mock_gnvn_post_hook_(UINTN *size, CHAR16 *name, EFI_GUID *guid,
+		     EFI_STATUS *status, const char * const file,
+		     const int line, const char * const func)
+{
+	if (mock_get_next_variable_name_post_hook)
+		mock_get_next_variable_name_post_hook(size, name, guid, status,
+						      file, line, func);
+}
+#define mock_gnvn_post_hook(size, name, guid, status) \
+	mock_gnvn_post_hook_(size, name, guid, status,\
+			     __FILE__, __LINE__, __func__)
+
+static EFI_STATUS
+mock_qvi_pre_hook(UINT32 attrs, UINT64 *max_var_storage,
+                  UINT64 *remaining_var_storage, UINT64 *max_var_size)
+{
+	EFI_STATUS status = EFI_SUCCESS;
+	if (mock_query_variable_info_pre_hook)
+		status = mock_query_variable_info_pre_hook(
+					attrs, max_var_storage,
+					remaining_var_storage, max_var_size);
+	return status;
+}
+
+static void
+mock_qvi_post_hook_(UINT32 attrs, UINT64 *max_var_storage,
+		    UINT64 *remaining_var_storage, UINT64 *max_var_size,
+		    EFI_STATUS *status, const char * const file,
+		    const int line, const char * const func)
+{
+	if (mock_query_variable_info_post_hook)
+		mock_query_variable_info_post_hook(attrs, max_var_storage,
+		                                   remaining_var_storage,
+		                                   max_var_size, status,
+						   file, line, func);
+}
+#define mock_qvi_post_hook(attrs, max_var_storage, remaining_var_storage,\
+			   max_var_size, status) \
+	mock_qvi_post_hook_(attrs, max_var_storage, remaining_var_storage,\
+			    max_var_size, status, \
+			    __FILE__, __LINE__, __func__)
+
 static const size_t guidstr_size = sizeof("8be4df61-93ca-11d2-aa0d-00e098032b8c");
 
 static int
@@ -113,8 +223,13 @@ mock_get_variable(CHAR16 *name, EFI_GUID *guid, UINT32 *attrs, UINTN *size,
 	struct mock_variable *result = NULL;
 	EFI_STATUS status;
 
+	status = mock_gv_pre_hook(name, guid, attrs, size, data);
+	if (EFI_ERROR(status))
+		return status;
+
 	if (name == NULL || guid == NULL || size == NULL) {
 		status = EFI_INVALID_PARAMETER;
+		mock_gv_post_hook(name, guid, attrs, size, data, &status);
 		return status;
 	}
 
@@ -134,20 +249,27 @@ mock_get_variable(CHAR16 *name, EFI_GUID *guid, UINT32 *attrs, UINTN *size,
 			if (var->size > *size) {
 				*size = var->size;
 				status = EFI_BUFFER_TOO_SMALL;
+				mock_gv_post_hook(name, guid, attrs, size, data,
+				                  &status);
 				return status;
 			}
 			if (data == NULL) {
 				status = EFI_INVALID_PARAMETER;
+				mock_gv_post_hook(name, guid, attrs, size, data,
+						  &status);
 				return status;
 			}
 			*size = var->size;
 			memcpy(data, var->data, var->size);
 			status = EFI_SUCCESS;
+			mock_gv_post_hook(name, guid, attrs, size, data,
+			                  &status);
 			return status;
 		}
 	}
 
 	status = EFI_NOT_FOUND;
+	mock_gv_post_hook(name, guid, attrs, size, data, &status);
 	return status;
 }
 
@@ -160,6 +282,7 @@ mock_gnvn_set_result(UINTN *size, CHAR16 *name, EFI_GUID *guid,
 	if (*size < StrSize(result->name)) {
 		*size = StrSize(result->name);
 		status = EFI_BUFFER_TOO_SMALL;
+		mock_gnvn_post_hook(size, name, guid, &status);
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
 		printf("%s:%d:%s():  returning %lx\n",
 		       __FILE__, __LINE__-1, __func__, status);
@@ -172,6 +295,7 @@ mock_gnvn_set_result(UINTN *size, CHAR16 *name, EFI_GUID *guid,
 	memcpy(guid, &result->guid, sizeof(EFI_GUID));
 
 	status = EFI_SUCCESS;
+	mock_gnvn_post_hook(size, name, guid, &status);
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
 	printf("%s:%d:%s():  returning %lx\n",
 	       __FILE__, __LINE__-1, __func__, status);
@@ -191,8 +315,13 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 	bool found = false;
 	EFI_STATUS status;
 
+	status = mock_gnvn_pre_hook(size, name, guid);
+	if (EFI_ERROR(status))
+		return status;
+
 	if (size == NULL || name == NULL || guid == NULL) {
 		status = EFI_INVALID_PARAMETER;
+		mock_gnvn_post_hook(size, name, guid, &status);
 		return status;
 	}
 
@@ -205,6 +334,7 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 
 	if (found == false) {
 		status = EFI_INVALID_PARAMETER;
+		mock_gnvn_post_hook(size, name, guid, &status);
 		return status;
 	}
 
@@ -277,11 +407,13 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 			status = EFI_NOT_FOUND;
 		else
 			status = EFI_INVALID_PARAMETER;
+		mock_gnvn_post_hook(size, name, guid, &status);
 		return status;
 	}
 
 	if (!result) {
 		status = EFI_NOT_FOUND;
+		mock_gnvn_post_hook(size, name, guid, &status);
 		return status;
 	}
 
@@ -409,10 +541,14 @@ mock_delete_variable(struct mock_variable *var)
 	if (EFI_ERROR(status)) {
 		printf("%s:%d:%s():  status:0x%lx\n",
 		       __FILE__, __LINE__ - 1, __func__, status);
+		mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+		                  var->data, &status, DELETE);
 		return status;
 	}
 
 	status = EFI_SUCCESS;
+	mock_sv_post_hook(var->name, &var->guid, var->attrs, 0, 0, &status,
+	                  DELETE);
 	free_var(var);
 	return status;
 }
@@ -426,6 +562,8 @@ mock_replace_variable(struct mock_variable *var, VOID *data, UINTN size)
 	status = mock_sv_adjust_usage_data(var->attrs, size,
 					   - var->size + size);
 	if (EFI_ERROR(status)) {
+		mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+		                  var->data, &status, REPLACE);
 		return status;
 	}
 
@@ -437,6 +575,8 @@ mock_replace_variable(struct mock_variable *var, VOID *data, UINTN size)
 		       size);
 #endif
 		status = EFI_OUT_OF_RESOURCES;
+		mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+		                  var->data, &status, REPLACE);
 		return status;
 	}
 	memcpy(new, data, size);
@@ -445,6 +585,8 @@ mock_replace_variable(struct mock_variable *var, VOID *data, UINTN size)
 	var->size = size;
 
 	status = EFI_SUCCESS;
+	mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+	                  var->data, &status, REPLACE);
 	return status;
 }
 
@@ -456,11 +598,15 @@ mock_sv_extend(struct mock_variable *var, VOID *data, UINTN size)
 
 	if (size == 0) {
 		status = EFI_SUCCESS;
+		mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+		                  var->data, &status, APPEND);
 		return status;
 	}
 
 	status = mock_sv_adjust_usage_data(var->attrs, var->size + size, size);
 	if (EFI_ERROR(status)) {
+		mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+		                  var->data, &status, APPEND);
 		return status;
 	}
 
@@ -472,6 +618,8 @@ mock_sv_extend(struct mock_variable *var, VOID *data, UINTN size)
 		       var->size + size);
 #endif
 		status = EFI_OUT_OF_RESOURCES;
+		mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+		                  var->data, &status, APPEND);
 		return status;
 	}
 
@@ -480,6 +628,8 @@ mock_sv_extend(struct mock_variable *var, VOID *data, UINTN size)
 	var->size += size;
 
 	status = EFI_SUCCESS;
+	mock_sv_post_hook(var->name, &var->guid, var->attrs, var->size,
+	                  var->data, &status, APPEND);
 	return status;
 }
 
@@ -574,14 +724,22 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	EFI_STATUS status;
 	long cmp = -1;
 
+	status = mock_sv_pre_hook(name, guid, attrs, size, data);
+	if (EFI_ERROR(status))
+		return status;
+
 	if (!name || name[0] == 0 || !guid) {
 		status = EFI_INVALID_PARAMETER;
+		mock_sv_post_hook(name, guid, attrs, size, data, &status,
+		                  CREATE);
 		return status;
 	}
 
 	if ((attrs & EFI_VARIABLE_RUNTIME_ACCESS) &&
 	    !(attrs & EFI_VARIABLE_BOOTSERVICE_ACCESS)) {
 		status = EFI_INVALID_PARAMETER;
+		mock_sv_post_hook(name, guid, attrs, size, data, &status,
+		                  CREATE);
 		return status;
 	}
 
@@ -592,6 +750,8 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	 */
 	if (has_exited_boot_services() && !(attrs & EFI_VARIABLE_RUNTIME_ACCESS)) {
 		status = EFI_INVALID_PARAMETER;
+		mock_sv_post_hook(name, guid, attrs, size, data, &status,
+				  CREATE);
 		return status;
 	}
 #endif
@@ -605,6 +765,8 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 		     EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS |
 		     EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS)) {
 		status = EFI_UNSUPPORTED;
+		mock_sv_post_hook(name, guid, attrs, size, data, &status,
+				  CREATE);
 		return status;
 	}
 #endif
@@ -682,9 +844,13 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 #endif
 		status = mock_new_variable(name, guid, attrs, size, data, &var);
 		if (EFI_ERROR(status)) {
+			mock_sv_post_hook(name, guid, attrs, size, data,
+					  &status, CREATE);
 			return status;
 		}
 		mock_sv_adjust_usage_data(attrs, size, totalsz);
+		mock_sv_post_hook(name, guid, attrs, size, data,
+				  &status, CREATE);
 		if (EFI_ERROR(status)) {
 			mock_sv_adjust_usage_data(attrs, 0, -totalsz);
 			return status;
@@ -725,6 +891,8 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 			       __FILE__, __LINE__ - 1, __func__,
 			       format_var_attrs(var->attrs),
 			       format_var_attrs(attrs));
+			mock_sv_post_hook(name, guid, attrs, size, data,
+					  &status, REPLACE);
 			return status;
 		}
 	}
@@ -760,10 +928,18 @@ mock_query_variable_info(UINT32 attrs, UINT64 *max_var_storage,
 	struct mock_variable_limits *limits = NULL;
 	EFI_STATUS status;
 
+	status = mock_qvi_pre_hook(attrs, max_var_storage,
+				   remaining_var_storage, max_var_size);
+	if (EFI_ERROR(status))
+		return status;
+
 	if (max_var_storage == NULL ||
 	    remaining_var_storage == NULL ||
 	    max_var_size == NULL) {
 		status = EFI_INVALID_PARAMETER;
+		mock_qvi_post_hook(attrs, max_var_storage,
+		                   remaining_var_storage, max_var_size,
+		                   &status);
 		return status;
 	}
 
@@ -773,12 +949,18 @@ mock_query_variable_info(UINT32 attrs, UINT64 *max_var_storage,
 			*max_var_storage = *limits->max_var_storage;
 			*remaining_var_storage = *limits->remaining_var_storage;
 			*max_var_size = *limits->max_var_size;
+
 			status = EFI_SUCCESS;
+			mock_qvi_post_hook(attrs, max_var_storage,
+			                   remaining_var_storage, max_var_size,
+			                   &status);
 			return status;
 		}
 	}
 
 	status = EFI_UNSUPPORTED;
+	mock_qvi_post_hook(attrs, max_var_storage, remaining_var_storage,
+	                   max_var_size, &status);
 	return status;
 }
 
@@ -990,6 +1172,15 @@ mock_reset_variables(void)
 	static bool once = true;
 
 	init_efi_system_table();
+
+	mock_set_variable_pre_hook = NULL;
+	mock_set_variable_post_hook = NULL;
+	mock_get_variable_pre_hook = NULL;
+	mock_get_variable_post_hook = NULL;
+	mock_get_next_variable_name_pre_hook = NULL;
+	mock_get_next_variable_name_post_hook = NULL;
+	mock_query_variable_info_pre_hook = NULL;
+	mock_query_variable_info_post_hook = NULL;
 
 	if (once) {
 		INIT_LIST_HEAD(&mock_variables);
