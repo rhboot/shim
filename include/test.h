@@ -43,21 +43,27 @@
 
 #include <stdlib.h>
 
-#define ZeroMem(buf, sz) memset(buf, 0, sz)
-#define SetMem(buf, sz, value) memset(buf, value, sz)
-#define CopyMem(dest, src, len) memcpy(dest, src, len)
-#define CompareMem(dest, src, len) memcmp(dest, src, len)
+#include <assert.h>
+
+#include <efiui.h>
+#include <efilib.h>
+
+#include <efivar/efivar.h>
 
 #include <assert.h>
 
-#define AllocateZeroPool(x) calloc(1, (x))
-#define AllocatePool(x) malloc(x)
-#define FreePool(x) free(x)
-#define ReallocatePool(old, oldsz, newsz) realloc(old, newsz)
+#include "list.h"
 
+INTN StrCmp(IN CONST CHAR16 *s1,
+	    IN CONST CHAR16 *s2);
 INTN StrnCmp(IN CONST CHAR16 *s1,
 	     IN CONST CHAR16 *s2,
 	     IN UINTN len);
+VOID StrCpy(IN CHAR16 *Dest,
+	    IN CONST CHAR16 *Src);
+VOID StrnCpy(IN CHAR16 *Dest,
+	     IN CONST CHAR16 *Src,
+	     IN UINTN Len);
 CHAR16 *StrDuplicate(IN CONST CHAR16 *Src);
 UINTN StrLen(IN CONST CHAR16 *s1);
 UINTN StrSize(IN CONST CHAR16 *s1);
@@ -296,6 +302,108 @@ efi_strerror(EFI_STATUS status)
 		break;
 	}
 	return out;
+}
+
+static inline char *
+Str2str(CHAR16 *in)
+{
+	static char buf0[1024];
+	static char buf1[1024];
+	char *out;
+	static int n;
+
+	out = n++ % 2 ? buf0 : buf1;
+	if (n > 1)
+		n -= 2;
+	SetMem(out, 1024, 0);
+	for (UINTN i = 0; i < 1023 && in[i]; i++)
+		out[i] = in[i];
+	return out;
+}
+
+static inline char *
+format_var_attrs(UINT32 attr)
+{
+	static char buf0[1024];
+	static char buf1[1024];
+	static int n;
+	int pos = 0;
+	bool found = false;
+	char *buf, *bufp;
+
+	buf = n++ % 2 ? buf0 : buf1;
+	if (n > 1)
+		n -= 2;
+	SetMem(buf, sizeof(buf0), 0);
+	bufp = &buf[0];
+	for (UINT32 i = 0; i < 8; i++) {
+		switch((1ul << i) & attr) {
+		case EFI_VARIABLE_NON_VOLATILE:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "NV");
+			attr &= ~EFI_VARIABLE_NON_VOLATILE;
+			found = true;
+			break;
+		case EFI_VARIABLE_BOOTSERVICE_ACCESS:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "BS");
+			attr &= ~EFI_VARIABLE_BOOTSERVICE_ACCESS;
+			found = true;
+			break;
+		case EFI_VARIABLE_RUNTIME_ACCESS:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "RT");
+			attr &= ~EFI_VARIABLE_RUNTIME_ACCESS;
+			found = true;
+			break;
+		case EFI_VARIABLE_HARDWARE_ERROR_RECORD:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "HER");
+			attr &= ~EFI_VARIABLE_HARDWARE_ERROR_RECORD;
+			found = true;
+			break;
+		case EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "AUTH");
+			attr &= ~EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS;
+			found = true;
+			break;
+		case EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "TIMEAUTH");
+			attr &= ~EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS;
+			found = true;
+			break;
+		case EFI_VARIABLE_APPEND_WRITE:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "APPEND");
+			attr &= ~EFI_VARIABLE_APPEND_WRITE;
+			found = true;
+			break;
+		case EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS:
+			if (found)
+				bufp = stpcpy(bufp, "|");
+			bufp = stpcpy(bufp, "ENHANCED_AUTH");
+			attr &= ~EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS;
+			found = true;
+			break;
+		default:
+			break;
+		}
+	}
+	if (attr) {
+		if (found)
+			bufp = stpcpy(bufp, "|");
+		snprintf(bufp, bufp - buf - 1, "0x%x", attr);
+	}
+	return &buf[0];
 }
 
 extern int debug;

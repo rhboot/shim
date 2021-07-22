@@ -79,6 +79,12 @@ $(patsubst %.c,%.o,$(wildcard test-*.c)) : | test-random.h
 test-load-options_FILES = lib/guid.c
 test-load-options : CFLAGS+=-DHAVE_SHIM_LOCK_GUID
 
+test-mock-variables_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c mock-variables.c
+test-mock-variables: CFLAGS+=-DHAVE_SHIM_LOCK_GUID
+
+test-mok-mirror_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c
+test-mok-mirror: CFLAGS+=-DHAVE_START_IMAGE -DHAVE_SHIM_LOCK_GUID
+
 test-sbat_FILES = csv.c lib/variables.c lib/guid.c
 test-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
 
@@ -89,7 +95,7 @@ tests := $(patsubst %.c,%,$(wildcard test-*.c))
 $(tests) :: test-% : | libefi-test.a
 
 $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ $(wildcard $*.c) $(test-$*_FILES) libefi-test.a -lefivar
+	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(test-$*_FILES)) libefi-test.a -lefivar
 	$(VALGRIND) ./$@
 
 test : $(tests)

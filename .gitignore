@@ -42,5 +42,6 @@ Make.local
 shim_cert.h
 /test-*
 !/test-*.c
+!/test-data/
 /test-random.h
 version.c

@@ -259,4 +259,12 @@ console_print(const CHAR16 *fmt, ...)
 	return 0;
 }
 
+#ifndef HAVE_START_IMAGE
+EFI_STATUS
+start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
+{
+	return EFI_UNSUPPORTED;
+}
+#endif
+
 // vim:fenc=utf-8:tw=75:noet
