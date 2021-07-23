@@ -52,27 +52,7 @@ extern struct {
 	UINT32 vendor_deauthorized_offset;
 } cert_table;
 
-UINT32 vendor_authorized_size = 0;
-UINT8 *vendor_authorized = NULL;
-
-UINT32 vendor_deauthorized_size = 0;
-UINT8 *vendor_deauthorized = NULL;
-
-#if defined(ENABLE_SHIM_CERT)
-UINT32 build_cert_size;
-UINT8 *build_cert;
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-/*
- * indicator of how an image has been verified
- */
-verification_method_t verification_method;
-int loader_is_participating;
-
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
-
-UINT8 user_insecure_mode;
-UINT8 ignore_db;
 
 typedef enum {
 	DATA_FOUND,
