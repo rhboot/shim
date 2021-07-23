@@ -124,6 +124,21 @@ typedef enum {
 	REPLACE,
 } mock_variable_op_t;
 
+static inline const char *
+format_var_op(mock_variable_op_t op)
+{
+	static const char *var_op_names[] = {
+		"NONE",
+		"CREATE",
+		"DELETE",
+		"APPEND",
+		"REPLACE",
+		NULL
+	};
+
+	return var_op_names[op];
+}
+
 typedef EFI_STATUS (mock_set_variable_pre_hook_t)(CHAR16 *name, EFI_GUID *guid,
 						  UINT32 attrs, UINTN size,
 						  VOID *data);

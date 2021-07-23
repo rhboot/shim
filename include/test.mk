@@ -82,7 +82,7 @@ test-load-options : CFLAGS+=-DHAVE_SHIM_LOCK_GUID
 test-mock-variables_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c mock-variables.c
 test-mock-variables: CFLAGS+=-DHAVE_SHIM_LOCK_GUID
 
-test-mok-mirror_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c
+test-mok-mirror_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c mock-variables.c
 test-mok-mirror: CFLAGS+=-DHAVE_START_IMAGE -DHAVE_SHIM_LOCK_GUID
 
 test-sbat_FILES = csv.c lib/variables.c lib/guid.c
