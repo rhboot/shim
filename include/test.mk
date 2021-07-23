@@ -67,10 +67,7 @@ $(wildcard test-*.c) :: %.c : test-random.h
 $(patsubst %.c,%,$(wildcard test-*.c)) :: | test-random.h
 $(patsubst %.c,%.o,$(wildcard test-*.c)) : | test-random.h
 
-test-load-options_FILES = lib/guid.c \
-			  libefi-test.a \
-			  -lefivar
-test-load-options :: libefi-test.a
+test-load-options_FILES = lib/guid.c
 test-load-options : CFLAGS+=-DHAVE_SHIM_LOCK_GUID
 
 test-sbat_FILES = csv.c lib/variables.c lib/guid.c
@@ -83,7 +80,7 @@ tests := $(patsubst %.c,%,$(wildcard test-*.c))
 $(tests) :: test-% : | libefi-test.a
 
 $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ $(wildcard $*.c) $(test-$*_FILES) libefi-test.a
+	$(CC) $(CFLAGS) -o $@ $^ $(wildcard $*.c) $(test-$*_FILES) libefi-test.a -lefivar
 	$(VALGRIND) ./$@
 
 test : $(tests)

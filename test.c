@@ -122,23 +122,6 @@ LogError_(const char *file, int line, const char *func, const CHAR16 *fmt, ...)
 	return EFI_SUCCESS;
 }
 
-#ifndef HAVE_GET_VARIABLE_ATTR
-EFI_STATUS
-get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
-		  EFI_GUID owner, UINT32 *attributes)
-{
-	return EFI_UNSUPPORTED;
-}
-#endif
-
-#ifndef HAVE_GET_VARIABLE
-EFI_STATUS
-get_variable(const CHAR16 * const var, UINT8 **data, UINTN *len, EFI_GUID owner)
-{
-	return get_variable_attr(var, data, len, owner, NULL);
-}
-#endif
-
 #ifndef HAVE_SHIM_LOCK_GUID
 EFI_GUID SHIM_LOCK_GUID = {0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23 } };
 #endif
