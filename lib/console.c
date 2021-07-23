@@ -35,7 +35,7 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 	EFI_STATUS efi_status;
 
 	do {
-		gBS->WaitForEvent(1, &ci->WaitForKey, &EventIndex);
+		BS->WaitForEvent(1, &ci->WaitForKey, &EventIndex);
 		efi_status = ci->ReadKeyStroke(ci, key);
 	} while (efi_status == EFI_NOT_READY);
 
@@ -495,7 +495,7 @@ console_mode_handle(VOID)
 	UINTN rows = 0, columns = 0;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 
-	efi_status = gBS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
+	efi_status = BS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Locate graphic output protocol fail", efi_status);
 		return;
@@ -679,7 +679,7 @@ setup_verbosity(VOID)
 VOID
 msleep(unsigned long msecs)
 {
-	gBS->Stall(msecs);
+	BS->Stall(msecs);
 }
 
 /* This is used in various things to determine if we should print to the

@@ -735,7 +735,7 @@ done:
 
 static INTN reset_system()
 {
-	gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
+	RT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
 	console_notify(L"Failed to reboot\n");
 	return -1;
 }
@@ -883,10 +883,10 @@ static EFI_STATUS write_db(CHAR16 * db_name, void *MokNew, UINTN MokNewSize)
 	CopyMem(new_data, old_data, old_size);
 	CopyMem(new_data + old_size, MokNew, MokNewSize);
 
-	efi_status = gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_NON_VOLATILE |
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				      new_size, new_data);
+	efi_status = RT->SetVariable(db_name, &SHIM_LOCK_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				     new_size, new_data);
 out:
 	if (old_size > 0) {
 		FreePool(old_data);
@@ -918,8 +918,8 @@ static EFI_STATUS store_keys(void *MokNew, UINTN MokNewSize, int authenticate,
 	}
 
 	if (authenticate) {
-		efi_status = gRT->GetVariable(auth_name, &SHIM_LOCK_GUID,
-					      &attributes, &auth_size, auth);
+		efi_status = RT->GetVariable(auth_name, &SHIM_LOCK_GUID,
+					     &attributes, &auth_size, auth);
 		if (EFI_ERROR(efi_status) ||
 		    (auth_size != SHA256_DIGEST_SIZE &&
 		     auth_size != PASSWORD_CRYPT_SIZE)) {
@@ -945,10 +945,10 @@ static EFI_STATUS store_keys(void *MokNew, UINTN MokNewSize, int authenticate,
 
 	if (!MokNewSize) {
 		/* Delete MOK */
-		efi_status = gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      0, NULL);
+		efi_status = RT->SetVariable(db_name, &SHIM_LOCK_GUID,
+					     EFI_VARIABLE_NON_VOLATILE |
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					     0, NULL);
 	} else {
 		/* Write new MOK */
 		efi_status = write_db(db_name, MokNew, MokNewSize);
@@ -1064,10 +1064,10 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 	}
 	if (DataSize == 0) {
 		dprint(L"DataSize = 0; deleting variable %s\n", db_name);
-		efi_status = gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      DataSize, Data);
+		efi_status = RT->SetVariable(db_name, &SHIM_LOCK_GUID,
+					     EFI_VARIABLE_NON_VOLATILE |
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					     DataSize, Data);
 		dprint(L"efi_status:%llu\n", efi_status);
 		return EFI_SUCCESS;
 	}
@@ -1109,10 +1109,10 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 		ptr = (uint8_t *) ptr + CertList->SignatureListSize;
 	}
 
-	efi_status = gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_NON_VOLATILE |
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				      DataSize, Data);
+	efi_status = RT->SetVariable(db_name, &SHIM_LOCK_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				     DataSize, Data);
 	if (Data)
 		FreePool(Data);
 
@@ -1262,8 +1262,8 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 		auth_name = L"MokDelAuth";
 	}
 
-	efi_status = gRT->GetVariable(auth_name, &SHIM_LOCK_GUID, &attributes,
-				      &auth_size, auth);
+	efi_status = RT->GetVariable(auth_name, &SHIM_LOCK_GUID, &attributes,
+				     &auth_size, auth);
 	if (EFI_ERROR(efi_status) ||
 	    (auth_size != SHA256_DIGEST_SIZE
 	     && auth_size != PASSWORD_CRYPT_SIZE)) {
@@ -1305,9 +1305,9 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 			err_strs[1] = L"Erase all keys in MokList!";
 		}
 		console_alertbox(err_strs);
-		gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-				 EFI_VARIABLE_NON_VOLATILE |
-				 EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
+		RT->SetVariable(db_name, &SHIM_LOCK_GUID,
+				EFI_VARIABLE_NON_VOLATILE |
+				EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
 		efi_status = EFI_ACCESS_DENIED;
 		goto error;
 	}
@@ -1327,9 +1327,9 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 			err_strs[1] = L"Reset MokList!";
 		}
 		console_alertbox(err_strs);
-		gRT->SetVariable(db_name, &SHIM_LOCK_GUID,
-				 EFI_VARIABLE_NON_VOLATILE |
-				 EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
+		RT->SetVariable(db_name, &SHIM_LOCK_GUID,
+				EFI_VARIABLE_NON_VOLATILE |
+				EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
 		efi_status = EFI_ABORTED;
 		goto error;
 	}
@@ -1541,19 +1541,19 @@ static EFI_STATUS mok_sb_prompt(void *MokSB, UINTN MokSBSize)
 	}
 
 	if (var->MokSBState == 0) {
-		efi_status = gRT->SetVariable(L"MokSBState", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      1, &sbval);
+		efi_status = RT->SetVariable(L"MokSBState", &SHIM_LOCK_GUID,
+					     EFI_VARIABLE_NON_VOLATILE |
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					     1, &sbval);
 		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to set Secure Boot state");
 			return efi_status;
 		}
 	} else {
-		efi_status = gRT->SetVariable(L"MokSBState", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      0, NULL);
+		efi_status = RT->SetVariable(L"MokSBState", &SHIM_LOCK_GUID,
+					     EFI_VARIABLE_NON_VOLATILE |
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					     0, NULL);
 		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to delete Secure Boot state");
 			return efi_status;
@@ -1656,19 +1656,19 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 	}
 
 	if (var->MokDBState == 0) {
-		efi_status = gRT->SetVariable(L"MokDBState", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      1, &dbval);
+		efi_status = RT->SetVariable(L"MokDBState", &SHIM_LOCK_GUID,
+					     EFI_VARIABLE_NON_VOLATILE |
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					     1, &dbval);
 		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to set DB state");
 			return efi_status;
 		}
 	} else {
-		efi_status = gRT->SetVariable(L"MokDBState", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      0, NULL);
+		efi_status = RT->SetVariable(L"MokDBState", &SHIM_LOCK_GUID,
+					     EFI_VARIABLE_NON_VOLATILE |
+					     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					     0, NULL);
 		if (EFI_ERROR(efi_status)) {
 			console_notify(L"Failed to delete DB state");
 			return efi_status;
@@ -1707,9 +1707,9 @@ static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 		if (console_yes_no(clear_p) == 0)
 			return EFI_ABORTED;
 
-		gRT->SetVariable(L"MokPWStore", &SHIM_LOCK_GUID,
-				 EFI_VARIABLE_NON_VOLATILE |
-				 EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
+		RT->SetVariable(L"MokPWStore", &SHIM_LOCK_GUID,
+				EFI_VARIABLE_NON_VOLATILE |
+				EFI_VARIABLE_BOOTSERVICE_ACCESS, 0, NULL);
 		goto mokpw_done;
 	}
 
@@ -1729,10 +1729,10 @@ static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 	if (console_yes_no(set_p) == 0)
 		return EFI_ABORTED;
 
-	efi_status = gRT->SetVariable(L"MokPWStore", &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_NON_VOLATILE |
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				      MokPWSize, MokPW);
+	efi_status = RT->SetVariable(L"MokPWStore", &SHIM_LOCK_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				     MokPWSize, MokPW);
 	if (EFI_ERROR(efi_status)) {
 		console_notify(L"Failed to set MOK password");
 		return efi_status;
@@ -1994,8 +1994,8 @@ static BOOLEAN verify_pw(BOOLEAN * protected)
 
 	*protected = FALSE;
 
-	efi_status = gRT->GetVariable(L"MokPWStore", &SHIM_LOCK_GUID, &attributes,
-				      &size, pwhash);
+	efi_status = RT->GetVariable(L"MokPWStore", &SHIM_LOCK_GUID, &attributes,
+				     &size, pwhash);
 	/*
 	 * If anything can attack the password it could just set it to a
 	 * known value, so there's no safety advantage in failing to validate
@@ -2122,29 +2122,29 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle UNUSED,
 		UINT32 MokXAuth = 0;
 		UINT32 MokXDelAuth = 0;
 
-		efi_status = gRT->GetVariable(L"MokAuth", &SHIM_LOCK_GUID,
-					      &attributes, &auth_size, auth);
+		efi_status = RT->GetVariable(L"MokAuth", &SHIM_LOCK_GUID,
+					     &attributes, &auth_size, auth);
 		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokAuth = 1;
 
-		efi_status = gRT->GetVariable(L"MokDelAuth", &SHIM_LOCK_GUID,
-					      &attributes, &auth_size, auth);
+		efi_status = RT->GetVariable(L"MokDelAuth", &SHIM_LOCK_GUID,
+					     &attributes, &auth_size, auth);
 		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokDelAuth = 1;
 
-		efi_status = gRT->GetVariable(L"MokXAuth", &SHIM_LOCK_GUID,
-					      &attributes, &auth_size, auth);
+		efi_status = RT->GetVariable(L"MokXAuth", &SHIM_LOCK_GUID,
+					     &attributes, &auth_size, auth);
 		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
 			MokXAuth = 1;
 
-		efi_status = gRT->GetVariable(L"MokXDelAuth", &SHIM_LOCK_GUID,
-					      &attributes, &auth_size, auth);
+		efi_status = RT->GetVariable(L"MokXDelAuth", &SHIM_LOCK_GUID,
+					     &attributes, &auth_size, auth);
 		if (!EFI_ERROR(efi_status) &&
 		    (auth_size == SHA256_DIGEST_SIZE ||
 		     auth_size == PASSWORD_CRYPT_SIZE))
@@ -2496,7 +2496,7 @@ static EFI_STATUS setup_rand(void)
 	UINT64 seed;
 	BOOLEAN status;
 
-	efi_status = gRT->GetTime(&time, NULL);
+	efi_status = RT->GetTime(&time, NULL);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 

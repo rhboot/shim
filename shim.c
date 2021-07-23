@@ -721,8 +721,8 @@ should_use_fallback(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	int ret = 0;
 
-	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-					 (void **)&li);
+	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					(void **)&li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get image for boot" EFI_ARCH L".efi: %r\n",
 		       efi_status);
@@ -746,8 +746,8 @@ should_use_fallback(EFI_HANDLE image_handle)
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
 		goto error;
 
-	efi_status = gBS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
-					 (void **) &fio);
+	efi_status = BS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
+					(void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get fio for li->DeviceHandle: %r\n",
 		       efi_status);
@@ -803,8 +803,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	/*
 	 * Open the device
 	 */
-	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
-					 (void **) &drive);
+	efi_status = BS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					(void **) &drive);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to find fs: %r\n", efi_status);
 		goto error;
@@ -1004,8 +1004,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * We need to refer to the loaded image protocol on the running
 	 * binary in order to find our path
 	 */
-	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-					 (void **)&shim_li);
+	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					(void **)&shim_li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to init protocol\n");
 		return efi_status;
@@ -1156,8 +1156,8 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	load_options = NULL;
 	load_options_size = 0;
 
-	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
-					 (void **) &li);
+	efi_status = BS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					(void **) &li);
 	if (EFI_ERROR(efi_status)) {
 		perror (L"Failed to get load options: %r\n", efi_status);
 		return efi_status;
@@ -1245,10 +1245,10 @@ install_shim_protocols(void)
 	/*
 	 * Install the protocol
 	 */
-	efi_status = gBS->InstallProtocolInterface(&shim_lock_handle,
-						   &SHIM_LOCK_GUID,
-						   EFI_NATIVE_INTERFACE,
-						   &shim_lock_interface);
+	efi_status = BS->InstallProtocolInterface(&shim_lock_handle,
+						  &SHIM_LOCK_GUID,
+						  EFI_NATIVE_INTERFACE,
+						  &shim_lock_interface);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Could not install security protocol",
 			      efi_status);
@@ -1274,8 +1274,8 @@ uninstall_shim_protocols(void)
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
-	gBS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
-					&shim_lock_interface);
+	BS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
+				       &shim_lock_interface);
 
 	if (!secure_mode())
 		return;
@@ -1429,7 +1429,7 @@ devel_egress(devel_egress_action action UNUSED)
 	console_print(L"\ndoing %a\n", action);
 
 	if (action == COLD_RESET)
-		gRT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION, 0, NULL);
+		RT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION, 0, NULL);
 #endif
 }
 
@@ -1556,8 +1556,8 @@ die:
 		devel_egress(COLD_RESET);
 #else
 		msleep(5000000);
-		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
-				 0, NULL);
+		RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
+				0, NULL);
 #endif
 	}
 

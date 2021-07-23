@@ -63,8 +63,8 @@ execute(EFI_HANDLE image, CHAR16 *name)
 	EFI_DEVICE_PATH *devpath;
 	CHAR16 *PathName;
 
-	efi_status = gBS->HandleProtocol(image, &IMAGE_PROTOCOL,
-					 (void **) &li);
+	efi_status = BS->HandleProtocol(image, &IMAGE_PROTOCOL,
+					(void **) &li);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -72,12 +72,12 @@ execute(EFI_HANDLE image, CHAR16 *name)
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	efi_status = gBS->LoadImage(FALSE, image, devpath, NULL, 0, &h);
+	efi_status = BS->LoadImage(FALSE, image, devpath, NULL, 0, &h);
 	if (EFI_ERROR(efi_status))
 		goto out;
 
-	efi_status = gBS->StartImage(h, NULL, NULL);
-	gBS->UnloadImage(h);
+	efi_status = BS->StartImage(h, NULL, NULL);
+	BS->UnloadImage(h);
 
  out:
 	FreePool(PathName);

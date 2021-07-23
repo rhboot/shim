@@ -252,7 +252,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 			}
 
-			efi_status = gRT->SetVariable(varname, &GV_GUID,
+			efi_status = RT->SetVariable(varname, &GV_GUID,
 						EFI_VARIABLE_NON_VOLATILE |
 						EFI_VARIABLE_BOOTSERVICE_ACCESS |
 						EFI_VARIABLE_RUNTIME_ACCESS,
@@ -431,8 +431,8 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 
 	while (1) {
 		UINTN varname_size = buffer_size;
-		efi_status = gRT->GetNextVariableName(&varname_size, varname,
-						      &vendor_guid);
+		efi_status = RT->GetNextVariableName(&varname_size, varname,
+						     &vendor_guid);
 		if (EFI_ERROR(efi_status)) {
 			if (efi_status == EFI_BUFFER_TOO_SMALL) {
 				VerbosePrint(L"Buffer too small for next variable name, re-allocating it to be %d bytes and retrying\n",
@@ -464,8 +464,8 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 			continue;
 
 		UINTN candidate_size = max_candidate_size;
-		efi_status = gRT->GetVariable(varname, &GV_GUID, NULL,
-					      &candidate_size, candidate);
+		efi_status = RT->GetVariable(varname, &GV_GUID, NULL,
+					     &candidate_size, candidate);
 		if (EFI_ERROR(efi_status))
 			continue;
 
@@ -543,15 +543,15 @@ update_boot_order(void)
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
 	VerbosePrintUnprefixed(L"\n");
-	efi_status = gRT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
+	efi_status = RT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &GV_GUID);
 
-	efi_status = gRT->SetVariable(L"BootOrder", &GV_GUID,
-				      EFI_VARIABLE_NON_VOLATILE |
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-				      EFI_VARIABLE_RUNTIME_ACCESS,
-				      size, newbootorder);
+	efi_status = RT->SetVariable(L"BootOrder", &GV_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				     EFI_VARIABLE_RUNTIME_ACCESS,
+				     size, newbootorder);
 	FreePool(newbootorder);
 	return efi_status;
 }
@@ -862,8 +862,8 @@ find_boot_options(EFI_HANDLE device)
 	EFI_STATUS efi_status;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
 
-	efi_status = gBS->HandleProtocol(device, &FileSystemProtocol,
-					 (void **) &fio);
+	efi_status = BS->HandleProtocol(device, &FileSystemProtocol,
+					(void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Couldn't find file system: %r\n", efi_status);
 		return efi_status;
@@ -990,8 +990,8 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		return EFI_SUCCESS;
 	}
 
-	efi_status = gBS->LoadImage(0, parent_image_handle, first_new_option,
-				    NULL, 0, &image_handle);
+	efi_status = BS->LoadImage(0, parent_image_handle, first_new_option,
+				   NULL, 0, &image_handle);
 	if (EFI_ERROR(efi_status)) {
 		CHAR16 *dps = DevicePathToStr(first_new_option);
 		UINTN s = DevicePathSize(first_new_option);
@@ -1011,14 +1011,14 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	}
 
 	EFI_LOADED_IMAGE *image;
-	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
-					 (void *) &image);
+	efi_status = BS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					(void *) &image);
 	if (!EFI_ERROR(efi_status)) {
 		image->LoadOptions = first_new_option_args;
 		image->LoadOptionsSize = first_new_option_size;
 	}
 
-	efi_status = gBS->StartImage(image_handle, NULL, NULL);
+	efi_status = BS->StartImage(image_handle, NULL, NULL);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"StartImage failed: %r\n", efi_status);
 		msleep(500000000);
@@ -1033,8 +1033,8 @@ get_fallback_no_reboot(void)
 	UINT32 no_reboot;
 	UINTN size = sizeof(UINT32);
 
-	efi_status = gRT->GetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
-				      NULL, &size, &no_reboot);
+	efi_status = RT->GetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
+				     NULL, &size, &no_reboot);
 	if (!EFI_ERROR(efi_status)) {
 		return no_reboot;
 	}
@@ -1047,11 +1047,11 @@ set_fallback_no_reboot(void)
 {
 	EFI_STATUS efi_status;
 	UINT32 no_reboot = 1;
-	efi_status = gRT->SetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_NON_VOLATILE
-				      | EFI_VARIABLE_BOOTSERVICE_ACCESS
-				      | EFI_VARIABLE_RUNTIME_ACCESS,
-				      sizeof(UINT32), &no_reboot);
+	efi_status = RT->SetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				     EFI_VARIABLE_RUNTIME_ACCESS,
+				     sizeof(UINT32), &no_reboot);
 	return efi_status;
 }
 
@@ -1129,8 +1129,8 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	 */
 	debug_hook();
 
-	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
-					 (void *) &this_image);
+	efi_status = BS->HandleProtocol(image, &LoadedImageProtocol,
+					(void *) &this_image);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Error: could not find loaded image: %r\n",
 			      efi_status);
@@ -1191,7 +1191,7 @@ reset:
 		msleep(fallback_verbose_wait);
 	}
 
-	gRT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+	RT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
 
 	return EFI_SUCCESS;
 }
