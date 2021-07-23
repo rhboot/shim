@@ -655,8 +655,6 @@ console_reset(void)
 	co->ClearScreen(co);
 }
 
-UINT32 verbose = 0;
-
 VOID
 setup_verbosity(VOID)
 {
