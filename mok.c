@@ -16,8 +16,8 @@ static BOOLEAN check_var(CHAR16 *varname)
 	UINT32 MokVar;
 	UINT32 attributes;
 
-	efi_status = gRT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
-				      &size, (void *)&MokVar);
+	efi_status = RT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
+				     &size, (void *)&MokVar);
 	if (!EFI_ERROR(efi_status) || efi_status == EFI_BUFFER_TOO_SMALL)
 		return TRUE;
 
@@ -27,7 +27,7 @@ static BOOLEAN check_var(CHAR16 *varname)
 #define SetVariable(name, guid, attrs, varsz, var)                                  \
 	({                                                                          \
 		EFI_STATUS efi_status_;                                             \
-		efi_status_ = gRT->SetVariable(name, guid, attrs, varsz, var);      \
+		efi_status_ = RT->SetVariable(name, guid, attrs, varsz, var);       \
 		dprint_(L"%a:%d:%a() SetVariable(\"%s\", ... varsz=0x%llx) = %r\n", \
 		        __FILE__, __LINE__ - 5, __func__, name, varsz,              \
 		        efi_status_);                                               \
@@ -273,16 +273,16 @@ get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 	uint64_t max_var_sz = 0;
 
 	*max_var_szp = 0;
-	if (EFI_MAJOR_VERSION(gRT) < 2) {
+	if (EFI_MAJOR_VERSION(RT) < 2) {
 		dprint(L"EFI %d.%d; no RT->QueryVariableInfo().  Using 1024!\n",
-		       EFI_MAJOR_VERSION(gRT), EFI_MINOR_VERSION(gRT));
+		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT));
 		max_var_sz = remaining_sz = max_storage_sz = 1024;
 		efi_status = EFI_SUCCESS;
 	} else {
 		dprint(L"calling RT->QueryVariableInfo() at 0x%lx\n",
-		       gRT->QueryVariableInfo);
-		efi_status = gRT->QueryVariableInfo(attrs, &max_storage_sz,
-						    &remaining_sz, &max_var_sz);
+		       RT->QueryVariableInfo);
+		efi_status = RT->QueryVariableInfo(attrs, &max_storage_sz,
+						   &remaining_sz, &max_var_sz);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Could not get variable storage info: %r\n",
 			       efi_status);
@@ -1016,10 +1016,9 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		config_sz += sizeof(config_template);
 		npages = ALIGN_VALUE(config_sz, PAGE_SIZE) >> EFI_PAGE_SHIFT;
 		config_table = NULL;
-		efi_status = gBS->AllocatePages(AllocateAnyPages,
-						EfiBootServicesData,
-						npages,
-						(EFI_PHYSICAL_ADDRESS *)&config_table);
+		efi_status = BS->AllocatePages(
+			AllocateAnyPages, EfiBootServicesData, npages,
+			(EFI_PHYSICAL_ADDRESS *)&config_table);
 		if (EFI_ERROR(efi_status) || !config_table) {
 			console_print(L"Allocating %lu pages for mok config table failed: %r\n",
 				      npages, efi_status);
@@ -1050,8 +1049,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		ZeroMem(&config_template, sizeof(config_template));
 		CopyMem(p, &config_template, sizeof(config_template));
 
-		efi_status = gBS->InstallConfigurationTable(&MOK_VARIABLE_STORE,
-							    config_table);
+		efi_status = BS->InstallConfigurationTable(&MOK_VARIABLE_STORE,
+		                                           config_table);
 		if (EFI_ERROR(efi_status)) {
 			console_print(L"Couldn't install MoK configuration table\n");
 		}

@@ -11,8 +11,8 @@ simple_file_open_by_handle(EFI_HANDLE device, CHAR16 *name, EFI_FILE **file, UIN
 	EFI_FILE_IO_INTERFACE *drive;
 	EFI_FILE *root;
 
-	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
-					 (void **)&drive);
+	efi_status = BS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					(void **)&drive);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Unable to find simple file protocol (%d)\n",
 			      efi_status);
@@ -40,8 +40,8 @@ simple_file_open(EFI_HANDLE image, CHAR16 *name, EFI_FILE **file, UINT64 mode)
 	EFI_DEVICE_PATH *loadpath = NULL;
 	CHAR16 *PathName = NULL;
 
-	efi_status = gBS->HandleProtocol(image, &IMAGE_PROTOCOL,
-					 (void **) &li);
+	efi_status = BS->HandleProtocol(image, &IMAGE_PROTOCOL,
+					(void **) &li);
 	if (EFI_ERROR(efi_status))
 		return simple_file_open_by_handle(image, name, file, mode);
 
@@ -176,9 +176,9 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	CHAR16 **entries;
 	int val;
 
-	efi_status = gBS->LocateHandleBuffer(ByProtocol,
-					     &EFI_SIMPLE_FILE_SYSTEM_GUID,
-					     NULL, &count, &vol_handles);
+	efi_status = BS->LocateHandleBuffer(ByProtocol,
+					    &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					    NULL, &count, &vol_handles);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 	if (!count || !vol_handles)
@@ -196,9 +196,9 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 		CHAR16 *name;
 		EFI_FILE_IO_INTERFACE *drive;
 
-		efi_status = gBS->HandleProtocol(vol_handles[i],
-					       &EFI_SIMPLE_FILE_SYSTEM_GUID,
-						 (void **) &drive);
+		efi_status = BS->HandleProtocol(vol_handles[i],
+						&EFI_SIMPLE_FILE_SYSTEM_GUID,
+						(void **) &drive);
 		if (EFI_ERROR(efi_status) || !drive)
 			continue;
 

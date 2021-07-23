@@ -123,7 +123,7 @@ security_policy_authentication (
 	 * EFI_SECURITY_VIOLATION */
 	fail_status = efi_status;
 
-	efi_status = gBS->LocateDevicePath(&SIMPLE_FS_PROTOCOL, &DevPath, &h);
+	efi_status = BS->LocateDevicePath(&SIMPLE_FS_PROTOCOL, &DevPath, &h);
 	if (EFI_ERROR(efi_status))
 		goto out;
 

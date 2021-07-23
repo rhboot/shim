@@ -949,8 +949,8 @@ handle_image (void *data, unsigned int datasize,
 				 PAGE_SIZE);
 	*alloc_pages = alloc_size / PAGE_SIZE;
 
-	efi_status = gBS->AllocatePages(AllocateAnyPages, EfiLoaderCode,
-					*alloc_pages, alloc_address);
+	efi_status = BS->AllocatePages(AllocateAnyPages, EfiLoaderCode,
+				       *alloc_pages, alloc_address);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to allocate image buffer\n");
 		return EFI_OUT_OF_RESOURCES;
@@ -963,7 +963,7 @@ handle_image (void *data, unsigned int datasize,
 	*entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!*entry_point) {
 		perror(L"Entry point is invalid\n");
-		gBS->FreePages(*alloc_address, *alloc_pages);
+		BS->FreePages(*alloc_address, *alloc_pages);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -1004,7 +1004,7 @@ handle_image (void *data, unsigned int datasize,
 
 		if (end < base) {
 			perror(L"Section %d has negative size\n", i);
-			gBS->FreePages(*alloc_address, *alloc_pages);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 
