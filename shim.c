@@ -1116,6 +1116,19 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 					 use_fb ? FALLBACK : second_stage);
 	}
 
+	// If the filename is invalid, or the file does not exist,
+	// just fallback to the default loader.
+	if (!use_fb && (efi_status == EFI_INVALID_PARAMETER ||
+	                efi_status == EFI_NOT_FOUND)) {
+		console_print(
+			L"start_image() returned %r, falling back to default loader\n",
+			efi_status);
+		msleep(2000000);
+		load_options = NULL;
+		load_options_size = 0;
+		efi_status = start_image(image_handle, DEFAULT_LOADER);
+	}
+
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"start_image() returned %r\n", efi_status);
 		msleep(2000000);
