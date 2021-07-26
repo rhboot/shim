@@ -21,6 +21,8 @@ EFI_STATUS EFIAPI mock_query_variable_info(UINT32 attrs,
                                            UINT64 *remaining_var_storage,
                                            UINT64 *max_var_size);
 
+EFI_STATUS EFIAPI mock_install_configuration_table(EFI_GUID *guid, VOID *table);
+
 struct mock_variable_limits {
 	UINT32 attrs;
 	UINT64 *max_var_storage;
@@ -40,6 +42,7 @@ typedef enum {
 } mock_sort_policy_t;
 
 extern mock_sort_policy_t mock_variable_sort_policy;
+extern mock_sort_policy_t mock_config_table_sort_policy;
 
 #define MOCK_VAR_DELETE_ATTR_ALLOW_ZERO		0x01
 #define MOCK_VAR_DELETE_ATTR_ALOW_MISMATCH	0x02
@@ -110,7 +113,8 @@ void mock_load_variables(const char *const dirname, const char *filters[],
 void mock_install_query_variable_info(void);
 void mock_uninstall_query_variable_info(void);
 void mock_reset_variables(void);
-void mock_finalize_vars(void);
+void mock_reset_config_table(void);
+void mock_finalize_vars_and_configs(void);
 
 typedef enum {
 	NONE = 0,
@@ -170,6 +174,9 @@ typedef void (mock_query_variable_info_post_hook_t)(
 	UINT64 *max_var_size, EFI_STATUS *status, const char * const file,
 	const int line, const char * const func);
 extern mock_query_variable_info_post_hook_t *mock_query_variable_info_post_hook;
+
+#define MOCK_CONFIG_TABLE_ENTRIES 1024
+extern EFI_CONFIGURATION_TABLE mock_config_table[MOCK_CONFIG_TABLE_ENTRIES];
 
 #endif /* !SHIM_MOCK_VARIABLES_H_ */
 // vim:fenc=utf-8:tw=75:noet

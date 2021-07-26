@@ -26,6 +26,7 @@ list_t *mock_sv_limits = &mock_default_variable_limits;
 list_t mock_variables = LIST_HEAD_INIT(mock_variables);
 
 mock_sort_policy_t mock_variable_sort_policy = MOCK_SORT_APPEND;
+mock_sort_policy_t mock_config_table_sort_policy = MOCK_SORT_APPEND;
 
 UINT32 mock_variable_delete_attr_policy;
 
@@ -1165,6 +1166,140 @@ mock_uninstall_query_variable_info(void)
 	RT->QueryVariableInfo = mock_efi_unsupported;
 }
 
+EFI_CONFIGURATION_TABLE mock_config_table[MOCK_CONFIG_TABLE_ENTRIES] = {
+	{
+		.VendorGuid = { 0, },
+		.VendorTable = NULL
+	},
+};
+
+int
+mock_config_table_cmp(const void *p0, const void *p1)
+{
+	EFI_CONFIGURATION_TABLE *entry0, *entry1;
+	long cmp;
+
+	if (!p0 || !p1) {
+		cmp = (int)((intptr_t)p0 - (intptr_t)p1);
+	} else {
+		entry0 = (EFI_CONFIGURATION_TABLE *)p0;
+		entry1 = (EFI_CONFIGURATION_TABLE *)p1;
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+		printf("comparing %p to %p\n", p0, p1);
+#endif
+		cmp = CompareGuid(&entry0->VendorGuid, &entry1->VendorGuid);
+	}
+
+	if (mock_config_table_sort_policy == MOCK_SORT_DESCENDING) {
+		cmp = -cmp;
+	}
+
+	return cmp;
+}
+
+EFI_STATUS EFIAPI
+mock_install_configuration_table(EFI_GUID *guid, VOID *table)
+{
+	bool found = false;
+	EFI_CONFIGURATION_TABLE *entry;
+	int idx = 0;
+	size_t sz;
+
+	if (!guid)
+		return EFI_INVALID_PARAMETER;
+
+	for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
+		EFI_CONFIGURATION_TABLE *entry = &ST->ConfigurationTable[i];
+
+		if (CompareGuid(guid, &entry->VendorGuid) == 0) {
+			found = true;
+			if (table) {
+				// replace it
+				entry->VendorTable = table;
+			} else {
+				// delete it
+				ST->NumberOfTableEntries -= 1;
+				sz = ST->NumberOfTableEntries - i;
+				sz *= sizeof(*entry);
+				memmove(&entry[0], &entry[1], sz);
+			}
+			return EFI_SUCCESS;
+		}
+	}
+	if (!found && table == NULL)
+		return EFI_NOT_FOUND;
+	if (ST->NumberOfTableEntries == MOCK_CONFIG_TABLE_ENTRIES - 1) {
+		/*
+		 * If necessary, we could allocate another table and copy
+		 * the data, but I'm lazy and we probably don't need to.
+		 */
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	switch (mock_config_table_sort_policy) {
+	case MOCK_SORT_DESCENDING:
+	case MOCK_SORT_ASCENDING:
+	case MOCK_SORT_APPEND:
+		idx = ST->NumberOfTableEntries;
+		break;
+	case MOCK_SORT_PREPEND:
+		sz = ST->NumberOfTableEntries ? ST->NumberOfTableEntries : 0;
+		sz *= sizeof(ST->ConfigurationTable[0]);
+		memmove(&ST->ConfigurationTable[1], &ST->ConfigurationTable[0], sz);
+		idx = 0;
+		break;
+	default:
+		break;
+	}
+
+	entry = &ST->ConfigurationTable[idx];
+	memcpy(&entry->VendorGuid, guid, sizeof(EFI_GUID));
+	entry->VendorTable = table;
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+	printf("%s:%d:%s(): installing entry %p={%p,%p} as entry %d\n",
+	       __FILE__, __LINE__, __func__,
+	       entry, &entry->VendorGuid, entry->VendorTable, idx);
+#endif
+	ST->NumberOfTableEntries += 1;
+
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+	printf("%s:%d:%s():ST->ConfigurationTable:%p\n"
+	       "\t[%d]:%p\n"
+	       "\t[%d]:%p\n",
+	       __FILE__, __LINE__, __func__, ST->ConfigurationTable,
+	       0, &ST->ConfigurationTable[0],
+	       1, &ST->ConfigurationTable[1]);
+#endif
+	switch (mock_config_table_sort_policy) {
+	case MOCK_SORT_DESCENDING:
+	case MOCK_SORT_ASCENDING:
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+		printf("%s:%d:%s(): entries before sorting:\n", __FILE__, __LINE__, __func__);
+		for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
+			printf("\t[%d] = %p = {", i, &ST->ConfigurationTable[i]);
+			printf(".VendorGuid=" GUID_FMT, GUID_ARGS(ST->ConfigurationTable[i].VendorGuid));
+			printf(".VendorTable=%p}\n", ST->ConfigurationTable[i].VendorTable);
+		}
+#endif
+		qsort(&ST->ConfigurationTable[0], ST->NumberOfTableEntries,
+		      sizeof(ST->ConfigurationTable[0]),
+		      mock_config_table_cmp);
+		break;
+	default:
+		break;
+	}
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+	printf("%s:%d:%s(): entries:\n", __FILE__, __LINE__, __func__);
+	for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
+		printf("\t[%d] = %p = {", i, &ST->ConfigurationTable[i]);
+		printf(".VendorGuid=" GUID_FMT, GUID_ARGS(ST->ConfigurationTable[i].VendorGuid));
+		printf(".VendorTable=%p}\n", ST->ConfigurationTable[i].VendorTable);
+	}
+#endif
+
+	return EFI_SUCCESS;
+}
+
 void CONSTRUCTOR
 mock_reset_variables(void)
 {
@@ -1222,10 +1357,44 @@ mock_reset_variables(void)
 		mock_uninstall_query_variable_info();
 }
 
+void CONSTRUCTOR
+mock_reset_config_table(void)
+{
+	init_efi_system_table();
+
+	/*
+	 * Note that BS->InstallConfigurationTable() is *not* defined as
+	 * freeing these.  If a test case installs non-malloc()ed tables,
+	 * it needs to call BS->InstallConfigurationTable(guid, NULL) to
+	 * clear them.
+	 */
+	for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
+		EFI_CONFIGURATION_TABLE *entry = &ST->ConfigurationTable[i];
+
+		if (entry->VendorTable)
+			free(entry->VendorTable);
+	}
+
+	SetMem(ST->ConfigurationTable,
+	       ST->NumberOfTableEntries * sizeof(EFI_CONFIGURATION_TABLE),
+	       0);
+
+	ST->NumberOfTableEntries = 0;
+
+	if (ST->ConfigurationTable != mock_config_table) {
+		free(ST->ConfigurationTable);
+		ST->ConfigurationTable = mock_config_table;
+		SetMem(mock_config_table, sizeof(mock_config_table), 0);
+	}
+
+	BS->InstallConfigurationTable = mock_install_configuration_table;
+}
+
 void DESTRUCTOR
-mock_finalize_vars(void)
+mock_finalize_vars_and_configs(void)
 {
 	mock_reset_variables();
+	mock_reset_config_table();
 }
 
 // vim:fenc=utf-8:tw=75:noet
