@@ -462,10 +462,15 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 			first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 		}
 
-		*optnum = xtoi(varname + 4);
-		FreePool(candidate);
-		FreePool(data);
-		return EFI_SUCCESS;
+		/* find the index for the matching entry in BootOrder */
+		UINT16 bootnum = xtoi(varname + 4);
+		for (*optnum = 0; *optnum < nbootorder; (*optnum)++) {
+			if (bootorder[*optnum] == bootnum) {
+				FreePool(candidate);
+				FreePool(data);
+				return EFI_SUCCESS;
+			}
+		}
 	}
 	FreePool(candidate);
 	FreePool(data);
