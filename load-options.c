@@ -310,6 +310,9 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 	UINT32 remaining_size;
 	CHAR16 *loader_str = NULL;
 
+	dprint(L"full load options:\n");
+	dhexdumpat(li->LoadOptions, li->LoadOptionsSize, 0);
+
 	/*
 	 * Sanity check since we make several assumptions about the length
 	 * Some firmware feeds the following load option when booting from
