@@ -27,6 +27,10 @@
 #error On x86_64 you must have a compiler new enough to support __attribute__((__ms_abi__))
 #endif
 
+#if CLANG_PREREQ(3, 4)
+#pragma GCC diagnostic ignored "-Wpointer-bool-conversion"
+#endif
+
 #if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
 #define GNU_EFI_USE_EXTERNAL_STDARG
 #endif
