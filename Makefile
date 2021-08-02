@@ -153,7 +153,10 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a: C
 gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
 	$(MAKE) -C gnu-efi \
-		ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+		COMPILER="$(COMPILER)" \
+		CC="$(CC)" \
+		ARCH=$(ARCH_GNUEFI) \
+		TOPDIR=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc
 
@@ -285,7 +288,13 @@ else
 endif
 
 test :
-	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" all
+	@make -f $(TOPDIR)/include/test.mk \
+		COMPILER="$(COMPILER)" \
+		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
+		ARCH_DEFINES="$(ARCH_DEFINES)" \
+		EFI_INCLUDES="$(EFI_INCLUDES)" \
+		all
 
 $(patsubst %.c,%,$(wildcard test-*.c)) :
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
@@ -298,7 +307,11 @@ clean-test-objs:
 clean-gnu-efi:
 	@if [ -d gnu-efi ] ; then \
 		$(MAKE) -C gnu-efi \
-			ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+			CC="$(CC)" \
+			HOSTCC="$(HOSTCC)" \
+			COMPILER="$(COMPILER)" \
+			ARCH=$(ARCH_GNUEFI) \
+			TOPDIR=$(TOPDIR)/gnu-efi \
 			-f $(TOPDIR)/gnu-efi/Makefile \
 			clean ; \
 	fi

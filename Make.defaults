@@ -52,7 +52,11 @@ override EFI_INCLUDES := $(EFI_INCLUDES)
 EFI_CRT_OBJS 	= $(LOCAL_EFI_PATH)/crt0-efi-$(ARCH_GNUEFI).o
 EFI_LDS		= $(TOPDIR)/elf_$(ARCH)_efi.lds
 
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
+CLANG_WARNINGS = -Wno-pointer-bool-conversion \
+		 -Wno-unknown-attributes
+
+CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,) \
+		  $(if $(findstring clang,$(CC)),$(CLANG_WARNINGS))
 
 COMMIT_ID ?= $(shell if [ -e .git ] ; then git log -1 --pretty=format:%H ; elif [ -f commit ]; then cat commit ; else echo master; fi)
 
@@ -131,6 +135,7 @@ $(call update-variable,WERRFLAGS)
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
 		  $(WARNFLAGS) \
+		  $(if $(findstring clang,$(CC)),$(CLANG_WARNINGS)) \
 		  $(ARCH_CFLAGS) \
 		  $(WERRFLAGS) \
 		  $(INCLUDES) \

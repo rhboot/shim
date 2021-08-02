@@ -27,10 +27,11 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -fno-eliminate-unused-debug-symbols \
 	 -gpubnames \
 	 -grecord-gcc-switches \
+	 $(if $(findstring clang,$(CC)),-Wno-unknown-warning-option) \
 	 $(DEFAULT_WARNFLAGS) \
 	 -Wsign-compare \
 	 -Wno-deprecated-declarations \
-	 -Wno-unused-but-set-variable \
+	 $(if $(findstring gcc,$(CC)),-Wno-unused-but-set-variable) \
 	 -Wno-unused-variable \
 	 -Wno-pointer-sign \
 	 $(DEFAULT_WERRFLAGS) \
@@ -43,11 +44,18 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 "-DDEFAULT_DEBUG_PRINT_STATE=$(DEBUG_PRINTS)"
 
 libefi-test.a :
-	$(MAKE) -C gnu-efi ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+	$(MAKE) -C gnu-efi \
+		COMPILER="$(COMPILER)" \
+		CC="$(CC)" \
+		ARCH=$(ARCH_GNUEFI) \
+		TOPDIR=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean lib
 	mv gnu-efi/$(ARCH)/lib/libefi.a $@
-	$(MAKE) -C gnu-efi ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+	$(MAKE) -C gnu-efi \
+		COMPILER="$(COMPILER)" \
+		ARCH=$(ARCH_GNUEFI) \
+		TOPDIR=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
