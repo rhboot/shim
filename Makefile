@@ -287,14 +287,14 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-test :
+test test-clean :
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
 		ARCH_DEFINES="$(ARCH_DEFINES)" \
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
-		all
+		test-clean $@
 
 $(patsubst %.c,%,$(wildcard test-*.c)) :
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
