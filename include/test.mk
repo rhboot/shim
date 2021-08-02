@@ -87,11 +87,14 @@ $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
 	$(VALGRIND) ./$@
 
 test : $(tests)
+	$(MAKE) -f include/test.mk test-clean
 
-clean :
-	@rm -vf test-random.h random.bin libefi-test.a
+test-clean :
+	@rm -vf test-random.h random.bin libefi-test.a vgcore.*
 
-all : clean test
+clean : test-clean
+
+all : test-clean test
 
 .PHONY: $(tests) all test clean
 .SECONDARY: random.bin
