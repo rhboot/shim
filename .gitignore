@@ -15,6 +15,9 @@ Make.local
 *.efi.signed
 *.esl
 *.gdb*
+*.gcda
+*.gcno
+*.gcov
 *.hash
 *.key
 *.key
@@ -27,7 +30,9 @@ Make.local
 *.sw?
 *.tar.*
 /build*/
+/.cache/
 /certdb/
+/compile_commands.json
 /cov-int/
 /post-process-pe
 /random.bin
