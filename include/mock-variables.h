@@ -41,6 +41,11 @@ typedef enum {
 
 extern mock_sort_policy_t mock_variable_sort_policy;
 
+#define MOCK_VAR_DELETE_ATTR_ALLOW_ZERO		0x01
+#define MOCK_VAR_DELETE_ATTR_ALOW_MISMATCH	0x02
+
+extern UINT32 mock_variable_delete_attr_policy;
+
 extern list_t mock_default_variable_limits;
 extern list_t *mock_qvi_limits;
 extern list_t *mock_sv_limits;
