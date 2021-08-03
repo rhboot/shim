@@ -304,6 +304,12 @@ extern int debug;
 #define dprint(fmt, ...) {( if (debug) printf("%s:%d:" fmt, __func__, __LINE__, ##__VA_ARGS__); })
 #endif
 
+void EFIAPI mock_efi_void();
+EFI_STATUS EFIAPI mock_efi_success();
+EFI_STATUS EFIAPI mock_efi_unsupported();
+EFI_STATUS EFIAPI mock_efi_not_found();
+void init_efi_system_table(void);
+void reset_efi_system_table(void);
 void print_traceback(int skip);
 
 #define eassert(cond, fmt, ...)                                  \
