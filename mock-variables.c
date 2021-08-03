@@ -27,6 +27,8 @@ list_t mock_variables = LIST_HEAD_INIT(mock_variables);
 
 mock_sort_policy_t mock_variable_sort_policy = MOCK_SORT_APPEND;
 
+UINT32 mock_variable_delete_attr_policy;
+
 static const size_t guidstr_size = sizeof("8be4df61-93ca-11d2-aa0d-00e098032b8c");
 
 static int
@@ -708,9 +710,23 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	       __FILE__, __LINE__ - 1, __func__,
 	       var, format_var_attrs(var->attrs), cmp, size);
 #endif
-	if (!mock_sv_attrs_match(var->attrs, attrs) && !(attrs == 0 && size == 0)) {
+	if (!mock_sv_attrs_match(var->attrs, attrs)) {
 		status = EFI_INVALID_PARAMETER;
-		return status;
+		if (size == 0 && !(attrs & EFI_VARIABLE_APPEND_WRITE)) {
+			if ((mock_variable_delete_attr_policy & MOCK_VAR_DELETE_ATTR_ALLOW_ZERO)
+			    && attrs == 0) {
+				status = EFI_SUCCESS;
+			} else if (mock_variable_delete_attr_policy & MOCK_VAR_DELETE_ATTR_ALOW_MISMATCH) {
+				status = EFI_SUCCESS;
+			}
+		}
+		if (EFI_ERROR(status)) {
+			printf("%s:%d:%s(): var->attrs:%s attrs:%s\n",
+			       __FILE__, __LINE__ - 1, __func__,
+			       format_var_attrs(var->attrs),
+			       format_var_attrs(attrs));
+			return status;
+		}
 	}
 
 	if (attrs & EFI_VARIABLE_APPEND_WRITE)
@@ -1003,6 +1019,8 @@ mock_reset_variables(void)
 	}
 	INIT_LIST_HEAD(&mock_variables);
 	mock_set_default_usage_limits();
+
+	mock_variable_delete_attr_policy = MOCK_VAR_DELETE_ATTR_ALLOW_ZERO;
 
 	RT->GetVariable = mock_get_variable;
 	RT->GetNextVariableName = mock_get_next_variable_name;
