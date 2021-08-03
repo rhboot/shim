@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 
@@ -179,6 +180,123 @@ guidcmp(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 }
 
 #define CompareGuid(a, b) guidcmp(a, b)
+
+static inline char *
+efi_strerror(EFI_STATUS status)
+{
+	static char buf0[1024];
+	static char buf1[1024];
+	char *out;
+	static int n;
+
+	out = n++ % 2 ? buf0 : buf1;
+	if (n > 1)
+		n -= 2;
+	SetMem(out, 1024, 0);
+
+	switch (status) {
+	case EFI_SUCCESS:
+		strcpy(out, "EFI_SUCCESS");
+		break;
+	case EFI_LOAD_ERROR:
+		strcpy(out, "EFI_LOAD_ERROR");
+		break;
+	case EFI_INVALID_PARAMETER:
+		strcpy(out, "EFI_INVALID_PARAMETER");
+		break;
+	case EFI_UNSUPPORTED:
+		strcpy(out, "EFI_UNSUPPORTED");
+		break;
+	case EFI_BAD_BUFFER_SIZE:
+		strcpy(out, "EFI_BAD_BUFFER_SIZE");
+		break;
+	case EFI_BUFFER_TOO_SMALL:
+		strcpy(out, "EFI_BUFFER_TOO_SMALL");
+		break;
+	case EFI_NOT_READY:
+		strcpy(out, "EFI_NOT_READY");
+		break;
+	case EFI_DEVICE_ERROR:
+		strcpy(out, "EFI_DEVICE_ERROR");
+		break;
+	case EFI_WRITE_PROTECTED:
+		strcpy(out, "EFI_WRITE_PROTECTED");
+		break;
+	case EFI_OUT_OF_RESOURCES:
+		strcpy(out, "EFI_OUT_OF_RESOURCES");
+		break;
+	case EFI_VOLUME_CORRUPTED:
+		strcpy(out, "EFI_VOLUME_CORRUPTED");
+		break;
+	case EFI_VOLUME_FULL:
+		strcpy(out, "EFI_VOLUME_FULL");
+		break;
+	case EFI_NO_MEDIA:
+		strcpy(out, "EFI_NO_MEDIA");
+		break;
+	case EFI_MEDIA_CHANGED:
+		strcpy(out, "EFI_MEDIA_CHANGED");
+		break;
+	case EFI_NOT_FOUND:
+		strcpy(out, "EFI_NOT_FOUND");
+		break;
+	case EFI_ACCESS_DENIED:
+		strcpy(out, "EFI_ACCESS_DENIED");
+		break;
+	case EFI_NO_RESPONSE:
+		strcpy(out, "EFI_NO_RESPONSE");
+		break;
+	case EFI_NO_MAPPING:
+		strcpy(out, "EFI_NO_MAPPING");
+		break;
+	case EFI_TIMEOUT:
+		strcpy(out, "EFI_TIMEOUT");
+		break;
+	case EFI_NOT_STARTED:
+		strcpy(out, "EFI_NOT_STARTED");
+		break;
+	case EFI_ALREADY_STARTED:
+		strcpy(out, "EFI_ALREADY_STARTED");
+		break;
+	case EFI_ABORTED:
+		strcpy(out, "EFI_ABORTED");
+		break;
+	case EFI_ICMP_ERROR:
+		strcpy(out, "EFI_ICMP_ERROR");
+		break;
+	case EFI_TFTP_ERROR:
+		strcpy(out, "EFI_TFTP_ERROR");
+		break;
+	case EFI_PROTOCOL_ERROR:
+		strcpy(out, "EFI_PROTOCOL_ERROR");
+		break;
+	case EFI_INCOMPATIBLE_VERSION:
+		strcpy(out, "EFI_INCOMPATIBLE_VERSION");
+		break;
+	case EFI_SECURITY_VIOLATION:
+		strcpy(out, "EFI_SECURITY_VIOLATION");
+		break;
+	case EFI_CRC_ERROR:
+		strcpy(out, "EFI_CRC_ERROR");
+		break;
+	case EFI_END_OF_MEDIA:
+		strcpy(out, "EFI_END_OF_MEDIA");
+		break;
+	case EFI_END_OF_FILE:
+		strcpy(out, "EFI_END_OF_FILE");
+		break;
+	case EFI_INVALID_LANGUAGE:
+		strcpy(out, "EFI_INVALID_LANGUAGE");
+		break;
+	case EFI_COMPROMISED_DATA:
+		strcpy(out, "EFI_COMPROMISED_DATA");
+		break;
+	default:
+		sprintf(out, "0x%lx", status);
+		break;
+	}
+	return out;
+}
 
 extern int debug;
 #ifdef dprint
