@@ -353,3 +353,25 @@ fallback_should_prefer_reset(void)
 		return EFI_NOT_FOUND;
 	return EFI_SUCCESS;
 }
+
+#ifdef SHIM_UNIT_TEST
+static void DESTRUCTOR
+tpm_clean_up_measurements(void)
+{
+	for (UINTN i = 0; i < measuredcount; i++) {
+		VARIABLE_RECORD *vr = &measureddata[i];
+
+		if (vr->VariableName)
+			FreePool(vr->VariableName);
+		if (vr->VendorGuid)
+			FreePool(vr->VendorGuid);
+		if (vr->Data)
+			FreePool(vr->Data);
+	}
+	if (measureddata)
+		FreePool(measureddata);
+
+	measuredcount = 0;
+	measureddata = NULL;
+}
+#endif
