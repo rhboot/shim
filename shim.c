@@ -690,24 +690,11 @@ verify_buffer (char *data, int datasize,
 }
 
 static int
-should_use_fallback(EFI_HANDLE image_handle)
+is_removable_media_path(EFI_LOADED_IMAGE *li)
 {
-	EFI_LOADED_IMAGE *li;
 	unsigned int pathlen = 0;
 	CHAR16 *bootpath = NULL;
-	EFI_FILE_IO_INTERFACE *fio = NULL;
-	EFI_FILE *vh = NULL;
-	EFI_FILE *fh = NULL;
-	EFI_STATUS efi_status;
 	int ret = 0;
-
-	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-					(void **)&li);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get image for boot" EFI_ARCH L".efi: %r\n",
-		       efi_status);
-		return 0;
-	}
 
 	bootpath = DevicePathToStr(li->FilePath);
 
@@ -724,6 +711,36 @@ should_use_fallback(EFI_HANDLE image_handle)
 
 	pathlen = StrLen(bootpath);
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
+		goto error;
+
+	ret = 1;
+
+error:
+	if (bootpath)
+		FreePool(bootpath);
+
+	return ret;
+}
+
+static int
+should_use_fallback(EFI_HANDLE image_handle)
+{
+	EFI_LOADED_IMAGE *li;
+	EFI_FILE_IO_INTERFACE *fio = NULL;
+	EFI_FILE *vh = NULL;
+	EFI_FILE *fh = NULL;
+	EFI_STATUS efi_status;
+	int ret = 0;
+
+	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+	                                (void **)&li);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Could not get image for boot" EFI_ARCH L".efi: %r\n",
+		       efi_status);
+		return 0;
+	}
+
+	if (!is_removable_media_path(li))
 		goto error;
 
 	efi_status = BS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
@@ -758,12 +775,9 @@ error:
 		fh->Close(fh);
 	if (vh)
 		vh->Close(vh);
-	if (bootpath)
-		FreePool(bootpath);
 
 	return ret;
 }
-
 /*
  * Open the second stage bootloader and read it into a buffer
  */
