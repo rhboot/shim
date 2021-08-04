@@ -122,6 +122,7 @@ typedef enum {
 	DELETE,
 	APPEND,
 	REPLACE,
+	GET,
 } mock_variable_op_t;
 
 static inline const char *
@@ -133,6 +134,7 @@ format_var_op(mock_variable_op_t op)
 		"DELETE",
 		"APPEND",
 		"REPLACE",
+		"GET",
 		NULL
 	};
 

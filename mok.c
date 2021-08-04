@@ -828,30 +828,32 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 
 	dprint(L"importing mok state for \"%s\"\n", v->name);
 
-	efi_status = get_variable_attr(v->name,
-				       &v->data, &v->data_size,
-				       *v->guid, &attrs);
-	if (efi_status == EFI_NOT_FOUND) {
-		v->data = NULL;
-		v->data_size = 0;
-	} else if (EFI_ERROR(efi_status)) {
-		perror(L"Could not verify %s: %r\n", v->name,
-		       efi_status);
-		delete = TRUE;
-	} else {
-		if (!(attrs & v->yes_attr)) {
-			perror(L"Variable %s is missing attributes:\n",
-			       v->name);
-			perror(L"  0x%08x should have 0x%08x set.\n",
-			       attrs, v->yes_attr);
+	if (!v->data && !v->data_size) {
+		efi_status = get_variable_attr(v->name,
+					       &v->data, &v->data_size,
+					       *v->guid, &attrs);
+		if (efi_status == EFI_NOT_FOUND) {
+			v->data = NULL;
+			v->data_size = 0;
+		} else if (EFI_ERROR(efi_status)) {
+			perror(L"Could not verify %s: %r\n", v->name,
+			       efi_status);
 			delete = TRUE;
-		}
-		if (attrs & v->no_attr) {
-			perror(L"Variable %s has incorrect attribute:\n",
-			       v->name);
-			perror(L"  0x%08x should not have 0x%08x set.\n",
-			       attrs, v->no_attr);
-			delete = TRUE;
+		} else {
+			if (!(attrs & v->yes_attr)) {
+				perror(L"Variable %s is missing attributes:\n",
+				       v->name);
+				perror(L"  0x%08x should have 0x%08x set.\n",
+				       attrs, v->yes_attr);
+				delete = TRUE;
+			}
+			if (attrs & v->no_attr) {
+				perror(L"Variable %s has incorrect attribute:\n",
+				       v->name);
+				perror(L"  0x%08x should not have 0x%08x set.\n",
+				       attrs, v->no_attr);
+				delete = TRUE;
+			}
 		}
 	}
 	if (delete == TRUE) {

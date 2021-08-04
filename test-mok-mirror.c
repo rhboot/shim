@@ -78,6 +78,20 @@ getvar_post(CHAR16 *name, EFI_GUID *guid,
 			printf("attrs:NULL\n");
 		printf("failed:%s\n", efi_strerror(*status));
 	}
+
+	if (!test_vars)
+		return;
+
+	for (UINTN i = 0; test_vars[i].name != NULL; i++) {
+		struct test_var *tv = &test_vars[i];
+
+		if (CompareGuid(&tv->guid, guid) != 0 ||
+		    StrCmp(tv->name, name) != 0)
+			continue;
+		tv->ops[tv->n_ops] = GET;
+		tv->results[tv->n_ops] = *status;
+		tv->n_ops += 1;
+	}
 }
 
 static int
@@ -201,6 +215,7 @@ test_mok_mirror_0(void)
 			struct mock_variable *var;
 			bool deleted;
 			bool created;
+			int gets = 0;
 
 			var = list_entry(pos, struct mock_variable, list);
 			if (CompareGuid(&tv->guid, &var->guid) != 0 ||
@@ -238,8 +253,14 @@ test_mok_mirror_0(void)
 					assert_goto(false, err,
 						    "No replace action should have been tested\n");
 					break;
+				case GET:
+					if (tv->results[j] == EFI_SUCCESS)
+						gets += 1;
+					break;
 				}
 			}
+			assert_goto(gets == 0 || gets == 1, err,
+				    "Variable should not be read %d times.\n", gets);
 		}
 		if (tv->must_be_present) {
 			assert_goto(found == true, err,
