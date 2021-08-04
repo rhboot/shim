@@ -216,7 +216,7 @@ WrapPkcs7Data (
     //
     // Part7: P7Data.
     //
-    CopyMem (SignedData + 19, P7Data, P7Length);
+    CopyMem (SignedData + 19, (void *)P7Data, P7Length);
   }
 
   *WrapFlag = Wrapped;

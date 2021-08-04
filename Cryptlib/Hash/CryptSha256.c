@@ -91,7 +91,7 @@ Sha256Duplicate (
     return FALSE;
   }
 
-  CopyMem (NewSha256Context, Sha256Context, sizeof (SHA256_CTX));
+  CopyMem (NewSha256Context, (void *)Sha256Context, sizeof (SHA256_CTX));
 
   return TRUE;
 }
