@@ -49,7 +49,7 @@ fill_esl(const EFI_SIGNATURE_DATA *first_sig, const size_t howmany,
 	sl->SignatureListSize = needed;
 
 	sd = (EFI_SIGNATURE_DATA *)(out + sizeof(EFI_SIGNATURE_LIST));
-	CopyMem(sd, first_sig, data_len);
+	CopyMem(sd, (void *)first_sig, data_len);
 
 	return EFI_SUCCESS;
 }
@@ -69,8 +69,8 @@ fill_esl_with_one_signature(const uint8_t *data, const uint32_t data_len,
 	if (out) {
 		sd = AllocateZeroPool(sig_size);
 		if (owner)
-			CopyMem(sd, owner, sizeof(EFI_GUID));
-		CopyMem(sd->SignatureData, data, data_len);
+			CopyMem(sd, (void *)owner, sizeof(EFI_GUID));
+		CopyMem(sd->SignatureData, (void *)data, data_len);
 	}
 
 	efi_status = fill_esl(sd, 1, type, sig_size, out, outlen);

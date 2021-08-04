@@ -179,8 +179,8 @@ generate_next_uri (CONST CHAR8 *current_uri, CONST CHAR8 *next_loader,
 	if (!*uri)
 		return EFI_OUT_OF_RESOURCES;
 
-	CopyMem(*uri, current_uri, path_len);
-	CopyMem(*uri + path_len, next_loader, next_len);
+	CopyMem(*uri, (void *)current_uri, path_len);
+	CopyMem(*uri + path_len, (void *)next_loader, next_len);
 	(*uri)[path_len + next_len] = '\0';
 
 	return EFI_SUCCESS;
@@ -209,7 +209,7 @@ extract_hostname (CONST CHAR8 *url, CHAR8 **hostname)
 	if (!*hostname)
 		return EFI_OUT_OF_RESOURCES;
 
-	CopyMem(*hostname, start, host_len);
+	CopyMem(*hostname, (void *)start, host_len);
 	(*hostname)[host_len] = '\0';
 
 	return EFI_SUCCESS;
