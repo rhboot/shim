@@ -11,6 +11,8 @@ CC = gcc
 VALGRIND ?=
 DEBUG_PRINTS ?= 0
 OPTIMIZATIONS=-O2 -ggdb
+CFLAGS_LTO =
+CFLAGS_GCOV =
 CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
 	 $(EFI_INCLUDES) \
@@ -18,8 +20,9 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem /usr/include \
 	 -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 	 $(ARCH_CFLAGS) \
+	 $(CFLAGS_LTO) \
+	 $(CFLAGS_GCOV) \
 	 -fshort-wchar \
-	 -flto \
 	 -fno-builtin \
 	 -rdynamic \
 	 -fno-inline \
@@ -43,12 +46,16 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -DSHIM_UNIT_TEST \
 	 "-DDEFAULT_DEBUG_PRINT_STATE=$(DEBUG_PRINTS)"
 
+export CFLAGS_LTO CFLAGS_GCOV
+
 libefi-test.a :
 	$(MAKE) -C gnu-efi \
 		COMPILER="$(COMPILER)" \
 		CC="$(CC)" \
 		ARCH=$(ARCH_GNUEFI) \
 		TOPDIR=$(TOPDIR)/gnu-efi \
+		CFLAGS_LTO="$(CFLAGS_LTO)" \
+		CFLAGS_GCOV="$(CFLAGS_GCOV)" \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean lib
 	mv gnu-efi/$(ARCH)/lib/libefi.a $@
@@ -56,6 +63,8 @@ libefi-test.a :
 		COMPILER="$(COMPILER)" \
 		ARCH=$(ARCH_GNUEFI) \
 		TOPDIR=$(TOPDIR)/gnu-efi \
+		CFLAGS_LTO="$(CFLAGS_LTO)" \
+		CFLAGS_GCOV="$(CFLAGS_GCOV)" \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
@@ -86,8 +95,16 @@ $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
 test : $(tests)
 	$(MAKE) -f include/test.mk test-clean
 
+test-lto : CFLAGS_LTO+=-flto
+test-lto : $(tests)
+	$(MAKE) -f include/test.mk test-clean
+
+test-coverage : CFLAGS_GCOV+=--coverage
+test-coverage : $(tests)
+
 test-clean :
-	@rm -vf test-random.h random.bin libefi-test.a vgcore.*
+	@rm -vf test-random.h random.bin libefi-test.a
+	@rm -vf *.gcda *.gcno *.gcov vgcore.*
 
 clean : test-clean
 

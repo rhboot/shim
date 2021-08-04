@@ -287,7 +287,7 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-test test-clean :
+test test-clean test-coverage test-lto :
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
