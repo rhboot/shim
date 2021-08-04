@@ -45,6 +45,12 @@ Variables you could set to customize the build:
   shim has already verified the kernel when shim loaded the kernel as the
   second stage loader.  In such a case, and only in this case, you should
   use DISABLE_EBS_PROTECTION=y to build.
+- DISABLE_REMOVABLE_LOAD_OPTIONS
+  Do not parse load options when invoked as boot*.efi. This prevents boot
+  failures because of unexpected data in boot entries automatically generated
+  by firmware. It breaks loading non-default second-stage loaders when invoked
+  via that path, and requires using a binary named shim*.efi (or really anything
+  else).
 - REQUIRE_TPM
   if tpm logging or extends return an error code, treat that as a fatal error.
 - ARCH
