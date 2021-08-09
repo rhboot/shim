@@ -491,14 +491,50 @@ console_mode_handle(VOID)
 	EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
 
-	UINTN mode_set;
+	UINTN mode_set, i;
 	UINTN rows = 0, columns = 0;
+	UINTN InfoSize;
+	INTN LargestModeIndex, LargestModeWidth, LargestModeHeight;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 
 	efi_status = gBS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Locate graphic output protocol fail", efi_status);
 		return;
+	}
+
+	/*
+	 * Detect the largest reasonable output mode available for use and
+	 * configure it, if it is not already the active output mode.
+	 */
+	LargestModeWidth = -1;
+	LargestModeHeight = -1;
+	LargestModeIndex = -1;
+
+	for (i = 0; i < gop->Mode->MaxMode; i++) {
+		gop->QueryMode(gop, i, &InfoSize, &Info);
+
+		if (Info->HorizontalResolution >= LargestModeWidth &&
+		    Info->VerticalResolution >= LargestModeHeight &&
+		    Info->HorizontalResolution <= HORIZONTAL_MAX_OK &&
+		    Info->VerticalResolution <= VERTICAL_MAX_OK) {
+			/* new largest mode */
+			LargestModeWidth = Info->HorizontalResolution;
+			LargestModeHeight = Info->VerticalResolution;
+			LargestModeIndex = i;
+		}
+	}
+
+	/*
+	 * Set up the console. Some buggy firmwares may not know what the
+	 * current mode is until we try to set it up.
+	 */
+	if (!console_text_mode)
+		setup_console(1);
+
+	if (gop->Mode->Mode != LargestModeIndex) {
+		/* Set the largest reasonable mode we can */
+		gop->SetMode(gop, LargestModeIndex);
 	}
 
 	Info = gop->Mode->Info;
@@ -528,9 +564,6 @@ console_mode_handle(VOID)
 		/* keep original mode and return */
 		return;
 	}
-
-	if (!console_text_mode)
-		setup_console(1);
 
 	co->Reset(co, TRUE);
 
