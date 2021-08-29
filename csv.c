@@ -15,6 +15,7 @@ parse_csv_line(char * line, size_t max, size_t *n_columns, const char *columns[]
 	char *token = NULL;
 
 	bool valid = true;
+
 	for (n = 0; n < *n_columns; n++) {
 
 		if (valid) {
@@ -62,16 +63,17 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 	}
 
 	max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
+	if (is_utf8_bom(line, max))
 
-	if (line && is_utf8_bom(line, max))
 		line += UTF8_BOM_SIZE;
 
-	while (line && line <= data_end) {
+	while (line <= data_end && *line) {
 		size_t entrysz = sizeof(char *) * n_columns + sizeof(struct csv_row);
 		struct csv_row *entry;
 		size_t m_columns = n_columns;
 		char *delim;
 		bool found = true;
+		bool eof = false;
 
 		end = data_end;
 		max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
@@ -91,6 +93,9 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 				end = tmp;
 		}
 		max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
+
+		if (!*end)
+			eof = true;
 		*end = '\0';
 
 		if (line == data_end || max == 0) {
@@ -115,6 +120,9 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 
 		parse_csv_line(line, max, &m_columns, (const char **)entry->columns);
 		entry->n_columns = m_columns;
+		if (eof)
+			break;
+
 		line = end + 1;
 	}
 
