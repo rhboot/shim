@@ -158,7 +158,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	}
 
 	b = AllocateZeroPool(len + 2);
-	if (!buffer) {
+	if (!b) {
 		console_print(L"Could not allocate memory\n");
 		fh2->Close(fh2);
 		return EFI_OUT_OF_RESOURCES;
