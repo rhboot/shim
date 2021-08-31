@@ -166,7 +166,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 
 	efi_status = fh->Read(fh, &len, b);
 	if (EFI_ERROR(efi_status)) {
-		FreePool(buffer);
+		FreePool(b);
 		fh2->Close(fh2);
 		console_print(L"Could not read file: %r\n", efi_status);
 		return efi_status;
