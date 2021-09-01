@@ -571,7 +571,8 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 
 	/* Check the length of the file */
 	for (i = 0; i < rx_message.HeaderCount; i++) {
-		if (!strcmp(rx_message.Headers[i].FieldName, (CHAR8 *)"Content-Length")) {
+		if (!strcasecmp(rx_message.Headers[i].FieldName,
+				(CHAR8 *)"Content-Length")) {
 			*buf_size = ascii_to_int(rx_message.Headers[i].FieldValue);
 		}
 	}
