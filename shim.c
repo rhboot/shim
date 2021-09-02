@@ -724,7 +724,7 @@ should_use_fallback(EFI_HANDLE image_handle)
 	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
 					 (void **)&li);
 	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get image for bootx64.efi: %r\n",
+		perror(L"Could not get image for boot" EFI_ARCH L".efi: %r\n",
 		       efi_status);
 		return 0;
 	}
