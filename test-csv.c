@@ -338,6 +338,68 @@ fail:
 }
 
 int
+test_csv_3(void)
+{
+	char csv[] =
+		"a,b,c,d,e,f,g,h\n"
+		"a,b,c\n"
+		"\n"
+		"\n"
+		"a,b,c,d,e,f,g,h\n"
+		"a,b,c\0x,y\0z\0";
+	struct test_entry test_entries[]= {
+		{ 7, { "a", "b", "c", "d", "e", "f", "g" } },
+		{ 3, { "a", "b", "c", NULL, NULL, NULL, NULL } },
+		{ 7, { "a", "b", "c", "d", "e", "f", "g" } },
+		{ 3, { "a", "b", "c", NULL, NULL, NULL, NULL } },
+	};
+	list_t entry_list;
+	size_t i;
+	char *current, *end;
+	list_t *pos = NULL;
+	EFI_STATUS efi_status;
+
+	INIT_LIST_HEAD(&entry_list);
+	assert_equal_return(list_size(&entry_list), 0, -1,
+			    "got %d expected %d\n");
+
+	current = csv;
+	end = csv + sizeof(csv) - 1;
+
+	efi_status = parse_csv_data(current, end, 7, &entry_list);
+	assert_equal_return(efi_status, EFI_SUCCESS, -1, "got %x expected %x\n");
+
+	i = 0;
+	list_for_each(pos, &entry_list) {
+		struct csv_row *csv_row;
+		struct test_entry *test_entry = &test_entries[i++];
+		size_t j;
+
+		assert_goto(i > 0 && i <= 4, fail, "got %d expected 0 to 4\n", i);
+
+		csv_row = list_entry(pos, struct csv_row, list);
+
+		assert_equal_goto(csv_row->n_columns, test_entry->n_columns,
+				  fail, "got %d expected %d\n");
+		for (j = 0; j < csv_row->n_columns; j++) {
+			assert_equal_goto(strcmp(csv_row->columns[j],
+					   test_entry->columns[j]), 0,
+				    fail, "got %d expected %d\n");
+		}
+	}
+
+	assert_equal_return(list_size(&entry_list), 4, -1,
+			    "got %d expected %d\n");
+	free_csv_list(&entry_list);
+	assert_equal_return(list_size(&entry_list), 0, -1,
+			    "got %d expected %d\n");
+	return 0;
+fail:
+	free_csv_list(&entry_list);
+	return -1;
+}
+
+int
 test_simple_sbat_csv(void)
 {
 	char csv[] =
@@ -456,6 +518,7 @@ main(void)
 	test(test_csv_0);
 	test(test_csv_1);
 	test(test_csv_2);
+	test(test_csv_3);
 	test(test_simple_sbat_csv);
 	test(test_csv_simple_fuzz, random_bin, random_bin_len, false);
 	for (i = 0; i < random_bin_len; i++) {
