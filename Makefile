@@ -46,6 +46,7 @@ ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildca
 FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o
 ORIG_FALLBACK_SRCS = fallback.c
 SBATPATH = $(TOPDIR)/data/sbat.csv
+NULPATH = $(TOPDIR)/data/nul
 
 ifeq ($(SOURCE_DATE_EPOCH),)
 	UNAME=$(shell uname -s -m -p -i -o)
@@ -124,6 +125,7 @@ sbat_data.o : /dev/null
 		--set-section-flags .sbat=contents,alloc,load,readonly,data \
 		$@
 	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
+	$(OBJCOPY) --add-section .sbat._nul=$(NULPATH) $@
 
 $(SHIMNAME) : $(SHIMSONAME) post-process-pe
 $(MMNAME) : $(MMSONAME) post-process-pe
