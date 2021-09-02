@@ -77,6 +77,7 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 
 		end = data_end;
 		max = (uintptr_t)end - (uintptr_t)line + (end > line ? 1 : 0);
+		/* Skip the delimiter(s) of the previous line */
 		while (max && found) {
 			found = false;
 			for (delim = &delims[0]; max && *delim; delim++) {
@@ -87,6 +88,7 @@ parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 				}
 			}
 		}
+		/* Find the first delimiter of the current line */
 		for (delim = &delims[0]; *delim; delim++) {
 			char *tmp = strnchrnul(line, max, *delim);
 			if (tmp < end)
