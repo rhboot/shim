@@ -346,7 +346,7 @@ Adding a .sbat section containing the SBAT metadata structure to PE images.
 | vendor_url | url to look stuff up, contact, whatever.
 
 The format of this .sbat section is comma separated values, or more
-specifically UTF-8 encoded strings.
+specifically ASCII encoded strings.
 
 ## Example sbat sections
 
