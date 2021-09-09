@@ -46,6 +46,10 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -DSHIM_UNIT_TEST \
 	 "-DDEFAULT_DEBUG_PRINT_STATE=$(DEBUG_PRINTS)"
 
+# On some systems (e.g. Arch Linux), limits.h is in the "include-fixed" instead
+# of the "include" directory
+CFLAGS += -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
+
 export CFLAGS_LTO CFLAGS_GCOV
 
 libefi-test.a :
