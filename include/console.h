@@ -50,6 +50,9 @@ void
 console_reset(void);
 void
 console_mode_handle(void);
+void
+clear_screen(void);
+
 #define NOSEL 0x7fffffff
 
 typedef struct _EFI_CONSOLE_CONTROL_PROTOCOL   EFI_CONSOLE_CONTROL_PROTOCOL;
