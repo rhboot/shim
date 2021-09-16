@@ -1005,7 +1005,7 @@ static EFI_STATUS mok_reset_prompt(BOOLEAN MokX)
 	EFI_STATUS efi_status;
 	CHAR16 *prompt[] = { NULL, NULL };
 
-	ST->ConOut->ClearScreen(ST->ConOut);
+	clear_screen();
 
 	if (MokX)
 		prompt[0] = L"Erase all stored keys in MokListX?";
@@ -1468,7 +1468,7 @@ static EFI_STATUS mok_sb_prompt(void *MokSB, UINTN MokSBSize)
 		return EFI_INVALID_PARAMETER;
 	}
 
-	ST->ConOut->ClearScreen(ST->ConOut);
+	clear_screen();
 
 	message[0] = L"Change Secure Boot state";
 	message[1] = NULL;
@@ -1583,7 +1583,7 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 		return EFI_INVALID_PARAMETER;
 	}
 
-	ST->ConOut->ClearScreen(ST->ConOut);
+	clear_screen();
 
 	message[0] = L"Change DB state";
 	message[1] = NULL;
@@ -1691,7 +1691,7 @@ static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 		return EFI_INVALID_PARAMETER;
 	}
 
-	ST->ConOut->ClearScreen(ST->ConOut);
+	clear_screen();
 
 	SetMem(hash, PASSWORD_CRYPT_SIZE, 0);
 
@@ -2008,7 +2008,7 @@ static BOOLEAN verify_pw(BOOLEAN * protected)
 	if (attributes & EFI_VARIABLE_RUNTIME_ACCESS)
 		return TRUE;
 
-	ST->ConOut->ClearScreen(ST->ConOut);
+	clear_screen();
 
 	/* Draw the background */
 	console_save_and_set_mode(&SavedMode);

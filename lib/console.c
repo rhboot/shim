@@ -580,7 +580,7 @@ console_mode_handle(VOID)
 		efi_status = co->SetMode(co, mode_set);
 	}
 
-	co->ClearScreen(co);
+	clear_screen();
 
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Console set mode fail", efi_status);
@@ -680,6 +680,17 @@ console_reset(void)
 	co->Reset(co, TRUE);
 	/* set mode 0 - required to be 80x25 */
 	co->SetMode(co, 0);
+	co->ClearScreen(co);
+}
+
+void
+clear_screen(void)
+{
+	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+
+	if (!co)
+		return;
+
 	co->ClearScreen(co);
 }
 
