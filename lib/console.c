@@ -34,6 +34,9 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 	UINTN EventIndex;
 	EFI_STATUS efi_status;
 
+	if (!ci)
+		return EFI_UNSUPPORTED;
+
 	do {
 		BS->WaitForEvent(1, &ci->WaitForKey, &EventIndex);
 		efi_status = ci->ReadKeyStroke(ci, key);
@@ -109,7 +112,8 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 	if (!console_text_mode)
 		setup_console(1);
 
-	co->SetCursorPosition(co, col, row);
+	if (co)
+		co->SetCursorPosition(co, col, row);
 
 	ms_va_start(args, fmt);
 	ret = VPrint(fmt, args);
@@ -135,6 +139,9 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 
 	if (!console_text_mode)
 		setup_console(1);
+
+	if (!co)
+		return;
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -241,6 +248,9 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 	if (!console_text_mode)
 		setup_console(1);
 
+	if (!co)
+		return;
+
 	CopyMem(&SavedConsoleMode, co->Mode, sizeof(SavedConsoleMode));
 	co->EnableCursor(co, FALSE);
 	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
@@ -273,6 +283,9 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 
 	if (!console_text_mode)
 		setup_console(1);
+
+	if (!co)
+		return -1;
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -413,6 +426,9 @@ console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
 		return;
 	}
 
+	if (!co)
+		return;
+
 	CopyMem(SavedMode, co->Mode, sizeof(SIMPLE_TEXT_OUTPUT_MODE));
 	co->EnableCursor(co, FALSE);
 	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
@@ -422,6 +438,9 @@ void
 console_restore_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
 {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
+
+	if (!co)
+		return;
 
 	co->EnableCursor(co, SavedMode->CursorVisible);
 	co->SetCursorPosition(co, SavedMode->CursorColumn,
@@ -440,6 +459,9 @@ console_countdown(CHAR16* title, const CHAR16* message, int timeout)
 	UINTN cols, rows;
 	CHAR16 *titles[2];
 	int wait = 10000000;
+
+	if (!co || !ci)
+		return -1;
 
 	console_save_and_set_mode(&SavedMode);
 
@@ -494,6 +516,9 @@ console_mode_handle(VOID)
 	UINTN mode_set;
 	UINTN rows = 0, columns = 0;
 	EFI_STATUS efi_status = EFI_SUCCESS;
+
+	if (!co)
+		return;
 
 	efi_status = BS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
 	if (EFI_ERROR(efi_status)) {
@@ -648,6 +673,9 @@ console_reset(void)
 
 	if (!console_text_mode)
 		setup_console(1);
+
+	if (!co)
+		return;
 
 	co->Reset(co, TRUE);
 	/* set mode 0 - required to be 80x25 */
