@@ -1002,18 +1002,27 @@ static struct mock_variable_limits default_limits[] = {
 };
 
 void
+mock_set_usage_limits(list_t *limit_list,
+		      struct mock_variable_limits *limits)
+{
+	INIT_LIST_HEAD(limit_list);
+	for (size_t i = 0; limits[i].attrs != 0; i++) {
+		INIT_LIST_HEAD(&limits[i].list);
+		list_add_tail(&limits[i].list, limit_list);
+	}
+
+	mock_qvi_limits = limit_list;
+	mock_sv_limits = limit_list;
+}
+
+void
 mock_set_default_usage_limits(void)
 {
 	default_max_var_storage = 65536;
 	default_remaining_var_storage = 65536;
 	default_max_var_size = 32768;
 
-	INIT_LIST_HEAD(&mock_default_variable_limits);
-	for (size_t i = 0; default_limits[i].attrs != 0; i++) {
-		INIT_LIST_HEAD(&default_limits[i].list);
-		list_add_tail(&default_limits[i].list,
-			      &mock_default_variable_limits);
-	}
+	mock_set_usage_limits(&mock_default_variable_limits, &default_limits[0]);
 }
 
 void
