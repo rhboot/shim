@@ -773,9 +773,9 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 #endif
 
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
-	printf("%s:%d:%s():Setting "GUID_FMT"-%s\n",
+	printf("%s:%d:%s():Setting "GUID_FMT"-%s size:0x%"PRIx64"\n",
 	       __FILE__, __LINE__ - 1, __func__,
-	       GUID_ARGS(*guid), Str2str(name));
+	       GUID_ARGS(*guid), Str2str(name), size);
 #endif
 	switch (mock_variable_sort_policy) {
 	case MOCK_SORT_PREPEND:
@@ -843,17 +843,17 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 		printf("%s:%d:%s():var:%p attrs:0x%lx\n",
 		       __FILE__, __LINE__ - 1, __func__, var, attrs);
 #endif
-		status = mock_new_variable(name, guid, attrs, size, data, &var);
+		status = mock_sv_adjust_usage_data(attrs, size, -totalsz);
 		if (EFI_ERROR(status)) {
 			mock_sv_post_hook(name, guid, attrs, size, data,
 					  &status, CREATE);
 			return status;
 		}
-		mock_sv_adjust_usage_data(attrs, size, totalsz);
+		status = mock_new_variable(name, guid, attrs, size, data, &var);
 		mock_sv_post_hook(name, guid, attrs, size, data,
 				  &status, CREATE);
 		if (EFI_ERROR(status)) {
-			mock_sv_adjust_usage_data(attrs, 0, -totalsz);
+			mock_sv_adjust_usage_data(attrs, 0, totalsz);
 			return status;
 		}
 
