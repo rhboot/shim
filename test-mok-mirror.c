@@ -441,6 +441,203 @@ test_mok_mirror_with_enough_space(void)
 	return ret;
 }
 
+static int
+test_mok_mirror_setvar_out_of_resources(void)
+{
+	const char *mok_rt_vars[n_mok_state_variables];
+	EFI_STATUS status;
+	EFI_GUID guid = SHIM_LOCK_GUID;
+	EFI_GUID mok_config_guid = MOK_VARIABLE_STORE;
+	int ret = -1;
+
+	/*
+	 * These sizes are picked specifically so that MokListRT will fail
+	 * to get mirrored with the test data in test-data/efivars-1
+	 */
+	list_t mock_obnoxious_variable_limits;
+	UINT64 obnoxious_max_var_storage = 0xffe4;
+	UINT64 obnoxious_remaining_var_storage = 919+0x3c;
+	UINT64 obnoxious_max_var_size = 919;
+
+	struct mock_variable_limits obnoxious_limits[] = {
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = 0, }
+	};
+
+	struct test_var test_mok_mirror_enospc_vars[] = {
+		/*
+		 * We must to see a BS|NV MokList
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokList",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must *NOT* see a BS|RT MokListRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListRT",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|NV MokListX
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListX",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT MokListXRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListXRT",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|NV SbatLevel
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"SbatLevel",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT SbatLevelRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"SbatLevelRT",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see a MokIgnoreDB
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokIgnoreDB",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see MokSBState
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokSBState",
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see MokSBStateRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokSBStateRT",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		{.guid = { 0, },
+		 .name = NULL,
+		}
+	};
+
+	/*
+	 * We must see the supplied values of MokListRT, MokListXRT, and
+	 * SbatLevelRT in the config table
+	 */
+	struct mock_mok_variable_config_entry test_mok_config_table[] = {
+		{.name = "MokListRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListRT),
+		 .data = test_data_efivars_1_MokListRT
+		},
+		{.name = "MokListXRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListXRT),
+		 .data = test_data_efivars_1_MokListXRT
+		},
+		{.name = "SbatLevelRT",
+		 .data_size = sizeof(test_data_efivars_1_SbatLevelRT),
+		 .data = test_data_efivars_1_SbatLevelRT
+		},
+		{.name = "MokListTrustedRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListTrustedRT),
+		 .data = test_data_efivars_1_MokListTrustedRT
+		},
+		{.name = { 0, },
+		 .data_size = 0,
+		 .data = NULL,
+		}
+	};
+
+	UINT64 max_storage_sz = 0;
+	UINT64 max_var_sz = 0;
+	UINT64 remaining_sz = 0;
+
+	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		mok_rt_vars[i] = mok_state_variables[i].rtname8;
+	}
+
+	mock_load_variables("test-data/efivars-1", mok_rt_vars, true);
+
+	mock_set_variable_post_hook = setvar_post;
+	mock_get_variable_post_hook = getvar_post;
+
+	mock_set_usage_limits(&mock_obnoxious_variable_limits,
+			      &obnoxious_limits[0]);
+
+	ret = test_mok_mirror(&test_mok_mirror_enospc_vars[0],
+			      test_mok_config_table,
+			      EFI_OUT_OF_RESOURCES);
+
+	mock_set_variable_post_hook = NULL;
+	mock_get_variable_post_hook = NULL;
+	return ret;
+}
+
 int
 main(void)
 {
@@ -485,6 +682,9 @@ main(void)
 
 			mock_variable_delete_attr_policy = delete_policies[j];
 			test(test_mok_mirror_with_enough_space);
+			mock_finalize_vars_and_configs();
+
+			test(test_mok_mirror_setvar_out_of_resources);
 			mock_finalize_vars_and_configs();
 
 			if (delete_policies[j] == 0)
