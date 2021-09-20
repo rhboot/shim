@@ -21,21 +21,51 @@ start_image(EFI_HANDLE image_handle UNUSED, CHAR16 *mm)
 
 #define N_TEST_VAR_OPS 40
 struct test_var {
+	/*
+	 * The GUID, name, and attributes of the variables
+	 */
 	EFI_GUID guid;
 	CHAR16 *name;
 	UINT32 attrs;
-	UINTN n_ops;
+	/*
+	 * If the variable is required to be present, with the attributes
+	 * specified above, for a test to pass
+	 */
 	bool must_be_present;
+	/*
+	 * If the variable is required to be absent, no matter what the
+	 * attributes, for a test to pass
+	 */
 	bool must_be_absent;
+	/*
+	 * The number of operations on this variable that we've seen
+	 */
+	UINTN n_ops;
+	/*
+	 * the operations that have occurred on this variable
+	 */
 	mock_variable_op_t ops[N_TEST_VAR_OPS];
+	/*
+	 * the result codes of those operations
+	 */
 	EFI_STATUS results[N_TEST_VAR_OPS];
 };
 
 static struct test_var *test_vars;
 
 struct mock_mok_variable_config_entry {
+	/*
+	 * The name of an entry we expect to see in the MokVars
+	 * configuration table
+	 */
 	CHAR8 name[256];
+	/*
+	 * The size of its data
+	 */
 	UINT64 data_size;
+	/*
+	 * A pointer to what the data should be
+	 */
 	const unsigned char *data;
 };
 
@@ -94,16 +124,211 @@ getvar_post(CHAR16 *name, EFI_GUID *guid,
 	}
 }
 
+static EFI_STATUS
+check_variables(struct test_var *vars)
+{
+	for (size_t i = 0; vars[i].name != NULL; i++) {
+		struct test_var *tv = &vars[i];
+		list_t *pos = NULL;
+		bool found = false;
+		char buf[1];
+		UINTN size = 0;
+		UINT32 attrs = 0;
+		bool present = false;
+
+		list_for_each(pos, &mock_variables) {
+			struct mock_variable *var;
+			bool deleted;
+			bool created;
+			int gets = 0;
+
+			var = list_entry(pos, struct mock_variable, list);
+			if (CompareGuid(&tv->guid, &var->guid) != 0 ||
+			    StrCmp(var->name, tv->name) != 0)
+				continue;
+			found = true;
+			assert_equal_goto(var->attrs, tv->attrs, err,
+					  "\"%s\": wrong attrs; got %s expected %s\n",
+					  Str2str(tv->name),
+					  format_var_attrs(var->attrs),
+					  format_var_attrs(tv->attrs));
+			for (UINTN j = 0; j < N_TEST_VAR_OPS
+					  && tv->ops[j] != NONE; j++) {
+				switch (tv->ops[j]) {
+				case NONE:
+				default:
+					break;
+				case CREATE:
+					if (tv->results[j] == EFI_SUCCESS)
+						created = true;
+					break;
+				case DELETE:
+					assert_goto(tv->results[j] != EFI_SUCCESS, err,
+							  "Tried to delete absent variable \"%s\"\n",
+							  Str2str(tv->name));
+					assert_goto(created == false, err,
+						    "Deleted variable \"%s\" was previously created.\n",
+						    Str2str(tv->name));
+					break;
+				case APPEND:
+					assert_goto(false, err,
+						    "No append action should have been tested\n");
+					break;
+				case REPLACE:
+					assert_goto(false, err,
+						    "No replace action should have been tested\n");
+					break;
+				case GET:
+					if (tv->results[j] == EFI_SUCCESS)
+						gets += 1;
+					break;
+				}
+			}
+			assert_goto(gets == 0 || gets == 1, err,
+				    "Variable should not be read %d times.\n", gets);
+		}
+		if (tv->must_be_present) {
+			/*
+			 * This asserts if it isn't present, and if that's
+			 * the case, then the attributes are already
+			 * validated in the search loop
+			 */
+			assert_goto(found == true, err,
+				 "variable \"%s\" was not found.\n",
+				 Str2str(tv->name));
+		}
+
+		if (tv->must_be_absent) {
+			/*
+			 * deliberately does not check the attributes at
+			 * this time.
+			 */
+			assert_goto(found == false, err,
+				 "variable \"%s\" was found.\n",
+				 Str2str(tv->name));
+		}
+	}
+
+	return EFI_SUCCESS;
+err:
+	return EFI_INVALID_PARAMETER;
+}
+
+static EFI_STATUS
+check_config_table(struct mock_mok_variable_config_entry *test_configs,
+		   uint8_t *config_pos)
+{
+	size_t i = 0;
+	while (config_pos) {
+		struct mock_mok_variable_config_entry *mock_entry =
+			&test_configs[i];
+		struct mok_variable_config_entry *mok_entry =
+			(struct mok_variable_config_entry *)config_pos;
+
+		/*
+		 * If the tables are different lengths, this will trigger.
+		 */
+		assert_equal_goto(mok_entry->name[0], mock_entry->name[0], err,
+				  "mok.name[0] %ld != test.name[0] %ld\n");
+		if (mock_entry->name[0] == 0)
+			break;
+
+		assert_nonzero_goto(mok_entry->name[0], err, "%ld != %ld\n");
+		assert_zero_goto(strncmp(mok_entry->name, mock_entry->name,
+					 sizeof(mock_entry->name)),
+				 err, "%ld != %ld: strcmp(\"%s\",\"%s\")\n",
+				 mok_entry->name, mock_entry->name);
+
+		/*
+		 * As of 7501b6bb449f ("mok: fix potential buffer overrun in
+		 * import_mok_state"), we should not see any mok config
+		 * variables with data_size == 0.
+		 */
+		assert_nonzero_goto(mok_entry->data_size, err, "%ld != 0\n");
+
+		assert_equal_goto(mok_entry->data_size, mock_entry->data_size,
+				  err, "%ld != %ld\n");
+		assert_zero_goto(CompareMem(mok_entry->data, mock_entry->data,
+					    mok_entry->data_size),
+				 err, "%ld != %ld\n");
+		config_pos += offsetof(struct mok_variable_config_entry, data)
+			   + mok_entry->data_size;
+		i += 1;
+	}
+
+	return EFI_SUCCESS;
+err:
+	return EFI_INVALID_PARAMETER;
+}
+
 static int
-test_mok_mirror_0(void)
+test_mok_mirror(struct test_var *vars,
+		struct mock_mok_variable_config_entry *configs,
+		EFI_STATUS expected_status)
+{
+	EFI_STATUS status;
+	EFI_GUID mok_config_guid = MOK_VARIABLE_STORE;
+	int ret = -1;
+
+	status = import_mok_state(NULL);
+	assert_equal_goto(status, expected_status, err,
+			  "got 0x%016lx, expected 0x%016lx\n",
+			  expected_status);
+
+	test_vars = vars;
+
+	status = check_variables(vars);
+	if (EFI_ERROR(status))
+		goto err;
+
+	uint8_t *pos = NULL;
+	for (size_t i = 0; i < ST->NumberOfTableEntries; i++) {
+		EFI_CONFIGURATION_TABLE *ct = &ST->ConfigurationTable[i];
+
+		if (CompareGuid(&ct->VendorGuid, &mok_config_guid) != 0)
+			continue;
+
+		pos = (void *)ct->VendorTable;
+		break;
+	}
+
+	assert_nonzero_goto(pos, err, "%p != 0\n");
+
+	status = check_config_table(configs, pos);
+	if (EFI_ERROR(status))
+		goto err;
+
+	ret = 0;
+err:
+	for (UINTN k = 0; k < n_mok_state_variables; k++) {
+		struct mok_state_variable *v =
+			&mok_state_variables[k];
+		if (v->data_size && v->data) {
+			free(v->data);
+			v->data = NULL;
+			v->data_size = 0;
+		}
+	}
+
+	test_vars = NULL;
+
+	return ret;
+}
+
+/*
+ * This tests mirroring of mok variables on fairly optimistic conditions:
+ * there's enough space for everything, and so we expect to see all the
+ * RT variables for which we have data mirrored
+ */
+static int
+test_mok_mirror_with_enough_space(void)
 {
 	const char *mok_rt_vars[n_mok_state_variables];
 	EFI_STATUS status;
 	EFI_GUID guid = SHIM_LOCK_GUID;
-	EFI_GUID mok_config_guid = MOK_VARIABLE_STORE;
 	int ret = -1;
 
-	struct test_var test_mok_mirror_0_vars[] = {
+	struct test_var test_mok_mirror_with_enough_space_vars[] = {
 		{.guid = SHIM_LOCK_GUID,
 		 .name = L"MokList",
 		 .must_be_present = true,
@@ -171,6 +396,10 @@ test_mok_mirror_0(void)
 		}
 	};
 
+	/*
+	 * We must see the supplied values of MokListRT, MokListXRT, and
+	 * SbatLevelRT in the config table
+	 */
 	struct mock_mok_variable_config_entry test_mok_config_table[] = {
 		{.name = "MokListRT",
 		 .data_size = sizeof(test_data_efivars_1_MokListRT),
@@ -202,147 +431,11 @@ test_mok_mirror_0(void)
 
 	mock_set_variable_post_hook = setvar_post;
 	mock_get_variable_post_hook = getvar_post;
-	test_vars = &test_mok_mirror_0_vars[0];
 
-	import_mok_state(NULL);
+	ret = test_mok_mirror(&test_mok_mirror_with_enough_space_vars[0],
+			      test_mok_config_table,
+			      EFI_SUCCESS);
 
-	for (size_t i = 0; test_mok_mirror_0_vars[i].name != NULL; i++) {
-		struct test_var *tv = &test_mok_mirror_0_vars[i];
-		list_t *pos = NULL;
-		bool found = false;
-		char buf[1];
-		UINTN size = 0;
-		UINT32 attrs = 0;
-		bool present = false;
-
-		list_for_each(pos, &mock_variables) {
-			struct mock_variable *var;
-			bool deleted;
-			bool created;
-			int gets = 0;
-
-			var = list_entry(pos, struct mock_variable, list);
-			if (CompareGuid(&tv->guid, &var->guid) != 0 ||
-			    StrCmp(var->name, tv->name) != 0)
-				continue;
-			found = true;
-			assert_equal_goto(var->attrs, tv->attrs, err,
-					  "\"%s\": wrong attrs; got %s expected %s\n",
-					  Str2str(tv->name),
-					  format_var_attrs(var->attrs),
-					  format_var_attrs(tv->attrs));
-			for (UINTN j = 0; j < N_TEST_VAR_OPS
-					  && tv->ops[j] != NONE; j++) {
-				switch (tv->ops[j]) {
-				case NONE:
-				default:
-					break;
-				case CREATE:
-					if (tv->results[j] == EFI_SUCCESS)
-						created = true;
-					break;
-				case DELETE:
-					assert_goto(tv->results[j] != EFI_SUCCESS, err,
-							  "Tried to delete absent variable \"%s\"\n",
-							  Str2str(tv->name));
-					assert_goto(created == false, err,
-						    "Deleted variable \"%s\" was previously created.\n",
-						    Str2str(tv->name));
-					break;
-				case APPEND:
-					assert_goto(false, err,
-						    "No append action should have been tested\n");
-					break;
-				case REPLACE:
-					assert_goto(false, err,
-						    "No replace action should have been tested\n");
-					break;
-				case GET:
-					if (tv->results[j] == EFI_SUCCESS)
-						gets += 1;
-					break;
-				}
-			}
-			assert_goto(gets == 0 || gets == 1, err,
-				    "Variable should not be read %d times.\n", gets);
-		}
-		if (tv->must_be_present) {
-			assert_goto(found == true, err,
-				 "variable \"%s\" was not found.\n",
-				 Str2str(tv->name));
-		}
-
-		if (tv->must_be_absent) {
-			assert_goto(found == false, err,
-				 "variable \"%s\" was found.\n",
-				 Str2str(tv->name));
-		}
-	}
-
-	uint8_t *pos = NULL;
-	for (size_t i = 0; i < ST->NumberOfTableEntries; i++) {
-		EFI_CONFIGURATION_TABLE *ct = &ST->ConfigurationTable[i];
-
-		if (CompareGuid(&ct->VendorGuid, &mok_config_guid) != 0)
-			continue;
-
-		pos = (void *)ct->VendorTable;
-		break;
-	}
-
-	assert_nonzero_goto(pos, err, "%p != 0\n");
-
-	size_t i = 0;
-	while (pos) {
-		struct mock_mok_variable_config_entry *mock_entry =
-			&test_mok_config_table[i];
-		struct mok_variable_config_entry *mok_entry =
-			(struct mok_variable_config_entry *)pos;
-
-		/*
-		 * If the tables are different lengths, this will trigger.
-		 */
-		assert_equal_goto(mok_entry->name[0], mock_entry->name[0], err,
-				  "mok.name[0] %ld != test.name[0] %ld\n");
-		if (mock_entry->name[0] == 0)
-			break;
-
-		assert_nonzero_goto(mok_entry->name[0], err, "%ld != %ld\n");
-		assert_zero_goto(strncmp(mok_entry->name, mock_entry->name,
-					 sizeof(mock_entry->name)),
-				 err, "%ld != %ld: strcmp(\"%s\",\"%s\")\n",
-				 mok_entry->name, mock_entry->name);
-
-		/*
-		 * As of 7501b6bb449f ("mok: fix potential buffer overrun in
-		 * import_mok_state"), we should not see any mok config
-		 * variables with data_size == 0.
-		 */
-		assert_nonzero_goto(mok_entry->data_size, err, "%ld != 0\n");
-
-		assert_equal_goto(mok_entry->data_size, mock_entry->data_size,
-				  err, "%ld != %ld\n");
-		assert_zero_goto(CompareMem(mok_entry->data, mock_entry->data,
-					    mok_entry->data_size),
-				 err, "%ld != %ld\n");
-		pos += offsetof(struct mok_variable_config_entry, data)
-		       + mok_entry->data_size;
-		i += 1;
-	}
-
-	ret = 0;
-err:
-	for (UINTN k = 0; k < n_mok_state_variables; k++) {
-		struct mok_state_variable *v =
-			&mok_state_variables[k];
-		if (v->data_size && v->data) {
-			free(v->data);
-			v->data = NULL;
-			v->data_size = 0;
-		}
-	}
-
-	test_vars = NULL;
 	mock_set_variable_post_hook = NULL;
 	mock_get_variable_post_hook = NULL;
 	return ret;
@@ -391,7 +484,7 @@ main(void)
 			       del_policy_names[j]);
 
 			mock_variable_delete_attr_policy = delete_policies[j];
-			test(test_mok_mirror_0);
+			test(test_mok_mirror_with_enough_space);
 			mock_finalize_vars_and_configs();
 
 			if (delete_policies[j] == 0)
