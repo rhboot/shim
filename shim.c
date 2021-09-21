@@ -1102,6 +1102,11 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	int use_fb = should_use_fallback(image_handle);
 
+	if (!use_fb)
+		/* If we are not going through fallback,
+		 * clear the fallback reboot counter */
+		LibDeleteVariable(L"FB_BOOT_COUNT", &SHIM_LOCK_GUID);
+
 	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
 	if (efi_status == EFI_SECURITY_VIOLATION ||
 	    efi_status == EFI_ACCESS_DENIED) {

@@ -5,6 +5,7 @@
  */
 #include "shim.h"
 
+#define BOOT_COUNT L"FB_BOOT_COUNT"
 #define NO_REBOOT L"FB_NO_REBOOT"
 
 EFI_LOADED_IMAGE *this_image = NULL;
@@ -1027,6 +1028,31 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 }
 
 static UINT32
+get_boot_count(void)
+{
+	EFI_STATUS efi_status;
+	UINT32 boot_count;
+	UINTN size = sizeof(UINT32);
+
+	efi_status = RT->GetVariable(BOOT_COUNT, &SHIM_LOCK_GUID,
+				     NULL, &size, &boot_count);
+	if (!EFI_ERROR(efi_status)) {
+		return boot_count;
+	}
+	return 0;
+}
+
+static EFI_STATUS
+set_boot_count(UINT32 boot_count)
+{
+	return RT->SetVariable(BOOT_COUNT, &SHIM_LOCK_GUID,
+			       EFI_VARIABLE_NON_VOLATILE |
+			       EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			       EFI_VARIABLE_RUNTIME_ACCESS,
+			       sizeof(UINT32), &boot_count);
+}
+
+static UINT32
 get_fallback_no_reboot(void)
 {
 	EFI_STATUS efi_status;
@@ -1041,7 +1067,6 @@ get_fallback_no_reboot(void)
 	return 0;
 }
 
-#ifndef FALLBACK_NONINTERACTIVE
 static EFI_STATUS
 set_fallback_no_reboot(void)
 {
@@ -1055,6 +1080,7 @@ set_fallback_no_reboot(void)
 	return efi_status;
 }
 
+#ifndef FALLBACK_NONINTERACTIVE
 static int
 draw_countdown(void)
 {
@@ -1121,6 +1147,7 @@ EFI_STATUS
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 {
 	EFI_STATUS efi_status;
+	UINT32 boot_count = 0;
 
 	InitializeLib(image, systab);
 
@@ -1153,6 +1180,17 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		VerbosePrint(L"tpm not present, starting the first image\n");
 		try_start_first_option(image);
 	} else {
+		boot_count = get_boot_count();
+		boot_count++;
+
+		VerbosePrint(L"fallback boot attempt number %d\n", boot_count);
+
+		if (boot_count >= FALLBACK_MAX_BOOT_ATTEMPTS) {
+			VerbosePrint(L"reboot loop detected: booted fallback %d times in a row, setting %s\n",
+				     FALLBACK_MAX_BOOT_ATTEMPTS, NO_REBOOT);
+			set_fallback_no_reboot();
+		}
+
 		if (get_fallback_no_reboot() == 1) {
 			VerbosePrint(L"%s is set, starting the first image\n",
 				     NO_REBOOT);
@@ -1180,6 +1218,7 @@ reset:
 	}
 
 	console_print(L"Reset System\n");
+	set_boot_count(boot_count);
 
 	if (get_fallback_verbose()) {
 		int fallback_verbose_wait = 500000; /* default to 0.5s */
