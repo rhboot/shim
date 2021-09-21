@@ -1154,7 +1154,8 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		try_start_first_option(image);
 	} else {
 		if (get_fallback_no_reboot() == 1) {
-			VerbosePrint(L"NO_REBOOT is set, starting the first image\n");
+			VerbosePrint(L"%s is set, starting the first image\n",
+				     NO_REBOOT);
 			try_start_first_option(image);
 		}
 
