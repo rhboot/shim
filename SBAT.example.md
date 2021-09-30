@@ -16,7 +16,7 @@ the `.sbat` section has the following fields:
 
 `SBAT` EFI variable
 -----------------
-The SBAT EFI variable (`SBAT-605dab50-e046-4300-abb6-3dd810dd8b23`) is structured as a series ASCII CSV records:
+The SBAT EFI variable (`SbatLevel-605dab50-e046-4300-abb6-3dd810dd8b23`) is structured as a series ASCII CSV records:
 
 ```
 sbat,1
