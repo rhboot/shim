@@ -255,6 +255,7 @@ extern UINT8 *build_cert;
 
 extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;
+extern UINT8 trust_mok_list;
 extern UINT8 in_protocol;
 extern void *load_options;
 extern UINT32 load_options_size;

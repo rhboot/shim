@@ -46,7 +46,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	    check_var(L"MokPW") || check_var(L"MokAuth") ||
 	    check_var(L"MokDel") || check_var(L"MokDB") ||
 	    check_var(L"MokXNew") || check_var(L"MokXDel") ||
-	    check_var(L"MokXAuth")) {
+	    check_var(L"MokXAuth") || check_var(L"MokListTrustedNew")) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (EFI_ERROR(efi_status)) {
@@ -165,6 +165,20 @@ struct mok_state_variable mok_state_variable_data[] = {
 	 .flags = MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_MEASURE,
 	 .pcr = 7,
+	},
+	{.name = L"MokListTrusted",
+	 .name8 = "MokListTrusted",
+	 .rtname = L"MokListTrustedRT",
+	 .rtname8 = "MokListTrustedRT",
+	 .guid = &SHIM_LOCK_GUID,
+	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+		     EFI_VARIABLE_NON_VOLATILE,
+	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+	 .flags = MOK_MIRROR_DELETE_FIRST |
+		  MOK_VARIABLE_MEASURE |
+		  MOK_VARIABLE_LOG,
+	 .pcr = 14,
+	 .state = &trust_mok_list,
 	},
 	{ NULL, }
 };
@@ -897,6 +911,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 	user_insecure_mode = 0;
 	ignore_db = 0;
+	trust_mok_list = 0;
 
 	UINT64 config_sz = 0;
 	UINT8 *config_table = NULL;
