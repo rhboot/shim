@@ -569,7 +569,7 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 	full_device_path = FileDevicePath(this_image->DeviceHandle, fullpath);
 	if (!full_device_path) {
 		efi_status = EFI_OUT_OF_RESOURCES;
-		goto err;
+		goto done;
 	}
 	dps = DevicePathToStr(full_device_path);
 	VerbosePrint(L"file DP: %s\n", dps);
@@ -583,7 +583,7 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 			dp = full_device_path;
 		} else {
 			efi_status = EFI_OUT_OF_RESOURCES;
-			goto err;
+			goto done;
 		}
 	}
 
@@ -612,21 +612,53 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 	if (EFI_ERROR(efi_status)) {
 		add_boot_option(dp, full_device_path, fullpath, label,
 				arguments);
-	} else if (option != 0) {
-		CHAR16 *newbootorder;
-		newbootorder = AllocateZeroPool(sizeof (CHAR16) * nbootorder);
-		if (!newbootorder)
-			return EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
 
-		newbootorder[0] = bootorder[option];
-		CopyMem(newbootorder + 1, bootorder, sizeof (CHAR16) * option);
-		CopyMem(newbootorder + option + 1, bootorder + option + 1,
-			sizeof (CHAR16) * (nbootorder - option - 1));
+	UINT16 bootnum;
+	CHAR16 *newbootorder;
+	/* Search for the option in the current bootorder */
+	for (bootnum = 0; bootnum < nbootorder; bootnum++)
+		if (bootorder[bootnum] == option)
+			break;
+	if (bootnum == nbootorder) {
+		/* Option not found, prepend option and copy the rest */
+		newbootorder = AllocateZeroPool(sizeof(CHAR16)
+						* (nbootorder + 1));
+		if (!newbootorder) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+		newbootorder[0] = option;
+		CopyMem(newbootorder + 1, bootorder,
+			sizeof(CHAR16) * nbootorder);
+		FreePool(bootorder);
+		bootorder = newbootorder;
+		nbootorder += 1;
+	} else {
+		/* Option found, put first and slice the rest */
+		newbootorder = AllocateZeroPool(
+			sizeof(CHAR16) * nbootorder);
+		if (!newbootorder) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+		newbootorder[0] = option;
+		CopyMem(newbootorder + 1, bootorder,
+			sizeof(CHAR16) * bootnum);
+		CopyMem(newbootorder + 1 + bootnum,
+			bootorder + bootnum + 1,
+			sizeof(CHAR16) * (nbootorder - bootnum - 1));
 		FreePool(bootorder);
 		bootorder = newbootorder;
 	}
+	VerbosePrint(L"New nbootorder: %d\nBootOrder: ",
+		      nbootorder);
+	for (int i = 0 ; i < nbootorder ; i++)
+		VerbosePrintUnprefixed(L"%04x ", bootorder[i]);
+	VerbosePrintUnprefixed(L"\n");
 
-err:
+done:
 	if (full_device_path)
 		FreePool(full_device_path);
 	if (dp && dp != full_device_path)
