@@ -41,6 +41,12 @@ typedef struct {
 } __attribute__ ((packed)) MokDBvar;
 
 typedef struct {
+	UINT32 MokTMLState;
+	UINT32 PWLen;
+	CHAR16 Password[SB_PASSWORD_LEN];
+} __attribute__ ((packed)) MokTMLvar;
+
+typedef struct {
 	INT32 Timeout;
 } __attribute__ ((packed)) MokTimeoutvar;
 
@@ -1678,6 +1684,121 @@ static EFI_STATUS mok_db_prompt(void *MokDB, UINTN MokDBSize)
 	return EFI_SUCCESS;
 }
 
+static EFI_STATUS mok_tml_prompt(void *MokTML, UINTN MokTMLSize)
+{
+	EFI_STATUS efi_status;
+	SIMPLE_TEXT_OUTPUT_MODE SavedMode;
+	MokTMLvar *var = MokTML;
+	CHAR16 *message[4];
+	CHAR16 pass1, pass2, pass3;
+	CHAR16 *str;
+	UINT8 fail_count = 0;
+	UINT8 dbval = 1;
+	UINT8 pos1, pos2, pos3;
+	int ret;
+	CHAR16 *untrust_tml[] = { L"Do not trust the MOK list", NULL };
+	CHAR16 *trust_tml[] = { L"Trust the MOK list", NULL };
+
+	if (MokTMLSize != sizeof(MokTMLvar)) {
+		console_notify(L"Invalid MokTML variable contents");
+		return EFI_INVALID_PARAMETER;
+	}
+
+	clear_screen();
+
+	message[0] = L"Change Trusted MOK List Keyring state";
+	message[1] = NULL;
+
+	console_save_and_set_mode(&SavedMode);
+	console_print_box_at(message, -1, 0, 0, -1, -1, 1, 1);
+	console_restore_mode(&SavedMode);
+
+	while (fail_count < 3) {
+		RandomBytes(&pos1, sizeof(pos1));
+		pos1 = (pos1 % var->PWLen);
+
+		do {
+			RandomBytes(&pos2, sizeof(pos2));
+			pos2 = (pos2 % var->PWLen);
+		} while (pos2 == pos1);
+
+		do {
+			RandomBytes(&pos3, sizeof(pos3));
+			pos3 = (pos3 % var->PWLen);
+		} while (pos3 == pos2 || pos3 == pos1);
+
+		str = PoolPrint(L"Enter password character %d: ", pos1 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		pass1 = get_password_charater(str);
+		FreePool(str);
+
+		str = PoolPrint(L"Enter password character %d: ", pos2 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		pass2 = get_password_charater(str);
+		FreePool(str);
+
+		str = PoolPrint(L"Enter password character %d: ", pos3 + 1);
+		if (!str) {
+			console_errorbox(L"Failed to allocate buffer");
+			return EFI_OUT_OF_RESOURCES;
+		}
+		pass3 = get_password_charater(str);
+		FreePool(str);
+
+		if (pass1 != var->Password[pos1] ||
+		    pass2 != var->Password[pos2] ||
+		    pass3 != var->Password[pos3]) {
+			console_print(L"Invalid character\n");
+			fail_count++;
+		} else {
+			break;
+		}
+	}
+
+	if (fail_count >= 3) {
+		console_notify(L"Password limit reached");
+		return EFI_ACCESS_DENIED;
+	}
+
+	if (var->MokTMLState == 0)
+		ret = console_yes_no(trust_tml);
+	else
+		ret = console_yes_no(untrust_tml);
+
+	if (ret == 0) {
+		LibDeleteVariable(L"MokListTrustedNew", &SHIM_LOCK_GUID);
+		return EFI_ABORTED;
+	}
+
+	if (var->MokTMLState == 0) {
+		efi_status = RT->SetVariable(L"MokListTrusted", &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_NON_VOLATILE |
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					      1, &dbval);
+		if (EFI_ERROR(efi_status)) {
+			console_notify(L"Failed to set MokListTrusted state");
+			return efi_status;
+		}
+	} else {
+		efi_status = RT->SetVariable(L"MokListTrusted", &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_NON_VOLATILE |
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					      0, NULL);
+		if (EFI_ERROR(efi_status)) {
+			console_notify(L"Failed to delete MokListTrusted state");
+			return efi_status;
+		}
+	}
+
+	return EFI_SUCCESS;
+}
+
 static EFI_STATUS mok_pw_prompt(void *MokPW, UINTN MokPWSize)
 {
 	EFI_STATUS efi_status;
@@ -2076,7 +2197,8 @@ typedef enum {
 	MOK_SET_PW,
 	MOK_CHANGE_DB,
 	MOK_KEY_ENROLL,
-	MOK_HASH_ENROLL
+	MOK_HASH_ENROLL,
+	MOK_CHANGE_TML
 } mok_menu_item;
 
 static void free_menu(mok_menu_item * menu_item, CHAR16 ** menu_strings)
@@ -2095,7 +2217,8 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle UNUSED,
 				 void *MokPW, UINTN MokPWSize,
 				 void *MokDB, UINTN MokDBSize,
 				 void *MokXNew, UINTN MokXNewSize,
-				 void *MokXDel, UINTN MokXDelSize)
+				 void *MokXDel, UINTN MokXDelSize,
+				 void *MokTML, UINTN MokTMLSize)
 {
 	CHAR16 **menu_strings = NULL;
 	mok_menu_item *menu_item = NULL;
@@ -2171,6 +2294,9 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle UNUSED,
 		if (MokDB)
 			menucount++;
 
+		if (MokTML)
+			menucount++;
+
 		menu_strings = AllocateZeroPool(sizeof(CHAR16 *) *
 						(menucount + 1));
 		if (!menu_strings)
@@ -2239,6 +2365,12 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle UNUSED,
 		if (MokDB) {
 			menu_strings[i] = L"Change DB state";
 			menu_item[i] = MOK_CHANGE_DB;
+			i++;
+		}
+
+		if (MokTML) {
+			menu_strings[i] = L"Change MOK List Trusted State";
+			menu_item[i] = MOK_CHANGE_TML;
 			i++;
 		}
 
@@ -2352,6 +2484,17 @@ static EFI_STATUS enter_mok_menu(EFI_HANDLE image_handle UNUSED,
 		case MOK_HASH_ENROLL:
 			efi_status = mok_hash_enroll();
 			break;
+		case MOK_CHANGE_TML:
+			if (!MokTML) {
+				console_print(L"MokManager: internal error: %s",
+					L"MokListTrusted was ! NULL bs is now NULL\n");
+				ret = EFI_ABORTED;
+				goto out;
+			}
+			efi_status = mok_tml_prompt(MokTML, MokTMLSize);
+			if (!EFI_ERROR(efi_status))
+				MokTML = NULL;
+			break;
 		}
 
 		if (!EFI_ERROR(efi_status))
@@ -2376,7 +2519,7 @@ out:
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
 	UINTN MokNewSize = 0, MokDelSize = 0, MokSBSize = 0, MokPWSize = 0;
-	UINTN MokDBSize = 0, MokXNewSize = 0, MokXDelSize = 0;
+	UINTN MokDBSize = 0, MokXNewSize = 0, MokXDelSize = 0, MokTMLSize = 0;
 	void *MokNew = NULL;
 	void *MokDel = NULL;
 	void *MokSB = NULL;
@@ -2384,6 +2527,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	void *MokDB = NULL;
 	void *MokXNew = NULL;
 	void *MokXDel = NULL;
+	void *MokTML = NULL;
 	EFI_STATUS efi_status;
 
 	efi_status = get_variable(L"MokNew", (UINT8 **) & MokNew, &MokNewSize,
@@ -2436,6 +2580,18 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		console_error(L"Could not retrieve MokDB", efi_status);
 	}
 
+	efi_status = get_variable(L"MokListTrustedNew", (UINT8 **) & MokTML,
+				  &MokTMLSize, SHIM_LOCK_GUID);
+	if (!EFI_ERROR(efi_status)) {
+		efi_status = LibDeleteVariable(L"MokListTrustedNew",
+					       &SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status))
+			console_notify(L"Failed to delete MokListTrustedNew");
+	} else if (EFI_ERROR(efi_status) && efi_status != EFI_NOT_FOUND) {
+		console_error(L"Could not retrieve MokListTrustedNew",
+			      efi_status);
+	}
+
 	efi_status = get_variable(L"MokXNew", (UINT8 **) & MokXNew,
 				  &MokXNewSize, SHIM_LOCK_GUID);
 	if (!EFI_ERROR(efi_status)) {
@@ -2458,7 +2614,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	enter_mok_menu(image_handle, MokNew, MokNewSize, MokDel, MokDelSize,
 		       MokSB, MokSBSize, MokPW, MokPWSize, MokDB, MokDBSize,
-		       MokXNew, MokXNewSize, MokXDel, MokXDelSize);
+		       MokXNew, MokXNewSize, MokXDel, MokXDelSize, MokTML, MokTMLSize);
 
 	if (MokNew)
 		FreePool(MokNew);
@@ -2480,6 +2636,9 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	if (MokXDel)
 		FreePool(MokXDel);
+
+	if (MokTML)
+		FreePool(MokTML);
 
 	LibDeleteVariable(L"MokAuth", &SHIM_LOCK_GUID);
 	LibDeleteVariable(L"MokDelAuth", &SHIM_LOCK_GUID);

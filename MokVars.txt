@@ -77,3 +77,9 @@ or not to import DB certs for its own verification purposes.
 MokPWStore: A SHA-256 representation of the password set by the user
 via MokPW. The user will be prompted to enter this password in order
 to interact with MokManager.
+
+MokListTrusted: An 8-bit unsigned integer.  If 1, it signifies to Linux
+to trust CA keys in the MokList. BS,NV
+
+MokListTrustedRT: A copy of MokListTrusted made available to the kernel
+at runtime. RT
