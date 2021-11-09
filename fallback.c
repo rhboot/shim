@@ -248,7 +248,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 
 			if (!first_new_option) {
 				first_new_option = DuplicateDevicePath(fulldp);
-				first_new_option_args = arguments;
+				first_new_option_args = StrDuplicate(arguments);
 				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 			}
 
@@ -482,7 +482,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		/* at this point, we have duplicate data. */
 		if (!first_new_option) {
 			first_new_option = DuplicateDevicePath(fulldp);
-			first_new_option_args = arguments;
+			first_new_option_args = StrDuplicate(arguments);
 			first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 		}
 
