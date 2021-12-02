@@ -11,6 +11,7 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +41,8 @@ static int verbosity;
 		}                                                \
 		0;                                               \
 	})
+
+static bool set_nx_compat = false;
 
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
@@ -331,6 +334,33 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 }
 
 static void
+set_dll_characteristics(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
+{
+	uint16_t oldflags, newflags;
+
+	if (image_is_64_bit(ctx->PEHdr)) {
+		oldflags = ctx->PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics;
+	} else {
+		oldflags = ctx->PEHdr->Pe32.OptionalHeader.DllCharacteristics;
+	}
+
+	if (set_nx_compat)
+		newflags = oldflags | EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
+	else
+		newflags = oldflags & ~(uint16_t)EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
+	if (oldflags == newflags)
+		return;
+
+	debug(INFO, "Updating DLL Characteristics from 0x%04hx to 0x%04hx\n",
+	      oldflags, newflags);
+	if (image_is_64_bit(ctx->PEHdr)) {
+		ctx->PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics = newflags;
+	} else {
+		ctx->PEHdr->Pe32.OptionalHeader.DllCharacteristics = newflags;
+	}
+}
+
+static void
 fix_timestamp(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 {
 	uint32_t ts;
@@ -417,6 +447,8 @@ handle_one(char *f)
 
 	load_pe(f, map, sz, &ctx);
 
+	set_dll_characteristics(&ctx);
+
 	fix_timestamp(&ctx);
 
 	fix_checksum(&ctx, map, sz);
@@ -449,6 +481,8 @@ static void __attribute__((__noreturn__)) usage(int status)
 	fprintf(out, "Options:\n");
 	fprintf(out, "       -q    Be more quiet\n");
 	fprintf(out, "       -v    Be more verbose\n");
+	fprintf(out, "       -N    Disable the NX compatibility flag\n");
+	fprintf(out, "       -n    Enable the NX compatibility flag\n");
 	fprintf(out, "       -h    Print this help text and exit\n");
 
 	exit(status);
@@ -464,6 +498,12 @@ int main(int argc, char **argv)
 		{.name = "usage",
 		 .val = '?',
 		 },
+		{.name = "disable-nx-compat",
+		 .val = 'N',
+		},
+		{.name = "enable-nx-compat",
+		 .val = 'n',
+		},
 		{.name = "quiet",
 		 .val = 'q',
 		},
@@ -474,11 +514,17 @@ int main(int argc, char **argv)
 	};
 	int longindex = -1;
 
-	while ((i = getopt_long(argc, argv, "hqv", options, &longindex)) != -1) {
+	while ((i = getopt_long(argc, argv, "hNnqv", options, &longindex)) != -1) {
 		switch (i) {
 		case 'h':
 		case '?':
 			usage(longindex == -1 ? 1 : 0);
+			break;
+		case 'N':
+			set_nx_compat = false;
+			break;
+		case 'n':
+			set_nx_compat = true;
 			break;
 		case 'q':
 			verbosity = MAX(verbosity - 1, MIN_VERBOSITY);
