@@ -236,6 +236,24 @@ typedef struct {
   EFI_IMAGE_DATA_DIRECTORY  DataDirectory[EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES];
 } EFI_IMAGE_OPTIONAL_HEADER64;
 
+#define EFI_IMAGE_DLLCHARACTERISTICS_RESERVED_0001         0x0001
+#define EFI_IMAGE_DLLCHARACTERISTICS_RESERVED_0002         0x0002
+#define EFI_IMAGE_DLLCHARACTERISTICS_RESERVED_0004         0x0004
+#define EFI_IMAGE_DLLCHARACTERISTICS_RESERVED_0008         0x0008
+#if 0 /* This is not in the PE spec. */
+#define EFI_IMAGE_DLLCHARACTERISTICS_RESERVED_0010         0x0010
+#endif
+#define EFI_IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA       0x0020
+#define EFI_IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE          0x0040
+#define EFI_IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY       0x0080
+#define EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT             0x0100
+#define EFI_IMAGE_DLLCHARACTERISTICS_NO_ISOLATION          0x0200
+#define EFI_IMAGE_DLLCHARACTERISTICS_NO_SEH                0x0400
+#define EFI_IMAGE_DLLCHARACTERISTICS_NO_BIND               0x0800
+#define EFI_IMAGE_DLLCHARACTERISTICS_APPCONTAINER          0x1000
+#define EFI_IMAGE_DLLCHARACTERISTICS_WDM_DRIVER            0x2000
+#define EFI_IMAGE_DLLCHARACTERISTICS_GUARD_CF              0x4000
+#define EFI_IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE 0x8000
 
 ///
 /// @attention
@@ -303,16 +321,31 @@ typedef struct {
 //
 // Section Flags Values
 //
-#define EFI_IMAGE_SCN_TYPE_NO_PAD                  0x00000008  ///< Reserved.
+#define EFI_IMAGE_SCN_RESERVED_00000000            0x00000000
+#define EFI_IMAGE_SCN_RESERVED_00000001            0x00000001
+#define EFI_IMAGE_SCN_RESERVED_00000002            0x00000002
+#define EFI_IMAGE_SCN_RESERVED_00000004            0x00000004
+#define EFI_IMAGE_SCN_TYPE_NO_PAD                  0x00000008
+#define EFI_IMAGE_SCN_RESERVED_00000010            0x00000010
 #define EFI_IMAGE_SCN_CNT_CODE                     0x00000020
 #define EFI_IMAGE_SCN_CNT_INITIALIZED_DATA         0x00000040
 #define EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA       0x00000080
-
-#define EFI_IMAGE_SCN_LNK_OTHER                    0x00000100  ///< Reserved.
-#define EFI_IMAGE_SCN_LNK_INFO                     0x00000200  ///< Section contains comments or some other type of information.
-#define EFI_IMAGE_SCN_LNK_REMOVE                   0x00000800  ///< Section contents will not become part of image.
+#define EFI_IMAGE_SCN_LNK_OTHER                    0x00000100
+#define EFI_IMAGE_SCN_LNK_INFO                     0x00000200
+#define EFI_IMAGE_SCN_RESERVED_00000400            0x00000400
+#define EFI_IMAGE_SCN_LNK_REMOVE                   0x00000800
 #define EFI_IMAGE_SCN_LNK_COMDAT                   0x00001000
-
+#define EFI_IMAGE_SCN_RESERVED_00002000            0x00002000
+#define EFI_IMAGE_SCN_RESERVED_00004000            0x00004000
+#define EFI_IMAGE_SCN_GPREL                        0x00008000
+/*
+ * PE 9.3 says both IMAGE_SCN_MEM_PURGEABLE and IMAGE_SCN_MEM_16BIT are
+ * 0x00020000, but I think it's wrong. --pjones
+ */
+#define EFI_IMAGE_SCN_MEM_PURGEABLE                0x00010000 // "Reserved for future use."
+#define EFI_IMAGE_SCN_MEM_16BIT                    0x00020000 // "Reserved for future use."
+#define EFI_IMAGE_SCN_MEM_LOCKED                   0x00040000 // "Reserved for future use."
+#define EFI_IMAGE_SCN_MEM_PRELOAD                  0x00080000 // "Reserved for future use."
 #define EFI_IMAGE_SCN_ALIGN_1BYTES                 0x00100000
 #define EFI_IMAGE_SCN_ALIGN_2BYTES                 0x00200000
 #define EFI_IMAGE_SCN_ALIGN_4BYTES                 0x00300000
@@ -320,7 +353,14 @@ typedef struct {
 #define EFI_IMAGE_SCN_ALIGN_16BYTES                0x00500000
 #define EFI_IMAGE_SCN_ALIGN_32BYTES                0x00600000
 #define EFI_IMAGE_SCN_ALIGN_64BYTES                0x00700000
-
+#define EFI_IMAGE_SCN_ALIGN_128BYTES               0x00800000
+#define EFI_IMAGE_SCN_ALIGN_256BYTES               0x00900000
+#define EFI_IMAGE_SCN_ALIGN_512BYTES               0x00a00000
+#define EFI_IMAGE_SCN_ALIGN_1024BYTES              0x00b00000
+#define EFI_IMAGE_SCN_ALIGN_2048BYTES              0x00c00000
+#define EFI_IMAGE_SCN_ALIGN_4096BYTES              0x00d00000
+#define EFI_IMAGE_SCN_ALIGN_8192BYTES              0x00e00000
+#define EFI_IMAGE_SCN_LNK_NRELOC_OVFL              0x01000000
 #define EFI_IMAGE_SCN_MEM_DISCARDABLE              0x02000000
 #define EFI_IMAGE_SCN_MEM_NOT_CACHED               0x04000000
 #define EFI_IMAGE_SCN_MEM_NOT_PAGED                0x08000000
