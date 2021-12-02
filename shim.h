@@ -195,6 +195,10 @@
 #include "Cryptlib/Include/OpenSslSupport.h"
 #endif
 
+#define MEM_ATTR_R	4
+#define MEM_ATTR_W	2
+#define MEM_ATTR_X	1
+
 INTERFACE_DECL(_SHIM_LOCK);
 
 typedef
