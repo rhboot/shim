@@ -474,7 +474,7 @@ int main(int argc, char **argv)
 	};
 	int longindex = -1;
 
-	while ((i = getopt_long(argc, argv, "hqsv", options, &longindex)) != -1) {
+	while ((i = getopt_long(argc, argv, "hqv", options, &longindex)) != -1) {
 		switch (i) {
 		case 'h':
 		case '?':
