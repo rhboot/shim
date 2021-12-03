@@ -429,8 +429,11 @@ BOOLEAN secure_mode (void)
 		return FALSE;
 
 	if (variable_is_secureboot() != 1) {
-		if (verbose && !in_protocol && first)
-			console_notify(L"Secure boot not enabled");
+		if (verbose && !in_protocol && first) {
+			CHAR16 *title = L"Secure boot not enabled";
+			CHAR16 *message = L"Press any key to continue";
+			console_countdown(title, message, 5);
+		}
 		first = 0;
 		return FALSE;
 	}
@@ -442,8 +445,11 @@ BOOLEAN secure_mode (void)
 	 * to consider it.
 	 */
 	if (variable_is_setupmode(0) == 1) {
-		if (verbose && !in_protocol && first)
-			console_notify(L"Platform is in setup mode");
+		if (verbose && !in_protocol && first) {
+			CHAR16 *title = L"Platform is in setup mode";
+			CHAR16 *message = L"Press any key to continue";
+			console_countdown(title, message, 5);
+		}
 		first = 0;
 		return FALSE;
 	}
