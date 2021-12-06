@@ -11,7 +11,8 @@ typedef struct {
 UINTN measuredcount = 0;
 VARIABLE_RECORD *measureddata = NULL;
 
-static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
+static BOOLEAN
+tpm_present(efi_tpm_protocol_t *tpm)
 {
 	EFI_STATUS efi_status;
 	TCG_EFI_BOOT_SERVICE_CAPABILITY caps;
@@ -19,18 +20,18 @@ static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
 	EFI_PHYSICAL_ADDRESS eventlog, lastevent;
 
 	caps.Size = (UINT8)sizeof(caps);
-	efi_status = tpm->status_check(tpm, &caps, &flags,
-				       &eventlog, &lastevent);
-	if (EFI_ERROR(efi_status) ||
-	    caps.TPMDeactivatedFlag || !caps.TPMPresentFlag)
+	efi_status =
+		tpm->status_check(tpm, &caps, &flags, &eventlog, &lastevent);
+	if (EFI_ERROR(efi_status) || caps.TPMDeactivatedFlag ||
+	    !caps.TPMPresentFlag)
 		return FALSE;
 
 	return TRUE;
 }
 
-static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
-				EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
-				BOOLEAN *old_caps)
+static EFI_STATUS
+tpm2_get_caps(efi_tpm2_protocol_t *tpm, EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
+              BOOLEAN *old_caps)
 {
 	EFI_STATUS efi_status;
 
@@ -49,8 +50,8 @@ static EFI_STATUS tpm2_get_caps(efi_tpm2_protocol_t *tpm,
 	return EFI_SUCCESS;
 }
 
-static BOOLEAN tpm2_present(EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
-			    BOOLEAN old_caps)
+static BOOLEAN
+tpm2_present(EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps, BOOLEAN old_caps)
 {
 	TREE_BOOT_SERVICE_CAPABILITY *caps_1_0;
 
@@ -66,10 +67,10 @@ static BOOLEAN tpm2_present(EFI_TCG2_BOOT_SERVICE_CAPABILITY *caps,
 	return FALSE;
 }
 
-static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
-				      efi_tpm2_protocol_t **tpm2,
-				      BOOLEAN *old_caps_p,
-				      EFI_TCG2_BOOT_SERVICE_CAPABILITY *capsp)
+static EFI_STATUS
+tpm_locate_protocol(efi_tpm_protocol_t **tpm, efi_tpm2_protocol_t **tpm2,
+                    BOOLEAN *old_caps_p,
+                    EFI_TCG2_BOOT_SERVICE_CAPABILITY *capsp)
 {
 	EFI_STATUS efi_status;
 
@@ -104,15 +105,17 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 	return EFI_NOT_FOUND;
 }
 
-static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
-				    UINT8 pcr, const CHAR8 *log, UINTN logsize,
-				    UINT32 type, CHAR8 *hash)
+static EFI_STATUS
+tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
+                  const CHAR8 *log, UINTN logsize, UINT32 type, CHAR8 *hash)
 {
 	EFI_STATUS efi_status;
 	efi_tpm_protocol_t *tpm;
 	efi_tpm2_protocol_t *tpm2;
 	BOOLEAN old_caps;
 	EFI_TCG2_BOOT_SERVICE_CAPABILITY caps;
+
+	cc_log_event_raw(buf, size, pcr, log, logsize, type, hash);
 
 	efi_status = tpm_locate_protocol(&tpm, &tpm2, &old_caps, &caps);
 	if (EFI_ERROR(efi_status)) {
@@ -127,8 +130,8 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 #endif
 	} else if (tpm2) {
 		EFI_TCG2_EVENT *event;
-		UINTN event_size = sizeof(*event) - sizeof(event->Event) +
-			logsize;
+		UINTN event_size =
+			sizeof(*event) - sizeof(event->Event) + logsize;
 
 		event = AllocatePool(event_size);
 		if (!event) {
@@ -147,13 +150,13 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			   themselves if we pass PE_COFF_IMAGE.  In case that
 			   fails we fall back to measuring without it.
 			*/
-			efi_status = tpm2->hash_log_extend_event(tpm2,
-				PE_COFF_IMAGE, buf, (UINT64) size, event);
+			efi_status = tpm2->hash_log_extend_event(
+				tpm2, PE_COFF_IMAGE, buf, (UINT64)size, event);
 		}
 
-	        if (!hash || EFI_ERROR(efi_status)) {
-			efi_status = tpm2->hash_log_extend_event(tpm2,
-				0, buf, (UINT64) size, event);
+		if (!hash || EFI_ERROR(efi_status)) {
+			efi_status = tpm2->hash_log_extend_event(
+				tpm2, 0, buf, (UINT64)size, event);
 		}
 		FreePool(event);
 		return efi_status;
@@ -185,12 +188,15 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			   hash rather than allowing the firmware to attempt
 			   to calculate it */
 			CopyMem(event->digest, hash, sizeof(event->digest));
-			efi_status = tpm->log_extend_event(tpm, 0, 0,
-				TPM_ALG_SHA, event, &eventnum, &lastevent);
+			efi_status =
+				tpm->log_extend_event(tpm, 0, 0, TPM_ALG_SHA,
+			                              event, &eventnum,
+			                              &lastevent);
 		} else {
-			efi_status = tpm->log_extend_event(tpm, buf,
-				(UINT64)size, TPM_ALG_SHA, event, &eventnum,
-				&lastevent);
+			efi_status =
+				tpm->log_extend_event(tpm, buf, (UINT64)size,
+			                              TPM_ALG_SHA, event,
+			                              &eventnum, &lastevent);
 		}
 		FreePool(event);
 		return efi_status;
@@ -199,16 +205,17 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
-			 const CHAR8 *description)
+EFI_STATUS
+tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
+              const CHAR8 *description)
 {
 	return tpm_log_event_raw(buf, size, pcr, description,
-				 strlen(description) + 1, EV_IPL, NULL);
+	                         strlen(description) + 1, EV_IPL, NULL);
 }
 
-EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
-		      EFI_PHYSICAL_ADDRESS addr, EFI_DEVICE_PATH *path,
-		      UINT8 *sha1hash, UINT8 pcr)
+EFI_STATUS
+tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size, EFI_PHYSICAL_ADDRESS addr,
+           EFI_DEVICE_PATH *path, UINT8 *sha1hash, UINT8 pcr)
 {
 	EFI_IMAGE_LOAD_EVENT *ImageLoad = NULL;
 	EFI_STATUS efi_status;
@@ -233,9 +240,9 @@ EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	}
 
 	efi_status = tpm_log_event_raw(buf, size, pcr, (CHAR8 *)ImageLoad,
-				       sizeof(*ImageLoad) + path_size,
-				       EV_EFI_BOOT_SERVICES_APPLICATION,
-				       (CHAR8 *)sha1hash);
+	                               sizeof(*ImageLoad) + path_size,
+	                               EV_EFI_BOOT_SERVICES_APPLICATION,
+	                               (CHAR8 *)sha1hash);
 	FreePool(ImageLoad);
 
 	return efi_status;
@@ -247,17 +254,20 @@ typedef struct {
 	UINT64 VariableDataLength;
 	CHAR16 UnicodeName[1];
 	INT8 VariableData[1];
-} __attribute__ ((packed)) EFI_VARIABLE_DATA_TREE;
+} __attribute__((packed)) EFI_VARIABLE_DATA_TREE;
 
-static BOOLEAN tpm_data_measured(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
+static BOOLEAN
+tpm_data_measured(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize,
+                  VOID *VarData)
 {
 	UINTN i;
 
-	for (i=0; i<measuredcount; i++) {
-		if ((StrCmp (VarName, measureddata[i].VariableName) == 0) &&
-		    (CompareGuid (&VendorGuid, measureddata[i].VendorGuid) == 0) &&
+	for (i = 0; i < measuredcount; i++) {
+		if ((StrCmp(VarName, measureddata[i].VariableName) == 0) &&
+		    (CompareGuid(&VendorGuid, measureddata[i].VendorGuid) ==
+		     0) &&
 		    (VarSize == measureddata[i].Size) &&
-		    (CompareMem (VarData, measureddata[i].Data, VarSize) == 0)) {
+		    (CompareMem(VarData, measureddata[i].Data, VarSize) == 0)) {
 			return TRUE;
 		}
 	}
@@ -265,19 +275,23 @@ static BOOLEAN tpm_data_measured(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN Var
 	return FALSE;
 }
 
-static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
+static EFI_STATUS
+tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize,
+                            VOID *VarData)
 {
 	if (measureddata == NULL) {
 		measureddata = AllocatePool(sizeof(*measureddata));
 	} else {
-		measureddata = ReallocatePool(measureddata, measuredcount * sizeof(*measureddata),
-					      (measuredcount + 1) * sizeof(*measureddata));
+		measureddata = ReallocatePool(
+			measureddata, measuredcount * sizeof(*measureddata),
+			(measuredcount + 1) * sizeof(*measureddata));
 	}
 
 	if (measureddata == NULL)
 		return EFI_OUT_OF_RESOURCES;
 
-	measureddata[measuredcount].VariableName = AllocatePool(StrSize(VarName));
+	measureddata[measuredcount].VariableName =
+		AllocatePool(StrSize(VarName));
 	measureddata[measuredcount].VendorGuid = AllocatePool(sizeof(EFI_GUID));
 	measureddata[measuredcount].Data = AllocatePool(VarSize);
 
@@ -288,7 +302,8 @@ static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGu
 	}
 
 	StrCpy(measureddata[measuredcount].VariableName, VarName);
-	CopyMem(measureddata[measuredcount].VendorGuid, &VendorGuid, sizeof(EFI_GUID));
+	CopyMem(measureddata[measuredcount].VendorGuid, &VendorGuid,
+	        sizeof(EFI_GUID));
 	CopyMem(measureddata[measuredcount].Data, VarData, VarSize);
 	measureddata[measuredcount].Size = VarSize;
 	measuredcount++;
@@ -296,7 +311,9 @@ static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGu
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize, VOID *VarData)
+EFI_STATUS
+tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarSize,
+                     VOID *VarData)
 {
 	EFI_STATUS efi_status;
 	UINTN VarNameLength;
@@ -307,30 +324,28 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 	if (tpm_data_measured(VarName, VendorGuid, VarSize, VarData))
 		return EFI_SUCCESS;
 
-	VarNameLength = StrLen (VarName);
-	VarLogSize = (UINT32)(sizeof (*VarLog) +
-			      VarNameLength * sizeof (*VarName) +
-			      VarSize -
-			      sizeof (VarLog->UnicodeName) -
-			      sizeof (VarLog->VariableData));
+	VarNameLength = StrLen(VarName);
+	VarLogSize = (UINT32)(
+		sizeof(*VarLog) + VarNameLength * sizeof(*VarName) + VarSize -
+		sizeof(VarLog->UnicodeName) - sizeof(VarLog->VariableData));
 
-	VarLog = (EFI_VARIABLE_DATA_TREE *) AllocateZeroPool (VarLogSize);
+	VarLog = (EFI_VARIABLE_DATA_TREE *)AllocateZeroPool(VarLogSize);
 	if (VarLog == NULL) {
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	CopyMem (&VarLog->VariableName, &VendorGuid,
-		 sizeof(VarLog->VariableName));
-	VarLog->UnicodeNameLength  = VarNameLength;
+	CopyMem(&VarLog->VariableName, &VendorGuid,
+	        sizeof(VarLog->VariableName));
+	VarLog->UnicodeNameLength = VarNameLength;
 	VarLog->VariableDataLength = VarSize;
-	CopyMem (VarLog->UnicodeName, VarName,
-		 VarNameLength * sizeof (*VarName));
-	CopyMem ((CHAR16 *)VarLog->UnicodeName + VarNameLength, VarData,
-		 VarSize);
+	CopyMem(VarLog->UnicodeName, VarName, VarNameLength * sizeof(*VarName));
+	CopyMem((CHAR16 *)VarLog->UnicodeName + VarNameLength, VarData,
+	        VarSize);
 
-	efi_status = tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)VarLog,
-				       VarLogSize, 7, (CHAR8 *)VarLog, VarLogSize,
-				       EV_EFI_VARIABLE_AUTHORITY, NULL);
+	efi_status =
+		tpm_log_event_raw((EFI_PHYSICAL_ADDRESS)(intptr_t)VarLog,
+	                          VarLogSize, 7, (CHAR8 *)VarLog, VarLogSize,
+	                          EV_EFI_VARIABLE_AUTHORITY, NULL);
 
 	FreePool(VarLog);
 
@@ -338,7 +353,7 @@ EFI_STATUS tpm_measure_variable(CHAR16 *VarName, EFI_GUID VendorGuid, UINTN VarS
 		return efi_status;
 
 	return tpm_record_data_measurement(VarName, VendorGuid, VarSize,
-					   VarData);
+	                                   VarData);
 }
 
 EFI_STATUS
@@ -352,4 +367,49 @@ fallback_should_prefer_reset(void)
 	if (EFI_ERROR(efi_status))
 		return EFI_NOT_FOUND;
 	return EFI_SUCCESS;
+}
+
+EFI_STATUS
+cc_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
+                 const CHAR8 *log, UINTN logsize, UINT32 type, CHAR8 *hash)
+{
+	EFI_STATUS efi_status;
+	EFI_CC_EVENT *event;
+	efi_cc_protocol_t *cc;
+	EFI_CC_MR_INDEX mr;
+
+	efi_status = LibLocateProtocol(&EFI_CC_MEASUREMENT_PROTOCOL_GUID,
+	                               (VOID **)&cc);
+	if (EFI_ERROR(efi_status) || cc == NULL)
+		return EFI_SUCCESS;
+
+	efi_status = cc->map_pcr_to_mr_index(cc, pcr, &mr);
+	if (EFI_ERROR(efi_status))
+		return EFI_NOT_FOUND;
+
+	UINTN event_size = sizeof(*event) - sizeof(event->Event) + logsize;
+
+	event = AllocatePool(event_size);
+	if (!event) {
+		perror(L"Unable to allocate event structure\n");
+		return EFI_OUT_OF_RESOURCES;
+	}
+
+	event->Header.HeaderSize = sizeof(EFI_CC_EVENT_HEADER);
+	event->Header.HeaderVersion = EFI_CC_EVENT_HEADER_VERSION;
+	event->Header.MrIndex = mr;
+	event->Header.EventType = type;
+	event->Size = event_size;
+	CopyMem(event->Event, (VOID *)log, logsize);
+	if (hash) {
+		efi_status = cc->hash_log_extend_event(cc, PE_COFF_IMAGE, buf,
+		                                       (UINT64)size, event);
+	}
+
+	if (!hash || EFI_ERROR(efi_status)) {
+		efi_status = cc->hash_log_extend_event(cc, 0, buf, (UINT64)size,
+		                                       event);
+	}
+	FreePool(event);
+	return efi_status;
 }

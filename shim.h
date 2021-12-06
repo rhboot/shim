@@ -179,6 +179,7 @@
 #include "include/simple_file.h"
 #include "include/str.h"
 #include "include/tpm.h"
+#include "include/cc.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
 #include "include/hexdump.h"
