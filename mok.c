@@ -883,7 +883,9 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 	}
 
 	dprint(L"maybe mirroring \"%s\".  original data:\n", v->name);
-	dhexdumpat(v->data, v->data_size, 0);
+	if (v->data && v->data_size) {
+		dhexdumpat(v->data, v->data_size, 0);
+	}
 
 	ret = maybe_mirror_one_mok_variable(v, ret, only_first);
 	dprint(L"returning %r\n", ret);

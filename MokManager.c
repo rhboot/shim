@@ -339,6 +339,7 @@ static void show_x509_info(X509 * X509Cert, UINT8 * hash)
 		for (i = 0; i < n; i++) {
 			CatPrint(&serial_string, L"%02x:", hexbuf[i]);
 		}
+		BN_free(bnser);
 	}
 
 	if (serial_string.str)

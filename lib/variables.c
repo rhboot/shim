@@ -68,6 +68,8 @@ fill_esl_with_one_signature(const uint8_t *data, const uint32_t data_len,
 
 	if (out) {
 		sd = AllocateZeroPool(sig_size);
+		if (!sd)
+			return EFI_OUT_OF_RESOURCES;
 		if (owner)
 			CopyMem(sd, (void *)owner, sizeof(EFI_GUID));
 		CopyMem(sd->SignatureData, (void *)data, data_len);

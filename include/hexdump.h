@@ -71,7 +71,7 @@ prepare_text(const void *data, size_t size, char *buf, unsigned int position)
 		else
 			buf[offset++] = '.';
 	}
-	buf[offset++] = size > 0 ? '|' : 'X';
+	buf[offset++] = '|';
 	buf[offset] = '\0';
 }
 
@@ -88,6 +88,11 @@ vhexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
 
 	if (verbose == 0)
 		return;
+
+	if (!data || !size) {
+		dprint(L"hexdump of a NULL pointer!\n");
+		return;
+	}
 
 	while (offset < size) {
 		char hexbuf[49];
