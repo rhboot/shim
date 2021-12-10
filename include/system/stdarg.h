@@ -24,7 +24,7 @@ typedef __builtin_va_list __builtin_sysv_va_list;
 #endif
 
 #if defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
-	defined(__i486__) || defined(__i686__)
+	defined(__i486__) || defined(__i686__) || defined(__COVERITY__)
 
 typedef __builtin_va_list ms_va_list;
 typedef __builtin_va_list __builtin_ms_va_list;
