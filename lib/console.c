@@ -522,7 +522,6 @@ console_mode_handle(VOID)
 
 	efi_status = BS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
 	if (EFI_ERROR(efi_status)) {
-		console_error(L"Locate graphic output protocol fail", efi_status);
 		return;
 	}
 
