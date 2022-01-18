@@ -1149,7 +1149,7 @@ handle_image (void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 	if (found_entry_point > 1) {
-		perror(L"%d sections contain entry point\n");
+		perror(L"%d sections contain entry point\n", found_entry_point);
 		return EFI_UNSUPPORTED;
 	}
 
