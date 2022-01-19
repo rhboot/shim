@@ -953,7 +953,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		npages = ALIGN_VALUE(config_sz, PAGE_SIZE) >> EFI_PAGE_SHIFT;
 		config_table = NULL;
 		efi_status = BS->AllocatePages(
-			AllocateAnyPages, EfiBootServicesData, npages,
+			AllocateAnyPages, EfiRuntimeServicesData, npages,
 			(EFI_PHYSICAL_ADDRESS *)&config_table);
 		if (EFI_ERROR(efi_status) || !config_table) {
 			console_print(L"Allocating %lu pages for mok config table failed: %r\n",
