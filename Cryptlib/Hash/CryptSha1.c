@@ -92,7 +92,7 @@ Sha1Duplicate (
     return FALSE;
   }
 
-  CopyMem (NewSha1Context, Sha1Context, sizeof (SHA_CTX));
+  CopyMem (NewSha1Context, (void *)Sha1Context, sizeof (SHA_CTX));
 
   return TRUE;
 }

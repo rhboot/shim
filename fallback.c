@@ -158,7 +158,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	}
 
 	b = AllocateZeroPool(len + 2);
-	if (!buffer) {
+	if (!b) {
 		console_print(L"Could not allocate memory\n");
 		fh2->Close(fh2);
 		return EFI_OUT_OF_RESOURCES;
@@ -166,7 +166,7 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 
 	efi_status = fh->Read(fh, &len, b);
 	if (EFI_ERROR(efi_status)) {
-		FreePool(buffer);
+		FreePool(b);
 		fh2->Close(fh2);
 		console_print(L"Could not read file: %r\n", efi_status);
 		return efi_status;
@@ -230,8 +230,11 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				StrLen(label)*2 + 2 + DevicePathSize(hddp) +
 				StrLen(arguments) * 2;
 
-			CHAR8 *data = AllocateZeroPool(size + 2);
-			CHAR8 *cursor = data;
+			CHAR8 *data, *cursor;
+			cursor = data = AllocateZeroPool(size + 2);
+			if (!data)
+				return EFI_OUT_OF_RESOURCES;
+
 			*(UINT32 *)cursor = LOAD_OPTION_ACTIVE;
 			cursor += sizeof (UINT32);
 			*(UINT16 *)cursor = DevicePathSize(hddp);
@@ -248,11 +251,11 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 
 			if (!first_new_option) {
 				first_new_option = DuplicateDevicePath(fulldp);
-				first_new_option_args = arguments;
+				first_new_option_args = StrDuplicate(arguments);
 				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 			}
 
-			efi_status = gRT->SetVariable(varname, &GV_GUID,
+			efi_status = RT->SetVariable(varname, &GV_GUID,
 						EFI_VARIABLE_NON_VOLATILE |
 						EFI_VARIABLE_BOOTSERVICE_ACCESS |
 						EFI_VARIABLE_RUNTIME_ACCESS,
@@ -415,9 +418,12 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	cursor += DevicePathSize(dp);
 	StrCpy((CHAR16 *)cursor, arguments);
 
-	CHAR16 varname[256];
 	EFI_STATUS efi_status;
 	EFI_GUID vendor_guid = NullGuid;
+	UINTN buffer_size = 256 * sizeof(CHAR16);
+	CHAR16 *varname = AllocateZeroPool(buffer_size);
+	if (!varname)
+		return EFI_OUT_OF_RESOURCES;
 
 	UINTN max_candidate_size = calc_masked_boot_option_size(size);
 	CHAR8 *candidate = AllocateZeroPool(max_candidate_size);
@@ -426,13 +432,34 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	varname[0] = 0;
 	while (1) {
-		UINTN varname_size = sizeof(varname);
-		efi_status = gRT->GetNextVariableName(&varname_size, varname,
-						      &vendor_guid);
-		if (EFI_ERROR(efi_status))
+		UINTN varname_size = buffer_size;
+		efi_status = RT->GetNextVariableName(&varname_size, varname,
+						     &vendor_guid);
+		if (EFI_ERROR(efi_status)) {
+			if (efi_status == EFI_BUFFER_TOO_SMALL) {
+				VerbosePrint(L"Buffer too small for next variable name, re-allocating it to be %d bytes and retrying\n",
+					     varname_size);
+				varname = ReallocatePool(varname,
+							 buffer_size,
+							 varname_size);
+				if (!varname)
+					return EFI_OUT_OF_RESOURCES;
+				buffer_size = varname_size;
+				continue;
+			}
+
+			if (efi_status == EFI_DEVICE_ERROR)
+				VerbosePrint(L"The next variable name could not be retrieved due to a hardware error\n");
+
+			if (efi_status == EFI_INVALID_PARAMETER)
+				VerbosePrint(L"Invalid parameter to GetNextVariableName: varname_size=%d, varname=%s\n",
+					     varname_size, varname);
+
+			/* EFI_NOT_FOUND means we listed all variables */
+			VerbosePrint(L"Checked all boot entries\n");
 			break;
+		}
 
 		if (StrLen(varname) != 8 || StrnCmp(varname, L"Boot", 4) ||
 		    !isxdigit(varname[4]) || !isxdigit(varname[5]) ||
@@ -440,8 +467,8 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 			continue;
 
 		UINTN candidate_size = max_candidate_size;
-		efi_status = gRT->GetVariable(varname, &GV_GUID, NULL,
-					      &candidate_size, candidate);
+		efi_status = RT->GetVariable(varname, &GV_GUID, NULL,
+					     &candidate_size, candidate);
 		if (EFI_ERROR(efi_status))
 			continue;
 
@@ -458,7 +485,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		/* at this point, we have duplicate data. */
 		if (!first_new_option) {
 			first_new_option = DuplicateDevicePath(fulldp);
-			first_new_option_args = arguments;
+			first_new_option_args = StrDuplicate(arguments);
 			first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 		}
 
@@ -469,7 +496,8 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 	}
 	FreePool(candidate);
 	FreePool(data);
-	return EFI_NOT_FOUND;
+	FreePool(varname);
+	return efi_status;
 }
 
 EFI_STATUS
@@ -513,15 +541,15 @@ update_boot_order(void)
 	for (j = 0 ; j < size / sizeof (CHAR16); j++)
 		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
 	VerbosePrintUnprefixed(L"\n");
-	efi_status = gRT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
+	efi_status = RT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &GV_GUID);
 
-	efi_status = gRT->SetVariable(L"BootOrder", &GV_GUID,
-				      EFI_VARIABLE_NON_VOLATILE |
-				      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-				      EFI_VARIABLE_RUNTIME_ACCESS,
-				      size, newbootorder);
+	efi_status = RT->SetVariable(L"BootOrder", &GV_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				     EFI_VARIABLE_RUNTIME_ACCESS,
+				     size, newbootorder);
 	FreePool(newbootorder);
 	return efi_status;
 }
@@ -544,7 +572,7 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 	full_device_path = FileDevicePath(this_image->DeviceHandle, fullpath);
 	if (!full_device_path) {
 		efi_status = EFI_OUT_OF_RESOURCES;
-		goto err;
+		goto done;
 	}
 	dps = DevicePathToStr(full_device_path);
 	VerbosePrint(L"file DP: %s\n", dps);
@@ -558,7 +586,7 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 			dp = full_device_path;
 		} else {
 			efi_status = EFI_OUT_OF_RESOURCES;
-			goto err;
+			goto done;
 		}
 	}
 
@@ -587,21 +615,53 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 	if (EFI_ERROR(efi_status)) {
 		add_boot_option(dp, full_device_path, fullpath, label,
 				arguments);
-	} else if (option != 0) {
-		CHAR16 *newbootorder;
-		newbootorder = AllocateZeroPool(sizeof (CHAR16) * nbootorder);
-		if (!newbootorder)
-			return EFI_OUT_OF_RESOURCES;
+		goto done;
+	}
 
-		newbootorder[0] = bootorder[option];
-		CopyMem(newbootorder + 1, bootorder, sizeof (CHAR16) * option);
-		CopyMem(newbootorder + option + 1, bootorder + option + 1,
-			sizeof (CHAR16) * (nbootorder - option - 1));
+	UINT16 bootnum;
+	CHAR16 *newbootorder;
+	/* Search for the option in the current bootorder */
+	for (bootnum = 0; bootnum < nbootorder; bootnum++)
+		if (bootorder[bootnum] == option)
+			break;
+	if (bootnum == nbootorder) {
+		/* Option not found, prepend option and copy the rest */
+		newbootorder = AllocateZeroPool(sizeof(CHAR16)
+						* (nbootorder + 1));
+		if (!newbootorder) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+		newbootorder[0] = option;
+		CopyMem(newbootorder + 1, bootorder,
+			sizeof(CHAR16) * nbootorder);
+		FreePool(bootorder);
+		bootorder = newbootorder;
+		nbootorder += 1;
+	} else {
+		/* Option found, put first and slice the rest */
+		newbootorder = AllocateZeroPool(
+			sizeof(CHAR16) * nbootorder);
+		if (!newbootorder) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto done;
+		}
+		newbootorder[0] = option;
+		CopyMem(newbootorder + 1, bootorder,
+			sizeof(CHAR16) * bootnum);
+		CopyMem(newbootorder + 1 + bootnum,
+			bootorder + bootnum + 1,
+			sizeof(CHAR16) * (nbootorder - bootnum - 1));
 		FreePool(bootorder);
 		bootorder = newbootorder;
 	}
+	VerbosePrint(L"New nbootorder: %d\nBootOrder: ",
+		      nbootorder);
+	for (int i = 0 ; i < nbootorder ; i++)
+		VerbosePrintUnprefixed(L"%04x ", bootorder[i]);
+	VerbosePrintUnprefixed(L"\n");
 
-err:
+done:
 	if (full_device_path)
 		FreePool(full_device_path);
 	if (dp && dp != full_device_path)
@@ -832,8 +892,8 @@ find_boot_options(EFI_HANDLE device)
 	EFI_STATUS efi_status;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
 
-	efi_status = gBS->HandleProtocol(device, &FileSystemProtocol,
-					 (void **) &fio);
+	efi_status = BS->HandleProtocol(device, &FileSystemProtocol,
+					(void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Couldn't find file system: %r\n", efi_status);
 		return efi_status;
@@ -960,8 +1020,8 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		return EFI_SUCCESS;
 	}
 
-	efi_status = gBS->LoadImage(0, parent_image_handle, first_new_option,
-				    NULL, 0, &image_handle);
+	efi_status = BS->LoadImage(0, parent_image_handle, first_new_option,
+				   NULL, 0, &image_handle);
 	if (EFI_ERROR(efi_status)) {
 		CHAR16 *dps = DevicePathToStr(first_new_option);
 		UINTN s = DevicePathSize(first_new_option);
@@ -981,14 +1041,14 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	}
 
 	EFI_LOADED_IMAGE *image;
-	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
-					 (void *) &image);
+	efi_status = BS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					(void *) &image);
 	if (!EFI_ERROR(efi_status)) {
 		image->LoadOptions = first_new_option_args;
 		image->LoadOptionsSize = first_new_option_size;
 	}
 
-	efi_status = gBS->StartImage(image_handle, NULL, NULL);
+	efi_status = BS->StartImage(image_handle, NULL, NULL);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"StartImage failed: %r\n", efi_status);
 		msleep(500000000);
@@ -1003,24 +1063,25 @@ get_fallback_no_reboot(void)
 	UINT32 no_reboot;
 	UINTN size = sizeof(UINT32);
 
-	efi_status = gRT->GetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
-				      NULL, &size, &no_reboot);
+	efi_status = RT->GetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
+				     NULL, &size, &no_reboot);
 	if (!EFI_ERROR(efi_status)) {
 		return no_reboot;
 	}
 	return 0;
 }
 
+#ifndef FALLBACK_NONINTERACTIVE
 static EFI_STATUS
 set_fallback_no_reboot(void)
 {
 	EFI_STATUS efi_status;
 	UINT32 no_reboot = 1;
-	efi_status = gRT->SetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
-				      EFI_VARIABLE_NON_VOLATILE
-				      | EFI_VARIABLE_BOOTSERVICE_ACCESS
-				      | EFI_VARIABLE_RUNTIME_ACCESS,
-				      sizeof(UINT32), &no_reboot);
+	efi_status = RT->SetVariable(NO_REBOOT, &SHIM_LOCK_GUID,
+				     EFI_VARIABLE_NON_VOLATILE |
+				     EFI_VARIABLE_BOOTSERVICE_ACCESS |
+				     EFI_VARIABLE_RUNTIME_ACCESS,
+				     sizeof(UINT32), &no_reboot);
 	return efi_status;
 }
 
@@ -1054,6 +1115,7 @@ get_user_choice(void)
 
 	return choice;
 }
+#endif
 
 extern EFI_STATUS
 efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab);
@@ -1097,8 +1159,8 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	 */
 	debug_hook();
 
-	efi_status = gBS->HandleProtocol(image, &LoadedImageProtocol,
-					 (void *) &this_image);
+	efi_status = BS->HandleProtocol(image, &LoadedImageProtocol,
+					(void *) &this_image);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Error: could not find loaded image: %r\n",
 			      efi_status);
@@ -1126,6 +1188,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 			try_start_first_option(image);
 		}
 
+#ifndef FALLBACK_NONINTERACTIVE
 		int timeout = draw_countdown();
 		if (timeout == 0)
 			goto reset;
@@ -1141,6 +1204,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		VerbosePrint(L"tpm present, starting the first image\n");
 		try_start_first_option(image);
 reset:
+#endif
 		VerbosePrint(L"tpm present, resetting system\n");
 	}
 
@@ -1157,7 +1221,7 @@ reset:
 		msleep(fallback_verbose_wait);
 	}
 
-	gRT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+	RT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
 
 	return EFI_SUCCESS;
 }

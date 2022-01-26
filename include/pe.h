@@ -25,7 +25,7 @@ handle_image (void *data, unsigned int datasize,
 	      UINTN *alloc_pages);
 
 EFI_STATUS
-generate_hash (char *data, unsigned int datasize_in,
+generate_hash (char *data, unsigned int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       UINT8 *sha256hash, UINT8 *sha1hash);
 

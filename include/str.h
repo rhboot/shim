@@ -72,8 +72,6 @@ strntoken(char *str, size_t max, const char *delims, char **token, char *state)
 		return 0;
 
 	tokend = &str[max-1];
-	if (!str || max == 0 || !delims || !token)
-		return 0;
 
 	/*
 	 * the very special case of "" with max=1, where we have no prior

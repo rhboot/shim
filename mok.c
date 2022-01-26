@@ -16,8 +16,8 @@ static BOOLEAN check_var(CHAR16 *varname)
 	UINT32 MokVar;
 	UINT32 attributes;
 
-	efi_status = gRT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
-				      &size, (void *)&MokVar);
+	efi_status = RT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
+				     &size, (void *)&MokVar);
 	if (!EFI_ERROR(efi_status) || efi_status == EFI_BUFFER_TOO_SMALL)
 		return TRUE;
 
@@ -27,7 +27,7 @@ static BOOLEAN check_var(CHAR16 *varname)
 #define SetVariable(name, guid, attrs, varsz, var)                                  \
 	({                                                                          \
 		EFI_STATUS efi_status_;                                             \
-		efi_status_ = gRT->SetVariable(name, guid, attrs, varsz, var);      \
+		efi_status_ = RT->SetVariable(name, guid, attrs, varsz, var);       \
 		dprint_(L"%a:%d:%a() SetVariable(\"%s\", ... varsz=0x%llx) = %r\n", \
 		        __FILE__, __LINE__ - 5, __func__, name, varsz,              \
 		        efi_status_);                                               \
@@ -46,7 +46,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 	    check_var(L"MokPW") || check_var(L"MokAuth") ||
 	    check_var(L"MokDel") || check_var(L"MokDB") ||
 	    check_var(L"MokXNew") || check_var(L"MokXDel") ||
-	    check_var(L"MokXAuth")) {
+	    check_var(L"MokXAuth") || check_var(L"MokListTrustedNew")) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (EFI_ERROR(efi_status)) {
@@ -57,85 +57,6 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 
 	return EFI_SUCCESS;
 }
-
-typedef enum {
-	VENDOR_ADDEND_DB,
-	VENDOR_ADDEND_X509,
-	VENDOR_ADDEND_NONE,
-} vendor_addend_category_t;
-
-struct mok_state_variable;
-typedef vendor_addend_category_t (vendor_addend_categorizer_t)(struct mok_state_variable *);
-
-/*
- * MoK variables that need to have their storage validated.
- *
- * The order here is important, since this is where we measure for the
- * tpm as well.
- */
-struct mok_state_variable {
-	CHAR16 *name;	/* UCS-2 BS|NV variable name */
-	char *name8;	/* UTF-8 BS|NV variable name */
-	CHAR16 *rtname;	/* UCS-2 RT variable name */
-	char *rtname8;	/* UTF-8 RT variable name */
-	EFI_GUID *guid;	/* variable GUID */
-
-	/*
-	 * these are used during processing, they shouldn't be filled out
-	 * in the static table below.
-	 */
-	UINT8 *data;
-	UINTN data_size;
-
-	/*
-	 * addend are added to the input variable, as part of the runtime
-	 * variable, so that they're visible to the kernel.  These are
-	 * where we put vendor_cert / vendor_db / vendor_dbx
-	 *
-	 * These are indirect pointers just to make initialization saner...
-	 */
-	vendor_addend_categorizer_t *categorize_addend; /* determines format */
-	/*
-	 * we call categorize_addend() and it determines what kind of thing
-	 * this is.  That is, if this shim was built with VENDOR_CERT, for
-	 * the DB entry it'll return VENDOR_ADDEND_X509; if you used
-	 * VENDOR_DB instead, it'll return VENDOR_ADDEND_DB.  If you used
-	 * neither, it'll do VENDOR_ADDEND_NONE.
-	 *
-	 * The existing categorizers are for db and dbx; they differ
-	 * because we don't currently support a CERT for dbx.
-	 */
-	UINT8 **addend;
-	UINT32 *addend_size;
-
-	/*
-	 * build_cert is our build-time cert.  Like addend, this is added
-	 * to the input variable, as part of the runtime variable, so that
-	 * they're visible to the kernel.  This is the ephemeral cert used
-	 * for signing MokManager.efi and fallback.efi.
-	 *
-	 * These are indirect pointers just to make initialization saner...
-	 */
-	UINT8 **build_cert;
-	UINT32 *build_cert_size;
-
-	UINT32 yes_attr;	/* var attrs that must be set */
-	UINT32 no_attr;		/* var attrs that must not be set */
-	UINT32 flags;		/* flags on what and how to mirror */
-	/*
-	 * MOK_MIRROR_KEYDB	    mirror this as a key database
-	 * MOK_MIRROR_DELETE_FIRST  delete any existing variable first
-	 * MOK_VARIABLE_MEASURE	    extend PCR 7 and log the hash change
-	 * MOK_VARIABLE_LOG	    measure into whatever .pcr says and log
-	 */
-	UINTN pcr;		/* PCR to measure and hash to */
-
-	/*
-	 * if this is a state value, a pointer to our internal state to be
-	 * mirrored.
-	 */
-	UINT8 *state;
-};
 
 static vendor_addend_category_t
 categorize_authorized(struct mok_state_variable *v)
@@ -164,7 +85,7 @@ categorize_deauthorized(struct mok_state_variable *v)
 #define MOK_VARIABLE_MEASURE	0x04
 #define MOK_VARIABLE_LOG	0x08
 
-struct mok_state_variable mok_state_variables[] = {
+struct mok_state_variable mok_state_variable_data[] = {
 	{.name = L"MokList",
 	 .name8 = "MokList",
 	 .rtname = L"MokListRT",
@@ -245,8 +166,24 @@ struct mok_state_variable mok_state_variables[] = {
 		  MOK_VARIABLE_MEASURE,
 	 .pcr = 7,
 	},
+	{.name = L"MokListTrusted",
+	 .name8 = "MokListTrusted",
+	 .rtname = L"MokListTrustedRT",
+	 .rtname8 = "MokListTrustedRT",
+	 .guid = &SHIM_LOCK_GUID,
+	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+		     EFI_VARIABLE_NON_VOLATILE,
+	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+	 .flags = MOK_MIRROR_DELETE_FIRST |
+		  MOK_VARIABLE_MEASURE |
+		  MOK_VARIABLE_LOG,
+	 .pcr = 14,
+	 .state = &trust_mok_list,
+	},
 	{ NULL, }
 };
+size_t n_mok_state_variables = sizeof(mok_state_variable_data) / sizeof(mok_state_variable_data[0]);
+struct mok_state_variable *mok_state_variables = &mok_state_variable_data[0];
 
 #define should_mirror_addend(v) (((v)->categorize_addend) && ((v)->categorize_addend(v) != VENDOR_ADDEND_NONE))
 
@@ -261,6 +198,9 @@ static const uint8_t null_sha256[32] = { 0, };
 
 typedef UINTN SIZE_T;
 
+#define EFI_MAJOR_VERSION(tablep) ((UINT16)((((tablep)->Hdr.Revision) >> 16) & 0xfffful))
+#define EFI_MINOR_VERSION(tablep) ((UINT16)(((tablep)->Hdr.Revision) & 0xfffful))
+
 static EFI_STATUS
 get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 {
@@ -270,11 +210,21 @@ get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 	uint64_t max_var_sz = 0;
 
 	*max_var_szp = 0;
-	efi_status = gRT->QueryVariableInfo(attrs, &max_storage_sz,
-					    &remaining_sz, &max_var_sz);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get variable storage info: %r\n", efi_status);
-		return efi_status;
+	if (EFI_MAJOR_VERSION(RT) < 2) {
+		dprint(L"EFI %d.%d; no RT->QueryVariableInfo().  Using 1024!\n",
+		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT));
+		max_var_sz = remaining_sz = max_storage_sz = 1024;
+		efi_status = EFI_SUCCESS;
+	} else {
+		dprint(L"calling RT->QueryVariableInfo() at 0x%lx\n",
+		       RT->QueryVariableInfo);
+		efi_status = RT->QueryVariableInfo(attrs, &max_storage_sz,
+						   &remaining_sz, &max_var_sz);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Could not get variable storage info: %r\n",
+			       efi_status);
+			return efi_status;
+		}
 	}
 
 	/*
@@ -351,13 +301,18 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 	SIZE_T max_var_sz;
 
 	efi_status = get_max_var_sz(attrs, &max_var_sz);
-	if (EFI_ERROR(efi_status)) {
+	if (EFI_ERROR(efi_status) && efi_status != EFI_UNSUPPORTED) {
 		LogError(L"Could not get maximum variable size: %r",
 			 efi_status);
 		return efi_status;
 	}
 
-	if (FullDataSize <= max_var_sz) {
+	/* Some UEFI environment such as u-boot doesn't implement
+	 * QueryVariableInfo() and we will only get EFI_UNSUPPORTED when
+	 * querying the available space. In this case, we just mirror
+	 * the variable directly. */
+	if (FullDataSize <= max_var_sz || efi_status == EFI_UNSUPPORTED) {
+		efi_status = EFI_SUCCESS;
 		if (only_first)
 			efi_status = SetVariable(name, guid, attrs,
 						 FullDataSize, FullData);
@@ -850,7 +805,7 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v,
 	BOOLEAN present = FALSE;
 
 	if (v->rtname) {
-		if (!only_first && (v->flags & MOK_MIRROR_DELETE_FIRST)) {
+		if (only_first && (v->flags & MOK_MIRROR_DELETE_FIRST)) {
 			dprint(L"deleting \"%s\"\n", v->rtname);
 			efi_status = LibDeleteVariable(v->rtname, v->guid);
 			dprint(L"LibDeleteVariable(\"%s\",...) => %r\n", v->rtname, efi_status);
@@ -876,50 +831,43 @@ maybe_mirror_one_mok_variable(struct mok_state_variable *v,
 	return ret;
 }
 
-struct mok_variable_config_entry {
-	CHAR8 name[256];
-	UINT64 data_size;
-	UINT8 data[];
-};
-
 EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 				BOOLEAN only_first)
 {
 	EFI_STATUS ret = EFI_SUCCESS;
 	EFI_STATUS efi_status;
 
-	user_insecure_mode = 0;
-	ignore_db = 0;
-
 	UINT32 attrs = 0;
 	BOOLEAN delete = FALSE;
 
 	dprint(L"importing mok state for \"%s\"\n", v->name);
 
-	efi_status = get_variable_attr(v->name,
-				       &v->data, &v->data_size,
-				       *v->guid, &attrs);
-	if (efi_status == EFI_NOT_FOUND) {
-		v->data = NULL;
-		v->data_size = 0;
-	} else if (EFI_ERROR(efi_status)) {
-		perror(L"Could not verify %s: %r\n", v->name,
-		       efi_status);
-		delete = TRUE;
-	} else {
-		if (!(attrs & v->yes_attr)) {
-			perror(L"Variable %s is missing attributes:\n",
-			       v->name);
-			perror(L"  0x%08x should have 0x%08x set.\n",
-			       attrs, v->yes_attr);
+	if (!v->data && !v->data_size) {
+		efi_status = get_variable_attr(v->name,
+					       &v->data, &v->data_size,
+					       *v->guid, &attrs);
+		if (efi_status == EFI_NOT_FOUND) {
+			v->data = NULL;
+			v->data_size = 0;
+		} else if (EFI_ERROR(efi_status)) {
+			perror(L"Could not verify %s: %r\n", v->name,
+			       efi_status);
 			delete = TRUE;
-		}
-		if (attrs & v->no_attr) {
-			perror(L"Variable %s has incorrect attribute:\n",
-			       v->name);
-			perror(L"  0x%08x should not have 0x%08x set.\n",
-			       attrs, v->no_attr);
-			delete = TRUE;
+		} else {
+			if (!(attrs & v->yes_attr)) {
+				perror(L"Variable %s is missing attributes:\n",
+				       v->name);
+				perror(L"  0x%08x should have 0x%08x set.\n",
+				       attrs, v->yes_attr);
+				delete = TRUE;
+			}
+			if (attrs & v->no_attr) {
+				perror(L"Variable %s has incorrect attribute:\n",
+				       v->name);
+				perror(L"  0x%08x should not have 0x%08x set.\n",
+				       attrs, v->no_attr);
+				delete = TRUE;
+			}
 		}
 	}
 	if (delete == TRUE) {
@@ -935,7 +883,9 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 	}
 
 	dprint(L"maybe mirroring \"%s\".  original data:\n", v->name);
-	dhexdumpat(v->data, v->data_size, 0);
+	if (v->data && v->data_size) {
+		dhexdumpat(v->data, v->data_size, 0);
+	}
 
 	ret = maybe_mirror_one_mok_variable(v, ret, only_first);
 	dprint(L"returning %r\n", ret);
@@ -963,6 +913,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 	user_insecure_mode = 0;
 	ignore_db = 0;
+	trust_mok_list = 0;
 
 	UINT64 config_sz = 0;
 	UINT8 *config_table = NULL;
@@ -1001,10 +952,9 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		config_sz += sizeof(config_template);
 		npages = ALIGN_VALUE(config_sz, PAGE_SIZE) >> EFI_PAGE_SHIFT;
 		config_table = NULL;
-		efi_status = gBS->AllocatePages(AllocateAnyPages,
-						EfiRuntimeServicesData,
-						npages,
-						(EFI_PHYSICAL_ADDRESS *)&config_table);
+		efi_status = BS->AllocatePages(
+			AllocateAnyPages, EfiBootServicesData, npages,
+			(EFI_PHYSICAL_ADDRESS *)&config_table);
 		if (EFI_ERROR(efi_status) || !config_table) {
 			console_print(L"Allocating %lu pages for mok config table failed: %r\n",
 				      npages, efi_status);
@@ -1024,17 +974,19 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 
 		config_template.data_size = v->data_size;
 
-		CopyMem(p, &config_template, sizeof(config_template));
-		p += sizeof(config_template);
-		CopyMem(p, v->data, v->data_size);
-		p += v->data_size;
+		if (v->data && v->data_size) {
+			CopyMem(p, &config_template, sizeof(config_template));
+			p += sizeof(config_template);
+			CopyMem(p, v->data, v->data_size);
+			p += v->data_size;
+		}
 	}
 	if (p) {
 		ZeroMem(&config_template, sizeof(config_template));
 		CopyMem(p, &config_template, sizeof(config_template));
 
-		efi_status = gBS->InstallConfigurationTable(&MOK_VARIABLE_STORE,
-							    config_table);
+		efi_status = BS->InstallConfigurationTable(&MOK_VARIABLE_STORE,
+		                                           config_table);
 		if (EFI_ERROR(efi_status)) {
 			console_print(L"Couldn't install MoK configuration table\n");
 		}

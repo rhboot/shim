@@ -1067,7 +1067,7 @@ test_strcat(void)
 	 * I don't know.
 	 */
 #pragma GCC diagnostic push
-#pragma GCC diagnostic warning "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Warray-bounds"
 	assert_zero_return(strncmp(s1, s0, sizeof(s)-1), 0, -1, "\n");
 	assert_negative_return(memcmp(s1, s0, sizeof(s)), 0, -1, "\n");
 #pragma GCC diagnostic pop

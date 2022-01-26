@@ -6,7 +6,7 @@ In the PC ecosystem, [UEFI Secure Boot](https://docs.microsoft.com/en-us/windows
 is typically configured to trust 2 authorities for signing UEFI boot code, the
 Microsoft UEFI Certificate Authority (CA) and Windows CA. When malicious or
 security compromised code is detected, 2 revocation mechanisms are provided by
-compatible UEFI implementations, signing certificate or image hash. The UEFI
+compatible UEFI implementations: signing certificate or image hash. The UEFI
 Specification does not provides any well tested additional revocation
 mechanisms.
 
@@ -140,13 +140,21 @@ value associated with the data currently stored in that variable.
 
 #### Generation-Based Revocation Scenarios
 
-Products (**not** vendors, a vendor can have multiple products or even pass a
+**Products** (**not** vendors, a vendor can have multiple products or even pass a
 product from one vendor to another over time) are assigned a name. Product
 names can specify a specific version or refer to the entire product family. For
 example mydistro and mydistro,12.
 
-Components that are used as a link in the UEFI Secure Boot chain of trust are
+**Components** that are used as a link in the UEFI Secure Boot chain of trust are
 assigned names. Examples of components are shim, GRUB, kernel, hypervisors, etc.
+
+Below is an example of a product and component, both in the same `sbat.csv` file. `sbat`
+defines the version of the format of the revocation metadata itself.
+`grub.acme` is an example of a product name.
+```
+sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub.acme,1,Acme Corporation,grub,1.96-8191,https://acme.arpa/packages/grub
+```
 
 We could conceivably support sub-components, but it's hard to conceive of a
 scenario that would trigger a UEFI variable update that wouldn't justify a
@@ -154,7 +162,7 @@ hypervisor or kernel re-release to enforce that sub-component level from there.
 Something like a "level 1.5 hypervisor" that can exist between different kernel
 generations can be considered its own component.
 
-Each component is assigned a minimum global generation number. Vendors signing
+Each component is assigned a **minimum global generation number**. Vendors signing
 component binary artifacts with a specific global generation number are
 required to include fixes for any public or pre-disclosed issue required for
 that generation. Additionally, in the event that a bypass only manifests in a
@@ -162,7 +170,9 @@ specific product's component, vendors may ask for a product-specific generation
 number to be published for one of their product's components. This avoids
 triggering an industry wide re-publishing of otherwise safe components.
 
-A product-specific minimum generation number only applies to the instance of
+In the example above, 1 is sbat's minimum global generation number.
+
+A **product-specific minimum generation number** only applies to the instance of
 that component that is signed with that product name. Another product's
 instance of the same component may be installed on the same system and would
 not be subject to the other product's product-specific minimum generation
@@ -173,6 +183,8 @@ generation number, but is labeled with that number. Rather than having the
 entire industry that uses that component re-release, just that product's
 minimum generation number would be incremented and that product's component
 re-released along with a UEFI variable update specifying that requirement.
+
+In the example above, 1 is grub.acme's product-specific minimum generation number.
 
 The global and product-specific generation number name spaces are not tied to
 each other. The global number is managed externally, and the vast majority of
@@ -232,8 +244,8 @@ number, this product-specific number can be dropped from the UEFI revocation
 variable.
 
 If this same Vendor C has a similar event after the global number is
-incremented, they would again set their product-specific or version-specific
-number to 1. If they have a second event on with the same component, they would
+incremented, they would again set their product-specific or **version-specific
+number** to 1. If they have a second event on the same component, they would
 set their product-specific or version-specific number to 2.
 
 In such an event, a vendor would set the product-specific or version-specific
@@ -242,21 +254,27 @@ branches or in just a subset of them. The goal is generally to limit end
 customer impact with as few re-releases as possible, while not creating an
 unnecessarily large UEFI revocation variable payload.
 
-|                                                                                      | prior to<br>disclosure | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>second update | after next global<br>disclosure |
+|                                                                                      | prior to<br>disclosure\* | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>second update | after next global<br>disclosure |
 |--------------------------------------------------------------------------------------|------------------------|---------------------|----------------------------------|----------------------------------|---------------------------------|
 | GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                      | 4                   | 4                                | 4                                | 5                               |
-| Vendor C's product-specific<br>generation number in artifact's<br>.sbat section      | 1                      | 1                   | 5                                | 6                                | 1                               |
+| Vendor C's product-specific<br>generation number in artifact's<br>.sbat section      | 1                      | 1                   | 2                                | 3                                | 1                               |
 | GRUB global<br>generation number in<br>UEFI SBAT revocation variable                 | 3                      | 4                   | 4                                | 4                                | 5                               |
-| Vendor C's product-specific<br>generation number in<br>UEFI SBAT revocation variable | not set                | not set             | 5                                | 6                                | not set                         |
+| Vendor C's product-specific<br>generation number in<br>UEFI SBAT revocation variable | not set                | not set             | 2                                | 3                                | not set                         |
+
+\* A disclosure is the event/date where a CVE and fixes for it are made public.
 
 The product-specific generation number does not reset and continues to
-monotonically increase over the course of these events.	Continuity of more
+monotonically increase over the course of these non-global events. Continuity of more
 specific generation numbers must be maintained in this way in order to satisfy
 checks against older revocation data.
 
 The variable payload will be stored publicly in the shim source base and
 identify the global generation associated with a product or version-specific
 one. The payload is also built into shim to additionally limit exposure.
+
+At this time of writing, all version-numbers are set to 1. Presumably at some point,
+updated numbers will be published on the respective websites of the associated vendors
+and components.
 
 #### Retiring Signed Releases
 
@@ -269,7 +287,7 @@ that the global generation numbers will eventually move forward and exclude
 those products from booting on a UEFI Secure Boot enabled system. However a
 product made up of GRUB and a closed source kernel is just as conceivable. In
 that case the kernel version may never move forward once the product reaches
-its end of support. Therefor it is recommended that the product-specific
+its end of support. Therefore it is recommended that the product-specific
 generation number be incremented past the latest one shown in any binary for
 that product, effectively disabling that product on UEFI Secure Boot enabled
 systems.
@@ -309,8 +327,8 @@ compromise.
 
 The initial SBAT implementation will add SBAT metadata to Shim and GRUB and
 enforce SBAT on all components labeled with it. Until a component (e.g. the
-Linux kernel gains SBAT metadata) it can not be revoked via SBAT, but only by
-revoking the keys signing that component. These keys will should live in
+Linux kernel) gains SBAT metadata it can not be revoked via SBAT, but only by
+revoking the keys signing that component. These keys will live in
 separate, product-specific signed PE files that contain **only** the
 certificate and SBAT metadata for the key files. These key files can then be
 revoked via SBAT in order to invalidate and replace a specific key. While
@@ -346,7 +364,7 @@ Adding a .sbat section containing the SBAT metadata structure to PE images.
 | vendor_url | url to look stuff up, contact, whatever.
 
 The format of this .sbat section is comma separated values, or more
-specifically UTF-8 encoded strings.
+specifically ASCII encoded strings.
 
 ## Example sbat sections
 

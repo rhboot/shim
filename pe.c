@@ -298,25 +298,21 @@ get_section_vma_by_name (char *name, size_t namesz,
  */
 
 EFI_STATUS
-generate_hash(char *data, unsigned int datasize_in,
+generate_hash(char *data, unsigned int datasize,
 	      PE_COFF_LOADER_IMAGE_CONTEXT *context, UINT8 *sha256hash,
 	      UINT8 *sha1hash)
 {
 	unsigned int sha256ctxsize, sha1ctxsize;
-	unsigned int size = datasize_in;
 	void *sha256ctx = NULL, *sha1ctx = NULL;
 	char *hashbase;
 	unsigned int hashsize;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
 	unsigned int index, pos;
-	unsigned int datasize;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	EFI_IMAGE_SECTION_HEADER *SectionHeader = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	EFI_IMAGE_DOS_HEADER *DosHdr = (void *)data;
 	unsigned int PEHdr_offset = 0;
-
-	size = datasize = datasize_in;
 
 	if (datasize <= sizeof (*DosHdr) ||
 	    DosHdr->e_magic != EFI_IMAGE_DOS_SIGNATURE) {
@@ -346,7 +342,7 @@ generate_hash(char *data, unsigned int datasize_in,
 	hashbase = data;
 	hashsize = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum -
 		hashbase;
-	check_size(data, datasize_in, hashbase, hashsize);
+	check_size(data, datasize, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -359,7 +355,7 @@ generate_hash(char *data, unsigned int datasize_in,
 	hashbase = (char *)&context->PEHdr->Pe32.OptionalHeader.CheckSum +
 		sizeof (int);
 	hashsize = (char *)context->SecDir - hashbase;
-	check_size(data, datasize_in, hashbase, hashsize);
+	check_size(data, datasize, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -372,12 +368,12 @@ generate_hash(char *data, unsigned int datasize_in,
 	EFI_IMAGE_DATA_DIRECTORY *dd = context->SecDir + 1;
 	hashbase = (char *)dd;
 	hashsize = context->SizeOfHeaders - (unsigned long)((char *)dd - data);
-	if (hashsize > datasize_in) {
+	if (hashsize > datasize) {
 		perror(L"Data Directory size %d is invalid\n", hashsize);
 		efi_status = EFI_INVALID_PARAMETER;
 		goto done;
 	}
-	check_size(data, datasize_in, hashbase, hashsize);
+	check_size(data, datasize, hashbase, hashsize);
 
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -491,7 +487,8 @@ generate_hash(char *data, unsigned int datasize_in,
 			continue;
 		}
 
-		hashbase  = ImageAddress(data, size, Section->PointerToRawData);
+		hashbase  = ImageAddress(data, datasize,
+					 Section->PointerToRawData);
 		if (!hashbase) {
 			perror(L"Malformed section header\n");
 			efi_status = EFI_INVALID_PARAMETER;
@@ -506,7 +503,7 @@ generate_hash(char *data, unsigned int datasize_in,
 			goto done;
 		}
 		hashsize  = (unsigned int) Section->SizeOfRawData;
-		check_size(data, datasize_in, hashbase, hashsize);
+		check_size(data, datasize, hashbase, hashsize);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -532,7 +529,7 @@ generate_hash(char *data, unsigned int datasize_in,
 			efi_status = EFI_INVALID_PARAMETER;
 			goto done;
 		}
-		check_size(data, datasize_in, hashbase, hashsize);
+		check_size(data, datasize, hashbase, hashsize);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -552,7 +549,7 @@ generate_hash(char *data, unsigned int datasize_in,
 		hashbase = data + SumOfBytesHashed;
 		hashsize = datasize - SumOfBytesHashed;
 
-		check_size(data, datasize_in, hashbase, hashsize);
+		check_size(data, datasize, hashbase, hashsize);
 
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
@@ -949,8 +946,8 @@ handle_image (void *data, unsigned int datasize,
 				 PAGE_SIZE);
 	*alloc_pages = alloc_size / PAGE_SIZE;
 
-	efi_status = gBS->AllocatePages(AllocateAnyPages, EfiLoaderCode,
-					*alloc_pages, alloc_address);
+	efi_status = BS->AllocatePages(AllocateAnyPages, EfiLoaderCode,
+				       *alloc_pages, alloc_address);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to allocate image buffer\n");
 		return EFI_OUT_OF_RESOURCES;
@@ -963,7 +960,7 @@ handle_image (void *data, unsigned int datasize,
 	*entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!*entry_point) {
 		perror(L"Entry point is invalid\n");
-		gBS->FreePages(*alloc_address, *alloc_pages);
+		BS->FreePages(*alloc_address, *alloc_pages);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -1004,7 +1001,7 @@ handle_image (void *data, unsigned int datasize,
 
 		if (end < base) {
 			perror(L"Section %d has negative size\n", i);
-			gBS->FreePages(*alloc_address, *alloc_pages);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -1144,10 +1141,8 @@ handle_image (void *data, unsigned int datasize,
 	li->ImageSize = context.ImageSize;
 
 	/* Pass the load options to the second stage loader */
-	if ( load_options ) {
-		li->LoadOptions = load_options;
-		li->LoadOptionsSize = load_options_size;
-	}
+	li->LoadOptions = load_options;
+	li->LoadOptionsSize = load_options_size;
 
 	if (!found_entry_point) {
 		perror(L"Entry point is not within sections\n");

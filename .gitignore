@@ -14,7 +14,10 @@ Make.local
 *.efi.debug
 *.efi.signed
 *.esl
-*.gdbinit
+*.gdb*
+*.gcda
+*.gcno
+*.gcov
 *.hash
 *.key
 *.key
@@ -27,8 +30,11 @@ Make.local
 *.sw?
 *.tar.*
 /build*/
+/.cache/
 /certdb/
+/compile_commands.json
 /cov-int/
+/post-process-pe
 /random.bin
 /sbat.*.csv
 /scan-results/
@@ -36,5 +42,6 @@ Make.local
 shim_cert.h
 /test-*
 !/test-*.c
+!/test-data/
 /test-random.h
 version.c

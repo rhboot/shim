@@ -124,9 +124,15 @@ typedef struct {
 /*
  * Attributes of Authenticated Variable
  */
+#ifndef EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS
 #define EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS              0x00000010
+#endif
+#ifndef EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS
 #define EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS   0x00000020
+#endif
+#ifndef EFI_VARIABLE_APPEND_WRITE
 #define EFI_VARIABLE_APPEND_WRITE                            0x00000040
+#endif
 
 /*
  * AuthInfo is a WIN_CERTIFICATE using the wCertificateType

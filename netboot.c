@@ -36,8 +36,8 @@ BOOLEAN findNetboot(EFI_HANDLE device)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = gBS->HandleProtocol(device, &PxeBaseCodeProtocol,
-					 (VOID **) &pxe);
+	efi_status = BS->HandleProtocol(device, &PxeBaseCodeProtocol,
+					(VOID **) &pxe);
 	if (EFI_ERROR(efi_status)) {
 		pxe = NULL;
 		return FALSE;

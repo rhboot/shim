@@ -262,11 +262,11 @@ extern FILE  *stdout;
 //
 // Macros that directly map functions to BaseLib, BaseMemoryLib, and DebugLib functions
 //
-#define memcpy(dest,source,count)         ( {CopyMem(dest,source,(UINTN)(count)); dest; })
+#define memcpy(dest,source,count)         ( {CopyMem(dest,(void *)source,(UINTN)(count)); dest; })
 #define memset(dest,ch,count)             SetMem(dest,(UINTN)(count),(UINT8)(ch))
 #define memchr(buf,ch,count)              ScanMem8((CHAR8 *)buf,(UINTN)(count),ch)
 #define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
-#define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
+#define memmove(dest,source,count)        CopyMem(dest,(void *)source,(UINTN)(count))
 #define localtime(timer)                  NULL
 #define assert(expression)
 #define atoi(nptr)                        AsciiStrDecimalToUintn((const CHAR8 *)nptr)

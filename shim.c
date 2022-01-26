@@ -40,10 +40,6 @@ static EFI_HANDLE global_image_handle;
 static EFI_LOADED_IMAGE *shim_li;
 static EFI_LOADED_IMAGE shim_li_bak;
 
-static CHAR16 *second_stage;
-void *load_options;
-UINT32 load_options_size;
-
 list_t sbat_var;
 
 /*
@@ -56,27 +52,7 @@ extern struct {
 	UINT32 vendor_deauthorized_offset;
 } cert_table;
 
-UINT32 vendor_authorized_size = 0;
-UINT8 *vendor_authorized = NULL;
-
-UINT32 vendor_deauthorized_size = 0;
-UINT8 *vendor_deauthorized = NULL;
-
-#if defined(ENABLE_SHIM_CERT)
-UINT32 build_cert_size;
-UINT8 *build_cert;
-#endif /* defined(ENABLE_SHIM_CERT) */
-
-/*
- * indicator of how an image has been verified
- */
-verification_method_t verification_method;
-int loader_is_participating;
-
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
-
-UINT8 user_insecure_mode;
-UINT8 ignore_db;
 
 typedef enum {
 	DATA_FOUND,
@@ -453,8 +429,11 @@ BOOLEAN secure_mode (void)
 		return FALSE;
 
 	if (variable_is_secureboot() != 1) {
-		if (verbose && !in_protocol && first)
-			console_notify(L"Secure boot not enabled");
+		if (verbose && !in_protocol && first) {
+			CHAR16 *title = L"Secure boot not enabled";
+			CHAR16 *message = L"Press any key to continue";
+			console_countdown(title, message, 5);
+		}
 		first = 0;
 		return FALSE;
 	}
@@ -466,8 +445,11 @@ BOOLEAN secure_mode (void)
 	 * to consider it.
 	 */
 	if (variable_is_setupmode(0) == 1) {
-		if (verbose && !in_protocol && first)
-			console_notify(L"Platform is in setup mode");
+		if (verbose && !in_protocol && first) {
+			CHAR16 *title = L"Platform is in setup mode";
+			CHAR16 *message = L"Press any key to continue";
+			console_countdown(title, message, 5);
+		}
 		first = 0;
 		return FALSE;
 	}
@@ -714,24 +696,11 @@ verify_buffer (char *data, int datasize,
 }
 
 static int
-should_use_fallback(EFI_HANDLE image_handle)
+is_removable_media_path(EFI_LOADED_IMAGE *li)
 {
-	EFI_LOADED_IMAGE *li;
 	unsigned int pathlen = 0;
 	CHAR16 *bootpath = NULL;
-	EFI_FILE_IO_INTERFACE *fio = NULL;
-	EFI_FILE *vh = NULL;
-	EFI_FILE *fh = NULL;
-	EFI_STATUS efi_status;
 	int ret = 0;
-
-	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-					 (void **)&li);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get image for bootx64.efi: %r\n",
-		       efi_status);
-		return 0;
-	}
 
 	bootpath = DevicePathToStr(li->FilePath);
 
@@ -750,8 +719,38 @@ should_use_fallback(EFI_HANDLE image_handle)
 	if (pathlen < 5 || StrCaseCmp(bootpath + pathlen - 4, L".EFI"))
 		goto error;
 
-	efi_status = gBS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
-					 (void **) &fio);
+	ret = 1;
+
+error:
+	if (bootpath)
+		FreePool(bootpath);
+
+	return ret;
+}
+
+static int
+should_use_fallback(EFI_HANDLE image_handle)
+{
+	EFI_LOADED_IMAGE *li;
+	EFI_FILE_IO_INTERFACE *fio = NULL;
+	EFI_FILE *vh = NULL;
+	EFI_FILE *fh = NULL;
+	EFI_STATUS efi_status;
+	int ret = 0;
+
+	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+	                                (void **)&li);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Could not get image for boot" EFI_ARCH L".efi: %r\n",
+		       efi_status);
+		return 0;
+	}
+
+	if (!is_removable_media_path(li))
+		goto error;
+
+	efi_status = BS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
+					(void **) &fio);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Could not get fio for li->DeviceHandle: %r\n",
 		       efi_status);
@@ -782,105 +781,9 @@ error:
 		fh->Close(fh);
 	if (vh)
 		vh->Close(vh);
-	if (bootpath)
-		FreePool(bootpath);
 
 	return ret;
 }
-
-/*
- * Generate the path of an executable given shim's path and the name
- * of the executable
- */
-static EFI_STATUS generate_path_from_image_path(EFI_LOADED_IMAGE *li,
-						CHAR16 *ImagePath,
-						CHAR16 **PathName)
-{
-	EFI_DEVICE_PATH *devpath;
-	unsigned int i;
-	int j, last = -1;
-	unsigned int pathlen = 0;
-	EFI_STATUS efi_status = EFI_SUCCESS;
-	CHAR16 *bootpath;
-
-	/*
-	 * Suuuuper lazy technique here, but check and see if this is a full
-	 * path to something on the ESP.  Backwards compatibility demands
-	 * that we don't just use \\, because we (not particularly brightly)
-	 * used to require that the relative file path started with that.
-	 *
-	 * If it is a full path, don't try to merge it with the directory
-	 * from our Loaded Image handle.
-	 */
-	if (StrSize(ImagePath) > 5 && StrnCmp(ImagePath, L"\\EFI\\", 5) == 0) {
-		*PathName = StrDuplicate(ImagePath);
-		if (!*PathName) {
-			perror(L"Failed to allocate path buffer\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-		return EFI_SUCCESS;
-	}
-
-	devpath = li->FilePath;
-
-	bootpath = DevicePathToStr(devpath);
-
-	pathlen = StrLen(bootpath);
-
-	/*
-	 * DevicePathToStr() concatenates two nodes with '/'.
-	 * Convert '/' to '\\'.
-	 */
-	for (i = 0; i < pathlen; i++) {
-		if (bootpath[i] == '/')
-			bootpath[i] = '\\';
-	}
-
-	for (i=pathlen; i>0; i--) {
-		if (bootpath[i] == '\\' && bootpath[i-1] == '\\')
-			bootpath[i] = '/';
-		else if (last == -1 && bootpath[i] == '\\')
-			last = i;
-	}
-
-	if (last == -1 && bootpath[0] == '\\')
-		last = 0;
-	bootpath[last+1] = '\0';
-
-	if (last > 0) {
-		for (i = 0, j = 0; bootpath[i] != '\0'; i++) {
-			if (bootpath[i] != '/') {
-				bootpath[j] = bootpath[i];
-				j++;
-			}
-		}
-		bootpath[j] = '\0';
-	}
-
-	for (i = 0, last = 0; i < StrLen(ImagePath); i++)
-		if (ImagePath[i] == '\\')
-			last = i + 1;
-
-	ImagePath = ImagePath + last;
-	*PathName = AllocatePool(StrSize(bootpath) + StrSize(ImagePath));
-
-	if (!*PathName) {
-		perror(L"Failed to allocate path buffer\n");
-		efi_status = EFI_OUT_OF_RESOURCES;
-		goto error;
-	}
-
-	*PathName[0] = '\0';
-	if (StrnCaseCmp(bootpath, ImagePath, StrLen(bootpath)))
-		StrCat(*PathName, bootpath);
-	StrCat(*PathName, ImagePath);
-
-error:
-	FreePool(bootpath);
-
-	return efi_status;
-}
-
 /*
  * Open the second stage bootloader and read it into a buffer
  */
@@ -900,8 +803,8 @@ static EFI_STATUS load_image (EFI_LOADED_IMAGE *li, void **data,
 	/*
 	 * Open the device
 	 */
-	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
-					 (void **) &drive);
+	efi_status = BS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					(void **) &drive);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to find fs: %r\n", efi_status);
 		goto error;
@@ -1101,8 +1004,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * We need to refer to the loaded image protocol on the running
 	 * binary in order to find our path
 	 */
-	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-					 (void **)&shim_li);
+	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					(void **)&shim_li);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to init protocol\n");
 		return efi_status;
@@ -1233,151 +1136,25 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 					 use_fb ? FALLBACK : second_stage);
 	}
 
+	// If the filename is invalid, or the file does not exist,
+	// just fallback to the default loader.
+	if (!use_fb && (efi_status == EFI_INVALID_PARAMETER ||
+	                efi_status == EFI_NOT_FOUND)) {
+		console_print(
+			L"start_image() returned %r, falling back to default loader\n",
+			efi_status);
+		msleep(2000000);
+		load_options = NULL;
+		load_options_size = 0;
+		efi_status = start_image(image_handle, DEFAULT_LOADER);
+	}
+
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"start_image() returned %r\n", efi_status);
 		msleep(2000000);
 	}
 
 	return efi_status;
-}
-
-static inline EFI_STATUS
-get_load_option_optional_data(UINT8 *data, UINTN data_size,
-			      UINT8 **od, UINTN *ods)
-{
-	/*
-	 * If it's not at least Attributes + FilePathListLength +
-	 * Description=L"" + 0x7fff0400 (EndEntrireDevicePath), it can't
-	 * be valid.
-	 */
-	if (data_size < (sizeof(UINT32) + sizeof(UINT16) + 2 + 4))
-		return EFI_INVALID_PARAMETER;
-
-	UINT8 *cur = data + sizeof(UINT32);
-	UINT16 fplistlen = *(UINT16 *)cur;
-	/*
-	 * If there's not enough space for the file path list and the
-	 * smallest possible description (L""), it's not valid.
-	 */
-	if (fplistlen > data_size - (sizeof(UINT32) + 2 + 4))
-		return EFI_INVALID_PARAMETER;
-
-	cur += sizeof(UINT16);
-	UINTN limit = data_size - (cur - data) - fplistlen;
-	UINTN i;
-	for (i = 0; i < limit ; i++) {
-		/* If the description isn't valid UCS2-LE, it's not valid. */
-		if (i % 2 != 0) {
-			if (cur[i] != 0)
-				return EFI_INVALID_PARAMETER;
-		} else if (cur[i] == 0) {
-			/* we've found the end */
-			i++;
-			if (i >= limit || cur[i] != 0)
-				return EFI_INVALID_PARAMETER;
-			break;
-		}
-	}
-	i++;
-	if (i > limit)
-		return EFI_INVALID_PARAMETER;
-
-	/*
-	 * If i is limit, we know the rest of this is the FilePathList and
-	 * there's no optional data.  So just bail now.
-	 */
-	if (i == limit) {
-		*od = NULL;
-		*ods = 0;
-		return EFI_SUCCESS;
-	}
-
-	cur += i;
-	limit -= i;
-	limit += fplistlen;
-	i = 0;
-	while (limit - i >= 4) {
-		struct {
-			UINT8 type;
-			UINT8 subtype;
-			UINT16 len;
-		} dp = {
-			.type = cur[i],
-			.subtype = cur[i+1],
-			/*
-			 * it's a little endian UINT16, but we're not
-			 * guaranteed alignment is sane, so we can't just
-			 * typecast it directly.
-			 */
-			.len = (cur[i+3] << 8) | cur[i+2],
-		};
-
-		/*
-		 * We haven't found an EndEntire, so this has to be a valid
-		 * EFI_DEVICE_PATH in order for the data to be valid.  That
-		 * means it has to fit, and it can't be smaller than 4 bytes.
-		 */
-		if (dp.len < 4 || dp.len > limit)
-			return EFI_INVALID_PARAMETER;
-
-		/*
-		 * see if this is an EndEntire node...
-		 */
-		if (dp.type == 0x7f && dp.subtype == 0xff) {
-			/*
-			 * if we've found the EndEntire node, it must be 4
-			 * bytes
-			 */
-			if (dp.len != 4)
-				return EFI_INVALID_PARAMETER;
-
-			i += dp.len;
-			break;
-		}
-
-		/*
-		 * It's just some random DP node; skip it.
-		 */
-		i += dp.len;
-	}
-	if (i != fplistlen)
-		return EFI_INVALID_PARAMETER;
-
-	/*
-	 * if there's any space left, it's "optional data"
-	 */
-	*od = cur + i;
-	*ods = limit - i;
-	return EFI_SUCCESS;
-}
-
-static int is_our_path(EFI_LOADED_IMAGE *li, CHAR16 *path)
-{
-	CHAR16 *dppath = NULL;
-	CHAR16 *PathName = NULL;
-	EFI_STATUS efi_status;
-	int ret = 1;
-
-	dppath = DevicePathToStr(li->FilePath);
-	if (!dppath)
-		return 0;
-
-	efi_status = generate_path_from_image_path(li, path, &PathName);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Unable to generate path %s: %r\n", path,
-		       efi_status);
-		goto done;
-	}
-
-	dprint(L"dppath: %s\n", dppath);
-	dprint(L"path:   %s\n", path);
-	if (StrnCaseCmp(dppath, PathName, StrLen(dppath)))
-		ret = 0;
-
-done:
-	FreePool(dppath);
-	FreePool(PathName);
-	return ret;
 }
 
 /*
@@ -1387,218 +1164,33 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
-	CHAR16 *start = NULL;
-	UINTN remaining_size = 0;
-	CHAR16 *loader_str = NULL;
-	UINTN loader_len = 0;
-	unsigned int i;
-	UINTN second_stage_len;
 
-	second_stage_len = (StrLen(DEFAULT_LOADER) + 1) * sizeof(CHAR16);
-	second_stage = AllocatePool(second_stage_len);
-	if (!second_stage) {
-		perror(L"Could not allocate %lu bytes\n", second_stage_len);
-		return EFI_OUT_OF_RESOURCES;
-	}
-	StrCpy(second_stage, DEFAULT_LOADER);
+	second_stage = DEFAULT_LOADER;
 	load_options = NULL;
 	load_options_size = 0;
 
-	efi_status = gBS->HandleProtocol(image_handle, &LoadedImageProtocol,
-					 (void **) &li);
+	efi_status = BS->HandleProtocol(image_handle, &LoadedImageProtocol,
+					(void **) &li);
 	if (EFI_ERROR(efi_status)) {
 		perror (L"Failed to get load options: %r\n", efi_status);
 		return efi_status;
 	}
 
-	/* Sanity check since we make several assumptions about the length */
-	if (li->LoadOptionsSize % 2 != 0)
-		return EFI_INVALID_PARAMETER;
-
-	/* So, load options are a giant pain in the ass.  If we're invoked
-	 * from the EFI shell, we get something like this:
-
-00000000  5c 00 45 00 36 00 49 00  5c 00 66 00 65 00 64 00  |\.E.F.I.\.f.e.d.|
-00000010  6f 00 72 00 61 00 5c 00  73 00 68 00 69 00 6d 00  |o.r.a.\.s.h.i.m.|
-00000020  78 00 36 00 34 00 2e 00  64 00 66 00 69 00 20 00  |x.6.4...e.f.i. .|
-00000030  5c 00 45 00 46 00 49 00  5c 00 66 00 65 00 64 00  |\.E.F.I.\.f.e.d.|
-00000040  6f 00 72 00 61 00 5c 00  66 00 77 00 75 00 70 00  |o.r.a.\.f.w.u.p.|
-00000050  64 00 61 00 74 00 65 00  2e 00 65 00 66 00 20 00  |d.a.t.e.e.f.i. .|
-00000060  00 00 66 00 73 00 30 00  3a 00 5c 00 00 00        |..f.s.0.:.\...|
-
-	*
-	* which is just some paths rammed together separated by a UCS-2 NUL.
-	* But if we're invoked from BDS, we get something more like:
-	*
-
-00000000  01 00 00 00 62 00 4c 00  69 00 6e 00 75 00 78 00  |....b.L.i.n.u.x.|
-00000010  20 00 46 00 69 00 72 00  6d 00 77 00 61 00 72 00  | .F.i.r.m.w.a.r.|
-00000020  65 00 20 00 55 00 70 00  64 00 61 00 74 00 65 00  |e. .U.p.d.a.t.e.|
-00000030  72 00 00 00 40 01 2a 00  01 00 00 00 00 08 00 00  |r.....*.........|
-00000040  00 00 00 00 00 40 06 00  00 00 00 00 1a 9e 55 bf  |.....@........U.|
-00000050  04 57 f2 4f b4 4a ed 26  4a 40 6a 94 02 02 04 04  |.W.O.:.&J@j.....|
-00000060  34 00 5c 00 45 00 46 00  49 00 5c 00 66 00 65 00  |4.\.E.F.I.f.e.d.|
-00000070  64 00 6f 00 72 00 61 00  5c 00 73 00 68 00 69 00  |o.r.a.\.s.h.i.m.|
-00000080  6d 00 78 00 36 00 34 00  2e 00 65 00 66 00 69 00  |x.6.4...e.f.i...|
-00000090  00 00 7f ff 40 00 20 00  5c 00 66 00 77 00 75 00  |...... .\.f.w.u.|
-000000a0  70 00 78 00 36 00 34 00  2e 00 65 00 66 00 69 00  |p.x.6.4...e.f.i.|
-000000b0  00 00                                             |..|
-
-	*
-	* which is clearly an EFI_LOAD_OPTION filled in halfway reasonably.
-	* In short, the UEFI shell is still a useless piece of junk.
-	*
-	* But then on some versions of BDS, we get:
-
-00000000  5c 00 66 00 77 00 75 00  70 00 78 00 36 00 34 00  |\.f.w.u.p.x.6.4.|
-00000010  2e 00 65 00 66 00 69 00  00 00                    |..e.f.i...|
-0000001a
-
-	* which as you can see is one perfectly normal UCS2-EL string
-	* containing the load option from the Boot#### variable.
-	*
-	* We also sometimes find a guid or partial guid at the end, because
-	* BDS will add that, but we ignore that here.
-	*/
-
+#if defined(DISABLE_REMOVABLE_LOAD_OPTIONS)
 	/*
-	 * Maybe there just aren't any options...
+	 * boot services build very strange load options, and we might misparse them,
+	 * causing boot failures on removable media.
 	 */
-	if (li->LoadOptionsSize == 0)
-		return EFI_SUCCESS;
-
-	/*
-	 * In either case, we've got to have at least a UCS2 NUL...
-	 */
-	if (li->LoadOptionsSize < 2)
-		return EFI_BAD_BUFFER_SIZE;
-
-	/*
-	 * Some awesome versions of BDS will add entries for Linux.  On top
-	 * of that, some versions of BDS will "tag" any Boot#### entries they
-	 * create by putting a GUID at the very end of the optional data in
-	 * the EFI_LOAD_OPTIONS, thus screwing things up for everybody who
-	 * tries to actually *use* the optional data for anything.  Why they
-	 * did this instead of adding a flag to the spec to /say/ it's
-	 * created by BDS, I do not know.  For shame.
-	 *
-	 * Anyway, just nerf that out from the start.  It's always just
-	 * garbage at the end.
-	 */
-	if (li->LoadOptionsSize > 16) {
-		if (CompareGuid((EFI_GUID *)(li->LoadOptions
-					     + (li->LoadOptionsSize - 16)),
-				&BDS_GUID) == 0)
-			li->LoadOptionsSize -= 16;
-	}
-
-	/*
-	 * Apparently sometimes we get L"\0\0"?  Which isn't useful at all.
-	 */
-	if (is_all_nuls(li->LoadOptions, li->LoadOptionsSize))
-		return EFI_SUCCESS;
-
-	/*
-	 * Check and see if this is just a list of strings.  If it's an
-	 * EFI_LOAD_OPTION, it'll be 0, since we know EndEntire device path
-	 * won't pass muster as UCS2-LE.
-	 *
-	 * If there are 3 strings, we're launched from the shell most likely,
-	 * But we actually only care about the second one.
-	 */
-	UINTN strings = count_ucs2_strings(li->LoadOptions,
-					   li->LoadOptionsSize);
-
-	/*
-	 * In some cases we get strings == 1 because BDS is using L' ' as the
-	 * delimeter:
-	 * 0000:74 00 65 00 73 00 74 00 2E 00 65 00 66 00 69 00 t.e.s.t...e.f.i.
-	 * 0016:20 00 6F 00 6E 00 65 00 20 00 74 00 77 00 6F 00 ..o.n.e...t.w.o.
-	 * 0032:20 00 74 00 68 00 72 00 65 00 65 00 00 00       ..t.h.r.e.e...
-	 *
-	 * If so replace it with NULs since the code already handles that
-	 * case.
-	 */
-	if (strings == 1) {
-		UINT16 *cur = start = li->LoadOptions;
-
-		/* replace L' ' with L'\0' if we find any */
-		for (i = 0; i < li->LoadOptionsSize / 2; i++) {
-			if (cur[i] == L' ')
-				cur[i] = L'\0';
-		}
-
-		/* redo the string count */
-		strings = count_ucs2_strings(li->LoadOptions,
-					     li->LoadOptionsSize);
-	}
-
-	/*
-	 * If it's not string data, try it as an EFI_LOAD_OPTION.
-	 */
-	if (strings == 0) {
-		/*
-		 * We at least didn't find /enough/ strings.  See if it works
-		 * as an EFI_LOAD_OPTION.
-		 */
-		efi_status = get_load_option_optional_data(li->LoadOptions,
-							   li->LoadOptionsSize,
-							   (UINT8 **)&start,
-							   &loader_len);
-		if (EFI_ERROR(efi_status))
-			return EFI_SUCCESS;
-
-		remaining_size = 0;
-	} else if (strings >= 2) {
-		/*
-		 * UEFI shell copies the whole line of the command into
-		 * LoadOptions.  We ignore the string before the first L'\0',
-		 * i.e. the name of this program.
-		 */
-		UINT16 *cur = li->LoadOptions;
-		for (i = 1; i < li->LoadOptionsSize / 2; i++) {
-			if (cur[i - 1] == L'\0') {
-				start = &cur[i];
-				remaining_size = li->LoadOptionsSize - (i * 2);
-				break;
-			}
-		}
-
-		remaining_size -= i * 2 + 2;
-	} else if (strings == 1 && is_our_path(li, start)) {
-		/*
-		 * And then I found a version of BDS that gives us our own path
-		 * in LoadOptions:
-
-77162C58                           5c 00 45 00 46 00 49 00          |\.E.F.I.|
-77162C60  5c 00 42 00 4f 00 4f 00  54 00 5c 00 42 00 4f 00  |\.B.O.O.T.\.B.O.|
-77162C70  4f 00 54 00 58 00 36 00  34 00 2e 00 45 00 46 00  |O.T.X.6.4...E.F.|
-77162C80  49 00 00 00                                       |I...|
-
-		* which is just cruel... So yeah, just don't use it.
-		*/
+	if (is_removable_media_path(li)) {
+		dprint("Invoked from removable media path, ignoring boot options");
 		return EFI_SUCCESS;
 	}
+#endif
 
-	/*
-	 * Set up the name of the alternative loader and the LoadOptions for
-	 * the loader
-	 */
-	if (loader_len > 0) {
-		/* we might not always have a NULL at the end */
-		loader_str = AllocatePool(loader_len + 2);
-		if (!loader_str) {
-			perror(L"Failed to allocate loader string\n");
-			return EFI_OUT_OF_RESOURCES;
-		}
-
-		for (i = 0; i < loader_len / 2; i++)
-			loader_str[i] = start[i];
-		loader_str[loader_len/2] = L'\0';
-
-		second_stage = loader_str;
-		load_options = remaining_size ? start + (loader_len/2) : NULL;
-		load_options_size = remaining_size;
+	efi_status = parse_load_options(li);
+	if (EFI_ERROR(efi_status)) {
+		perror (L"Failed to get load options: %r\n", efi_status);
+		return efi_status;
 	}
 
 	return EFI_SUCCESS;
@@ -1677,10 +1269,10 @@ install_shim_protocols(void)
 	/*
 	 * Install the protocol
 	 */
-	efi_status = gBS->InstallProtocolInterface(&shim_lock_handle,
-						   &SHIM_LOCK_GUID,
-						   EFI_NATIVE_INTERFACE,
-						   &shim_lock_interface);
+	efi_status = BS->InstallProtocolInterface(&shim_lock_handle,
+						  &SHIM_LOCK_GUID,
+						  EFI_NATIVE_INTERFACE,
+						  &shim_lock_interface);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Could not install security protocol",
 			      efi_status);
@@ -1706,8 +1298,8 @@ uninstall_shim_protocols(void)
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
-	gBS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
-					&shim_lock_interface);
+	BS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
+				       &shim_lock_interface);
 
 	if (!secure_mode())
 		return;
@@ -1777,12 +1369,6 @@ shim_fini(void)
 
 	unhook_exit();
 
-	/*
-	 * Free the space allocated for the alternative 2nd stage loader
-	 */
-	if (load_options_size > 0 && second_stage)
-		FreePool(second_stage);
-
 	console_fini();
 }
 
@@ -1837,7 +1423,7 @@ debug_hook(void)
 		if (x > 12000)
 			break;
 #endif
-		pause();
+		wait_for_debug();
 	}
 	x = 1;
 }
@@ -1867,7 +1453,7 @@ devel_egress(devel_egress_action action UNUSED)
 	console_print(L"\ndoing %a\n", action);
 
 	if (action == COLD_RESET)
-		gRT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION, 0, NULL);
+		RT->ResetSystem(EfiResetCold, EFI_SECURITY_VIOLATION, 0, NULL);
 #endif
 }
 
@@ -1973,10 +1559,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * boot-services-only state variables are what we think they are.
 	 */
 	efi_status = import_mok_state(image_handle);
-	if (!secure_mode() && efi_status == EFI_INVALID_PARAMETER) {
+	if (!secure_mode() &&
+	    (efi_status == EFI_INVALID_PARAMETER ||
+	     efi_status == EFI_OUT_OF_RESOURCES)) {
 		/*
 		 * Make copy failures fatal only if secure_mode is enabled, or
-		 * the error was anything else than EFI_INVALID_PARAMETER.
+		 * the error was anything else than EFI_INVALID_PARAMETER or
+		 * EFI_OUT_OF_RESOURCES.
 		 * There are non-secureboot firmware implementations that don't
 		 * reserve enough EFI variable memory to fit the variable.
 		 */
@@ -1991,8 +1580,8 @@ die:
 		devel_egress(COLD_RESET);
 #else
 		msleep(5000000);
-		gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
-				 0, NULL);
+		RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
+				0, NULL);
 #endif
 	}
 

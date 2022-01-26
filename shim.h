@@ -27,6 +27,10 @@
 #error On x86_64 you must have a compiler new enough to support __attribute__((__ms_abi__))
 #endif
 
+#if CLANG_PREREQ(3, 4)
+#pragma GCC diagnostic ignored "-Wpointer-bool-conversion"
+#endif
+
 #if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
 #define GNU_EFI_USE_EXTERNAL_STDARG
 #endif
@@ -167,6 +171,8 @@
 #include "include/httpboot.h"
 #include "include/ip4config2.h"
 #include "include/ip6config.h"
+#include "include/load-options.h"
+#include "include/mok.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
 #include "include/peimage.h"
@@ -250,6 +256,7 @@ extern UINT8 *build_cert;
 
 extern UINT8 user_insecure_mode;
 extern UINT8 ignore_db;
+extern UINT8 trust_mok_list;
 extern UINT8 in_protocol;
 extern void *load_options;
 extern UINT32 load_options_size;

@@ -10,6 +10,7 @@ typedef struct {
 
 UINTN measuredcount = 0;
 VARIABLE_RECORD *measureddata = NULL;
+static BOOLEAN tpm_defective = FALSE;
 
 static BOOLEAN
 tpm_present(efi_tpm_protocol_t *tpm)
@@ -18,6 +19,9 @@ tpm_present(efi_tpm_protocol_t *tpm)
 	TCG_EFI_BOOT_SERVICE_CAPABILITY caps;
 	UINT32 flags;
 	EFI_PHYSICAL_ADDRESS eventlog, lastevent;
+
+	if (tpm_defective)
+		return FALSE;
 
 	caps.Size = (UINT8)sizeof(caps);
 	efi_status =
@@ -197,6 +201,12 @@ tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 				tpm->log_extend_event(tpm, buf, (UINT64)size,
 			                              TPM_ALG_SHA, event,
 			                              &eventnum, &lastevent);
+		}
+		if (efi_status == EFI_UNSUPPORTED) {
+			perror(L"Could not write TPM event: %r. Considering "
+			       "the TPM as defective.\n", efi_status);
+			tpm_defective = TRUE;
+			efi_status = EFI_SUCCESS;
 		}
 		FreePool(event);
 		return efi_status;
@@ -413,3 +423,25 @@ cc_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 	FreePool(event);
 	return efi_status;
 }
+
+#ifdef SHIM_UNIT_TEST
+static void DESTRUCTOR
+tpm_clean_up_measurements(void)
+{
+	for (UINTN i = 0; i < measuredcount; i++) {
+		VARIABLE_RECORD *vr = &measureddata[i];
+
+		if (vr->VariableName)
+			FreePool(vr->VariableName);
+		if (vr->VendorGuid)
+			FreePool(vr->VendorGuid);
+		if (vr->Data)
+			FreePool(vr->Data);
+	}
+	if (measureddata)
+		FreePool(measureddata);
+
+	measuredcount = 0;
+	measureddata = NULL;
+}
+#endif

@@ -1,7 +1,7 @@
 default : all
 
 NAME		= shim
-VERSION		= 15.4
+VERSION		= 15.5~rc1
 ifneq ($(origin RELEASE),undefined)
 DASHRELEASE	?= -$(RELEASE)
 else
@@ -38,12 +38,12 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
-OBJS	= shim.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o pe.o httpboot.o csv.o
+OBJS	= shim.o globals.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o pe.o httpboot.o csv.o load-options.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
-ORIG_SOURCES	= shim.c mok.c netboot.c replacements.c tpm.c errlog.c sbat.c pe.c httpboot.c shim.h version.h $(wildcard include/*.h)
-MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o
+ORIG_SOURCES	= shim.c globals.c mok.c netboot.c replacements.c tpm.c errlog.c sbat.c pe.c httpboot.c shim.h version.h $(wildcard include/*.h)
+MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o globals.o
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
-FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o
+FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o
 ORIG_FALLBACK_SRCS = fallback.c
 SBATPATH = $(TOPDIR)/data/sbat.csv
 
@@ -59,6 +59,10 @@ FALLBACK_SRCS = $(foreach source,$(ORIG_FALLBACK_SRCS),$(TOPDIR)/$(source))
 
 ifneq ($(origin FALLBACK_VERBOSE), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE
+endif
+
+ifneq ($(origin FALLBACK_NONINTERACTIVE), undefined)
+	CFLAGS += -DFALLBACK_NONINTERACTIVE
 endif
 
 ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
@@ -121,9 +125,10 @@ sbat_data.o : /dev/null
 		$@
 	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
 
-$(SHIMNAME) : $(SHIMSONAME)
-$(MMNAME) : $(MMSONAME)
-$(FBNAME) : $(FBSONAME)
+$(SHIMNAME) : $(SHIMSONAME) post-process-pe
+$(MMNAME) : $(MMSONAME) post-process-pe
+$(FBNAME) : $(FBSONAME) post-process-pe
+$(SHIMNAME) $(MMNAME) $(FBNAME) : | post-process-pe
 
 LIBS = Cryptlib/libcryptlib.a \
        Cryptlib/OpenSSL/libopenssl.a \
@@ -148,7 +153,10 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a: C
 gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
 	$(MAKE) -C gnu-efi \
-		ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+		COMPILER="$(COMPILER)" \
+		CC="$(CC)" \
+		ARCH=$(ARCH_GNUEFI) \
+		TOPDIR=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc
 
@@ -163,6 +171,9 @@ Cryptlib/OpenSSL/libopenssl.a:
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	mkdir -p lib
 	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) -C lib -f $(TOPDIR)/lib/Makefile
+
+post-process-pe : $(TOPDIR)/post-process-pe.c
+	$(HOSTCC) -std=gnu11 -Og -g3 -Wall -Wextra -Wno-missing-field-initializers -Werror -o $@ $<
 
 buildid : $(TOPDIR)/buildid.c
 	$(HOSTCC) -I/usr/include -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
@@ -243,11 +254,10 @@ ifneq ($(OBJCOPY_GTE224),1)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .rodata -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame \
+		-j .rela* -j .dyn -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat \
 		$(FORMAT) $< $@
-	# I am tired of wasting my time fighting binutils timestamp code.
-	dd conv=notrunc bs=1 count=4 seek=$(TIMESTAMP_LOCATION) if=/dev/zero of=$@
+	./post-process-pe -vv $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
@@ -260,7 +270,7 @@ ifneq ($(OBJCOPY_GTE224),1)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data \
 		-j .dynamic -j .rodata -j .rel* \
-		-j .rela* -j .reloc -j .eh_frame -j .sbat \
+		-j .rela* -j .dyn -j .reloc -j .eh_frame -j .sbat \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		-j .note.gnu.build-id \
@@ -277,8 +287,14 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-test :
-	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" all
+test test-clean test-coverage test-lto :
+	@make -f $(TOPDIR)/include/test.mk \
+		COMPILER="$(COMPILER)" \
+		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
+		ARCH_DEFINES="$(ARCH_DEFINES)" \
+		EFI_INCLUDES="$(EFI_INCLUDES)" \
+		test-clean $@
 
 $(patsubst %.c,%,$(wildcard test-*.c)) :
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
@@ -291,7 +307,11 @@ clean-test-objs:
 clean-gnu-efi:
 	@if [ -d gnu-efi ] ; then \
 		$(MAKE) -C gnu-efi \
-			ARCH=$(ARCH_GNUEFI) TOPDIR=$(TOPDIR)/gnu-efi \
+			CC="$(CC)" \
+			HOSTCC="$(HOSTCC)" \
+			COMPILER="$(COMPILER)" \
+			ARCH=$(ARCH_GNUEFI) \
+			TOPDIR=$(TOPDIR)/gnu-efi \
 			-f $(TOPDIR)/gnu-efi/Makefile \
 			clean ; \
 	fi

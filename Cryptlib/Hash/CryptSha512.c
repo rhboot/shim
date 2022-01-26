@@ -93,7 +93,7 @@ Sha384Duplicate (
     return FALSE;
   }
 
-  CopyMem (NewSha384Context, Sha384Context, sizeof (SHA512_CTX));
+  CopyMem (NewSha384Context, (void *)Sha384Context, sizeof (SHA512_CTX));
 
   return TRUE;
 }
@@ -308,7 +308,7 @@ Sha512Duplicate (
     return FALSE;
   }
 
-  CopyMem (NewSha512Context, Sha512Context, sizeof (SHA512_CTX));
+  CopyMem (NewSha512Context, (void *)Sha512Context, sizeof (SHA512_CTX));
 
   return TRUE;
 }

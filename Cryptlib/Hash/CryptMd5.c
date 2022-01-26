@@ -93,7 +93,7 @@ Md5Duplicate (
     return FALSE;
   }
 
-  CopyMem (NewMd5Context, Md5Context, sizeof (MD5_CTX));
+  CopyMem (NewMd5Context, (void *)Md5Context, sizeof (MD5_CTX));
 
   return TRUE;
 }
