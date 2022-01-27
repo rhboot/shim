@@ -988,17 +988,12 @@ restore_loaded_image(VOID)
 /*
  * Load and run an EFI executable
  */
-EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
+EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
+		      CHAR16 *PathName, void **data, int *datasize)
 {
 	EFI_STATUS efi_status;
-	EFI_IMAGE_ENTRY_POINT entry_point;
-	EFI_PHYSICAL_ADDRESS alloc_address;
-	UINTN alloc_pages;
-	CHAR16 *PathName = NULL;
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
-	void *data = NULL;
-	int datasize = 0;
 
 	/*
 	 * We need to refer to the loaded image protocol on the running
@@ -1018,7 +1013,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to generate path %s: %r\n", ImagePath,
 		       efi_status);
-		goto done;
+		return efi_status;
 	}
 
 	if (findNetboot(shim_li->DeviceHandle)) {
@@ -1034,8 +1029,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 			       efi_status);
 			return efi_status;
 		}
-		data = sourcebuffer;
-		datasize = sourcesize;
+		*data = sourcebuffer;
+		*datasize = sourcesize;
 	} else if (find_httpboot(shim_li->DeviceHandle)) {
 		efi_status = httpboot_fetch_buffer (image_handle,
 						    &sourcebuffer,
@@ -1045,26 +1040,45 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 			       efi_status);
 			return efi_status;
 		}
-		data = sourcebuffer;
-		datasize = sourcesize;
+		*data = sourcebuffer;
+		*datasize = sourcesize;
 	} else {
 		/*
 		 * Read the new executable off disk
 		 */
-		efi_status = load_image(shim_li, &data, &datasize, PathName);
+		efi_status = load_image(shim_li, data, datasize, PathName);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to load image %s: %r\n",
 			       PathName, efi_status);
 			PrintErrors();
 			ClearErrors();
-			goto done;
+			return efi_status;
 		}
 	}
 
-	if (datasize < 0) {
+	if (*datasize < 0)
 		efi_status = EFI_INVALID_PARAMETER;
+
+	return efi_status;
+}
+
+/*
+ * Load and run an EFI executable
+ */
+EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
+{
+	EFI_STATUS efi_status;
+	EFI_IMAGE_ENTRY_POINT entry_point;
+	EFI_PHYSICAL_ADDRESS alloc_address;
+	UINTN alloc_pages;
+	CHAR16 *PathName = NULL;
+	void *data = NULL;
+	int datasize;
+
+	efi_status = read_image(image_handle, ImagePath, PathName, &data,
+				&datasize);
+	if (EFI_ERROR(efi_status))
 		goto done;
-	}
 
 	/*
 	 * We need to modify the loaded image protocol entry before running
