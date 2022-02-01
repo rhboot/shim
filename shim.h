@@ -248,6 +248,9 @@ extern UINT8 *vendor_authorized;
 extern UINT32 vendor_deauthorized_size;
 extern UINT8 *vendor_deauthorized;
 
+extern UINT32 user_cert_size;
+extern UINT8 *user_cert;
+
 #if defined(ENABLE_SHIM_CERT)
 extern UINT32 build_cert_size;
 extern UINT8 *build_cert;

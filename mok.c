@@ -98,6 +98,8 @@ struct mok_state_variable mok_state_variable_data[] = {
 	 .categorize_addend = categorize_authorized,
 	 .addend = &vendor_authorized,
 	 .addend_size = &vendor_authorized_size,
+	 .user_cert = &user_cert,
+	 .user_cert_size = &user_cert_size,
 #if defined(ENABLE_SHIM_CERT)
 	 .build_cert = &build_cert,
 	 .build_cert_size = &build_cert_size,
@@ -588,7 +590,8 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			dprint(L"FullDataSize:0x%lx FullData:0x%llx\n",
 			       FullDataSize, FullData);
 		}
-
+		if (v->user_cert_size)
+			FullDataSize += *v->user_cert_size;
 	}
 
 	/*
@@ -701,6 +704,10 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			p += build_cert_esl_sz;
 			dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
 			       FullDataSize, FullData, p, p-(uintptr_t)FullData);
+		}
+		if (v->user_cert_size) {
+			CopyMem(p, *v->user_cert, *v->user_cert_size);
+			p += *v->user_cert_size;
 		}
 	}
 

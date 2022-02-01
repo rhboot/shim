@@ -59,6 +59,9 @@ struct mok_state_variable {
 	UINT8 **addend;
 	UINT32 *addend_size;
 
+	UINT8 **user_cert;
+	UINT32 *user_cert_size;
+
 	/*
 	 * build_cert is our build-time cert.  Like addend, this is added
 	 * to the input variable, as part of the runtime variable, so that
