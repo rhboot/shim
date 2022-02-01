@@ -1327,6 +1327,126 @@ uninstall_shim_protocols(void)
 }
 
 EFI_STATUS
+load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE *li = NULL;
+	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	EFI_IMAGE_SECTION_HEADER *Section;
+	EFI_SIGNATURE_LIST *certlist;
+	CHAR16 *PathName = NULL;
+	void *pointer;
+	UINT32 original;
+	int datasize;
+	void *data;
+	int i;
+
+	efi_status = read_image(image_handle, filename, PathName,
+				&data, &datasize);
+
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = verify_image(data, datasize, li, &context);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	Section = context.FirstSection;
+	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		if (CompareMem(Section->Name, ".db\0\0\0\0\0", 8) == 0) {
+			original = user_cert_size;
+			if (Section->SizeOfRawData < sizeof(EFI_SIGNATURE_LIST)) {
+				continue;
+			}
+			pointer = ImageAddress(data, datasize,
+					       Section->PointerToRawData);
+			if (!pointer) {
+				continue;
+			}
+			certlist = pointer;
+			user_cert_size += certlist->SignatureListSize;;
+			user_cert = ReallocatePool(user_cert, original,
+						   user_cert_size);
+			memcpy(user_cert + original, pointer,
+			       certlist->SignatureListSize);
+		}
+	}
+	FreePool(data);
+	return EFI_SUCCESS;
+}
+
+/* Read additional certificates from files (after verifying signatures) */
+EFI_STATUS
+load_certs(EFI_HANDLE image_handle)
+{
+	EFI_STATUS efi_status;
+	EFI_LOADED_IMAGE *li = NULL;
+	CHAR16 *PathName = NULL;
+	EFI_FILE *root, *dir;
+	EFI_FILE_INFO *info;
+	EFI_HANDLE device;
+	EFI_FILE_IO_INTERFACE *drive;
+	UINTN buffersize = 0;
+	void *buffer = NULL;
+
+	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					 (void **)&li);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Unable to init protocol\n");
+		return efi_status;
+	}
+
+	efi_status = generate_path_from_image_path(li, L"", &PathName);
+	if (EFI_ERROR(efi_status))
+		goto done;
+
+	device = li->DeviceHandle;
+	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					 (void **)&drive);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to find fs: %r\n", efi_status);
+		goto done;
+	}
+
+	efi_status = drive->OpenVolume(drive, &root);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to open fs: %r\n", efi_status);
+		goto done;
+	}
+
+	efi_status = root->Open(root, &dir, PathName, EFI_FILE_MODE_READ, 0);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to open %s - %r\n", PathName, efi_status);
+		goto done;
+	}
+
+	while (1) {
+		int old = buffersize;
+		efi_status = dir->Read(dir, &buffersize, buffer);
+		if (efi_status == EFI_BUFFER_TOO_SMALL) {
+			buffer = ReallocatePool(buffer, old, buffersize);
+			continue;
+		} else if (EFI_ERROR(efi_status)) {
+			perror(L"Failed to read directory %s - %r\n", PathName,
+			       efi_status);
+			goto done;
+		}
+
+		if (buffersize == 0)
+			goto done;
+
+		info = (EFI_FILE_INFO *)buffer;
+		if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
+			load_cert_file(image_handle, info->FileName);
+		}
+	}
+done:
+	FreePool(buffer);
+	FreePool(PathName);
+	return efi_status;
+}
+
+EFI_STATUS
 shim_init(void)
 {
 	EFI_STATUS efi_status;
@@ -1567,6 +1687,13 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	}
 
 	init_openssl();
+
+	if (secure_mode()) {
+		efi_status = load_certs(global_image_handle);
+		if (EFI_ERROR(efi_status)) {
+			LogError(L"Failed to load addon certificates\n");
+		}
+	}
 
 	/*
 	 * Before we do anything else, validate our non-volatile,
