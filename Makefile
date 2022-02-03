@@ -323,7 +323,7 @@ clean-lib-objs:
 
 clean-shim-objs:
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
-	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid
+	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid post-process-pe
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
