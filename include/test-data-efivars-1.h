@@ -102,5 +102,9 @@ static const unsigned char test_data_efivars_1_SbatLevelRT[] = {
 	0x32, 0x31, 0x30, 0x33, 0x30, 0x32, 0x31, 0x38, 0x0a
 };
 
+static const unsigned char test_data_efivars_1_MokListTrustedRT[] ={
+	0x01
+};
+
 #endif /* !TEST_DATA_EFIVARS_1_H_ */
 // vim:fenc=utf-8:tw=75:noet
