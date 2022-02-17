@@ -1776,17 +1776,7 @@ static EFI_STATUS mok_tml_prompt(void *MokTML, UINTN MokTMLSize)
 		LibDeleteVariable(L"MokListTrustedNew", &SHIM_LOCK_GUID);
 		return EFI_ABORTED;
 	}
-
 	if (var->MokTMLState == 0) {
-		efi_status = RT->SetVariable(L"MokListTrusted", &SHIM_LOCK_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
-					      1, &dbval);
-		if (EFI_ERROR(efi_status)) {
-			console_notify(L"Failed to set MokListTrusted state");
-			return efi_status;
-		}
-	} else {
 		efi_status = RT->SetVariable(L"MokListTrusted", &SHIM_LOCK_GUID,
 					      EFI_VARIABLE_NON_VOLATILE |
 					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
@@ -1795,8 +1785,16 @@ static EFI_STATUS mok_tml_prompt(void *MokTML, UINTN MokTMLSize)
 			console_notify(L"Failed to delete MokListTrusted state");
 			return efi_status;
 		}
+	} else {
+		efi_status = RT->SetVariable(L"MokListTrusted", &SHIM_LOCK_GUID,
+					      EFI_VARIABLE_NON_VOLATILE |
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS,
+					      1, &dbval);
+		if (EFI_ERROR(efi_status)) {
+			console_notify(L"Failed to set MokListTrusted state");
+			return efi_status;
+		}
 	}
-
 	return EFI_SUCCESS;
 }
 
