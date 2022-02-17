@@ -84,6 +84,7 @@ categorize_deauthorized(struct mok_state_variable *v)
 #define MOK_MIRROR_DELETE_FIRST	0x02
 #define MOK_VARIABLE_MEASURE	0x04
 #define MOK_VARIABLE_LOG	0x08
+#define MOK_VARIABLE_INVERSE	0x10
 
 struct mok_state_variable mok_state_variable_data[] = {
 	{.name = L"MokList",
@@ -176,6 +177,7 @@ struct mok_state_variable mok_state_variable_data[] = {
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
 	 .flags = MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_MEASURE |
+		  MOK_VARIABLE_INVERSE |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
 	 .state = &trust_mok_list,
@@ -846,7 +848,13 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
-		if (efi_status == EFI_NOT_FOUND) {
+		if (efi_status == EFI_NOT_FOUND &&
+		    v->flags & MOK_VARIABLE_INVERSE) {
+			v->data = AllocateZeroPool(4);
+			v->data[0] = 0x01;
+			v->data_size = 1;
+			efi_status = EFI_SUCCESS;
+		} else if (efi_status == EFI_NOT_FOUND) {
 			v->data = NULL;
 			v->data_size = 0;
 		} else if (EFI_ERROR(efi_status)) {
@@ -867,6 +875,11 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 				perror(L"  0x%08x should not have 0x%08x set.\n",
 				       attrs, v->no_attr);
 				delete = TRUE;
+			}
+			if (v->flags & MOK_VARIABLE_INVERSE) {
+				FreePool(v->data);
+				v->data = NULL;
+				v->data_size = 0;
 			}
 		}
 	}
