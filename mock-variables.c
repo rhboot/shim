@@ -773,9 +773,9 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 #endif
 
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
-	printf("%s:%d:%s():Setting "GUID_FMT"-%s\n",
+	printf("%s:%d:%s():Setting "GUID_FMT"-%s size:0x%"PRIx64"\n",
 	       __FILE__, __LINE__ - 1, __func__,
-	       GUID_ARGS(*guid), Str2str(name));
+	       GUID_ARGS(*guid), Str2str(name), size);
 #endif
 	switch (mock_variable_sort_policy) {
 	case MOCK_SORT_PREPEND:
@@ -843,17 +843,17 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 		printf("%s:%d:%s():var:%p attrs:0x%lx\n",
 		       __FILE__, __LINE__ - 1, __func__, var, attrs);
 #endif
-		status = mock_new_variable(name, guid, attrs, size, data, &var);
+		status = mock_sv_adjust_usage_data(attrs, size, -totalsz);
 		if (EFI_ERROR(status)) {
 			mock_sv_post_hook(name, guid, attrs, size, data,
 					  &status, CREATE);
 			return status;
 		}
-		mock_sv_adjust_usage_data(attrs, size, totalsz);
+		status = mock_new_variable(name, guid, attrs, size, data, &var);
 		mock_sv_post_hook(name, guid, attrs, size, data,
 				  &status, CREATE);
 		if (EFI_ERROR(status)) {
-			mock_sv_adjust_usage_data(attrs, 0, -totalsz);
+			mock_sv_adjust_usage_data(attrs, 0, totalsz);
 			return status;
 		}
 
@@ -1002,18 +1002,27 @@ static struct mock_variable_limits default_limits[] = {
 };
 
 void
+mock_set_usage_limits(list_t *limit_list,
+		      struct mock_variable_limits *limits)
+{
+	INIT_LIST_HEAD(limit_list);
+	for (size_t i = 0; limits[i].attrs != 0; i++) {
+		INIT_LIST_HEAD(&limits[i].list);
+		list_add_tail(&limits[i].list, limit_list);
+	}
+
+	mock_qvi_limits = limit_list;
+	mock_sv_limits = limit_list;
+}
+
+void
 mock_set_default_usage_limits(void)
 {
 	default_max_var_storage = 65536;
 	default_remaining_var_storage = 65536;
 	default_max_var_size = 32768;
 
-	INIT_LIST_HEAD(&mock_default_variable_limits);
-	for (size_t i = 0; default_limits[i].attrs != 0; i++) {
-		INIT_LIST_HEAD(&default_limits[i].list);
-		list_add_tail(&default_limits[i].list,
-			      &mock_default_variable_limits);
-	}
+	mock_set_usage_limits(&mock_default_variable_limits, &default_limits[0]);
 }
 
 void

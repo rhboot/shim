@@ -21,21 +21,51 @@ start_image(EFI_HANDLE image_handle UNUSED, CHAR16 *mm)
 
 #define N_TEST_VAR_OPS 40
 struct test_var {
+	/*
+	 * The GUID, name, and attributes of the variables
+	 */
 	EFI_GUID guid;
 	CHAR16 *name;
 	UINT32 attrs;
-	UINTN n_ops;
+	/*
+	 * If the variable is required to be present, with the attributes
+	 * specified above, for a test to pass
+	 */
 	bool must_be_present;
+	/*
+	 * If the variable is required to be absent, no matter what the
+	 * attributes, for a test to pass
+	 */
 	bool must_be_absent;
+	/*
+	 * The number of operations on this variable that we've seen
+	 */
+	UINTN n_ops;
+	/*
+	 * the operations that have occurred on this variable
+	 */
 	mock_variable_op_t ops[N_TEST_VAR_OPS];
+	/*
+	 * the result codes of those operations
+	 */
 	EFI_STATUS results[N_TEST_VAR_OPS];
 };
 
 static struct test_var *test_vars;
 
 struct mock_mok_variable_config_entry {
+	/*
+	 * The name of an entry we expect to see in the MokVars
+	 * configuration table
+	 */
 	CHAR8 name[256];
+	/*
+	 * The size of its data
+	 */
 	UINT64 data_size;
+	/*
+	 * A pointer to what the data should be
+	 */
 	const unsigned char *data;
 };
 
@@ -94,116 +124,11 @@ getvar_post(CHAR16 *name, EFI_GUID *guid,
 	}
 }
 
-static int
-test_mok_mirror_0(void)
+static EFI_STATUS
+check_variables(struct test_var *vars)
 {
-	const char *mok_rt_vars[n_mok_state_variables];
-	EFI_STATUS status;
-	EFI_GUID guid = SHIM_LOCK_GUID;
-	EFI_GUID mok_config_guid = MOK_VARIABLE_STORE;
-	int ret = -1;
-
-	struct test_var test_mok_mirror_0_vars[] = {
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokList",
-		 .must_be_present = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_NON_VOLATILE,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokListRT",
-		 .must_be_present = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_RUNTIME_ACCESS,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokListX",
-		 .must_be_present = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_NON_VOLATILE,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokListXRT",
-		 .must_be_present = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_RUNTIME_ACCESS,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"SbatLevel",
-		 .must_be_present = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_NON_VOLATILE,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"SbatLevelRT",
-		 .must_be_present = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_RUNTIME_ACCESS,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokIgnoreDB",
-		 .must_be_absent = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_RUNTIME_ACCESS,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokSBState",
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_NON_VOLATILE,
-		 .ops = { NONE, },
-		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"MokSBStateRT",
-		 .must_be_absent = true,
-		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			  EFI_VARIABLE_RUNTIME_ACCESS,
-		 .ops = { NONE, },
-		},
-		{.guid = { 0, },
-		 .name = NULL,
-		}
-	};
-
-	struct mock_mok_variable_config_entry test_mok_config_table[] = {
-		{.name = "MokListRT",
-		 .data_size = sizeof(test_data_efivars_1_MokListRT),
-		 .data = test_data_efivars_1_MokListRT
-		},
-		{.name = "MokListXRT",
-		 .data_size = sizeof(test_data_efivars_1_MokListXRT),
-		 .data = test_data_efivars_1_MokListXRT
-		},
-		{.name = "SbatLevelRT",
-		 .data_size = sizeof(test_data_efivars_1_SbatLevelRT),
-		 .data = test_data_efivars_1_SbatLevelRT
-		},
-		{.name = { 0, },
-		 .data_size = 0,
-		 .data = NULL,
-		}
-	};
-
-	for (size_t i = 0; i < n_mok_state_variables; i++) {
-		mok_rt_vars[i] = mok_state_variables[i].rtname8;
-	}
-
-	mock_load_variables("test-data/efivars-1", mok_rt_vars, true);
-
-	mock_set_variable_post_hook = setvar_post;
-	mock_get_variable_post_hook = getvar_post;
-	test_vars = &test_mok_mirror_0_vars[0];
-
-	import_mok_state(NULL);
-
-	for (size_t i = 0; test_mok_mirror_0_vars[i].name != NULL; i++) {
-		struct test_var *tv = &test_mok_mirror_0_vars[i];
+	for (size_t i = 0; vars[i].name != NULL; i++) {
+		struct test_var *tv = &vars[i];
 		list_t *pos = NULL;
 		bool found = false;
 		char buf[1];
@@ -263,37 +188,42 @@ test_mok_mirror_0(void)
 				    "Variable should not be read %d times.\n", gets);
 		}
 		if (tv->must_be_present) {
+			/*
+			 * This asserts if it isn't present, and if that's
+			 * the case, then the attributes are already
+			 * validated in the search loop
+			 */
 			assert_goto(found == true, err,
 				 "variable \"%s\" was not found.\n",
 				 Str2str(tv->name));
 		}
 
 		if (tv->must_be_absent) {
+			/*
+			 * deliberately does not check the attributes at
+			 * this time.
+			 */
 			assert_goto(found == false, err,
 				 "variable \"%s\" was found.\n",
 				 Str2str(tv->name));
 		}
 	}
 
-	uint8_t *pos = NULL;
-	for (size_t i = 0; i < ST->NumberOfTableEntries; i++) {
-		EFI_CONFIGURATION_TABLE *ct = &ST->ConfigurationTable[i];
+	return EFI_SUCCESS;
+err:
+	return EFI_INVALID_PARAMETER;
+}
 
-		if (CompareGuid(&ct->VendorGuid, &mok_config_guid) != 0)
-			continue;
-
-		pos = (void *)ct->VendorTable;
-		break;
-	}
-
-	assert_nonzero_goto(pos, err, "%p != 0\n");
-
+static EFI_STATUS
+check_config_table(struct mock_mok_variable_config_entry *test_configs,
+		   uint8_t *config_pos)
+{
 	size_t i = 0;
-	while (pos) {
+	while (config_pos) {
 		struct mock_mok_variable_config_entry *mock_entry =
-			&test_mok_config_table[i];
+			&test_configs[i];
 		struct mok_variable_config_entry *mok_entry =
-			(struct mok_variable_config_entry *)pos;
+			(struct mok_variable_config_entry *)config_pos;
 
 		/*
 		 * If the tables are different lengths, this will trigger.
@@ -321,10 +251,52 @@ test_mok_mirror_0(void)
 		assert_zero_goto(CompareMem(mok_entry->data, mock_entry->data,
 					    mok_entry->data_size),
 				 err, "%ld != %ld\n");
-		pos += offsetof(struct mok_variable_config_entry, data)
-		       + mok_entry->data_size;
+		config_pos += offsetof(struct mok_variable_config_entry, data)
+			   + mok_entry->data_size;
 		i += 1;
 	}
+
+	return EFI_SUCCESS;
+err:
+	return EFI_INVALID_PARAMETER;
+}
+
+static int
+test_mok_mirror(struct test_var *vars,
+		struct mock_mok_variable_config_entry *configs,
+		EFI_STATUS expected_status)
+{
+	EFI_STATUS status;
+	EFI_GUID mok_config_guid = MOK_VARIABLE_STORE;
+	int ret = -1;
+
+	status = import_mok_state(NULL);
+	assert_equal_goto(status, expected_status, err,
+			  "got 0x%016lx, expected 0x%016lx\n",
+			  expected_status);
+
+	test_vars = vars;
+
+	status = check_variables(vars);
+	if (EFI_ERROR(status))
+		goto err;
+
+	uint8_t *pos = NULL;
+	for (size_t i = 0; i < ST->NumberOfTableEntries; i++) {
+		EFI_CONFIGURATION_TABLE *ct = &ST->ConfigurationTable[i];
+
+		if (CompareGuid(&ct->VendorGuid, &mok_config_guid) != 0)
+			continue;
+
+		pos = (void *)ct->VendorTable;
+		break;
+	}
+
+	assert_nonzero_goto(pos, err, "%p != 0\n");
+
+	status = check_config_table(configs, pos);
+	if (EFI_ERROR(status))
+		goto err;
 
 	ret = 0;
 err:
@@ -339,6 +311,341 @@ err:
 	}
 
 	test_vars = NULL;
+
+	return ret;
+}
+
+/*
+ * This tests mirroring of mok variables on fairly optimistic conditions:
+ * there's enough space for everything, and so we expect to see all the
+ * RT variables for which we have data mirrored
+ */
+static int
+test_mok_mirror_0(void)
+{
+	const char *mok_rt_vars[n_mok_state_variables];
+	EFI_STATUS status;
+	EFI_GUID guid = SHIM_LOCK_GUID;
+	int ret = -1;
+
+	struct test_var test_mok_mirror_0_vars[] = {
+		/*
+		 * We must to see a BS|NV MokList
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokList",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT MokListRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListRT",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|NV MokListX
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListX",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT MokListXRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListXRT",
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|NV SbatLevel
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"SbatLevel",
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT SbatLevelRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"SbatLevelRT",
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see a MokIgnoreDB
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokIgnoreDB",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see MokSBState
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokSBState",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see MokSBStateRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokSBStateRT",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		{.guid = { 0, },
+		 .name = NULL,
+		}
+	};
+
+	/*
+	 * We must see the supplied values of MokListRT, MokListXRT, and
+	 * SbatLevelRT in the config table
+	 */
+	struct mock_mok_variable_config_entry test_mok_config_table[] = {
+		{.name = "MokListRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListRT),
+		 .data = test_data_efivars_1_MokListRT
+		},
+		{.name = "MokListXRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListXRT),
+		 .data = test_data_efivars_1_MokListXRT
+		},
+		{.name = "SbatLevelRT",
+		 .data_size = sizeof(test_data_efivars_1_SbatLevelRT),
+		 .data = test_data_efivars_1_SbatLevelRT
+		},
+		{.name = { 0, },
+		 .data_size = 0,
+		 .data = NULL,
+		}
+	};
+
+	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		mok_rt_vars[i] = mok_state_variables[i].rtname8;
+	}
+
+	mock_load_variables("test-data/efivars-1", mok_rt_vars, true);
+
+	mock_set_variable_post_hook = setvar_post;
+	mock_get_variable_post_hook = getvar_post;
+
+	ret = test_mok_mirror(&test_mok_mirror_0_vars[0],
+			      test_mok_config_table,
+			      EFI_SUCCESS);
+
+	mock_set_variable_post_hook = NULL;
+	mock_get_variable_post_hook = NULL;
+	return ret;
+}
+
+static int
+test_mok_mirror_setvar_out_of_resources(void)
+{
+	const char *mok_rt_vars[n_mok_state_variables];
+	EFI_STATUS status;
+	EFI_GUID guid = SHIM_LOCK_GUID;
+	EFI_GUID mok_config_guid = MOK_VARIABLE_STORE;
+	int ret = -1;
+
+	list_t mock_obnoxious_variable_limits;
+	UINT64 obnoxious_max_var_storage = 0xffe4;
+	UINT64 obnoxious_remaining_var_storage = 919+0x3c;
+	UINT64 obnoxious_max_var_size = 919;
+
+	struct mock_variable_limits obnoxious_limits[] = {
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .max_var_storage = &obnoxious_max_var_storage,
+		 .remaining_var_storage = &obnoxious_remaining_var_storage,
+		 .max_var_size = &obnoxious_max_var_size,
+		 .status = EFI_SUCCESS,
+		},
+		{.attrs = 0, }
+	};
+
+	struct test_var test_mok_mirror_1_vars[] = {
+		/*
+		 * We must to see a BS|NV MokList
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokList",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must *NOT* see a BS|RT MokListRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListRT",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|NV MokListX
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListX",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT MokListXRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokListXRT",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|NV SbatLevel
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"SbatLevel",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must see a BS|RT SbatLevelRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"SbatLevelRT",
+		 .must_be_present = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see a MokIgnoreDB
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokIgnoreDB",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see MokSBState
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokSBState",
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE,
+		 .ops = { NONE, },
+		},
+		/*
+		 * We must not see MokSBStateRT
+		 */
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"MokSBStateRT",
+		 .must_be_absent = true,
+		 .attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS,
+		 .ops = { NONE, },
+		},
+		{.guid = { 0, },
+		 .name = NULL,
+		}
+	};
+
+	/*
+	 * We must see the supplied values of MokListRT, MokListXRT, and
+	 * SbatLevelRT in the config table
+	 */
+	struct mock_mok_variable_config_entry test_mok_config_table[] = {
+		{.name = "MokListRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListRT),
+		 .data = test_data_efivars_1_MokListRT
+		},
+		{.name = "MokListXRT",
+		 .data_size = sizeof(test_data_efivars_1_MokListXRT),
+		 .data = test_data_efivars_1_MokListXRT
+		},
+		{.name = "SbatLevelRT",
+		 .data_size = sizeof(test_data_efivars_1_SbatLevelRT),
+		 .data = test_data_efivars_1_SbatLevelRT
+		},
+		{.name = { 0, },
+		 .data_size = 0,
+		 .data = NULL,
+		}
+	};
+
+	UINT64 max_storage_sz = 0;
+	UINT64 max_var_sz = 0;
+	UINT64 remaining_sz = 0;
+
+	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		mok_rt_vars[i] = mok_state_variables[i].rtname8;
+	}
+
+	mock_load_variables("test-data/efivars-1", mok_rt_vars, true);
+
+	mock_set_variable_post_hook = setvar_post;
+	mock_get_variable_post_hook = getvar_post;
+
+	mock_set_usage_limits(&mock_obnoxious_variable_limits,
+			      &obnoxious_limits[0]);
+
+	ret = test_mok_mirror(&test_mok_mirror_1_vars[0],
+			      test_mok_config_table,
+			      EFI_OUT_OF_RESOURCES);
+
 	mock_set_variable_post_hook = NULL;
 	mock_get_variable_post_hook = NULL;
 	return ret;
@@ -388,6 +695,9 @@ main(void)
 
 			mock_variable_delete_attr_policy = delete_policies[j];
 			test(test_mok_mirror_0);
+			mock_finalize_vars_and_configs();
+
+			test(test_mok_mirror_setvar_out_of_resources);
 			mock_finalize_vars_and_configs();
 
 			if (delete_policies[j] == 0)

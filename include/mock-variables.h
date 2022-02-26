@@ -115,6 +115,8 @@ void mock_uninstall_query_variable_info(void);
 void mock_reset_variables(void);
 void mock_reset_config_table(void);
 void mock_finalize_vars_and_configs(void);
+void mock_set_usage_limits(list_t *limit_list,
+			   struct mock_variable_limits *limits);
 
 typedef enum {
 	NONE = 0,
