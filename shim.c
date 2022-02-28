@@ -559,9 +559,9 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
  * Check that the signature is valid and matches the binary
  */
 EFI_STATUS
-verify_buffer (char *data, int datasize,
-	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	       UINT8 *sha256hash, UINT8 *sha1hash)
+verify_buffer_authenticode (char *data, int datasize,
+			    PE_COFF_LOADER_IMAGE_CONTEXT *context,
+			    UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_STATUS ret_efi_status;
 	size_t size = datasize;
@@ -693,6 +693,71 @@ verify_buffer (char *data, int datasize,
 	}
 	drain_openssl_errors();
 	return ret_efi_status;
+}
+
+/*
+ * Check that the binary is permitted to load by SBAT.
+ */
+EFI_STATUS
+verify_buffer_sbat (char *data, int datasize,
+		    PE_COFF_LOADER_IMAGE_CONTEXT *context)
+{
+	int i;
+	EFI_IMAGE_SECTION_HEADER *Section;
+	char *SBATBase = NULL;
+	size_t SBATSize = 0;
+
+	Section = context->FirstSection;
+	for (i = 0; i < context->NumberOfSections; i++, Section++) {
+		if (CompareMem(Section->Name, ".sbat\0\0\0", 8) != 0)
+			continue;
+
+		if (SBATBase || SBATSize) {
+			perror(L"Image has multiple SBAT sections\n");
+			return EFI_UNSUPPORTED;
+		}
+
+		if (Section->NumberOfRelocations != 0 ||
+		    Section->PointerToRelocations != 0) {
+			perror(L"SBAT section has relocations\n");
+			return EFI_UNSUPPORTED;
+		}
+
+		/* The virtual size corresponds to the size of the SBAT
+		 * metadata and isn't necessarily a multiple of the file
+		 * alignment. The on-disk size is a multiple of the file
+		 * alignment and is zero padded. Make sure that the
+		 * on-disk size is at least as large as virtual size,
+		 * and ignore the section if it isn't. */
+		if (Section->SizeOfRawData &&
+		    Section->SizeOfRawData >= Section->Misc.VirtualSize) {
+			SBATBase = ImageAddress(data, datasize,
+						Section->PointerToRawData);
+			SBATSize = Section->SizeOfRawData;
+			dprint(L"sbat section base:0x%lx size:0x%lx\n",
+			       SBATBase, SBATSize);
+		}
+	}
+
+	return verify_sbat_section(SBATBase, SBATSize);
+}
+
+/*
+ * Check that the signature is valid and matches the binary and that
+ * the binary is permitted to load by SBAT.
+ */
+EFI_STATUS
+verify_buffer (char *data, int datasize,
+	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	       UINT8 *sha256hash, UINT8 *sha1hash)
+{
+	EFI_STATUS efi_status;
+
+	efi_status = verify_buffer_sbat(data, datasize, context);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	return verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash);
 }
 
 static int
@@ -1542,7 +1607,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			goto die;
 		}
 
-		efi_status = handle_sbat(sbat_start, sbat_end - sbat_start - 1);
+		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Verifiying shim SBAT data failed: %r\n",
 			       efi_status);
