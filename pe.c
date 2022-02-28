@@ -820,7 +820,7 @@ read_header(void *data, unsigned int datasize,
 }
 
 EFI_STATUS
-handle_sbat(char *SBATBase, size_t SBATSize)
+verify_sbat_section(char *SBATBase, size_t SBATSize)
 {
 	unsigned int i;
 	EFI_STATUS efi_status;
@@ -834,7 +834,12 @@ handle_sbat(char *SBATBase, size_t SBATSize)
 
 	if (SBATBase == NULL || SBATSize == 0) {
 		dprint(L"No .sbat section data\n");
-		return EFI_SECURITY_VIOLATION;
+		/*
+		 * SBAT is mandatory for binaries loaded by shim, but optional
+		 * for binaries loaded outside of shim but verified via the
+		 * protocol.
+		 */
+		return in_protocol ? EFI_SUCCESS : EFI_SECURITY_VIOLATION;
 	}
 
 	sbat_size = SBATSize + 1;
@@ -980,9 +985,6 @@ handle_image (void *data, unsigned int datasize,
 
 	EFI_IMAGE_SECTION_HEADER *RelocSection = NULL;
 
-	char *SBATBase = NULL;
-	size_t SBATSize = 0;
-
 	/*
 	 * Copy the executable's sections to their desired offsets
 	 */
@@ -1027,33 +1029,6 @@ handle_image (void *data, unsigned int datasize,
 					RelocBaseEnd == end) {
 				RelocSection = Section;
 			}
-		} else if (CompareMem(Section->Name, ".sbat\0\0\0", 8) == 0) {
-			if (SBATBase || SBATSize) {
-				perror(L"Image has multiple SBAT sections\n");
-				return EFI_UNSUPPORTED;
-			}
-
-			if (Section->NumberOfRelocations != 0 ||
-			    Section->PointerToRelocations != 0) {
-				perror(L"SBAT section has relocations\n");
-				return EFI_UNSUPPORTED;
-			}
-
-			/* The virtual size corresponds to the size of the SBAT
-			 * metadata and isn't necessarily a multiple of the file
-			 * alignment. The on-disk size is a multiple of the file
-			 * alignment and is zero padded. Make sure that the
-			 * on-disk size is at least as large as virtual size,
-			 * and ignore the section if it isn't. */
-			if (Section->SizeOfRawData &&
-			    Section->SizeOfRawData >= Section->Misc.VirtualSize &&
-			    base && end) {
-				SBATBase = base;
-				/* +1 because of size vs last byte location */
-				SBATSize = end - base + 1;
-				dprint(L"sbat section base:0x%lx size:0x%lx\n",
-				       SBATBase, SBATSize);
-			}
 		}
 
 		if (Section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE) {
@@ -1095,11 +1070,8 @@ handle_image (void *data, unsigned int datasize,
 	}
 
 	if (secure_mode ()) {
-		efi_status = handle_sbat(SBATBase, SBATSize);
-
-		if (!EFI_ERROR(efi_status))
-			efi_status = verify_buffer(data, datasize,
-						   &context, sha256hash, sha1hash);
+		efi_status = verify_buffer(data, datasize, &context, sha256hash,
+					   sha1hash);
 
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
