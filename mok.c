@@ -184,6 +184,19 @@ struct mok_state_variable mok_state_variable_data[] = {
 	 .pcr = 14,
 	 .state = &trust_mok_list,
 	},
+	{.name = L"MokPolicy",
+	 .name8 = "MokPolicy",
+	 .rtname = L"MokPolicyRT",
+	 .rtname8 = "MokPolicyRT",
+	 .guid = &SHIM_LOCK_GUID,
+	 .yes_attr = EFI_VARIABLE_BOOTSERVICE_ACCESS |
+		     EFI_VARIABLE_NON_VOLATILE,
+	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
+	 .flags = MOK_MIRROR_DELETE_FIRST |
+		  MOK_VARIABLE_LOG,
+	 .pcr = 14,
+	 .state = &mok_policy,
+	},
 	{ NULL, }
 };
 size_t n_mok_state_variables = sizeof(mok_state_variable_data) / sizeof(mok_state_variable_data[0]);

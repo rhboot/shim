@@ -100,5 +100,10 @@ struct mok_variable_config_entry {
 	UINT8 data[];
 };
 
+/*
+ * bit definitions for MokPolicy
+ */
+#define MOK_POLICY_REQUIRE_NX	1
+
 #endif /* !SHIM_MOK_H_ */
 // vim:fenc=utf-8:tw=75:noet
