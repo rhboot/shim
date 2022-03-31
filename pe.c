@@ -800,8 +800,9 @@ read_header(void *data, unsigned int datasize,
 		DllFlags = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
 	}
 
-	if (!(DllFlags & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
-		perror(L"Image does not support NX\n");
+	if ((mok_policy & MOK_POLICY_REQUIRE_NX) &&
+	    !(DllFlags & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
+		perror(L"Policy requires NX, but image does not support NX\n");
 		return EFI_UNSUPPORTED;
         }
 
@@ -1203,7 +1204,8 @@ handle_image (void *data, unsigned int datasize,
 
 		if (!(Section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE) &&
 		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) &&
-		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
+		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) &&
+		    (mok_policy & MOK_POLICY_REQUIRE_NX)) {
 			perror(L"Section %d is writable and executable\n", i);
 			return EFI_UNSUPPORTED;
 		}
