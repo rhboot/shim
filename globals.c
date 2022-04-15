@@ -6,12 +6,6 @@
 
 #include "shim.h"
 
-UINT32 vendor_authorized_size = 0;
-UINT8 *vendor_authorized = NULL;
-
-UINT32 vendor_deauthorized_size = 0;
-UINT8 *vendor_deauthorized = NULL;
-
 #if defined(ENABLE_SHIM_CERT)
 UINT32 build_cert_size;
 UINT8 *build_cert;

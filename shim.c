@@ -33,6 +33,12 @@
 
 #include <stdint.h>
 
+UINT32 vendor_authorized_size = 0;
+UINT8 *vendor_authorized = NULL;
+
+UINT32 vendor_deauthorized_size = 0;
+UINT8 *vendor_deauthorized = NULL;
+
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
 static EFI_SYSTEM_TABLE *systab;
