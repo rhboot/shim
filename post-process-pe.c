@@ -426,7 +426,7 @@ handle_one(char *f)
 		warn("msync(%p, %zu, MS_SYNC) failed", map, sz);
 		failed = 1;
 	}
-	munmap(map, sz);
+	rc = munmap(map, sz);
 	if (rc < 0) {
 		warn("munmap(%p, %zu) failed", map, sz);
 		failed = 1;
