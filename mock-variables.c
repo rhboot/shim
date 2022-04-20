@@ -445,7 +445,7 @@ free_var(struct mock_variable *var)
 static bool
 mock_sv_attrs_match(UINT32 old, UINT32 new)
 {
-	UINT32 mask = ~EFI_VARIABLE_APPEND_WRITE;
+	UINT32 mask = ~((UINT32)EFI_VARIABLE_APPEND_WRITE);
 
 	return (old & mask) == (new & mask);
 }
