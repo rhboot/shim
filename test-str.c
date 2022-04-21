@@ -926,12 +926,15 @@ static int
 test_strncpy(void)
 {
 	char s[] = "0123456789abcdef\0000";
-	char s0[4096+4096];
-	char *s1 = &s0[4096];
+	char s0[4096];
+	char s1[4096];
 
 	memset(s0, 0, sizeof(s0));
 	memcpy(s0, s, sizeof(s));
-
+#if __GNUC_PREREQ(8, 1)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
 	memset(s1, 0, 4096);
 	assert_equal_return(strncpy(s1, s0, 0), s1, -1, "got %p expected %p\n");
 	assert_equal_return(strlen(s1), 0, -1, "got %d expected %d\n");
@@ -1030,7 +1033,9 @@ test_strncpy(void)
 	assert_equal_return(s1[16], '\000', -1, "got %#02hhx expected %02hhx\n");
 	assert_equal_return(s1[17], '0', -1, "got %#02hhx expected %02hhx\n");
 	assert_equal_return(s1[18], '1', -1, "got %#02hhx expected %02hhx\n");
-
+#if __GNUC_PREREQ(8, 1)
+# pragma GCC diagnostic pop
+#endif
 	return 0;
 }
 
@@ -1038,12 +1043,12 @@ static int
 test_strcat(void)
 {
 	char s[] = "0123456789abcdef\0000";
-	char s0[8192];
-	char *s1 = &s0[4096];
+	char s0[4096];
+	char s1[4096];
 	char *s2;
 	char s3[] = "0123456789abcdef0123456789abcdef\000\000\000\000\000";
 
-	memset(s0, 0, 8192);
+	memset(s0, 0, sizeof(s0));
 	memcpy(s0, s, sizeof(s));
 
 	memset(s1, 0, 4096);
