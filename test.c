@@ -259,6 +259,12 @@ console_print(const CHAR16 *fmt, ...)
 	return 0;
 }
 
+void
+console_error(CHAR16 *err, EFI_STATUS efi_status)
+{
+	return;
+}
+
 #ifndef HAVE_START_IMAGE
 EFI_STATUS
 start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
