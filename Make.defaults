@@ -84,9 +84,7 @@ ifeq ($(ARCH),aarch64)
 	ARCH_GNUEFI		?= aarch64
 	ARCH_SUFFIX		?= aa64
 	ARCH_SUFFIX_UPPER	?= AA64
-	FORMAT			:= -O binary
-	SUBSYSTEM		:= 0xa
-	ARCH_LDFLAGS		+= --defsym=EFI_SUBSYSTEM=$(SUBSYSTEM)
+	ARCH_LDFLAGS		?=
 	ARCH_CFLAGS		?=
 endif
 ifeq ($(ARCH),arm)
