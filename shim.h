@@ -284,6 +284,16 @@ verify_buffer (char *data, int datasize,
 #define LogError(fmt, ...)
 #endif
 
+#ifdef ENABLE_SHIM_DEVEL
+#define FALLBACK_VERBOSE_VAR_NAME L"FALLBACK_DEVEL_VERBOSE"
+#define VERBOSE_VAR_NAME L"SHIM_DEVEL_VERBOSE"
+#define DEBUG_VAR_NAME L"SHIM_DEVEL_DEBUG"
+#else
+#define FALLBACK_VERBOSE_VAR_NAME L"FALLBACK_VERBOSE"
+#define VERBOSE_VAR_NAME L"SHIM_VERBOSE"
+#define DEBUG_VAR_NAME L"SHIM_DEBUG"
+#endif
+
 char *translate_slashes(char *out, const char *str);
 
 #endif /* SHIM_H_ */

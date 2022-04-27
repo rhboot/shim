@@ -732,7 +732,7 @@ setup_verbosity(VOID)
 	UINTN verbose_check_size;
 
 	verbose_check_size = sizeof(verbose);
-	efi_status = get_variable(L"SHIM_VERBOSE", &verbose_check_ptr,
+	efi_status = get_variable(VERBOSE_VAR_NAME, &verbose_check_ptr,
 				  &verbose_check_size, SHIM_LOCK_GUID);
 	if (!EFI_ERROR(efi_status)) {
 		verbose = *(__typeof__(verbose) *)verbose_check_ptr;
