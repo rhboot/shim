@@ -24,7 +24,7 @@ get_fallback_verbose(void)
 	if (state != -1)
 		return state;
 
-	efi_status = get_variable(L"FALLBACK_VERBOSE",
+	efi_status = get_variable(FALLBACK_VERBOSE_VAR_NAME,
 				  &data, &dataSize, SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		state = 0;
@@ -1130,7 +1130,7 @@ debug_hook(void)
 	register volatile int x = 0;
 	extern char _etext, _edata;
 
-	efi_status = get_variable(L"SHIM_DEBUG", &data, &dataSize,
+	efi_status = get_variable(DEBUG_VAR_NAME, &data, &dataSize,
 				  SHIM_LOCK_GUID);
 	if (EFI_ERROR(efi_status)) {
 		return;

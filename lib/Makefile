@@ -41,6 +41,10 @@ CFLAGS		= $(FEATUREFLAGS) \
 		  $(INCLUDES) \
 		  $(DEFINES)
 
+ifneq ($(origin ENABLE_SHIM_DEVEL),undefined)
+CFLAGS += -DENABLE_SHIM_DEVEL
+endif
+
 lib.a: $(LIBFILES)
 	$(AR) rcs lib.a $(LIBFILES)
 
