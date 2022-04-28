@@ -50,6 +50,9 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 # of the "include" directory
 CFLAGS += -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
 
+# And on Debian also check the multi-arch include path
+CFLAGS += -isystem /usr/include/$(shell $(CC) $(ARCH_CFLAGS) -print-multiarch)
+
 export CFLAGS_LTO CFLAGS_GCOV
 
 libefi-test.a :
