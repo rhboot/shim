@@ -174,7 +174,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 	}
 
 	if (FileAlignment % 2 != 0)
-		errx(1, "%s: Invalid file alignment %ld", file, FileAlignment);
+		errx(1, "%s: Invalid file alignment %zu", file, FileAlignment);
 
 	if (FileAlignment == 0)
 		FileAlignment = 0x200;
@@ -190,7 +190,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 	      ctx->NumberOfRvaAndSizes, EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES);
 	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < ctx->NumberOfRvaAndSizes)
 		errx(1, "%s: invalid number of RVAs (%lu entries, max is %d)",
-		     file, ctx->NumberOfRvaAndSizes,
+		     file, (unsigned long)ctx->NumberOfRvaAndSizes,
 		     EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES);
 
 	if (mul(sizeof(EFI_IMAGE_DATA_DIRECTORY),
@@ -233,12 +233,12 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		if (mul(ctx->NumberOfRvaAndSizes,
 		        sizeof(EFI_IMAGE_DATA_DIRECTORY), &sz1))
 			debug(ERROR,
-			      "ctx->NumberOfRvaAndSizes (%zu) * sizeof(EFI_IMAGE_DATA_DIRECTORY) overflows\n",
-			      ctx->NumberOfRvaAndSizes);
+			      "ctx->NumberOfRvaAndSizes (%ld) * sizeof(EFI_IMAGE_DATA_DIRECTORY) overflows\n",
+			      (unsigned long)ctx->NumberOfRvaAndSizes);
 		else
 			debug(ERROR,
-			      "ctx->NumberOfRvaAndSizes (%zu) * sizeof(EFI_IMAGE_DATA_DIRECTORY) = %zu\n",
-			      ctx->NumberOfRvaAndSizes, sz1);
+			      "ctx->NumberOfRvaAndSizes (%ld) * sizeof(EFI_IMAGE_DATA_DIRECTORY) = %zu\n",
+			      (unsigned long)ctx->NumberOfRvaAndSizes, sz1);
 		debug(ERROR,
 		      "space after image header:%zu data directory size:%zu\n",
 		      sz0, sz1);
@@ -271,7 +271,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 	if (sub(ctx->SizeOfHeaders, SectionHeaderOffset, &sz0) ||
 	    div(sz0, EFI_IMAGE_SIZEOF_SECTION_HEADER, &sz0) ||
 	    (sz0 < ctx->NumberOfSections)) {
-		debug(ERROR, "(%zu - %zu) / %d >= %d\n", ctx->SizeOfHeaders,
+		debug(ERROR, "(%zu - %zu) / %d >= %d\n", (size_t)ctx->SizeOfHeaders,
 		      SectionHeaderOffset, EFI_IMAGE_SIZEOF_SECTION_HEADER,
 		      ctx->NumberOfSections);
 		errx(1, "%s: image sections overflow section headers", file);
