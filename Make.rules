@@ -35,4 +35,7 @@ $(strip $(foreach x,$(DEFAULT_$(1)),
 		$(eval override $(1)+=$(x)))))
 endef
 
+%.o : %.S
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 # vim:filetype=make
