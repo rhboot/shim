@@ -1106,7 +1106,31 @@ handle_image (void *data, unsigned int datasize,
 	}
 
 	/*
-	 * We only need to verify the binary if we're in secure mode
+	 * Perform the image verification before we start copying data around
+	 * in order to load it.
+	 */
+	if (secure_mode ()) {
+		efi_status = verify_buffer(data, datasize, &context, sha256hash,
+					   sha1hash);
+
+		if (EFI_ERROR(efi_status)) {
+			if (verbose)
+				console_print(L"Verification failed: %r\n", efi_status);
+			else
+				console_error(L"Verification failed", efi_status);
+			return efi_status;
+		} else {
+			if (verbose)
+				console_print(L"Verification succeeded\n");
+		}
+	}
+
+	/*
+	 * Calculate the hash for the TPM measurement.
+	 * XXX: We're computing these twice in secure boot mode when the
+	 *  buffers already contain the previously computed hashes. Also,
+	 *  this is only useful for the TPM1.2 case. We should try to fix
+	 *  this in a follow-up.
 	 */
 	efi_status = generate_hash(data, datasize, &context, sha256hash,
 				   sha1hash);
@@ -1284,22 +1308,6 @@ handle_image (void *data, unsigned int datasize,
 
 			if (size < Section->Misc.VirtualSize)
 				ZeroMem(base + size, Section->Misc.VirtualSize - size);
-		}
-	}
-
-	if (secure_mode ()) {
-		efi_status = verify_buffer(data, datasize, &context, sha256hash,
-					   sha1hash);
-
-		if (EFI_ERROR(efi_status)) {
-			if (verbose)
-				console_print(L"Verification failed: %r\n", efi_status);
-			else
-				console_error(L"Verification failed", efi_status);
-			return efi_status;
-		} else {
-			if (verbose)
-				console_print(L"Verification succeeded\n");
 		}
 	}
 
