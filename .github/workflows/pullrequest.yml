@@ -15,6 +15,7 @@ jobs:
     name: ${{ matrix.distro }} ${{ matrix.efiarch }} cross-build
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
