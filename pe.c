@@ -1089,6 +1089,7 @@ handle_image (void *data, unsigned int datasize,
 	int i;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
+	UINT32 size;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	unsigned int alignment, alloc_size;
 	int found_entry_point = 0;
@@ -1274,13 +1275,15 @@ handle_image (void *data, unsigned int datasize,
 				return EFI_UNSUPPORTED;
 			}
 
-			if (Section->SizeOfRawData > 0)
-				CopyMem(base, data + Section->PointerToRawData,
-					Section->SizeOfRawData);
+			size = Section->Misc.VirtualSize;
+			if (size > Section->SizeOfRawData)
+				size = Section->SizeOfRawData;
 
-			if (Section->SizeOfRawData < Section->Misc.VirtualSize)
-				ZeroMem(base + Section->SizeOfRawData,
-					Section->Misc.VirtualSize - Section->SizeOfRawData);
+			if (size > 0)
+				CopyMem(base, data + Section->PointerToRawData, size);
+
+			if (size < Section->Misc.VirtualSize)
+				ZeroMem(base + size, Section->Misc.VirtualSize - size);
 		}
 	}
 
