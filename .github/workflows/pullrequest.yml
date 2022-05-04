@@ -58,21 +58,6 @@ jobs:
             gccarch: x86_64
             makearch: x86_64
             distro: f34
-          - arch: amd64
-            efiarch: ia32
-            gccarch: x86_64
-            makearch: ia32
-            distro: f36
-          - arch: amd64
-            efiarch: ia32
-            gccarch: x86_64
-            makearch: ia32
-            distro: f35
-          - arch: amd64
-            efiarch: ia32
-            gccarch: x86_64
-            makearch: ia32
-            distro: f34
 
     steps:
       - name: Checkout
@@ -139,18 +124,6 @@ jobs:
             efiarch: x64
             makearch: x86_64
             distro: centos7
-          - arch: amd64
-            efiarch: ia32
-            makearch: ia32
-            distro: f36
-          - arch: amd64
-            efiarch: ia32
-            makearch: ia32
-            distro: f35
-          - arch: amd64
-            efiarch: ia32
-            makearch: ia32
-            distro: f34
           - arch: amd64
             efiarch: ia32
             makearch: ia32
