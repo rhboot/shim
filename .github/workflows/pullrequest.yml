@@ -24,11 +24,6 @@ jobs:
             makearch: aarch64
             distro: f35
           - arch: amd64
-            efiarch: aa64
-            gccarch: aarch64
-            makearch: aarch64
-            distro: f34
-          - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
