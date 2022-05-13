@@ -50,6 +50,10 @@
 
 #include <efivar/efivar.h>
 
+/* workaround for incompatible efivar-devel definitions */
+#undef EFI_VARIABLE_APPEND_WRITE
+#include "efiauthenticated.h"
+
 #include <assert.h>
 
 #include "list.h"
