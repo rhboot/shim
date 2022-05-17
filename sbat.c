@@ -113,13 +113,14 @@ cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries)
 }
 
 EFI_STATUS
-verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sbat_var_entry)
+verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sbat_var_entry, bool *found)
 {
 	UINT16 sbat_gen, sbat_var_gen;
 
 	if (strcmp((const char *)entry->component_name, (const char *)sbat_var_entry->component_name) == 0) {
 		dprint(L"component %a has a matching SBAT variable entry, verifying\n",
 			entry->component_name);
+		*found = true;
 
 		/*
 		 * atoi returns zero for failed conversion, so essentially
@@ -172,10 +173,13 @@ verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry *
 
 	for (i = 0; i < n; i++) {
 		list_for_each(pos, local_sbat_var) {
+			bool found = false;
 			sbat_var_entry = list_entry(pos, struct sbat_var_entry, list);
-			efi_status = verify_single_entry(entries[i], sbat_var_entry);
+			efi_status = verify_single_entry(entries[i], sbat_var_entry, &found);
 			if (EFI_ERROR(efi_status))
 				goto out;
+			if (found)
+				break;
 		}
 	}
 
