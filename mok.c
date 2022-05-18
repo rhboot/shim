@@ -873,7 +873,6 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 			v->data = AllocateZeroPool(4);
 			v->data[0] = 0x01;
 			v->data_size = 1;
-			efi_status = EFI_SUCCESS;
 		} else if (efi_status == EFI_NOT_FOUND) {
 			v->data = NULL;
 			v->data_size = 0;
