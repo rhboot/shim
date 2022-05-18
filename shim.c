@@ -1054,7 +1054,7 @@ restore_loaded_image(VOID)
  * Load and run an EFI executable
  */
 EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
-		      CHAR16 *PathName, void **data, int *datasize)
+		      CHAR16 **PathName, void **data, int *datasize)
 {
 	EFI_STATUS efi_status;
 	void *sourcebuffer = NULL;
@@ -1074,7 +1074,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 	/*
 	 * Build a new path from the existing one plus the executable name
 	 */
-	efi_status = generate_path_from_image_path(shim_li, ImagePath, &PathName);
+	efi_status = generate_path_from_image_path(shim_li, ImagePath, PathName);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Unable to generate path %s: %r\n", ImagePath,
 		       efi_status);
@@ -1111,7 +1111,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		/*
 		 * Read the new executable off disk
 		 */
-		efi_status = load_image(shim_li, data, datasize, PathName);
+		efi_status = load_image(shim_li, data, datasize, *PathName);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to load image %s: %r\n",
 			       PathName, efi_status);
@@ -1140,7 +1140,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	void *data = NULL;
 	int datasize = 0;
 
-	efi_status = read_image(image_handle, ImagePath, PathName, &data,
+	efi_status = read_image(image_handle, ImagePath, &PathName, &data,
 				&datasize);
 	if (EFI_ERROR(efi_status))
 		goto done;
@@ -1392,26 +1392,28 @@ uninstall_shim_protocols(void)
 }
 
 EFI_STATUS
-load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename)
+load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE *li = NULL;
+	EFI_LOADED_IMAGE li;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	EFI_SIGNATURE_LIST *certlist;
-	CHAR16 *PathName = NULL;
 	void *pointer;
 	UINT32 original;
 	int datasize = 0;
 	void *data = NULL;
 	int i;
 
-	efi_status = read_image(image_handle, filename, PathName,
+	efi_status = read_image(image_handle, filename, &PathName,
 				&data, &datasize);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	efi_status = verify_image(data, datasize, li, &context);
+	memset(&li, 0, sizeof(li));
+	memcpy(&li.FilePath[0], filename, MIN(StrSize(filename), sizeof(li.FilePath)));
+
+	efi_status = verify_image(data, datasize, &li, &context);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -1501,7 +1503,7 @@ load_certs(EFI_HANDLE image_handle)
 			goto done;
 
 		if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
-			load_cert_file(image_handle, info->FileName);
+			load_cert_file(image_handle, info->FileName, PathName);
 		}
 	}
 done:
