@@ -353,15 +353,15 @@ set_sbat_uefi_variable(void)
 		sbat_var = SBAT_VAR_PREVIOUS;
 	} else {
 		switch (*sbat_policy) {
-			case 1:
+			case SBAT_POLICY_LATEST:
 				dprint("Custom sbat policy: latest\n");
 				sbat_var = SBAT_VAR_LATEST;
 				break;
-			case 2:
+			case SBAT_POLICY_PREVIOUS:
 				dprint("Custom sbat policy: previous\n");
 				sbat_var = SBAT_VAR_PREVIOUS;
 				break;
-			case 3:
+			case SBAT_POLICY_RESET:
 				if (secure_mode()) {
 					console_print(L"Cannot reset SBAT policy: Secure Boot is enabled.\n");
 					sbat_var = SBAT_VAR_PREVIOUS;
@@ -374,6 +374,16 @@ set_sbat_uefi_variable(void)
 				if (EFI_ERROR(efi_status))
 					console_error(L"Could not reset SBAT Policy",
 						      efi_status);
+				break;
+			default:
+				console_error(L"SBAT policy state %llu is invalid",
+					      EFI_INVALID_PARAMETER);
+				efi_status = del_variable(SBAT_POLICY, SHIM_LOCK_GUID);
+				if (EFI_ERROR(efi_status))
+					console_error(L"Could not reset SBAT Policy",
+						      efi_status);
+				sbat_var = SBAT_VAR_PREVIOUS;
+				break;
 		}
 	}
 
