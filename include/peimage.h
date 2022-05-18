@@ -17,10 +17,14 @@
 
 #include "wincert.h"
 
-#define SIGNATURE_16(A, B)        ((A) | (B << 8))
-#define SIGNATURE_32(A, B, C, D)  (SIGNATURE_16 (A, B) | (SIGNATURE_16 (C, D) << 16))
-#define SIGNATURE_64(A, B, C, D, E, F, G, H) \
-	(SIGNATURE_32 (A, B, C, D) | ((UINT64) (SIGNATURE_32 (E, F, G, H)) << 32))
+#define SIGNATURE_16(A, B) \
+	((UINT16)(((UINT16)(A)) | (((UINT16)(B)) << ((UINT16)8))))
+#define SIGNATURE_32(A, B, C, D)                 \
+	((UINT32)(((UINT32)SIGNATURE_16(A, B)) | \
+	          (((UINT32)SIGNATURE_16(C, D)) << (UINT32)16)))
+#define SIGNATURE_64(A, B, C, D, E, F, G, H)         \
+	((UINT64)((UINT64)SIGNATURE_32(A, B, C, D) | \
+	          ((UINT64)(SIGNATURE_32(E, F, G, H)) << (UINT64)32)))
 
 #define ALIGN_VALUE(Value, Alignment) ((Value) + (((Alignment) - (Value)) & ((Alignment) - 1)))
 #define ALIGN_POINTER(Pointer, Alignment) ((VOID *) (ALIGN_VALUE ((UINTN)(Pointer), (Alignment))))
