@@ -319,16 +319,53 @@ check_sbat_var_attributes(UINT32 attributes)
 #endif
 }
 
+static char *
+nth_sbat_field(char *str, int n)
+{
+	char *ret = str;
+	while (n > 0 && ret != NULL) {
+		if (ret[0] == ',')
+			n--;
+		ret++;
+	}
+	return ret;
+}
+
 bool
 preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes,
 		char *sbat_var)
 {
-	const char *sbatc = (const char *)sbat;
+	char *sbatc = (char *)sbat;
+	char *current_version, *new_version,
+	     *current_datestamp, *new_datestamp;
+	int current_version_len, new_version_len;
 
-	return check_sbat_var_attributes(attributes) &&
-	       sbatsize >= strlen(SBAT_VAR_ORIGINAL) &&
-	       !strcmp(sbatc, SBAT_VAR_SIG SBAT_VAR_VERSION) &&
-	       strcmp(sbatc, sbat_var) >= 0;
+	/* current metadata is not currupt somehow */
+	if (!check_sbat_var_attributes(attributes) ||
+               sbatsize < strlen(SBAT_VAR_ORIGINAL) ||
+	       strncmp(sbatc, SBAT_VAR_SIG, strlen(SBAT_VAR_SIG)))
+		return false;
+
+	/* current metadata version not newer */
+	current_version = nth_sbat_field(sbatc, 1);
+	new_version = nth_sbat_field(sbat_var, 1);
+	current_datestamp = nth_sbat_field(sbatc, 2);
+	new_datestamp = nth_sbat_field(sbat_var, 2);
+
+	current_version_len = current_datestamp - current_version - 1;
+	new_version_len = new_datestamp - new_version - 1;
+
+	if (current_version_len > new_version_len ||
+	    (current_version_len == new_version_len &&
+	    strncmp(current_version, new_version, new_version_len) > 0))
+		return true;
+
+	/* current datestamp is not newer or idential */
+	if (strncmp(current_datestamp, new_datestamp,
+	    strlen(SBAT_VAR_ORIGINAL_DATE)) >= 0)
+                return true;
+
+	return false;
 }
 
 EFI_STATUS
