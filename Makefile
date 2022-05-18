@@ -151,6 +151,7 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
 	$(MAKE) -C gnu-efi \
 		COMPILER="$(COMPILER)" \
+		CCC_CC="$(COMPILER)" \
 		CC="$(CC)" \
 		ARCH=$(ARCH_GNUEFI) \
 		TOPDIR=$(TOPDIR)/gnu-efi \
