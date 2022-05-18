@@ -63,6 +63,10 @@
 #define SBAT_POLICY L"SbatPolicy"
 #define SBAT_POLICY8 "SbatPolicy"
 
+#define SBAT_POLICY_LATEST	1
+#define SBAT_POLICY_PREVIOUS	2
+#define SBAT_POLICY_RESET	3
+
 extern UINTN _sbat, _esbat;
 
 struct sbat_var_entry {
