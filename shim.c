@@ -1138,7 +1138,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	UINTN alloc_pages;
 	CHAR16 *PathName = NULL;
 	void *data = NULL;
-	int datasize;
+	int datasize = 0;
 
 	efi_status = read_image(image_handle, ImagePath, PathName, &data,
 				&datasize);
@@ -1402,13 +1402,12 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename)
 	CHAR16 *PathName = NULL;
 	void *pointer;
 	UINT32 original;
-	int datasize;
-	void *data;
+	int datasize = 0;
+	void *data = NULL;
 	int i;
 
 	efi_status = read_image(image_handle, filename, PathName,
 				&data, &datasize);
-
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
