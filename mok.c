@@ -871,6 +871,10 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 		if (efi_status == EFI_NOT_FOUND &&
 		    v->flags & MOK_VARIABLE_INVERSE) {
 			v->data = AllocateZeroPool(4);
+			if (!v->data) {
+				perror(L"Out of memory\n");
+				return EFI_OUT_OF_RESOURCES;
+			}
 			v->data[0] = 0x01;
 			v->data_size = 1;
 		} else if (efi_status == EFI_NOT_FOUND) {
