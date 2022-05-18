@@ -1496,10 +1496,10 @@ load_certs(EFI_HANDLE image_handle)
 			goto done;
 		}
 
-		if (buffersize == 0)
+		info = (EFI_FILE_INFO *)buffer;
+		if (buffersize == 0 || !info)
 			goto done;
 
-		info = (EFI_FILE_INFO *)buffer;
 		if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
 			load_cert_file(image_handle, info->FileName);
 		}
