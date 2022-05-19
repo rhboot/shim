@@ -47,7 +47,11 @@
 #define ALIAS(x) __attribute__((weak, alias (#x)))
 #endif
 #ifndef ALLOCFUNC
+#if defined(__COVERITY__)
+#define ALLOCFUNC(a, b)
+#else
 #define ALLOCFUNC(dealloc, dealloc_arg) __attribute__((__malloc__(dealloc, dealloc_arg)))
+#endif
 #endif
 #ifndef PRINTF
 #define PRINTF(first, args...) __attribute__((__format__(printf, first, ## args)))
