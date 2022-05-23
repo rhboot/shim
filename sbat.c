@@ -320,15 +320,16 @@ check_sbat_var_attributes(UINT32 attributes)
 }
 
 static char *
-nth_sbat_field(char *str, int n)
+nth_sbat_field(char *str, size_t limit, int n)
 {
-	char *ret = str;
-	while (n > 0 && ret != NULL) {
-		if (ret[0] == ',')
+	size_t i;
+	for (i = 0; i < limit && str[i] != '\0'; i++) {
+		if (n == 0)
+			return &str[i];
+		if (str[i] == ',')
 			n--;
-		ret++;
 	}
-	return ret;
+	return &str[i];
 }
 
 bool
@@ -347,10 +348,10 @@ preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes,
 		return false;
 
 	/* current metadata version not newer */
-	current_version = nth_sbat_field(sbatc, 1);
-	new_version = nth_sbat_field(sbat_var, 1);
-	current_datestamp = nth_sbat_field(sbatc, 2);
-	new_datestamp = nth_sbat_field(sbat_var, 2);
+	current_version = nth_sbat_field(sbatc, sbatsize, 1);
+	new_version = nth_sbat_field(sbat_var, strlen(sbat_var)+1, 1);
+	current_datestamp = nth_sbat_field(sbatc, sbatsize, 2);
+	new_datestamp = nth_sbat_field(sbat_var, strlen(sbat_var)+1, 2);
 
 	current_version_len = current_datestamp - current_version - 1;
 	new_version_len = new_datestamp - new_version - 1;
