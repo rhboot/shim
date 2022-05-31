@@ -5,6 +5,11 @@
 
 #include "shim.h"
 
+extern struct {
+	UINT32 previous_offset;
+	UINT32 latest_offset;
+} sbat_var_payload_header;
+
 EFI_STATUS
 parse_sbat_section(char *section_base, size_t section_size,
 		   size_t *n_entries,
@@ -399,6 +404,9 @@ set_sbat_uefi_variable(void)
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	UINT32 attributes = 0;
 
+	char *sbat_var_previous;
+	char *sbat_var_latest;
+
 	UINT8 *sbat = NULL;
 	UINT8 *sbat_policy = NULL;
 	UINTN sbatsize = 0;
@@ -407,27 +415,30 @@ set_sbat_uefi_variable(void)
 	char *sbat_var = NULL;
 	bool reset_sbat = false;
 
+	sbat_var_previous = (char *)&sbat_var_payload_header + sbat_var_payload_header.previous_offset;
+	sbat_var_latest = (char *)&sbat_var_payload_header + sbat_var_payload_header.latest_offset;
+
 	efi_status = get_variable_attr(SBAT_POLICY, &sbat_policy,
 				       &sbat_policysize, SHIM_LOCK_GUID,
 				       &attributes);
 	if (EFI_ERROR(efi_status)) {
 		dprint("Default sbat policy: previous\n");
-		sbat_var = SBAT_VAR_PREVIOUS;
+		sbat_var = sbat_var_previous;
 	} else {
 		switch (*sbat_policy) {
 			case SBAT_POLICY_LATEST:
 				dprint("Custom sbat policy: latest\n");
-				sbat_var = SBAT_VAR_LATEST;
+				sbat_var = sbat_var_latest;
 				clear_sbat_policy();
 				break;
 			case SBAT_POLICY_PREVIOUS:
 				dprint("Custom sbat policy: previous\n");
-				sbat_var = SBAT_VAR_PREVIOUS;
+				sbat_var = sbat_var_previous;
 				break;
 			case SBAT_POLICY_RESET:
 				if (secure_mode()) {
 					console_print(L"Cannot reset SBAT policy: Secure Boot is enabled.\n");
-					sbat_var = SBAT_VAR_PREVIOUS;
+					sbat_var = sbat_var_previous;
 				} else {
 					dprint(L"Custom SBAT policy: reset OK\n");
 					reset_sbat = true;
@@ -438,7 +449,7 @@ set_sbat_uefi_variable(void)
 			default:
 				console_error(L"SBAT policy state %llu is invalid",
 					      EFI_INVALID_PARAMETER);
-				sbat_var = SBAT_VAR_PREVIOUS;
+				sbat_var = sbat_var_previous;
 				clear_sbat_policy();
 				break;
 		}
