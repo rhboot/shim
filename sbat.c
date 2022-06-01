@@ -289,6 +289,7 @@ parse_sbat_var(list_t *entries)
 	UINT8 *data = 0;
 	UINTN datasize;
 	EFI_STATUS efi_status;
+	list_t *pos = NULL;
 
 	if (!entries) {
 		dprint(L"entries is NULL\n");
@@ -305,7 +306,20 @@ parse_sbat_var(list_t *entries)
 	 * We've intentionally made sure there's a NUL byte on all variable
 	 * allocations, so use that here.
 	 */
-	return parse_sbat_var_data(entries, data, datasize+1);
+	efi_status = parse_sbat_var_data(entries, data, datasize+1);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	dprint(L"SBAT variable entries:\n");
+	list_for_each(pos, entries) {
+		struct sbat_var_entry *entry;
+
+		entry = list_entry(pos, struct sbat_var_entry, list);
+		dprint(L"%a, %a, %a\n", entry->component_name,
+		       entry->component_generation, entry->sbat_datestamp);
+	}
+
+	return efi_status;
 }
 
 static bool
