@@ -1,7 +1,7 @@
 default : all
 
 NAME		= shim
-VERSION		= 15.6~rc2
+VERSION		= 15.6
 ifneq ($(origin RELEASE),undefined)
 DASHRELEASE	?= -$(RELEASE)
 else
