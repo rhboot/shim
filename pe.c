@@ -1097,7 +1097,7 @@ handle_image (void *data, unsigned int datasize,
 	int i;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	char *base, *end;
-	UINT32 size;
+	UINT32 minSize;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	unsigned int alignment, alloc_size;
 	int found_entry_point = 0;
@@ -1299,24 +1299,24 @@ handle_image (void *data, unsigned int datasize,
 			return EFI_UNSUPPORTED;
 		}
 
-		if (Section->Characteristics & EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
-			ZeroMem(base, Section->Misc.VirtualSize);
-		} else {
-			if (Section->PointerToRawData < context.SizeOfHeaders) {
-				perror(L"Section %d is inside image headers\n", i);
-				return EFI_UNSUPPORTED;
-			}
-
-			size = Section->Misc.VirtualSize;
-			if (size > Section->SizeOfRawData)
-				size = Section->SizeOfRawData;
-
-			if (size > 0)
-				CopyMem(base, data + Section->PointerToRawData, size);
-
-			if (size < Section->Misc.VirtualSize)
-				ZeroMem(base + size, Section->Misc.VirtualSize - size);
+		if (Section->PointerToRawData < context.SizeOfHeaders) {
+			perror(L"Section %d is inside image headers\n", i);
+			return EFI_UNSUPPORTED;
 		}
+
+		minSize = Section->Misc.VirtualSize;
+		if (minSize > Section->SizeOfRawData)
+			minSize = Section->SizeOfRawData;
+
+		if (minSize > 0)
+			CopyMem(base, data + Section->PointerToRawData, minSize);
+
+		if (minSize < Section->Misc.VirtualSize)
+			ZeroMem(base + minSize, Section->Misc.VirtualSize - minSize);
+
+		if (Section->Misc.VirtualSize < Section->SizeOfRawData ||
+            Section->Characteristics & EFI_IMAGE_SCN_CNT_UNINITIALIZED_DATA)	
+			ZeroMem(base + minSize, Section->Misc.VirtualSize - minSize);
 	}
 
 	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
