@@ -397,22 +397,22 @@ static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	}
 #endif
 
-	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
+	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
 				== DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
 	} else {
-		LogError(L"check_db_hash(MokList, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_db_hash(MokListRT, sha256hash) != DATA_FOUND\n");
 	}
-	if (cert && check_db_cert(L"MokList", SHIM_LOCK_GUID, cert, sha256hash)
+	if (cert && check_db_cert(L"MokListRT", SHIM_LOCK_GUID, cert, sha256hash)
 			== DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
 	} else if (cert) {
-		LogError(L"check_db_cert(MokList, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_db_cert(MokListRT, sha256hash) != DATA_FOUND\n");
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
