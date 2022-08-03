@@ -54,8 +54,8 @@ void help_func(void)
 	Print(L"  shimutil OPTIONS <args...>\n");
 	Print(L"Options:\n");
 	Print(L"  sb-state: show secure-boot state\n");
-	Print(L"  show MokList [der/text]: show key in list\n");
 	Print(L"  sbat-state [get/set] [latest/previous/delete]: apply sbat\n");
+	Print(L"  show-mok db [der]: show key in list\n");
 	Print(L"\n\n\n");
 }
 
