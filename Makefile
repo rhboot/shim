@@ -25,6 +25,7 @@ include $(TOPDIR)/include/scan-build.mk
 include $(TOPDIR)/include/fanalyzer.mk
 
 TARGETS	= $(SHIMNAME)
+TARGETS += $(UTILNAME)
 TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 TARGETS += $(SHIMHASHNAME)
@@ -45,6 +46,10 @@ MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o gl
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
 FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o
 ORIG_FALLBACK_SRCS = fallback.c
+
+UTIL_OBJS = shimutil.o
+ORIG_UTIL_SRCS = shimutil.c
+
 SBATPATH = $(TOPDIR)/data/sbat.csv
 
 ifeq ($(SOURCE_DATE_EPOCH),)
@@ -56,6 +61,7 @@ endif
 SOURCES = $(foreach source,$(ORIG_SOURCES),$(TOPDIR)/$(source)) version.c
 MOK_SOURCES = $(foreach source,$(ORIG_MOK_SOURCES),$(TOPDIR)/$(source))
 FALLBACK_SRCS = $(foreach source,$(ORIG_FALLBACK_SRCS),$(TOPDIR)/$(source))
+UTIL_SRCS = $(foreach source,$(ORIG_UTIL_SRCS),$(TOPDIR)/$(source))
 
 ifneq ($(origin FALLBACK_VERBOSE), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE
@@ -123,6 +129,7 @@ sbat_data.o : /dev/null
 	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
 
 $(SHIMNAME) : $(SHIMSONAME) post-process-pe
+$(UTILNAME) : $(UTILSONAME) post-process-pe
 $(MMNAME) : $(MMSONAME) post-process-pe
 $(FBNAME) : $(FBSONAME) post-process-pe
 $(SHIMNAME) $(MMNAME) $(FBNAME) : | post-process-pe
@@ -137,13 +144,15 @@ $(SHIMSONAME): $(OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 fallback.o: $(FALLBACK_SRCS)
-
 $(FBSONAME): $(FALLBACK_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 MokManager.o: $(MOK_SOURCES)
-
 $(MMSONAME): $(MOK_OBJS) $(LIBS)
+	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
+
+shimutil.o: $(UTIL_SRCS)
+$(UTILSONAME): $(UTIL_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a: CFLAGS+=-DGNU_EFI_USE_EXTERNAL_STDARG
@@ -320,7 +329,7 @@ clean-lib-objs:
 	fi
 
 clean-shim-objs:
-	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
+	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(UTIL_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
 	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid post-process-pe
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
