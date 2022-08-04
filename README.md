@@ -23,3 +23,5 @@ pub.cer and build with `make VENDOR_CERT_FILE=pub.cer`.
 
 There are a couple of build options, and a couple of ways to customize the
 build, described in [BUILDING](BUILDING).
+
+See the [test plan](testplan.txt), and file a ticket if anything fails!
