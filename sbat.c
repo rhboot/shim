@@ -453,6 +453,7 @@ set_sbat_uefi_variable(void)
 				clear_sbat_policy();
 				break;
 		}
+		FreePool(sbat_policy);
 	}
 
 	efi_status = get_variable_attr(SBAT_VAR_NAME, &sbat, &sbatsize,
