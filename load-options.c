@@ -404,8 +404,13 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 
 	/*
 	 * Apparently sometimes we get L"\0\0"?  Which isn't useful at all.
+	 *
+	 * Possibly related, but some boards have additional data before the
+	 * size which is garbage (it's a weird path to the directory
+	 * containing the loaders).  Known boards that do this: Kontron VX3040
+	 * (AMI), ASUS B85M-E, and at least one "older Dell laptop".
 	 */
-	if (is_all_nuls(li->LoadOptions, li->LoadOptionsSize))
+	if (((CHAR16 *)li->LoadOptions)[0] == 0)
 		return EFI_SUCCESS;
 
 	/*
