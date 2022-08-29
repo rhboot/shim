@@ -118,8 +118,6 @@ struct mok_state_variable mok_state_variable_data[] = {
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
 	 .categorize_addend = categorize_deauthorized,
-	 .addend = &vendor_deauthorized,
-	 .addend_size = &vendor_deauthorized_size,
 	 .flags = MOK_MIRROR_KEYDB |
 		  MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_LOG,
