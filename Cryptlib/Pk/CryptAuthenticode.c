@@ -106,7 +106,7 @@ AuthenticodeVerify (
   //
   // Check if it's PKCS#7 Signed Data (for Authenticode Scenario)
   //
-  if (!PKCS7_type_is_signed (Pkcs7)) {
+  if (!PKCS7_type_is_signed (Pkcs7) || PKCS7_get_detached (Pkcs7)) {
     goto _Exit;
   }
 
