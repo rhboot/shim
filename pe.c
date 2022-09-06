@@ -1196,6 +1196,9 @@ handle_image (void *data, unsigned int datasize,
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
+	/* Flush the instruction cache for the region holding the image */
+	cache_invalidate(buffer, buffer + context.ImageSize);
+
 	*entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!*entry_point) {
 		perror(L"Entry point is invalid\n");
