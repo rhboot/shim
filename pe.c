@@ -5,6 +5,7 @@
  */
 
 #include "shim.h"
+#include "cache.h"
 
 #include <openssl/err.h>
 #include <openssl/bn.h>
@@ -1195,6 +1196,9 @@ handle_image (void *data, unsigned int datasize,
 			 MEM_ATTR_X);
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
+
+	/* Flush the instruction cache for the region holding the image */
+	cache_invalidate(buffer, buffer + context.ImageSize);
 
 	*entry_point = ImageAddress(buffer, context.ImageSize, context.EntryPoint);
 	if (!*entry_point) {
