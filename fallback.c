@@ -6,8 +6,24 @@
 #include "shim.h"
 
 #define NO_REBOOT L"FB_NO_REBOOT"
+#define NO_WRITE_BOOT_ORDER L"FB_NO_WRITE_BOOT_ORDER"
 
 EFI_LOADED_IMAGE *this_image = NULL;
+
+
+static UINT32 get_fallback_no_write_boot_order() {
+	EFI_STATUS efi_status;
+	UINT32 no_write;
+	UINTN size = sizeof(UINT32);
+
+	efi_status = RT->GetVariable(NO_WRITE_BOOT_ORDER,
+	                             &SHIM_LOCK_GUID,
+	                             NULL, &size, &no_write);
+	if (!EFI_ERROR(efi_status)) {
+		return no_write;
+	}
+	return 0;
+}
 
 int
 get_fallback_verbose(void)
@@ -255,11 +271,16 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
 			}
 
-			efi_status = RT->SetVariable(varname, &GV_GUID,
-						EFI_VARIABLE_NON_VOLATILE |
-						EFI_VARIABLE_BOOTSERVICE_ACCESS |
-						EFI_VARIABLE_RUNTIME_ACCESS,
-						size, data);
+			if (get_fallback_no_write_boot_order() == 0) {
+				efi_status = RT->SetVariable(varname,
+							&GV_GUID,
+							EFI_VARIABLE_NON_VOLATILE |
+							EFI_VARIABLE_BOOTSERVICE_ACCESS |
+							EFI_VARIABLE_RUNTIME_ACCESS,
+							size, data);
+			} else {
+				efi_status = EFI_SUCCESS;
+			}
 
 			FreePool(data);
 
@@ -545,11 +566,16 @@ update_boot_order(void)
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
 		LibDeleteVariable(L"BootOrder", &GV_GUID);
 
-	efi_status = RT->SetVariable(L"BootOrder", &GV_GUID,
-				     EFI_VARIABLE_NON_VOLATILE |
-				     EFI_VARIABLE_BOOTSERVICE_ACCESS |
-				     EFI_VARIABLE_RUNTIME_ACCESS,
-				     size, newbootorder);
+	if (get_fallback_no_write_boot_order() == 0) {
+		efi_status = RT->SetVariable(L"BootOrder",
+							&GV_GUID,
+							EFI_VARIABLE_NON_VOLATILE |
+							EFI_VARIABLE_BOOTSERVICE_ACCESS |
+							EFI_VARIABLE_RUNTIME_ACCESS,
+							size, newbootorder);
+	} else {
+		efi_status = EFI_SUCCESS;
+	}
 	FreePool(newbootorder);
 	return efi_status;
 }
@@ -1185,6 +1211,10 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	} else {
 		if (get_fallback_no_reboot() == 1) {
 			VerbosePrint(L"NO_REBOOT is set, starting the first image\n");
+			try_start_first_option(image);
+		}
+		if (get_fallback_no_write_boot_order() == 1) {
+			VerbosePrint(L"NO_WRITE_BOOT_ORDER is set, starting the first image\n");
 			try_start_first_option(image);
 		}
 
