@@ -178,7 +178,7 @@ buildid : $(TOPDIR)/buildid.c
 
 $(BOOTCSVNAME) :
 	@echo Making $@
-	@echo "$(SHIMNAME),$(OSLABEL),,This is the boot entry for $(OSLABEL)" | iconv -t UCS-2LE > $@
+	@echo "$(SHIMNAME),$(OSLABEL),,This is the boot entry for $(OSLABEL)" | iconv -t unicode > $@
 
 install-check :
 ifeq ($(origin LIBDIR),undefined)
