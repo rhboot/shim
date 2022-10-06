@@ -71,7 +71,7 @@ ifeq ($(ARCH),x86_64)
 endif
 ifeq ($(ARCH),ia32)
 	ARCH_CFLAGS		?= -mno-mmx -mno-sse -mno-red-zone -nostdinc \
-				   $(CLANG_BUGS) -m32 \
+				   $(CLANG_BUGS) -m32 -malign-double \
 				   -DMDE_CPU_IA32 -DPAGE_SIZE=4096
 	ARCH_GNUEFI		?= ia32
 	ARCH_SUFFIX		?= ia32
