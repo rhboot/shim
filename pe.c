@@ -1259,7 +1259,7 @@ handle_image (void *data, unsigned int datasize,
 		}
 
 		if (Section->VirtualAddress <= context.EntryPoint &&
-		    (Section->VirtualAddress + Section->SizeOfRawData - 1)
+		    (Section->VirtualAddress + Section->Misc.VirtualSize - 1)
 		    > context.EntryPoint)
 			found_entry_point++;
 
