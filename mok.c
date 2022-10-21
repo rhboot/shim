@@ -178,7 +178,6 @@ struct mok_state_variable mok_state_variable_data[] = {
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
 	 .flags = MOK_MIRROR_DELETE_FIRST |
-		  MOK_VARIABLE_MEASURE |
 		  MOK_VARIABLE_INVERSE |
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
