@@ -1143,7 +1143,11 @@ debug_hook(void)
 
 	x = 1;
 	console_print(L"add-symbol-file "DEBUGDIR
+#ifndef ARCH_INDEPEND	
 		      L"fb" EFI_ARCH L".efi.debug %p -s .data %p\n",
+#else	   
+            	      L"fallback.efi.debug %p -s .data %p\n",
+#endif		      
 		      &_etext, &_edata);
 }
 

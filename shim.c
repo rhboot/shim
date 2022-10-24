@@ -1597,7 +1597,11 @@ debug_hook(void)
 	FreePool(data);
 
 	console_print(L"add-symbol-file "DEBUGDIR
+#ifdef ARCH_INDEPEND
 		      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
+#else	      	      
+		      L"shim.efi.debug 0x%08x -s .data 0x%08x\n",
+#endif		      
 		      &_text, &_data);
 
 	console_print(L"Pausing for debugger attachment.\n");

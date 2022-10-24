@@ -69,6 +69,10 @@ ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE_WAIT=$(FALLBACK_VERBOSE_WAIT)
 endif
 
+ifneq ($(origin ARCH_INDEPEND),undefined)
+	CFLAGS += -DARCH_INDEPEND
+endif
+
 all: confcheck $(TARGETS)
 
 confcheck:
