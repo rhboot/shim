@@ -1395,7 +1395,6 @@ EFI_STATUS
 load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE li;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	EFI_SIGNATURE_LIST *certlist;
@@ -1410,10 +1409,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	memset(&li, 0, sizeof(li));
-	memcpy(&li.FilePath[0], filename, MIN(StrSize(filename), sizeof(li.FilePath)));
-
-	efi_status = verify_image(data, datasize, &li, &context);
+	efi_status = verify_image(data, datasize, shim_li, &context);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
