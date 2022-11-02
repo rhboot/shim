@@ -1429,8 +1429,8 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 			user_cert_size += certlist->SignatureListSize;;
 			user_cert = ReallocatePool(user_cert, original,
 						   user_cert_size);
-			memcpy(user_cert + original, pointer,
-			       certlist->SignatureListSize);
+			CopyMem(user_cert + original, pointer,
+			        certlist->SignatureListSize);
 		}
 	}
 	FreePool(data);
