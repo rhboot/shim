@@ -5,6 +5,7 @@
 
 #ifndef SHIM_UNIT_TEST
 #define SHIM_UNIT_TEST
+#include "sbat_var_defs.h"
 #endif
 #include "shim.h"
 
@@ -1132,7 +1133,7 @@ test_sbat_var_asciz(void)
 	UINTN size = sizeof(buf);
 	char expected[] = SBAT_VAR_PREVIOUS;
 
-	status = set_sbat_uefi_variable();
+	status = set_sbat_uefi_variable(SBAT_VAR_PREVIOUS, SBAT_VAR_PREVIOUS);
 	if (status != EFI_SUCCESS)
 		return -1;
 
