@@ -34,6 +34,7 @@
 #define SBAT_POLICY_LATEST	1
 #define SBAT_POLICY_PREVIOUS	2
 #define SBAT_POLICY_RESET	3
+#define SBAT_POLICY_NOTREAD	255
 
 extern UINTN _sbat, _esbat;
 
@@ -52,7 +53,8 @@ extern list_t sbat_var;
 
 EFI_STATUS parse_sbat_var(list_t *entries);
 void cleanup_sbat_var(list_t *entries);
-EFI_STATUS set_sbat_uefi_variable(void);
+EFI_STATUS set_sbat_uefi_variable_internal(void);
+EFI_STATUS set_sbat_uefi_variable(char *, char *);
 bool preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize,
 				 UINT32 attributes, char *sbar_var);
 

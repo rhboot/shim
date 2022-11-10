@@ -1392,6 +1392,65 @@ uninstall_shim_protocols(void)
 }
 
 EFI_STATUS
+load_sbat_level_file(EFI_HANDLE image_handle, CHAR16 *PathName)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	EFI_IMAGE_SECTION_HEADER *Section;
+	void *pointer;
+	int datasize = 0;
+	void *data = NULL;
+	int i;
+	char *sbat_var_previous = NULL;
+	char *sbat_var_latest = NULL;
+
+	efi_status = read_image(image_handle, L"sbat_level", &PathName,
+				&data, &datasize);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = verify_image(data, datasize, shim_li, &context);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"sbat_level failed to verify\n");
+		return efi_status;
+	}
+	dprint(L"verified sbat_level\n");
+
+	Section = context.FirstSection;
+	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		dprint(L"checking section %a\n", (char *)Section->Name);
+		if (CompareMem(Section->Name, ".sbatl", 6) == 0) {
+			pointer = ImageAddress(data, datasize,
+					       Section->PointerToRawData);
+			if (!pointer) {
+				continue;
+			}
+			sbat_var_latest = (char *)pointer;
+			dprint(L"found sbatl\n");
+		}
+		if (CompareMem(Section->Name, ".sbatp", 6) == 0) {
+			pointer = ImageAddress(data, datasize,
+					       Section->PointerToRawData);
+			if (!pointer) {
+				continue;
+			}
+			sbat_var_previous = (char *)pointer;
+			dprint(L"found sbatp\n");
+		}
+	}
+
+	if (sbat_var_latest && sbat_var_previous) {
+		dprint(L"attempting to update SBAT_LEVEL\n");
+		efi_status = set_sbat_uefi_variable(sbat_var_previous,
+				sbat_var_latest);
+	} else {
+		dprint(L"no data for SBAT_LEVEL\n");
+	}
+	FreePool(data);
+	return efi_status;
+}
+
+EFI_STATUS
 load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status;
@@ -1439,7 +1498,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 
 /* Read additional certificates from files (after verifying signatures) */
 EFI_STATUS
-load_certs(EFI_HANDLE image_handle)
+load_mules(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
@@ -1482,24 +1541,28 @@ load_certs(EFI_HANDLE image_handle)
 		goto done;
 	}
 
-	while (1) {
-		int old = buffersize;
-		efi_status = dir->Read(dir, &buffersize, buffer);
-		if (efi_status == EFI_BUFFER_TOO_SMALL) {
-			buffer = ReallocatePool(buffer, old, buffersize);
-			continue;
-		} else if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to read directory %s - %r\n", PathName,
-			       efi_status);
-			goto done;
-		}
+	load_sbat_level_file(image_handle, PathName);
 
-		info = (EFI_FILE_INFO *)buffer;
-		if (buffersize == 0 || !info)
-			goto done;
+	if (secure_mode()) {
+		while (1) {
+			int old = buffersize;
+			efi_status = dir->Read(dir, &buffersize, buffer);
+			if (efi_status == EFI_BUFFER_TOO_SMALL) {
+				buffer = ReallocatePool(buffer, old, buffersize);
+				continue;
+			} else if (EFI_ERROR(efi_status)) {
+				perror(L"Failed to read directory %s - %r\n", PathName,
+				       efi_status);
+				goto done;
+			}
 
-		if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
-			load_cert_file(image_handle, info->FileName, PathName);
+			info = (EFI_FILE_INFO *)buffer;
+			if (buffersize == 0 || !info)
+				goto done;
+
+			if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
+				load_cert_file(image_handle, info->FileName, PathName);
+			}
 		}
 	}
 done:
@@ -1708,7 +1771,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
-	efi_status = set_sbat_uefi_variable();
+	efi_status = set_sbat_uefi_variable_internal();
 	if (EFI_ERROR(efi_status) && secure_mode()) {
 		perror(L"%s variable initialization failed\n", SBAT_VAR_NAME);
 		msg = SET_SBAT;
@@ -1743,11 +1806,9 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	init_openssl();
 
-	if (secure_mode()) {
-		efi_status = load_certs(global_image_handle);
-		if (EFI_ERROR(efi_status)) {
-			LogError(L"Failed to load addon certificates\n");
-		}
+	efi_status = load_mules(global_image_handle);
+	if (EFI_ERROR(efi_status)) {
+		LogError(L"Failed to load addon certificates / sbat level\n");
 	}
 
 	/*
