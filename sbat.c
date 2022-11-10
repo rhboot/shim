@@ -10,6 +10,8 @@ extern struct {
 	UINT32 latest_offset;
 } sbat_var_payload_header;
 
+UINT8 sbat_policy = SBAT_POLICY_NOTREAD;
+
 EFI_STATUS
 parse_sbat_section(char *section_base, size_t section_size,
 		   size_t *n_entries,
@@ -399,37 +401,37 @@ clear_sbat_policy()
 }
 
 EFI_STATUS
-set_sbat_uefi_variable(void)
+set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	UINT32 attributes = 0;
 
-	char *sbat_var_previous;
-	char *sbat_var_latest;
-
 	UINT8 *sbat = NULL;
-	UINT8 *sbat_policy = NULL;
+	UINT8 *sbat_policyp = NULL;
 	UINTN sbatsize = 0;
 	UINTN sbat_policysize = 0;
 
 	char *sbat_var = NULL;
 	bool reset_sbat = false;
 
-	sbat_var_previous = (char *)&sbat_var_payload_header + sbat_var_payload_header.previous_offset;
-	sbat_var_latest = (char *)&sbat_var_payload_header + sbat_var_payload_header.latest_offset;
-
-	efi_status = get_variable_attr(SBAT_POLICY, &sbat_policy,
+	if (sbat_policy == SBAT_POLICY_NOTREAD) {
+		efi_status = get_variable_attr(SBAT_POLICY, &sbat_policyp,
 				       &sbat_policysize, SHIM_LOCK_GUID,
 				       &attributes);
+		if (!EFI_ERROR(efi_status)) {
+			sbat_policy = *sbat_policyp;
+			clear_sbat_policy();
+		}
+	}
+
 	if (EFI_ERROR(efi_status)) {
 		dprint("Default sbat policy: previous\n");
 		sbat_var = sbat_var_previous;
 	} else {
-		switch (*sbat_policy) {
+		switch (sbat_policy) {
 			case SBAT_POLICY_LATEST:
 				dprint("Custom sbat policy: latest\n");
 				sbat_var = sbat_var_latest;
-				clear_sbat_policy();
 				break;
 			case SBAT_POLICY_PREVIOUS:
 				dprint("Custom sbat policy: previous\n");
@@ -444,13 +446,11 @@ set_sbat_uefi_variable(void)
 					reset_sbat = true;
 					sbat_var = SBAT_VAR_ORIGINAL;
 				}
-				clear_sbat_policy();
 				break;
 			default:
 				console_error(L"SBAT policy state %llu is invalid",
 					      EFI_INVALID_PARAMETER);
 				sbat_var = sbat_var_previous;
-				clear_sbat_policy();
 				break;
 		}
 	}
@@ -516,6 +516,20 @@ set_sbat_uefi_variable(void)
 	FreePool(sbat);
 
 	return efi_status;
+}
+
+EFI_STATUS
+set_sbat_uefi_variable_internal(void)
+{
+	char *sbat_var_previous;
+	char *sbat_var_latest;
+
+	sbat_var_previous = (char *)&sbat_var_payload_header +
+		sbat_var_payload_header.previous_offset;
+	sbat_var_latest = (char *)&sbat_var_payload_header +
+		sbat_var_payload_header.latest_offset;
+
+	return (set_sbat_uefi_variable(sbat_var_previous, sbat_var_latest));
 }
 
 // vim:fenc=utf-8:tw=75:noet
