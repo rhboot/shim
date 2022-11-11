@@ -34,6 +34,10 @@ SECTIONS
   .data.ident : {
     *(.data.ident)
   }
+  . = ALIGN(4096);
+  .sbatlevel : {
+    *(.sbatlevel)
+  }
 
   . = ALIGN(4096);
   .data :

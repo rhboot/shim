@@ -192,5 +192,11 @@
  */
 #define unreachable() __builtin_unreachable()
 
+#if defined(__GNUC__)
+#define cache_invalidate(begin, end)  __builtin___clear_cache(begin, end)
+#else /* __GNUC__ */
+#error shim has no cache_invalidate() implementation for this compiler
+#endif /* __GNUC__ */
+
 #endif /* !COMPILER_H_ */
 // vim:fenc=utf-8:tw=75:et

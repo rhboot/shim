@@ -179,12 +179,14 @@
 #include "include/pe.h"
 #include "include/replacements.h"
 #include "include/sbat.h"
+#include "include/sbat_var_defs.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
 #endif
 #include "include/simple_file.h"
 #include "include/str.h"
 #include "include/tpm.h"
+#include "include/cc.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
 #include "include/hexdump.h"

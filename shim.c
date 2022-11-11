@@ -397,22 +397,22 @@ static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	}
 #endif
 
-	if (check_db_hash(L"MokList", SHIM_LOCK_GUID, sha256hash,
+	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
 				== DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
 		return EFI_SUCCESS;
 	} else {
-		LogError(L"check_db_hash(MokList, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_db_hash(MokListRT, sha256hash) != DATA_FOUND\n");
 	}
-	if (cert && check_db_cert(L"MokList", SHIM_LOCK_GUID, cert, sha256hash)
+	if (cert && check_db_cert(L"MokListRT", SHIM_LOCK_GUID, cert, sha256hash)
 			== DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
 	} else if (cert) {
-		LogError(L"check_db_cert(MokList, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_db_cert(MokListRT, sha256hash) != DATA_FOUND\n");
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
@@ -1395,7 +1395,6 @@ EFI_STATUS
 load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE li;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	EFI_SIGNATURE_LIST *certlist;
@@ -1410,10 +1409,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	memset(&li, 0, sizeof(li));
-	memcpy(&li.FilePath[0], filename, MIN(StrSize(filename), sizeof(li.FilePath)));
-
-	efi_status = verify_image(data, datasize, &li, &context);
+	efi_status = verify_image(data, datasize, shim_li, &context);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -1433,8 +1429,8 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 			user_cert_size += certlist->SignatureListSize;;
 			user_cert = ReallocatePool(user_cert, original,
 						   user_cert_size);
-			memcpy(user_cert + original, pointer,
-			       certlist->SignatureListSize);
+			CopyMem(user_cert + original, pointer,
+			        certlist->SignatureListSize);
 		}
 	}
 	FreePool(data);
