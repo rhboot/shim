@@ -86,14 +86,16 @@ main() {
 	cd ..
 	if [ "x" = "x${SHIM_GIT_TAG}" ] ; then
 		git archive --format=tar "$(git log -1 --pretty=format:%h)" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}" ; tar x )
+		TIMESTAMP=0
 	else
 		# ORIGIN doesn't yet have this tag
 		git archive --format=tar "${SHIM_GIT_TAG}" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}" ; tar x )
+		TIMESTAMP=$(git log -1 --pretty=%ct "${SHIM_GIT_TAG}")
 	fi
 	git log -1 --pretty=format:%H > "${ARCHIVE_DIR}/shim-${VERSION}/commit"
 	DIR="$PWD"
 	cd "${ARCHIVE_DIR}"
-	tar -c --bzip2 -f "${DIR}/shim-${VERSION}.tar.bz2" "shim-${VERSION}"
+	tar -c --sort=name --mtime="@${TIMESTAMP}" --owner=0 --group=0 --numeric-owner --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime --bzip2 -f "${DIR}/shim-${VERSION}.tar.bz2" "shim-${VERSION}"
 	rm -rf "${ARCHIVE_DIR}"
 	echo "The archive is in shim-${VERSION}.tar.bz2"
 	exit 0
