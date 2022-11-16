@@ -3,6 +3,9 @@
 #ifndef SBAT_VAR_DEFS_H_
 #define SBAT_VAR_DEFS_H_
 
+/*
+ * This is the entry for the sbat data format
+ */
 #define SBAT_VAR_SIG "sbat,"
 #define SBAT_VAR_VERSION "1,"
 #define SBAT_VAR_ORIGINAL_DATE "2021030218"
@@ -22,14 +25,18 @@
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE "\n" \
 	SBAT_VAR_LATEST_REVOCATIONS
 #else /* !ENABLE_SHIM_DEVEL */
-#define SBAT_VAR_PREVIOUS_DATE SBAT_VAR_ORIGINAL_DATE
-#define SBAT_VAR_PREVIOUS_REVOCATIONS
+/*
+ * As of 2022-11-16, most folks (including Ubuntu, SUSE, openSUSE) don't have
+ * a "shim,2" yet, so adding that here would end up unbootable.
+ */
+#define SBAT_VAR_PREVIOUS_DATE "2022052400"
+#define SBAT_VAR_PREVIOUS_REVOCATIONS "grub,2\n"
 #define SBAT_VAR_PREVIOUS \
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_PREVIOUS_DATE "\n" \
 	SBAT_VAR_PREVIOUS_REVOCATIONS
 
-#define SBAT_VAR_LATEST_DATE "2022052400"
-#define SBAT_VAR_LATEST_REVOCATIONS "shim,2\ngrub,2\n"
+#define SBAT_VAR_LATEST_DATE "2022111500"
+#define SBAT_VAR_LATEST_REVOCATIONS "shim,2\ngrub,3\n"
 #define SBAT_VAR_LATEST \
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE "\n" \
 	SBAT_VAR_LATEST_REVOCATIONS
