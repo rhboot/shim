@@ -78,6 +78,9 @@ Variables you could set to customize the build:
 - OSLABEL
   This is the label that will be put in BOOT$(EFI_ARCH).CSV for your OS.
   By default this is the same value as EFIDIR .
+- POST_PROCESS_PE_FLAGS
+  This allows you to add flags to the invocation of "post-process-pe", for
+  example to disable the NX compatibility flag.
 
 Vendor SBAT data:
 It will sometimes be requested by reviewers that a build includes extra

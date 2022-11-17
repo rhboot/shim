@@ -255,7 +255,7 @@ endif
 		-j .rela* -j .dyn -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat -j .sbatlevel \
 		$(FORMAT) $< $@
-	./post-process-pe -vv $@
+	./post-process-pe -vv $(POST_PROCESS_PE_FLAGS) $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
