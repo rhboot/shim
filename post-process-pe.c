@@ -43,6 +43,7 @@ static int verbosity;
 	})
 
 static bool set_nx_compat = false;
+static bool set_ms_validation = true;
 
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
@@ -348,8 +349,11 @@ set_dll_characteristics(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 		newflags = oldflags | EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
 	else
 		newflags = oldflags & ~(uint16_t)EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT;
-	if (oldflags == newflags)
+	if (oldflags == newflags) {
+		warnx("Dll Characteristics(0x%04x) indentical to previous one",
+			ctx->PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics);
 		return;
+	}	
 
 	debug(INFO, "Updating DLL Characteristics from 0x%04hx to 0x%04hx\n",
 	      oldflags, newflags);
@@ -358,6 +362,34 @@ set_dll_characteristics(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 	} else {
 		ctx->PEHdr->Pe32.OptionalHeader.DllCharacteristics = newflags;
 	}
+}
+
+static void
+ms_validation(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
+{
+	EFI_IMAGE_SECTION_HEADER *Section;
+	int i;
+
+	debug(INFO, "%14s: %s\n","NX-Compat-Flag",
+		EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT == 
+		ctx->PEHdr->Pe32.OptionalHeader.DllCharacteristics ?
+		"PASS":"FAIL");
+	
+	debug(INFO, "%14s: %s\n","4K-Alignment",
+		PAGE_SIZE == ctx->PEHdr->Pe32Plus.OptionalHeader.SectionAlignment ?
+		"PASS":"FAIL");
+
+	Section = ctx->FirstSection;
+	//printf("NumberOfSections=%d\n",ctx->NumberOfSections);
+	for (i = 0; i < ctx->NumberOfSections; i++, Section++) {
+		//printf("name=%s, Charact=0x%04x\n",Section->Name,Section->Characteristics);
+		if ((Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) &&
+		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
+		    debug(INFO, "%14s: %s\n","Section-Wr-Exe", "FAIL");
+			return;
+		}
+	}
+	debug(INFO, "%14s: %s\n","Section-Wr-Exe", "PASS");
 }
 
 static void
@@ -449,6 +481,9 @@ handle_one(char *f)
 
 	set_dll_characteristics(&ctx);
 
+	if (set_ms_validation)
+		ms_validation(&ctx);
+
 	fix_timestamp(&ctx);
 
 	fix_checksum(&ctx, map, sz);
@@ -483,6 +518,7 @@ static void __attribute__((__noreturn__)) usage(int status)
 	fprintf(out, "       -v    Be more verbose\n");
 	fprintf(out, "       -N    Disable the NX compatibility flag\n");
 	fprintf(out, "       -n    Enable the NX compatibility flag\n");
+	fprintf(out, "       -m    Microsoft validation\n");
 	fprintf(out, "       -h    Print this help text and exit\n");
 
 	exit(status);
@@ -504,6 +540,9 @@ int main(int argc, char **argv)
 		{.name = "enable-nx-compat",
 		 .val = 'n',
 		},
+		{.name = "ms-validation",
+		 .val = 'm',
+		},
 		{.name = "quiet",
 		 .val = 'q',
 		},
@@ -514,7 +553,7 @@ int main(int argc, char **argv)
 	};
 	int longindex = -1;
 
-	while ((i = getopt_long(argc, argv, "hNnqv", options, &longindex)) != -1) {
+	while ((i = getopt_long(argc, argv, "hNnmqv", options, &longindex)) != -1) {
 		switch (i) {
 		case 'h':
 		case '?':
@@ -526,6 +565,9 @@ int main(int argc, char **argv)
 		case 'n':
 			set_nx_compat = true;
 			break;
+		case 'm':
+			set_ms_validation = true;
+			break;	
 		case 'q':
 			verbosity = MAX(verbosity - 1, MIN_VERBOSITY);
 			break;
