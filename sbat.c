@@ -362,7 +362,7 @@ preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes,
 
 	/* current metadata is not currupt somehow */
 	if (!check_sbat_var_attributes(attributes) ||
-               sbatsize < strlen(SBAT_VAR_ORIGINAL) ||
+               sbatsize < strlen(SBAT_VAR_SIG) ||
 	       strncmp(sbatc, SBAT_VAR_SIG, strlen(SBAT_VAR_SIG)))
 		return false;
 
