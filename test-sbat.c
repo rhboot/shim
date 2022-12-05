@@ -1107,6 +1107,36 @@ test_preserve_sbat_uefi_variable_bad_short(void)
 		return 0;
 }
 
+static int
+test_sbat_var_asciz(void)
+{
+	EFI_STATUS status;
+	char buf[1024] = "";
+	UINT32 attrs = 0;
+	UINTN size = sizeof(buf);
+	char expected[] = SBAT_VAR_PREVIOUS;
+
+	status = set_sbat_uefi_variable();
+	if (status != EFI_SUCCESS)
+		return -1;
+
+	status = RT->GetVariable(SBAT_VAR_NAME, &SHIM_LOCK_GUID, &attrs, &size, buf);
+	if (status != EFI_SUCCESS)
+		return -1;
+
+	/*
+	 * this should be enough to get past "sbat,", which handles the
+	 * first error.
+	 */
+	if (size < (strlen(SBAT_VAR_SIG) + 2) || size != strlen(expected))
+		return -1;
+
+	if (strncmp(expected, buf, size) != 0)
+		return -1;
+
+	return 0;
+}
+
 int
 main(void)
 {
@@ -1154,6 +1184,8 @@ main(void)
 	test(test_preserve_sbat_uefi_variable_version_newerlonger);
 	test(test_preserve_sbat_uefi_variable_version_older);
 	test(test_preserve_sbat_uefi_variable_version_olderlonger);
+
+	test(test_sbat_var_asciz);
 
 	return 0;
 }
