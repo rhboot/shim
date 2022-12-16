@@ -1275,24 +1275,10 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
-static void *
-ossl_malloc(size_t num)
-{
-	return AllocatePool(num);
-}
-
-static void
-ossl_free(void *addr)
-{
-	FreePool(addr);
-}
-
 static void
 init_openssl(void)
 {
-	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
 	OPENSSL_init();
-	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
 	ERR_load_ERR_strings();
 	ERR_load_BN_strings();
 	ERR_load_RSA_strings();
