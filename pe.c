@@ -1372,7 +1372,11 @@ handle_image (void *data, unsigned int datasize,
 				     + Section->Misc.VirtualSize - 1);
 
 		addr = (uintptr_t)base;
-		length = (uintptr_t)end - (uintptr_t)base + 1;
+		// Align the length up to PAGE_SIZE. This is required because
+		// platforms generally set memory attributes at page
+		// granularity, but the section length (unlike the section
+		// address) is not required to be aligned.
+		length = ALIGN_VALUE((uintptr_t)end - (uintptr_t)base + 1, PAGE_SIZE);
 
 		if (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) {
 			set_attrs |= MEM_ATTR_W;
