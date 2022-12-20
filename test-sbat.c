@@ -1187,7 +1187,7 @@ main(void)
 
 	test(test_sbat_var_asciz);
 
-	return 0;
+	return status;
 }
 
 // vim:fenc=utf-8:tw=75:noet
