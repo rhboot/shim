@@ -29,6 +29,9 @@
 #define ALIGN_VALUE(Value, Alignment) ((Value) + (((Alignment) - (Value)) & ((Alignment) - 1)))
 #define ALIGN_POINTER(Pointer, Alignment) ((VOID *) (ALIGN_VALUE ((UINTN)(Pointer), (Alignment))))
 
+// Check if `val` is evenly aligned to the page size.
+#define IS_PAGE_ALIGNED(val) (!((val) & EFI_PAGE_MASK))
+
 //
 // PE32+ Subsystem type for EFI images
 //
