@@ -937,7 +937,7 @@ get_mem_attrs (uintptr_t addr, size_t size, uint64_t *attrs)
 	if (EFI_ERROR(efi_status) || !proto)
 		return efi_status;
 
-	if (physaddr & 0xfff || size & 0xfff || size == 0 || attrs == NULL) {
+	if (physaddr & EFI_PAGE_MASK || size == 0 || attrs == NULL) {
 		dprint(L"%a called on 0x%llx-0x%llx and attrs 0x%llx\n",
 		       __func__, (unsigned long long)physaddr,
 		       (unsigned long long)(physaddr+size-1),
@@ -971,7 +971,7 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 		       (unsigned long long)addr, (unsigned long long)size,
 		       &before, efi_status);
 
-	if (physaddr & 0xfff || size & 0xfff || size == 0) {
+	if (physaddr & EFI_PAGE_MASK || size == 0) {
 		dprint(L"%a called on 0x%llx-0x%llx (size 0x%llx) +%a%a%a -%a%a%a\n",
 		       __func__, (unsigned long long)physaddr,
 		       (unsigned long long)(physaddr + size - 1),
