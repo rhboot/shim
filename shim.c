@@ -1483,11 +1483,21 @@ load_certs(EFI_HANDLE image_handle)
 	}
 
 	while (1) {
-		int old = buffersize;
+		UINTN old = buffersize;
 		efi_status = dir->Read(dir, &buffersize, buffer);
 		if (efi_status == EFI_BUFFER_TOO_SMALL) {
-			buffer = ReallocatePool(buffer, old, buffersize);
-			continue;
+			if (buffersize != old) {
+				buffer = ReallocatePool(buffer, old, buffersize);
+				if (buffer == NULL) {
+					perror(L"Failed to read directory %s - %r\n",
+					       PathName, EFI_OUT_OF_RESOURCES);
+					goto done;
+				}
+				continue;
+			}
+			perror(L"Failed to read directory %s - buggy firmware\n",
+			       PathName);
+			goto done;
 		} else if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to read directory %s - %r\n", PathName,
 			       efi_status);
