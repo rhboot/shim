@@ -56,6 +56,7 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    Pk/CryptRsaExtNull.o \
 		    Pk/CryptPkcs7SignNull.o \
 		    Pk/CryptPkcs7Verify.o \
+		    Pk/CryptPkcs7VerifyEku.o \
 		    Pk/CryptDhNull.o \
 		    Pk/CryptTs.o \
 		    Pk/CryptX509.o \
