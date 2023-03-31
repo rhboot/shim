@@ -1486,18 +1486,28 @@ load_certs(EFI_HANDLE image_handle)
 		UINTN old = buffersize;
 		efi_status = dir->Read(dir, &buffersize, buffer);
 		if (efi_status == EFI_BUFFER_TOO_SMALL) {
-			if (buffersize != old) {
-				buffer = ReallocatePool(buffer, old, buffersize);
-				if (buffer == NULL) {
-					perror(L"Failed to read directory %s - %r\n",
-					       PathName, EFI_OUT_OF_RESOURCES);
+			if (buffersize == old) {
+				/*
+				 * Some UEFI drivers or firmwares are not compliant with
+				 * the EFI_FILE_PROTOCOL.Read() specs and do not return the
+				 * required buffer size along with EFI_BUFFER_TOO_SMALL.
+				 * Work around this by progressively increasing the buffer
+				 * size, up to a certain point, until the call succeeds.
+				 */
+				perror(L"Error reading directory %s - "
+				       L"non-compliant UEFI driver or firmware!\n",
+				       PathName);
+				buffersize = (buffersize < 4) ? 4 : buffersize * 2;
+				if (buffersize > 1024)
 					goto done;
-				}
-				continue;
 			}
-			perror(L"Failed to read directory %s - buggy firmware\n",
-			       PathName);
-			goto done;
+			buffer = ReallocatePool(buffer, old, buffersize);
+			if (buffer == NULL) {
+				perror(L"Failed to read directory %s - %r\n",
+				       PathName, EFI_OUT_OF_RESOURCES);
+				goto done;
+			}
+			continue;
 		} else if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to read directory %s - %r\n", PathName,
 			       efi_status);
