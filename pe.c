@@ -87,7 +87,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	/* RelocBaseEnd here is the address of the first entry /past/ the
 	 * table.  */
 	RelocBaseEnd = ImageAddress(orig, size, Section->PointerToRawData +
-						Section->Misc.VirtualSize);
+						context->RelocDir->Size);
 
 	if (!RelocBase && !RelocBaseEnd)
 		return EFI_SUCCESS;
@@ -741,7 +741,7 @@ read_header(void *data, unsigned int datasize,
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
 	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < context->NumberOfRvaAndSizes) {
-		perror(L"Image header too small\n");
+		perror(L"Image header too large\n");
 		return EFI_UNSUPPORTED;
 	}
 
@@ -1277,8 +1277,11 @@ handle_image (void *data, unsigned int datasize,
 					Section->Misc.VirtualSize &&
 					base && end &&
 					RelocBase == base &&
-					RelocBaseEnd == end) {
+					RelocBaseEnd <= end) {
 				RelocSection = Section;
+			} else {
+				perror(L"Relocation section is invalid \n");
+				return EFI_UNSUPPORTED;
 			}
 		}
 
