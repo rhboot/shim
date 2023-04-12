@@ -122,7 +122,7 @@ extern EFI_STATUS EFIAPI vdprint_(const CHAR16 *fmt, const char *file, int line,
 extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
 #define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)
 
-extern VOID msleep(unsigned long msecs);
+extern VOID msleep(unsigned long usecs);
 
 /* This is used in various things to determine if we should print to the
  * console */

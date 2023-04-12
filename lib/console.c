@@ -744,9 +744,9 @@ setup_verbosity(VOID)
 }
 
 VOID
-msleep(unsigned long msecs)
+msleep(unsigned long usecs)
 {
-	BS->Stall(msecs);
+	BS->Stall(usecs);
 }
 
 /* This is used in various things to determine if we should print to the
