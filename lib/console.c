@@ -745,9 +745,9 @@ setup_verbosity(VOID)
 
 #ifndef SHIM_UNIT_TEST
 VOID
-msleep(unsigned long msecs)
+usleep(unsigned long usecs)
 {
-	BS->Stall(msecs);
+	BS->Stall(usecs);
 }
 #endif
 

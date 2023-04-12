@@ -54,7 +54,7 @@ gcm_gmult_4bit(u64 Xi[2], u128 Htable[16])
 }
 
 void
-msleep(int n)
+usleep(int n)
 {
 	__coverity_sleep__();
 }

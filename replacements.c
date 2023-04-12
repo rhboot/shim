@@ -109,7 +109,7 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 				console_print(L"Something has gone seriously wrong: %r\n",
 					      efi_status2);
 				console_print(L"shim cannot continue, sorry.\n");
-				msleep(5000000);
+				usleep(5000000);
 				RT->ResetSystem(EfiResetShutdown,
 						EFI_SECURITY_VIOLATION,
 						0, NULL);
@@ -137,7 +137,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 
 	console_print(L"Bootloader has not verified loaded image.\n");
 	console_print(L"System is compromised.  halting.\n");
-	msleep(5000000);
+	usleep(5000000);
 	RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
 	return EFI_SECURITY_VIOLATION;
 }
@@ -162,7 +162,7 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 			console_print(L"Something has gone seriously wrong: %r\n",
 				      efi_status2);
 			console_print(L"shim cannot continue, sorry.\n");
-			msleep(5000000);
+			usleep(5000000);
 			RT->ResetSystem(EfiResetShutdown,
 					EFI_SECURITY_VIOLATION, 0, NULL);
 		}
