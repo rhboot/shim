@@ -255,11 +255,11 @@ customer impact with as few re-releases as possible, while not creating an
 unnecessarily large UEFI revocation variable payload.
 
 |                                                                                      | prior to<br>disclosure\* | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>second update | after next global<br>disclosure |
-|--------------------------------------------------------------------------------------|------------------------|---------------------|----------------------------------|----------------------------------|---------------------------------|
-| GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                      | 4                   | 4                                | 4                                | 5                               |
-| Vendor C's product-specific<br>generation number in artifact's<br>.sbat section      | 1                      | 1                   | 2                                | 3                                | 1                               |
-| GRUB global<br>generation number in<br>UEFI SBAT revocation variable                 | 3                      | 4                   | 4                                | 4                                | 5                               |
-| Vendor C's product-specific<br>generation number in<br>UEFI SBAT revocation variable | not set                | not set             | 2                                | 3                                | not set                         |
+|--------------------------------------------------------------------------------------|--------------------------|---------------------|----------------------------------|-----------------------------------|---------------------------------|
+| GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                        | 4                   | 4                                | 4                                 | 5                               |
+| Vendor C's product-specific<br>generation number in artifact's<br>.sbat section      | 1                        | 1                   | 2                                | 3                                 | 1                               |
+| GRUB global<br>generation number in<br>UEFI SBAT revocation variable                 | 3                        | 4                   | 4                                | 4                                 | 5                               |
+| Vendor C's product-specific<br>generation number in<br>UEFI SBAT revocation variable | not set                  | not set             | 2                                | 3                                 | not set                         |
 
 \* A disclosure is the event/date where a CVE and fixes for it are made public.
 
@@ -307,7 +307,7 @@ most up to date UEFI metadata.
 Even prior to or without moving to one-shim, it is desirable to get every
 vendor onto as few shims as possible. Ideally a vendor would have a single shim
 signed with their certificate embedded and then use that certificate to sign
-additional <Vendor>_key.EFI key files that then contain all the keys that the
+additional `<Vendor>_key.EFI` key files that then contain all the keys that the
 individual components for their products are signed with. This file name needs
 to be registered at the time of shim review and should not be changed without
 going back to a shim review. A vendor should be able to store as many
@@ -354,14 +354,14 @@ them.
 
 Adding a .sbat section containing the SBAT metadata structure to PE images.
 
-| field | meaning |
-|---|---|
-| component_name | the name we're comparing
-| component_generation | the generation number for the comparison
-| vendor_name | human readable vendor name
-| vendor_package_name | human readable package name
-| vendor_version | human readable package version (maybe machine parseable too, not specified here)
-| vendor_url | url to look stuff up, contact, whatever.
+| field                | meaning                                                                          |
+|----------------------|----------------------------------------------------------------------------------|
+| component_name       | the name we're comparing                                                         |
+| component_generation | the generation number for the comparison                                         |
+| vendor_name          | human readable vendor name                                                       |
+| vendor_package_name  | human readable package name                                                      |
+| vendor_version       | human readable package version (maybe machine parseable too, not specified here) |
+| vendor_url           | url to look stuff up, contact, whatever.                                         |
 
 The format of this .sbat section is comma separated values, or more
 specifically ASCII encoded strings.
@@ -448,7 +448,7 @@ fixed. The following show the evolution over a sample set of events:
 
 ## Starting point
 
-Before CVEs are encountered, an undesirable moudule was built into the a fedora
+Before CVEs are encountered, an undesirable module was built into Fedora's
 grub, so it's product-specific generation number has been bumped:
 
 ```
