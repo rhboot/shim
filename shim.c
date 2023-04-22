@@ -1791,6 +1791,12 @@ die:
 #endif
 	}
 
+	/*
+	 * This variable is supposed to be set by second stages, so ensure it is
+	 * not set when we are starting up.
+	 */
+	(void) del_variable(SHIM_RETAIN_PROTOCOL_VAR_NAME, SHIM_LOCK_GUID);
+
 	efi_status = shim_init();
 	if (EFI_ERROR(efi_status)) {
 		msg = SHIM_INIT;

@@ -78,8 +78,27 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 	unhook_system_services();
 
 	if (image_handle == last_loaded_image) {
+		UINT8 retain_protocol = 0;
+		UINTN retain_protocol_size = sizeof(retain_protocol);
+		UINT32 retain_protocol_attrs = 0;
+
 		loader_is_participating = 1;
-		uninstall_shim_protocols();
+
+		/* If a boot component asks us, keep our protocol around - it will be used to
+		 * validate further PE payloads (e.g.: by the UKI stub, before the kernel is booted).
+		 * But also check that the variable was set by a boot component, to ensure that
+		 * nobody at runtime can attempt to change shim's behaviour. */
+		efi_status = RT->GetVariable(SHIM_RETAIN_PROTOCOL_VAR_NAME,
+					     &SHIM_LOCK_GUID,
+					     &retain_protocol_attrs,
+					     &retain_protocol_size,
+					     &retain_protocol);
+		if (EFI_ERROR(efi_status) ||
+				(retain_protocol_attrs & EFI_VARIABLE_NON_VOLATILE) ||
+				!(retain_protocol_attrs & EFI_VARIABLE_BOOTSERVICE_ACCESS) ||
+				retain_protocol_size != sizeof(retain_protocol) ||
+				retain_protocol == 0)
+			uninstall_shim_protocols();
 	}
 	efi_status = BS->StartImage(image_handle, exit_data_size, exit_data);
 	if (EFI_ERROR(efi_status)) {
