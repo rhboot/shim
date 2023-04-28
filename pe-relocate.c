@@ -12,16 +12,19 @@
 void *
 ImageAddress (void *image, uint64_t size, uint64_t address)
 {
+	uintptr_t img_addr;
+
 	/* ensure our local pointer isn't bigger than our size */
-	if (address > size)
+	if (address >= size)
 		return NULL;
 
 	/* Insure our math won't overflow */
-	if (UINT64_MAX - address < (uint64_t)(intptr_t)image)
+	img_addr = (uintptr_t)image;
+	if (__builtin_add_overflow(img_addr, address, &img_addr))
 		return NULL;
 
 	/* return the absolute pointer */
-	return image + address;
+	return (void *)img_addr;
 }
 
 /*
