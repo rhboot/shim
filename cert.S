@@ -52,3 +52,4 @@ vendor_deauthorized:
 #endif
 .Lvendor_deauthorized_end:
 .Lcert_table_end:
+	.section .note.GNU-stack,"a"
