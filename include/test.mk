@@ -95,6 +95,9 @@ test-mok-mirror: CFLAGS+=-DHAVE_START_IMAGE -DHAVE_SHIM_LOCK_GUID
 test-sbat_FILES = csv.c lib/variables.c lib/guid.c sbat_var.S mock-variables.c
 test-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
 
+test-pe-relocate_FILES = globals.c
+test-pe-relocate :: CFLAGS+=-DHAVE_SHIM_LOCK_GUID
+
 test-str_FILES = lib/string.c
 
 tests := $(patsubst %.c,%,$(wildcard test-*.c))
