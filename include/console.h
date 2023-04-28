@@ -106,8 +106,8 @@ extern UINT32 verbose;
 	dprint_(L"%a:%d:%a() " fmt, __FILE__, __LINE__ - 1, __func__, \
 	        ##__VA_ARGS__)
 #else
-#define dprint_(...)
-#define dprint(fmt, ...)
+#define dprint_(...) ({ ; })
+#define dprint(fmt, ...) ({ ; })
 #endif
 
 extern EFI_STATUS EFIAPI vdprint_(const CHAR16 *fmt, const char *file, int line,
