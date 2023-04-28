@@ -22,6 +22,20 @@ EFI_STATUS
 verify_sbat_section(char *SBATBase, size_t SBATSize);
 
 EFI_STATUS
+get_section_vma (UINTN section_num,
+		 char *buffer, size_t bufsz UNUSED,
+		 PE_COFF_LOADER_IMAGE_CONTEXT *context,
+		 char **basep, size_t *sizep,
+		 EFI_IMAGE_SECTION_HEADER **sectionp);
+
+EFI_STATUS
+get_section_vma_by_name (char *name, size_t namesz,
+			 char *buffer, size_t bufsz,
+			 PE_COFF_LOADER_IMAGE_CONTEXT *context,
+			 char **basep, size_t *sizep,
+			 EFI_IMAGE_SECTION_HEADER **sectionp);
+
+EFI_STATUS
 handle_image (void *data, unsigned int datasize,
 	      EFI_LOADED_IMAGE *li,
 	      EFI_IMAGE_ENTRY_POINT *entry_point,
