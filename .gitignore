@@ -33,6 +33,7 @@ Make.local
 /.cache/
 /certdb/
 /compile_commands.json
+/compile_commands.events.json
 /cov-int/
 /post-process-pe
 /random.bin
