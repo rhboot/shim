@@ -1377,18 +1377,33 @@ uninstall_shim_protocols(void)
 #endif
 }
 
+void
+check_section(char *section_name, int len, void **pointer,
+		EFI_IMAGE_SECTION_HEADER *Section, void *data, int datasize)
+{
+	if (CompareMem(Section->Name, section_name, len) == 0) {
+		*pointer = ImageAddress(data, datasize, Section->PointerToRawData);
+		if (!*pointer) {
+			return ;
+		}
+		dprint(L"found %.*s\n", len, section_name);
+	}
+}
 EFI_STATUS
 load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_IMAGE_SECTION_HEADER *Section;
-	void *pointer;
 	int datasize = 0;
 	void *data = NULL;
 	int i;
 	char *sbat_var_previous = NULL;
 	char *sbat_var_latest = NULL;
+	uint8_t *ssps_previous = NULL;
+	uint8_t *sspv_previous = NULL;
+	uint8_t *ssps_latest = NULL;
+	uint8_t *sspv_latest = NULL;
 
 	efi_status = read_image(image_handle, L"revocations", &PathName,
 				&data, &datasize);
@@ -1405,24 +1420,18 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
 		dprint(L"checking section %a\n", (char *)Section->Name);
-		if (CompareMem(Section->Name, ".sbatl", 6) == 0) {
-			pointer = ImageAddress(data, datasize,
-					       Section->PointerToRawData);
-			if (!pointer) {
-				continue;
-			}
-			sbat_var_latest = (char *)pointer;
-			dprint(L"found sbatl\n");
-		}
-		if (CompareMem(Section->Name, ".sbatp", 6) == 0) {
-			pointer = ImageAddress(data, datasize,
-					       Section->PointerToRawData);
-			if (!pointer) {
-				continue;
-			}
-			sbat_var_previous = (char *)pointer;
-			dprint(L"found sbatp\n");
-		}
+		check_section(".sbatp", 6, (void **)&sbat_var_previous,
+				Section, data, datasize);
+		check_section(".sbatl", 6, (void **)&sbat_var_latest,
+				Section, data, datasize);
+		check_section(".sspvp", 6, (void **)&sspv_previous,
+				Section, data, datasize);
+		check_section(".sspsp", 6, (void **)&ssps_previous,
+				Section, data, datasize);
+		check_section(".sspvl", 6, (void **)&sspv_latest,
+				Section, data, datasize);
+		check_section(".sspsl", 6, (void **)&ssps_latest,
+				Section, data, datasize);
 	}
 
 	if (sbat_var_latest && sbat_var_previous) {
@@ -1432,6 +1441,16 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	} else {
 		dprint(L"no data for SBAT_LEVEL\n");
 	}
+
+	if ((sspv_previous && ssps_previous) || (sspv_latest && ssps_latest)) {
+		dprint(L"attempting to update SkuSiPolicy\n");
+		efi_status = set_ssp_uefi_variable(sspv_previous, ssps_previous,
+				sspv_latest, ssps_latest);
+
+	} else {
+		dprint(L"no data for SkuSiPolicy\n");
+	}
+
 	FreePool(data);
 	return efi_status;
 }
@@ -1796,6 +1815,12 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		dprint(L"%s variable initialization failed: %r\n",
 		       SBAT_VAR_NAME, efi_status);
 	}
+	efi_status = set_ssp_uefi_variable_internal();
+	if (EFI_ERROR(efi_status)) {
+                dprint(L"%s variable initialization failed: %r\n",
+                       SSPVER_VAR_NAME, efi_status);
+        }
+        dprint(L"%s variable initialization done\n", SSPVER_VAR_NAME);
 
 	if (secure_mode()) {
 		char *sbat_start = (char *)&_sbat;
