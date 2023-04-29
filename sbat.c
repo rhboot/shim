@@ -4,13 +4,16 @@
  */
 
 #include "shim.h"
+#include "ssp.h"
+#include "ssp_var_defs.h"
 
 extern struct {
 	UINT32 previous_offset;
 	UINT32 latest_offset;
 } sbat_var_payload_header;
 
-static UINT8 sbat_policy = SBAT_POLICY_NOTREAD;
+static UINT8 sbat_policy = POLICY_NOTREAD;
+static UINT8 ssp_policy = POLICY_NOTREAD;
 
 EFI_STATUS
 parse_sbat_section(char *section_base, size_t section_size,
@@ -398,6 +401,49 @@ preserve_sbat_uefi_variable(UINT8 *sbat, UINTN sbatsize, UINT32 attributes,
 	return false;
 }
 
+/*
+ * This looks kind of weird, but it comes directly from the MS
+ * documentation:
+ * https://support.microsoft.com/en-us/topic/kb5027455-guidance-for-blocking-vulnerable-windows-boot-managers-522bb851-0a61-44ad-aa94-ad11119c5e91
+ */
+static UINT64
+ssp_ver_to_ull(UINT16 *ver)
+{
+	dprint("major: %u\n", ver[0]);
+	dprint("minor: %u\n", ver[1]);
+	dprint("rev: %u\n", ver[2]);
+	dprint("build: %u\n", ver[3]);
+
+	return ((UINT64)ver[0] << 48)
+		+ ((UINT64)ver[1] << 32)
+		+ ((UINT64)ver[2] << 16)
+		+ ver[3];
+}
+
+static bool
+preserve_ssp_uefi_variable(UINT8 *ssp_applied, UINTN sspversize, UINT32 attributes,
+		uint8_t *ssp_candidate)
+{
+	UINT64 old, new;
+
+	if (ssp_applied == NULL || ssp_candidate == NULL)
+		return false;
+
+	if (sspversize != SSPVER_SIZE)
+		return false;
+
+	if (!check_sbat_var_attributes(attributes))
+		return false;
+
+	old = ssp_ver_to_ull((UINT16 *)ssp_applied);
+	new = ssp_ver_to_ull((UINT16 *)ssp_candidate);
+
+	if (new > old)
+		return false;
+	else
+		return true;
+}
+
 static void
 clear_sbat_policy()
 {
@@ -422,7 +468,7 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 	char *sbat_var = NULL;
 	bool reset_sbat = false;
 
-	if (sbat_policy == SBAT_POLICY_NOTREAD) {
+	if (sbat_policy == POLICY_NOTREAD) {
 		efi_status = get_variable_attr(SBAT_POLICY, &sbat_policyp,
 		                               &sbat_policysize, SHIM_LOCK_GUID,
 		                               &attributes);
@@ -477,9 +523,6 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 					SHIM_LOCK_GUID, &attributes);
 	/*
 	 * Always set the SbatLevel UEFI variable if it fails to read.
-	 *
-	 * Don't try to set the SbatLevel UEFI variable if attributes match
-	 * and the signature matches.
 	 */
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
@@ -532,7 +575,6 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 	}
 
 	FreePool(sbat);
-
 	return efi_status;
 }
 
@@ -550,4 +592,161 @@ set_sbat_uefi_variable_internal(void)
 	return set_sbat_uefi_variable(sbat_var_previous, sbat_var_latest);
 }
 
+static void
+clear_ssp_policy(void)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+
+	efi_status = del_variable(SSP_POLICY, SHIM_LOCK_GUID);
+	if (EFI_ERROR(efi_status))
+		console_error(L"Could not reset SSP Policy", efi_status);
+}
+
+static EFI_STATUS
+clear_ssp_uefi_variables(void)
+{
+	EFI_STATUS efi_status, rc = EFI_SUCCESS;
+
+	/* delete previous variable */
+	dprint("Deleting %s variable.\n", SSPVER_VAR_NAME);
+	efi_status = del_variable(SSPVER_VAR_NAME, SECUREBOOT_EFI_NAMESPACE_GUID);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"%s variable delete failed %r\n", SSPVER_VAR_NAME,
+				efi_status);
+		rc = efi_status;
+	}
+	dprint("Deleting %s variable.\n", SSPSIG_VAR_NAME);
+	efi_status = del_variable(SSPSIG_VAR_NAME, SECUREBOOT_EFI_NAMESPACE_GUID);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"%s variable delete failed %r\n", SSPSIG_VAR_NAME,
+				efi_status);
+		rc = efi_status;
+	}
+
+	return rc;
+}
+
+EFI_STATUS
+set_ssp_uefi_variable(uint8_t *ssp_ver_previous, uint8_t *ssp_sig_previous,
+		uint8_t *ssp_ver_latest, uint8_t *ssp_sig_latest)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	UINT32 attributes = 0;
+
+	UINT8 *sspver = NULL;
+	UINT8 *policyp = NULL;
+	UINTN sspversize = 0;
+	UINTN policysize = 0;
+
+	uint8_t *ssp_ver = NULL;
+	uint8_t *ssp_sig = NULL;
+	bool reset_ssp = false;
+
+	_Static_assert(sizeof(SkuSiPolicyVersion) == SSPVER_SIZE,
+			"SkuSiPolicyVersion has unexpected size");
+	_Static_assert(sizeof(SkuSiPolicyUpdateSigners) == SSPSIG_SIZE,
+			"SkuSiPolicyUpdateSigners has unexpected size");
+
+	if (ssp_policy == POLICY_NOTREAD) {
+		efi_status = get_variable_attr(SSP_POLICY, &policyp,
+				       &policysize, SHIM_LOCK_GUID,
+				       &attributes);
+		if (!EFI_ERROR(efi_status)) {
+			ssp_policy = *policyp;
+			clear_ssp_policy();
+		}
+	}
+
+	if (EFI_ERROR(efi_status)) {
+		dprint("Default SSP policy: previous\n");
+		ssp_ver = ssp_ver_previous;
+		ssp_sig = ssp_sig_previous;
+	} else {
+		switch (ssp_policy) {
+			case POLICY_LATEST:
+				dprint("Custom SSP policy: latest\n");\
+				ssp_ver = ssp_ver_latest;
+				ssp_sig = ssp_sig_latest;
+				break;
+			case POLICY_PREVIOUS:
+				dprint("Custom SSP policy: previous\n");
+				ssp_ver = ssp_ver_previous;
+				ssp_sig = ssp_sig_previous;
+				break;
+			case POLICY_RESET:
+				if (secure_mode()) {
+					console_print(L"Cannot reset SSP policy: Secure Boot is enabled.\n");
+					ssp_ver = ssp_ver_previous;
+					ssp_sig = ssp_sig_previous;
+				} else {
+					dprint(L"Custom SSP policy: reset OK\n");
+					reset_ssp = true;
+				}
+				break;
+			default:
+				console_error(L"SSP policy state %llu is invalid",
+					      EFI_INVALID_PARAMETER);
+				ssp_ver = ssp_ver_previous;
+				ssp_sig = ssp_sig_previous;
+				break;
+		}
+	}
+
+	if (!ssp_ver && !ssp_sig && !reset_ssp) {
+		dprint(L"No supplied SSP data, not setting variables\n");
+		return EFI_SUCCESS;
+	}
+
+	efi_status = get_variable_attr(SSPVER_VAR_NAME, &sspver, &sspversize,
+				       SECUREBOOT_EFI_NAMESPACE_GUID, &attributes);
+	/*
+	 * Since generally we want bootmgr to manage its own revocations,
+	 * we are much less agressive trying to set those variables
+	 */
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"SkuSiPolicyVersion read failed %r\n", efi_status);
+	} else if (preserve_ssp_uefi_variable(sspver, sspversize, attributes, ssp_ver)
+		   && !reset_ssp) {
+		FreePool(sspver);
+
+		dprint(L"preserving %s variable it is %d bytes, attributes are 0x%08x\n",
+		       SSPVER_VAR_NAME, sspversize, attributes);
+		return EFI_SUCCESS;
+	} else {
+		FreePool(sspver);
+
+		efi_status = clear_ssp_uefi_variables();
+	}
+
+	if (reset_ssp)
+		return efi_status;
+
+	/* set variable */
+	efi_status = set_variable(SSPVER_VAR_NAME, SECUREBOOT_EFI_NAMESPACE_GUID,
+			SSP_VAR_ATTRS, SSPVER_SIZE, ssp_ver);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"%s variable writing failed %r\n", SSPVER_VAR_NAME,
+				efi_status);
+		return efi_status;
+	}
+	dprint("done setting %s variable.\n", SSPSIG_VAR_NAME);
+
+	efi_status = set_variable(SSPSIG_VAR_NAME, SECUREBOOT_EFI_NAMESPACE_GUID,
+			SSP_VAR_ATTRS, SSPSIG_SIZE, ssp_sig);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"%s variable writing failed %r\n", SSPSIG_VAR_NAME,
+				efi_status);
+		return efi_status;
+	}
+	dprint("done setting %s variable.\n", SSPSIG_VAR_NAME);
+
+	return efi_status;
+}
+
+EFI_STATUS
+set_ssp_uefi_variable_internal(void)
+{
+	return set_ssp_uefi_variable(NULL, NULL, SkuSiPolicyVersion,
+	                             SkuSiPolicyUpdateSigners);
+}
 // vim:fenc=utf-8:tw=75:noet

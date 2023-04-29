@@ -30,11 +30,13 @@
 
 #define SBAT_POLICY L"SbatPolicy"
 #define SBAT_POLICY8 "SbatPolicy"
+#define SSP_POLICY L"SSPPolicy"
+#define SSP_POLICY8 "SSPPolicy"
 
-#define SBAT_POLICY_LATEST	1
-#define SBAT_POLICY_PREVIOUS	2
-#define SBAT_POLICY_RESET	3
-#define SBAT_POLICY_NOTREAD	255
+#define POLICY_LATEST	1
+#define POLICY_PREVIOUS	2
+#define POLICY_RESET	3
+#define POLICY_NOTREAD	255
 
 extern UINTN _sbat, _esbat;
 
