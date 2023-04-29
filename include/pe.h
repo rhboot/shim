@@ -6,6 +6,7 @@
 
 #ifndef PE_H_
 #define PE_H_
+#include "include/peimage.h"
 
 void *
 ImageAddress (void *image, uint64_t size, uint64_t address);

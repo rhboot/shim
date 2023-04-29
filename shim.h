@@ -8,16 +8,16 @@
 #endif
 
 #if defined __GNUC__ && defined __GNUC_MINOR__
-# define GNUC_PREREQ(maj, min) \
-        ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
+#define GNUC_PREREQ(maj, min) \
+	((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
 #else
-# define GNUC_PREREQ(maj, min) 0
+#define GNUC_PREREQ(maj, min) 0
 #endif
 #if defined __clang_major__ && defined __clang_minor__
-# define CLANG_PREREQ(maj, min) \
-  ((__clang_major__ << 16) + __clang_minor__ >= ((maj) << 16) + (min))
+#define CLANG_PREREQ(maj, min) \
+	((__clang_major__ << 16) + __clang_minor__ >= ((maj) << 16) + (min))
 #else
-# define CLANG_PREREQ(maj, min) 0
+#define CLANG_PREREQ(maj, min) 0
 #endif
 
 #if defined(__x86_64__)
@@ -45,10 +45,10 @@
 #endif
 
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdarg.h>
 #include <string.h>
 #include <strings.h>
 
@@ -132,34 +132,33 @@
 #define DEBUGSRC L"/usr/src/debug/shim-" VERSIONSTR "." EFI_ARCH
 #endif
 
-#define FALLBACK L"\\fb" EFI_ARCH L".efi"
+#define FALLBACK    L"\\fb" EFI_ARCH L".efi"
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
 
 #if defined(VENDOR_DB_FILE)
-# define vendor_authorized vendor_db
-# define vendor_authorized_size vendor_db_size
-# define vendor_authorized_category VENDOR_ADDEND_DB
+#define vendor_authorized          vendor_db
+#define vendor_authorized_size     vendor_db_size
+#define vendor_authorized_category VENDOR_ADDEND_DB
 #elif defined(VENDOR_CERT_FILE)
-# define vendor_authorized vendor_cert
-# define vendor_authorized_size vendor_cert_size
-# define vendor_authorized_category VENDOR_ADDEND_X509
+#define vendor_authorized          vendor_cert
+#define vendor_authorized_size     vendor_cert_size
+#define vendor_authorized_category VENDOR_ADDEND_X509
 #else
-# define vendor_authorized vendor_null
-# define vendor_authorized_size vendor_null_size
-# define vendor_authorized_category VENDOR_ADDEND_NONE
+#define vendor_authorized          vendor_null
+#define vendor_authorized_size     vendor_null_size
+#define vendor_authorized_category VENDOR_ADDEND_NONE
 #endif
 
 #if defined(VENDOR_DBX_FILE)
-# define vendor_deauthorized vendor_dbx
-# define vendor_deauthorized_size vendor_dbx_size
+#define vendor_deauthorized      vendor_dbx
+#define vendor_deauthorized_size vendor_dbx_size
 #else
-# define vendor_deauthorized vendor_deauthorized_null
-# define vendor_deauthorized_size vendor_deauthorized_null_size
+#define vendor_deauthorized      vendor_deauthorized_null
+#define vendor_deauthorized_size vendor_deauthorized_null_size
 #endif
 
 #include "include/asm.h"
 #include "include/compiler.h"
-#include "include/list.h"
 #include "include/configtable.h"
 #include "include/console.h"
 #include "include/crypt_blowfish.h"
@@ -171,25 +170,26 @@
 #include "include/httpboot.h"
 #include "include/ip4config2.h"
 #include "include/ip6config.h"
+#include "include/list.h"
 #include "include/load-options.h"
 #include "include/mok.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
-#include "include/peimage.h"
 #include "include/pe.h"
 #include "include/replacements.h"
 #include "include/sbat.h"
 #include "include/sbat_var_defs.h"
+#include "include/ssp.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
 #endif
+#include "include/cc.h"
+#include "include/hexdump.h"
 #include "include/simple_file.h"
 #include "include/str.h"
 #include "include/tpm.h"
-#include "include/cc.h"
 #include "include/ucs2.h"
 #include "include/variables.h"
-#include "include/hexdump.h"
 
 #include "version.h"
 
@@ -197,36 +197,21 @@
 #include "Cryptlib/Include/OpenSslSupport.h"
 #endif
 
-#define MEM_ATTR_R	4
-#define MEM_ATTR_W	2
-#define MEM_ATTR_X	1
+#define MEM_ATTR_R 4
+#define MEM_ATTR_W 2
+#define MEM_ATTR_X 1
 
 INTERFACE_DECL(_SHIM_LOCK);
 
-typedef
-EFI_STATUS
-(*EFI_SHIM_LOCK_VERIFY) (
-	IN VOID *buffer,
-	IN UINT32 size
-	);
+typedef EFI_STATUS (*EFI_SHIM_LOCK_VERIFY)(IN VOID *buffer, IN UINT32 size);
 
-typedef
-EFI_STATUS
-(*EFI_SHIM_LOCK_HASH) (
-	IN char *data,
-	IN int datasize,
-	PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	UINT8 *sha256hash,
-	UINT8 *sha1hash
-	);
+typedef EFI_STATUS (*EFI_SHIM_LOCK_HASH)(IN char *data, IN int datasize,
+                                         PE_COFF_LOADER_IMAGE_CONTEXT *context,
+                                         UINT8 *sha256hash, UINT8 *sha1hash);
 
-typedef
-EFI_STATUS
-(*EFI_SHIM_LOCK_CONTEXT) (
-	IN VOID *data,
-	IN unsigned int datasize,
-	PE_COFF_LOADER_IMAGE_CONTEXT *context
-	);
+typedef EFI_STATUS (*EFI_SHIM_LOCK_CONTEXT)(
+	IN VOID *data, IN unsigned int datasize,
+	PE_COFF_LOADER_IMAGE_CONTEXT *context);
 
 typedef struct _SHIM_LOCK {
 	EFI_SHIM_LOCK_VERIFY Verify;
@@ -271,20 +256,20 @@ extern UINT8 in_protocol;
 extern void *load_options;
 extern UINT32 load_options_size;
 
-BOOLEAN secure_mode (void);
+BOOLEAN secure_mode(void);
 
 EFI_STATUS
-verify_buffer (char *data, int datasize,
-	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	       UINT8 *sha256hash, UINT8 *sha1hash);
+verify_buffer(char *data, int datasize, PE_COFF_LOADER_IMAGE_CONTEXT *context,
+              UINT8 *sha256hash, UINT8 *sha1hash);
 
 #ifndef SHIM_UNIT_TEST
-#define perror_(file, line, func, fmt, ...) ({					\
-		UINTN __perror_ret = 0;						\
-		if (!in_protocol)						\
-			__perror_ret = console_print((fmt), ##__VA_ARGS__);	\
-		LogError_(file, line, func, fmt, ##__VA_ARGS__);		\
-		__perror_ret;							\
+#define perror_(file, line, func, fmt, ...)                                 \
+	({                                                                  \
+		UINTN __perror_ret = 0;                                     \
+		if (!in_protocol)                                           \
+			__perror_ret = console_print((fmt), ##__VA_ARGS__); \
+		LogError_(file, line, func, fmt, ##__VA_ARGS__);            \
+		__perror_ret;                                               \
 	})
 #define perror(fmt, ...) \
 	perror_(__FILE__, __LINE__ - 1, __func__, fmt, ##__VA_ARGS__)
@@ -297,16 +282,20 @@ verify_buffer (char *data, int datasize,
 
 #ifdef ENABLE_SHIM_DEVEL
 #define FALLBACK_VERBOSE_VAR_NAME L"FALLBACK_DEVEL_VERBOSE"
-#define VERBOSE_VAR_NAME L"SHIM_DEVEL_VERBOSE"
-#define DEBUG_VAR_NAME L"SHIM_DEVEL_DEBUG"
+#define VERBOSE_VAR_NAME          L"SHIM_DEVEL_VERBOSE"
+#define DEBUG_VAR_NAME            L"SHIM_DEVEL_DEBUG"
 #else
 #define FALLBACK_VERBOSE_VAR_NAME L"FALLBACK_VERBOSE"
-#define VERBOSE_VAR_NAME L"SHIM_VERBOSE"
-#define DEBUG_VAR_NAME L"SHIM_DEBUG"
+#define VERBOSE_VAR_NAME          L"SHIM_VERBOSE"
+#define DEBUG_VAR_NAME            L"SHIM_DEBUG"
 #endif
 
 #define SHIM_RETAIN_PROTOCOL_VAR_NAME L"ShimRetainProtocol"
 
 char *translate_slashes(char *out, const char *str);
+
+#define CHECK_SECTION(section_name, pointer, section, data, datasize, minsize) \
+	check_section(section_name, sizeof(section_name) - 1, pointer,         \
+	              section, data, datasize, minsize)
 
 #endif /* SHIM_H_ */
