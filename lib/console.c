@@ -744,7 +744,7 @@ setup_verbosity(VOID)
 }
 
 VOID
-msleep(unsigned long usecs)
+usleep(unsigned long usecs)
 {
 	BS->Stall(usecs);
 }

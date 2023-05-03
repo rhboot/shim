@@ -1207,7 +1207,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 		if (EFI_ERROR(efi_status)) {
 			console_print(L"start_image() returned %r\n", efi_status);
-			msleep(2000000);
+			usleep(2000000);
 			return efi_status;
 		}
 
@@ -1222,7 +1222,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		console_print(
 			L"start_image() returned %r, falling back to default loader\n",
 			efi_status);
-		msleep(2000000);
+		usleep(2000000);
 		load_options = NULL;
 		load_options_size = 0;
 		efi_status = start_image(image_handle, DEFAULT_LOADER);
@@ -1230,7 +1230,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"start_image() returned %r\n", efi_status);
-		msleep(2000000);
+		usleep(2000000);
 	}
 
 	return efi_status;
@@ -1647,7 +1647,7 @@ devel_egress(devel_egress_action action UNUSED)
 	console_print(L"Waiting to %a...", reasons[action]);
 	for (size_t sleepcount = 0; sleepcount < 10; sleepcount++) {
 		console_print(L"%d...", 10 - sleepcount);
-		msleep(1000000);
+		usleep(1000000);
 	}
 	console_print(L"\ndoing %a\n", action);
 
@@ -1785,7 +1785,7 @@ die:
 #if defined(ENABLE_SHIM_DEVEL)
 		devel_egress(COLD_RESET);
 #else
-		msleep(5000000);
+		usleep(5000000);
 		RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				0, NULL);
 #endif
@@ -1802,7 +1802,7 @@ die:
 	 */
 	if (user_insecure_mode) {
 		console_print(L"Booting in insecure mode\n");
-		msleep(2000000);
+		usleep(2000000);
 	}
 
 	/*
