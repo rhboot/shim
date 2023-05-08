@@ -1006,7 +1006,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	EFI_HANDLE image_handle;
 
 	if (get_fallback_verbose()) {
-		int fallback_verbose_wait = 500000; /* default to 0.5s */
+		unsigned long fallback_verbose_wait = 500000; /* default to 0.5s */
 #ifdef FALLBACK_VERBOSE_WAIT
 		fallback_verbose_wait = FALLBACK_VERBOSE_WAIT;
 #endif
@@ -1211,7 +1211,7 @@ reset:
 	console_print(L"Reset System\n");
 
 	if (get_fallback_verbose()) {
-		int fallback_verbose_wait = 500000; /* default to 0.5s */
+		unsigned long fallback_verbose_wait = 500000; /* default to 0.5s */
 #ifdef FALLBACK_VERBOSE_WAIT
 		fallback_verbose_wait = FALLBACK_VERBOSE_WAIT;
 #endif
