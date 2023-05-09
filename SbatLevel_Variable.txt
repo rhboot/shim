@@ -1,0 +1,42 @@
+In order to apply SBAT based revocations on systems that will never
+run shim, code running in boot services context needs to set the
+following variable:
+
+Name: SbatLevel
+Attributes: (EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS)
+Namespace Guid: 605dab50-e046-4300-abb6-3dd810dd8b23
+
+Variable content:
+
+Initialized, no revocations:
+
+sbat,1,2021030218
+
+To Revoke GRUB binaries impacted by
+
+* CVE-2021-3695
+* CVE-2021-3696
+* CVE-2021-3697
+* CVE-2022-28733
+* CVE-2022-28734
+* CVE-2022-28735
+* CVE-2022-28736
+* CVE-2022-28737
+
+sbat,1,2022052400
+grub,2
+
+To revoke the above and also grub binaries impacted by
+
+* CVE-2022-2601
+* CVE-2022-3775
+
+sbat,1,2022111500
+grub,3
+
+An additonal bug was fixed in shim that was not considered exploitable
+and can be revoked by setting:
+
+sbat,1,2022111500
+shim,2
+grub,3
