@@ -434,7 +434,12 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 
 	if (EFI_ERROR(efi_status)) {
 		dprint("Default sbat policy: previous\n");
-		sbat_var = sbat_var_previous;
+		if (secure_mode()) {
+			sbat_var = sbat_var_previous;
+		} else {
+			reset_sbat = true;
+			sbat_var = SBAT_VAR_ORIGINAL;
+		}
 	} else {
 		switch (sbat_policy) {
 		case SBAT_POLICY_LATEST:
@@ -458,7 +463,12 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 		default:
 			console_error(L"SBAT policy state %llu is invalid",
 				      EFI_INVALID_PARAMETER);
-			sbat_var = sbat_var_previous;
+			if (secure_mode()) {
+				sbat_var = sbat_var_previous;
+			} else {
+				reset_sbat = true;
+				sbat_var = SBAT_VAR_ORIGINAL;
+			}
 			break;
 		}
 	}
