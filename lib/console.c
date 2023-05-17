@@ -743,11 +743,13 @@ setup_verbosity(VOID)
 	setup_console(-1);
 }
 
+#ifndef SHIM_UNIT_TEST
 VOID
 usleep(unsigned long usecs)
 {
 	BS->Stall(usecs);
 }
+#endif
 
 /* This is used in various things to determine if we should print to the
  * console */
