@@ -25,3 +25,8 @@ There are a couple of build options, and a couple of ways to customize the
 build, described in [BUILDING](BUILDING).
 
 See the [test plan](testplan.txt), and file a ticket if anything fails!
+
+In the event that the developers need to be contacted related to a security
+incident or vulnerability, please mail [secalert@redhat.com].
+
+[secalert@redhat.com]: mailto:secalert@redhat.com
