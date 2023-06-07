@@ -291,7 +291,7 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 					 &var, &varsz);
 	if (EFI_ERROR(efi_status) || !var || !varsz) {
 		LogError(L"Couldn't allocate %lu bytes for mok variable \"%s\": %r\n",
-			 varsz, var, efi_status);
+			 varsz, name, efi_status);
 		return efi_status;
 	}
 
@@ -302,7 +302,7 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	FreePool(var);
 	if (EFI_ERROR(efi_status)) {
 		LogError(L"Couldn't create mok variable \"%s\": %r\n",
-			 varsz, var, efi_status);
+			 name, efi_status);
 		return efi_status;
 	}
 
