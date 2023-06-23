@@ -136,10 +136,6 @@ jobs:
             makearch: x86_64
             distro: centos8
           - arch: amd64
-            efiarch: x64
-            makearch: x86_64
-            distro: centos7
-          - arch: amd64
             efiarch: ia32
             makearch: ia32
             distro: f36
@@ -155,10 +151,6 @@ jobs:
             efiarch: ia32
             makearch: ia32
             distro: centos8
-          - arch: amd64
-            efiarch: ia32
-            makearch: ia32
-            distro: centos7
 
     steps:
       - name: Checkout
