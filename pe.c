@@ -747,6 +747,7 @@ handle_image (void *data, unsigned int datasize,
 		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) &&
 		    (mok_policy & MOK_POLICY_REQUIRE_NX)) {
 			perror(L"Section %d is writable and executable\n", i);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -772,6 +773,7 @@ handle_image (void *data, unsigned int datasize,
 		if (CompareMem(Section->Name, ".reloc\0\0", 8) == 0) {
 			if (RelocSection) {
 				perror(L"Image has multiple relocation sections\n");
+				BS->FreePages(*alloc_address, *alloc_pages);
 				return EFI_UNSUPPORTED;
 			}
 			/* If it has nonzero sizes, and our bounds check
@@ -785,6 +787,7 @@ handle_image (void *data, unsigned int datasize,
 				RelocSection = Section;
 			} else {
 				perror(L"Relocation section is invalid \n");
+				BS->FreePages(*alloc_address, *alloc_pages);
 				return EFI_UNSUPPORTED;
 			}
 		}
@@ -795,10 +798,12 @@ handle_image (void *data, unsigned int datasize,
 
 		if (!base) {
 			perror(L"Section %d has invalid base address\n", i);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 		if (!end) {
 			perror(L"Section %d has zero size\n", i);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -806,6 +811,7 @@ handle_image (void *data, unsigned int datasize,
 		    (Section->VirtualAddress < context.SizeOfHeaders ||
 		     Section->PointerToRawData < context.SizeOfHeaders)) {
 			perror(L"Section %d is inside image headers\n", i);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
 
@@ -814,6 +820,7 @@ handle_image (void *data, unsigned int datasize,
 		} else {
 			if (Section->PointerToRawData < context.SizeOfHeaders) {
 				perror(L"Section %d is inside image headers\n", i);
+				BS->FreePages(*alloc_address, *alloc_pages);
 				return EFI_UNSUPPORTED;
 			}
 
@@ -831,7 +838,7 @@ handle_image (void *data, unsigned int datasize,
 
 	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
 		perror(L"Image has no relocation entry\n");
-		FreePool(buffer);
+		BS->FreePages(*alloc_address, *alloc_pages);
 		return EFI_UNSUPPORTED;
 	}
 
@@ -844,7 +851,7 @@ handle_image (void *data, unsigned int datasize,
 
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Relocation failed: %r\n", efi_status);
-			FreePool(buffer);
+			BS->FreePages(*alloc_address, *alloc_pages);
 			return efi_status;
 		}
 	}
@@ -910,10 +917,12 @@ handle_image (void *data, unsigned int datasize,
 
 	if (!found_entry_point) {
 		perror(L"Entry point is not within sections\n");
+		BS->FreePages(*alloc_address, *alloc_pages);
 		return EFI_UNSUPPORTED;
 	}
 	if (found_entry_point > 1) {
 		perror(L"%d sections contain entry point\n", found_entry_point);
+		BS->FreePages(*alloc_address, *alloc_pages);
 		return EFI_UNSUPPORTED;
 	}
 
