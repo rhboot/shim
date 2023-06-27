@@ -75,7 +75,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	/* RelocBaseEnd here is the address of the first entry /past/ the
 	 * table.  */
 	RelocBaseEnd = ImageAddress(orig, size, Section->PointerToRawData +
-						context->RelocDir->Size);
+						context->RelocDir->Size - 1);
 
 	if (!RelocBase && !RelocBaseEnd)
 		return EFI_SUCCESS;
