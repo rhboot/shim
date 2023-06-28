@@ -35,6 +35,10 @@ Make.local
 /compile_commands.json
 /compile_commands.events.json
 /cov-int/
+/crash-*
+/fuzz-*
+!/fuzz-*.c
+/leak-*
 /post-process-pe
 /random.bin
 /sbat.*.csv

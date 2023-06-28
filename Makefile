@@ -290,6 +290,15 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
+fuzz fuzz-clean fuzz-coverage fuzz-lto :
+	@make -f $(TOPDIR)/include/fuzz.mk \
+		COMPILER="$(COMPILER)" \
+		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
+		ARCH_DEFINES="$(ARCH_DEFINES)" \
+		EFI_INCLUDES="$(EFI_INCLUDES)" \
+		fuzz-clean $@
+
 test test-clean test-coverage test-lto :
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
@@ -299,13 +308,20 @@ test test-clean test-coverage test-lto :
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
 		test-clean $@
 
+$(patsubst %.c,%,$(wildcard fuzz-*.c)) :
+	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
+
 $(patsubst %.c,%,$(wildcard test-*.c)) :
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
 
-.PHONY : $(patsubst %.c,%,$(wildcard test-*.c)) test
+clean-fuzz-objs:
+	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
 
 clean-test-objs:
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
+
+.PHONY : $(patsubst %.c,%,$(wildcard fuzz-*.c)) fuzz
+.PHONY : $(patsubst %.c,%,$(wildcard test-*.c)) test
 
 clean-gnu-efi:
 	@if [ -d gnu-efi ] ; then \
@@ -340,7 +356,7 @@ clean-cryptlib-objs:
 		$(MAKE) -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile clean ; \
 	fi
 
-clean: clean-shim-objs clean-test-objs clean-gnu-efi clean-openssl-objs clean-cryptlib-objs clean-lib-objs
+clean: clean-shim-objs clean-fuzz-objs clean-test-objs clean-gnu-efi clean-openssl-objs clean-cryptlib-objs clean-lib-objs
 
 GITTAG = $(VERSION)
 
