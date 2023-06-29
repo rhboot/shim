@@ -1314,6 +1314,7 @@ init_openssl(void)
 }
 
 static SHIM_LOCK shim_lock_interface;
+static SHIM_IMAGE_LOADER shim_image_loader_interface;
 static EFI_HANDLE shim_lock_handle;
 
 EFI_STATUS
@@ -1346,10 +1347,12 @@ install_shim_protocols(void)
 	/*
 	 * Install the protocol
 	 */
-	efi_status = BS->InstallProtocolInterface(&shim_lock_handle,
-						  &SHIM_LOCK_GUID,
-						  EFI_NATIVE_INTERFACE,
-						  &shim_lock_interface);
+	efi_status = BS->InstallMultipleProtocolInterfaces(&shim_lock_handle,
+							   &SHIM_LOCK_GUID,
+							   &shim_lock_interface,
+							   &SHIM_IMAGE_LOADER_GUID,
+							   &shim_image_loader_interface,
+							   NULL);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Could not install security protocol",
 			      efi_status);
@@ -1375,8 +1378,12 @@ uninstall_shim_protocols(void)
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
-	BS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
-				       &shim_lock_interface);
+	BS->UninstallMultipleProtocolInterfaces(shim_lock_handle,
+						&SHIM_LOCK_GUID,
+						&shim_lock_interface,
+						&SHIM_IMAGE_LOADER_GUID,
+						&shim_image_loader_interface,
+						NULL);
 
 	if (!secure_mode())
 		return;
@@ -1908,6 +1915,91 @@ devel_egress(devel_egress_action action UNUSED)
 #endif
 }
 
+static EFI_STATUS EFIAPI
+shim_load_image(IN BOOLEAN BootPolicy, IN EFI_HANDLE ParentImageHandle,
+                IN EFI_DEVICE_PATH *FilePath, IN VOID *SourceBuffer,
+                IN UINTN SourceSize, OUT EFI_HANDLE *ImageHandle)
+{
+	SHIM_LOADED_IMAGE *image;
+	EFI_STATUS efi_status;
+
+	(void)FilePath;
+
+	if (BootPolicy || !SourceBuffer || !SourceSize)
+		return EFI_UNSUPPORTED;
+
+	image = AllocatePool(sizeof(*image));
+	if (!image)
+		return EFI_OUT_OF_RESOURCES;
+
+	SetMem(image, sizeof(*image), 0);
+
+	image->li.Revision = 0x1000;
+	image->li.ParentHandle = ParentImageHandle;
+	image->li.SystemTable = systab;
+
+	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
+	                          &image->entry_point, &image->alloc_address,
+	                          &image->alloc_pages);
+	if (EFI_ERROR(efi_status))
+		goto free_image;
+
+	*ImageHandle = NULL;
+	efi_status = BS->InstallMultipleProtocolInterfaces(ImageHandle,
+				&SHIM_LOADED_IMAGE_GUID, image,
+				&EFI_LOADED_IMAGE_GUID, &image->li,
+				NULL);
+	if (EFI_ERROR(efi_status))
+		goto free_alloc;
+
+	return EFI_SUCCESS;
+
+free_alloc:
+	BS->FreePages(image->alloc_address, image->alloc_pages);
+free_image:
+	FreePool(image);
+	return efi_status;
+}
+
+static EFI_STATUS EFIAPI
+shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
+                 OUT CHAR16 **ExitData OPTIONAL)
+{
+	SHIM_LOADED_IMAGE *image;
+	EFI_STATUS efi_status;
+
+	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
+	                                (void **)&image);
+	if (EFI_ERROR(efi_status) || image->started)
+		return EFI_INVALID_PARAMETER;
+
+	if (!setjmp(image->longjmp_buf)) {
+		image->started = true;
+		efi_status =
+			image->entry_point(ImageHandle, image->li.SystemTable);
+	} else {
+		if (ExitData) {
+			*ExitDataSize = image->exit_data_size;
+			*ExitData = (CHAR16 *)image->exit_data;
+		}
+		efi_status = image->exit_status;
+	}
+
+	//
+	// We only support EFI applications, so we can unload and free the
+	// image unconditionally.
+	//
+	BS->UninstallMultipleProtocolInterfaces(ImageHandle,
+	                                &EFI_LOADED_IMAGE_GUID, image,
+					&SHIM_LOADED_IMAGE_GUID, &image->li,
+					NULL);
+
+	BS->FreePages(image->alloc_address, image->alloc_pages);
+	FreePool(image);
+
+	return efi_status;
+}
+
 EFI_STATUS
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
@@ -1950,6 +2042,9 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	shim_lock_interface.Verify = shim_verify;
 	shim_lock_interface.Hash = shim_hash;
 	shim_lock_interface.Context = shim_read_header;
+
+	shim_image_loader_interface.LoadImage = shim_load_image;
+	shim_image_loader_interface.StartImage = shim_start_image;
 
 	systab = passed_systab;
 	image_handle = global_image_handle = passed_image_handle;

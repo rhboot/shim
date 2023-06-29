@@ -55,6 +55,7 @@
 #ifndef SHIM_UNIT_TEST
 #include <efi.h>
 #include <efilib.h>
+#include <efisetjmp.h>
 #undef uefi_call_wrapper
 #include <efierr.h>
 #include <efiip.h>
@@ -237,6 +238,11 @@ typedef struct _SHIM_LOCK {
 	EFI_SHIM_LOCK_CONTEXT Context;
 } SHIM_LOCK;
 
+typedef struct _SHIM_IMAGE_LOADER {
+    EFI_IMAGE_LOAD	LoadImage;
+    EFI_IMAGE_START	StartImage;
+} SHIM_IMAGE_LOADER;
+
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
 extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
@@ -325,5 +331,17 @@ verify_buffer (char *data, int datasize,
 #define SHIM_RETAIN_PROTOCOL_VAR_NAME L"ShimRetainProtocol"
 
 char *translate_slashes(char *out, const char *str);
+
+typedef struct {
+	EFI_LOADED_IMAGE	li;
+	EFI_IMAGE_ENTRY_POINT	entry_point;
+	EFI_PHYSICAL_ADDRESS	alloc_address;
+	UINTN			alloc_pages;
+	EFI_STATUS		exit_status;
+	CONST CHAR16		*exit_data;
+	UINTN			exit_data_size;
+	jmp_buf			longjmp_buf;
+	BOOLEAN			started;
+} SHIM_LOADED_IMAGE;
 
 #endif /* SHIM_H_ */

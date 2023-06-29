@@ -148,6 +148,17 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 	UINTN ExitDataSize, CHAR16 *ExitData)
 {
 	EFI_STATUS efi_status;
+	SHIM_LOADED_IMAGE *image;
+
+	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
+					(void **)&image);
+	if (!EFI_ERROR(efi_status)) {
+		image->exit_status = ExitStatus;
+		image->exit_data_size = ExitDataSize;
+		image->exit_data = ExitData;
+
+		longjmp(image->longjmp_buf, 1);
+	}
 
 	shim_fini();
 
