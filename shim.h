@@ -174,12 +174,12 @@
 #include "include/ip4config2.h"
 #include "include/ip6config.h"
 #include "include/load-options.h"
+#include "include/loader-proto.h"
 #include "include/mok.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
 #include "include/peimage.h"
 #include "include/pe.h"
-#include "include/replacements.h"
 #include "include/sbat.h"
 #include "include/sbat_var_defs.h"
 #include "include/ssp.h"
@@ -238,11 +238,6 @@ typedef struct _SHIM_LOCK {
 	EFI_SHIM_LOCK_CONTEXT Context;
 } SHIM_LOCK;
 
-typedef struct _SHIM_IMAGE_LOADER {
-    EFI_IMAGE_LOAD	LoadImage;
-    EFI_IMAGE_START	StartImage;
-} SHIM_IMAGE_LOADER;
-
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
 extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
@@ -256,6 +251,8 @@ extern VOID ClearErrors(VOID);
 extern VOID restore_loaded_image(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
 extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
+extern EFI_STATUS install_shim_protocols(void);
+extern void uninstall_shim_protocols(void);
 
 extern UINT32 vendor_authorized_size;
 extern UINT8 *vendor_authorized;
@@ -331,6 +328,8 @@ verify_buffer (char *data, int datasize,
 #define SHIM_RETAIN_PROTOCOL_VAR_NAME L"ShimRetainProtocol"
 
 char *translate_slashes(char *out, const char *str);
+
+#include <efisetjmp_arch.h>
 
 typedef struct {
 	EFI_LOADED_IMAGE	li;
