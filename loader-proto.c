@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 /*
- * shim - trivial UEFI first-stage bootloader
+ * loader-proto.c - shim's loader protocol
  *
  * Copyright Red Hat, Inc
  */
@@ -51,6 +51,91 @@ unhook_system_services(void)
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
 #endif /* !defined(DISABLE_EBS_PROTECTION) */
 	BS = systab->BootServices;
+}
+
+static EFI_STATUS EFIAPI
+shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
+                EFI_DEVICE_PATH *FilePath, VOID *SourceBuffer,
+                UINTN SourceSize, EFI_HANDLE *ImageHandle)
+{
+	SHIM_LOADED_IMAGE *image;
+	EFI_STATUS efi_status;
+
+	(void)FilePath;
+
+	if (BootPolicy || !SourceBuffer || !SourceSize)
+		return EFI_UNSUPPORTED;
+
+	image = AllocatePool(sizeof(*image));
+	if (!image)
+		return EFI_OUT_OF_RESOURCES;
+
+	SetMem(image, sizeof(*image), 0);
+
+	image->li.Revision = 0x1000;
+	image->li.ParentHandle = ParentImageHandle;
+	image->li.SystemTable = systab;
+
+	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
+	                          &image->entry_point, &image->alloc_address,
+	                          &image->alloc_pages);
+	if (EFI_ERROR(efi_status))
+		goto free_image;
+
+	*ImageHandle = NULL;
+	efi_status = BS->InstallMultipleProtocolInterfaces(ImageHandle,
+					&SHIM_LOADED_IMAGE_GUID, image,
+					&EFI_LOADED_IMAGE_GUID, &image->li,
+					NULL);
+	if (EFI_ERROR(efi_status))
+		goto free_alloc;
+
+	return EFI_SUCCESS;
+
+free_alloc:
+	BS->FreePages(image->alloc_address, image->alloc_pages);
+free_image:
+	FreePool(image);
+	return efi_status;
+}
+
+static EFI_STATUS EFIAPI
+shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
+                 OUT CHAR16 **ExitData OPTIONAL)
+{
+	SHIM_LOADED_IMAGE *image;
+	EFI_STATUS efi_status;
+
+	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
+					(void **)&image);
+	if (EFI_ERROR(efi_status) || image->started)
+		return EFI_INVALID_PARAMETER;
+
+	if (!setjmp(image->longjmp_buf)) {
+		image->started = true;
+		efi_status =
+			image->entry_point(ImageHandle, image->li.SystemTable);
+	} else {
+		if (ExitData) {
+			*ExitDataSize = image->exit_data_size;
+			*ExitData = (CHAR16 *)image->exit_data;
+		}
+		efi_status = image->exit_status;
+	}
+
+	//
+	// We only support EFI applications, so we can unload and free the
+	// image unconditionally.
+	//
+	BS->UninstallMultipleProtocolInterfaces(ImageHandle,
+	                                &EFI_LOADED_IMAGE_GUID, image,
+	                                &SHIM_LOADED_IMAGE_GUID, &image->li,
+					NULL);
+
+	BS->FreePages(image->alloc_address, image->alloc_pages);
+	FreePool(image);
+
+	return efi_status;
 }
 
 static EFI_STATUS EFIAPI
@@ -179,6 +264,13 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 		}
 	}
 	return efi_status;
+}
+
+void
+init_image_loader(void)
+{
+	shim_image_loader_interface.LoadImage = shim_load_image;
+	shim_image_loader_interface.StartImage = shim_start_image;
 }
 
 void
