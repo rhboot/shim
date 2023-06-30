@@ -26,6 +26,8 @@ UINT8 *build_cert;
 verification_method_t verification_method;
 int loader_is_participating;
 
+SHIM_IMAGE_LOADER shim_image_loader_interface;
+
 UINT8 user_insecure_mode;
 UINT8 ignore_db;
 UINT8 trust_mok_list;
