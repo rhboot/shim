@@ -959,7 +959,6 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if ((INT32)size < 0)
 		return EFI_INVALID_PARAMETER;
 
-	loader_is_participating = 1;
 	in_protocol = 1;
 
 	efi_status = read_header(buffer, size, &context);
@@ -1179,8 +1178,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		ClearErrors();
 		goto restore;
 	}
-
-	loader_is_participating = 0;
 
 	/*
 	 * The binary is trusted and relocated. Run it
@@ -1799,7 +1796,6 @@ shim_init(void)
 			 * validation of the next image.
 			 */
 			hook_system_services(systab);
-			loader_is_participating = 0;
 		}
 
 	}

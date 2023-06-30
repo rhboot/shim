@@ -149,10 +149,6 @@ ifneq ($(origin REQUIRE_TPM), undefined)
 	DEFINES  += -DREQUIRE_TPM
 endif
 
-ifneq ($(origin DISABLE_EBS_PROTECTION), undefined)
-	DEFINES  += -DDISABLE_EBS_PROTECTION
-endif
-
 ifneq ($(origin DISABLE_REMOVABLE_LOAD_OPTIONS), undefined)
 	DEFINES  += -DDISABLE_REMOVABLE_LOAD_OPTIONS
 endif
