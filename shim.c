@@ -1843,16 +1843,13 @@ devel_egress(devel_egress_action action UNUSED)
 #endif
 }
 
-static EFI_STATUS EFIAPI shim_load_image(
-	IN BOOLEAN		BootPolicy,
-	IN EFI_HANDLE		ParentImageHandle,
-	IN EFI_DEVICE_PATH	*FilePath,
-	IN VOID			*SourceBuffer,
-	IN UINTN		SourceSize,
-	OUT EFI_HANDLE		*ImageHandle)
+static EFI_STATUS EFIAPI
+shim_load_image(IN BOOLEAN BootPolicy, IN EFI_HANDLE ParentImageHandle,
+                IN EFI_DEVICE_PATH *FilePath, IN VOID *SourceBuffer,
+                IN UINTN SourceSize, OUT EFI_HANDLE *ImageHandle)
 {
-	SHIM_LOADED_IMAGE	*image;
-	EFI_STATUS		efi_status;
+	SHIM_LOADED_IMAGE *image;
+	EFI_STATUS efi_status;
 
 	(void)FilePath;
 
@@ -1870,18 +1867,16 @@ static EFI_STATUS EFIAPI shim_load_image(
 	image->li.SystemTable = systab;
 
 	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
-				  &image->entry_point, &image->alloc_address,
-				  &image->alloc_pages);
+	                          &image->entry_point, &image->alloc_address,
+	                          &image->alloc_pages);
 	if (EFI_ERROR(efi_status))
 		goto free_image;
 
 	*ImageHandle = NULL;
 	efi_status = BS->InstallMultipleProtocolInterfaces(ImageHandle,
-							   &SHIM_LOADED_IMAGE_GUID,
-							   image,
-							   &EFI_LOADED_IMAGE_GUID,
-							   &image->li,
-							   NULL);
+				&SHIM_LOADED_IMAGE_GUID, image,
+				&EFI_LOADED_IMAGE_GUID, &image->li,
+				NULL);
 	if (EFI_ERROR(efi_status))
 		goto free_alloc;
 
@@ -1894,22 +1889,22 @@ free_image:
 	return efi_status;
 }
 
-static EFI_STATUS EFIAPI shim_start_image(
-	IN EFI_HANDLE		ImageHandle,
-	OUT UINTN		*ExitDataSize,
-	OUT CHAR16		**ExitData  OPTIONAL)
+static EFI_STATUS EFIAPI
+shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
+                 OUT CHAR16 **ExitData OPTIONAL)
 {
-	SHIM_LOADED_IMAGE	*image;
-	EFI_STATUS		efi_status;
+	SHIM_LOADED_IMAGE *image;
+	EFI_STATUS efi_status;
 
 	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
-					(void **)&image);
+	                                (void **)&image);
 	if (EFI_ERROR(efi_status) || image->started)
 		return EFI_INVALID_PARAMETER;
 
 	if (!setjmp(image->longjmp_buf)) {
 		image->started = true;
-		efi_status = image->entry_point(ImageHandle, image->li.SystemTable);
+		efi_status =
+			image->entry_point(ImageHandle, image->li.SystemTable);
 	} else {
 		if (ExitData) {
 			*ExitDataSize = image->exit_data_size;
@@ -1923,11 +1918,9 @@ static EFI_STATUS EFIAPI shim_start_image(
 	// image unconditionally.
 	//
 	BS->UninstallMultipleProtocolInterfaces(ImageHandle,
-						&EFI_LOADED_IMAGE_GUID,
-						image,
-						&SHIM_LOADED_IMAGE_GUID,
-						&image->li,
-						NULL);
+	                                &EFI_LOADED_IMAGE_GUID, image,
+					&SHIM_LOADED_IMAGE_GUID, &image->li,
+					NULL);
 
 	BS->FreePages(image->alloc_address, image->alloc_pages);
 	FreePool(image);
