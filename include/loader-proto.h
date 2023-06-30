@@ -16,7 +16,6 @@ typedef enum {
 } verification_method_t;
 
 extern verification_method_t verification_method;
-extern int loader_is_participating;
 
 extern void hook_system_services(EFI_SYSTEM_TABLE *local_systab);
 extern void unhook_system_services(void);
@@ -27,6 +26,8 @@ extern void unhook_exit(void);
 typedef struct _SHIM_IMAGE_LOADER {
 	EFI_IMAGE_LOAD LoadImage;
 	EFI_IMAGE_START StartImage;
+	EFI_EXIT Exit;
+	EFI_IMAGE_UNLOAD UnloadImage;
 } SHIM_IMAGE_LOADER;
 
 extern SHIM_IMAGE_LOADER shim_image_loader_interface;

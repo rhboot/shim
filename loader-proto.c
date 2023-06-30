@@ -32,12 +32,8 @@ get_active_systab(void)
 
 static typeof(systab->BootServices->LoadImage) system_load_image;
 static typeof(systab->BootServices->StartImage) system_start_image;
+static typeof(systab->BootServices->UnloadImage) system_unload_image;
 static typeof(systab->BootServices->Exit) system_exit;
-#if !defined(DISABLE_EBS_PROTECTION)
-static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
-#endif /* !defined(DISABLE_EBS_PROTECTION) */
-
-static EFI_HANDLE last_loaded_image;
 
 void
 unhook_system_services(void)
@@ -47,9 +43,8 @@ unhook_system_services(void)
 
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
-#if !defined(DISABLE_EBS_PROTECTION)
-	systab->BootServices->ExitBootServices = system_exit_boot_services;
-#endif /* !defined(DISABLE_EBS_PROTECTION) */
+	systab->BootServices->Exit = system_exit;
+	systab->BootServices->UnloadImage = system_unload_image;
 	BS = systab->BootServices;
 }
 
@@ -108,6 +103,14 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 
 	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
 					(void **)&image);
+
+	/*
+	 * This image didn't come from shim_load_image(), so it must have come
+	 * from something before shim was involved.
+	 */
+	if (efi_status == EFI_UNSUPPORTED)
+		return system_start_image(ImageHandle, ExitDataSize, ExitData);
+
 	if (EFI_ERROR(efi_status) || image->started)
 		return EFI_INVALID_PARAMETER;
 
@@ -139,131 +142,54 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 }
 
 static EFI_STATUS EFIAPI
-load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
-	EFI_DEVICE_PATH *DevicePath, VOID *SourceBuffer,
-	UINTN SourceSize, EFI_HANDLE *ImageHandle)
+shim_unload_image(EFI_HANDLE ImageHandle)
 {
+	SHIM_LOADED_IMAGE *image;
 	EFI_STATUS efi_status;
 
-	unhook_system_services();
-	efi_status = BS->LoadImage(BootPolicy, ParentImageHandle, DevicePath,
-				   SourceBuffer, SourceSize, ImageHandle);
-	hook_system_services(systab);
-	if (EFI_ERROR(efi_status))
-		last_loaded_image = NULL;
-	else
-		last_loaded_image = *ImageHandle;
-	return efi_status;
+	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
+					(void **)&image);
+
+	if (efi_status == EFI_UNSUPPORTED)
+		return system_unload_image(ImageHandle);
+
+	BS->FreePages(image->alloc_address, image->alloc_pages);
+	FreePool(image);
+
+	return EFI_SUCCESS;
 }
 
 static EFI_STATUS EFIAPI
-replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 **exit_data)
-{
-	EFI_STATUS efi_status;
-	unhook_system_services();
-
-	if (image_handle == last_loaded_image) {
-		UINT8 retain_protocol = 0;
-		UINTN retain_protocol_size = sizeof(retain_protocol);
-		UINT32 retain_protocol_attrs = 0;
-
-		loader_is_participating = 1;
-
-		/* If a boot component asks us, keep our protocol around - it will be used to
-		 * validate further PE payloads (e.g.: by the UKI stub, before the kernel is booted).
-		 * But also check that the variable was set by a boot component, to ensure that
-		 * nobody at runtime can attempt to change shim's behaviour. */
-		efi_status = RT->GetVariable(SHIM_RETAIN_PROTOCOL_VAR_NAME,
-					     &SHIM_LOCK_GUID,
-					     &retain_protocol_attrs,
-					     &retain_protocol_size,
-					     &retain_protocol);
-		if (EFI_ERROR(efi_status) ||
-				(retain_protocol_attrs & EFI_VARIABLE_NON_VOLATILE) ||
-				!(retain_protocol_attrs & EFI_VARIABLE_BOOTSERVICE_ACCESS) ||
-				retain_protocol_size != sizeof(retain_protocol) ||
-				retain_protocol == 0)
-			uninstall_shim_protocols();
-	}
-	efi_status = BS->StartImage(image_handle, exit_data_size, exit_data);
-	if (EFI_ERROR(efi_status)) {
-		if (image_handle == last_loaded_image) {
-			EFI_STATUS efi_status2 = install_shim_protocols();
-
-			if (EFI_ERROR(efi_status2)) {
-				console_print(L"Something has gone seriously wrong: %r\n",
-					      efi_status2);
-				console_print(L"shim cannot continue, sorry.\n");
-				usleep(5000000);
-				RT->ResetSystem(EfiResetShutdown,
-						EFI_SECURITY_VIOLATION,
-						0, NULL);
-			}
-		}
-		hook_system_services(systab);
-		loader_is_participating = 0;
-	}
-	return efi_status;
-}
-
-#if !defined(DISABLE_EBS_PROTECTION)
-static EFI_STATUS EFIAPI
-exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
-{
-	if (loader_is_participating ||
-	    verification_method == VERIFIED_BY_HASH) {
-		unhook_system_services();
-		EFI_STATUS efi_status;
-		efi_status = BS->ExitBootServices(image_key, map_key);
-		if (EFI_ERROR(efi_status))
-			hook_system_services(systab);
-		return efi_status;
-	}
-
-	console_print(L"Bootloader has not verified loaded image.\n");
-	console_print(L"System is compromised.  halting.\n");
-	usleep(5000000);
-	RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
-	return EFI_SECURITY_VIOLATION;
-}
-#endif /* !defined(DISABLE_EBS_PROTECTION) */
-
-static EFI_STATUS EFIAPI
-do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
-	UINTN ExitDataSize, CHAR16 *ExitData)
+shim_exit(EFI_HANDLE ImageHandle,
+	  EFI_STATUS ExitStatus,
+	  UINTN ExitDataSize,
+	  CHAR16 *ExitData)
 {
 	EFI_STATUS efi_status;
 	SHIM_LOADED_IMAGE *image;
 
 	efi_status = BS->HandleProtocol(ImageHandle, &SHIM_LOADED_IMAGE_GUID,
 					(void **)&image);
-	if (!EFI_ERROR(efi_status)) {
-		image->exit_status = ExitStatus;
-		image->exit_data_size = ExitDataSize;
-		image->exit_data = ExitData;
 
-		longjmp(image->longjmp_buf, 1);
+	/*
+	 * If this happens, something above us on the stack of running
+	 * applications called Exit(), and we're getting aborted along with
+	 * it.
+	 */
+	if (efi_status == EFI_UNSUPPORTED) {
+		shim_fini();
+		return system_exit(ImageHandle, ExitStatus, ExitDataSize,
+				   ExitData);
 	}
 
-	shim_fini();
+	if (EFI_ERROR(efi_status))
+		return efi_status;
 
-	restore_loaded_image();
+	image->exit_status = ExitStatus;
+	image->exit_data_size = ExitDataSize;
+	image->exit_data = ExitData;
 
-	efi_status = BS->Exit(ImageHandle, ExitStatus,
-			      ExitDataSize, ExitData);
-	if (EFI_ERROR(efi_status)) {
-		EFI_STATUS efi_status2 = shim_init();
-
-		if (EFI_ERROR(efi_status2)) {
-			console_print(L"Something has gone seriously wrong: %r\n",
-				      efi_status2);
-			console_print(L"shim cannot continue, sorry.\n");
-			usleep(5000000);
-			RT->ResetSystem(EfiResetShutdown,
-					EFI_SECURITY_VIOLATION, 0, NULL);
-		}
-	}
-	return efi_status;
+	longjmp(image->longjmp_buf, 1);
 }
 
 void
@@ -271,6 +197,8 @@ init_image_loader(void)
 {
 	shim_image_loader_interface.LoadImage = shim_load_image;
 	shim_image_loader_interface.StartImage = shim_start_image;
+	shim_image_loader_interface.Exit = shim_exit;
+	shim_image_loader_interface.UnloadImage = shim_unload_image;
 }
 
 void
@@ -281,27 +209,31 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 
 	/* We need to hook various calls to make this work... */
 
-	/* We need LoadImage() hooked so that fallback.c can load shim
-	 * without having to fake LoadImage as well.  This allows it
-	 * to call the system LoadImage(), and have us track the output
-	 * and mark loader_is_participating in replacement_start_image.  This
-	 * means anything added by fallback has to be verified by the system
-	 * db, which we want to preserve anyway, since that's all launching
-	 * through BDS gives us. */
+	/*
+	 * We need LoadImage() hooked so that we can guarantee everything is
+	 * verified.
+	 */
 	system_load_image = systab->BootServices->LoadImage;
-	systab->BootServices->LoadImage = load_image;
+	systab->BootServices->LoadImage = shim_load_image;
 
-	/* we need StartImage() so that we can allow chain booting to an
-	 * image trusted by the firmware */
+	/*
+	 * We need StartImage() hooked because the system's StartImage()
+	 * doesn't know about our structure layout.
+	 */
 	system_start_image = systab->BootServices->StartImage;
-	systab->BootServices->StartImage = replacement_start_image;
+	systab->BootServices->StartImage = shim_start_image;
 
-#if !defined(DISABLE_EBS_PROTECTION)
-	/* we need to hook ExitBootServices() so a) we can enforce the policy
-	 * and b) we can unwrap when we're done. */
-	system_exit_boot_services = systab->BootServices->ExitBootServices;
-	systab->BootServices->ExitBootServices = exit_boot_services;
-#endif /* defined(DISABLE_EBS_PROTECTION) */
+	/*
+	 * We need Exit() hooked so that we make sure to use the right jmp_buf
+	 * when an application calls Exit(), but that happens in a separate
+	 * function.
+	 */
+
+	/*
+	 * We need UnloadImage() to match our LoadImage()
+	 */
+	system_unload_image = systab->BootServices->UnloadImage;
+	systab->BootServices->UnloadImage = shim_unload_image;
 }
 
 void
@@ -317,9 +249,11 @@ hook_exit(EFI_SYSTEM_TABLE *local_systab)
 	systab = local_systab;
 	BS = local_systab->BootServices;
 
-	/* we need to hook Exit() so that we can allow users to quit the
+	/*
+	 * We need to hook Exit() so that we can allow users to quit the
 	 * bootloader and still e.g. start a new one or run an internal
-	 * shell. */
+	 * shell.
+	 */
 	system_exit = systab->BootServices->Exit;
-	systab->BootServices->Exit = do_exit;
+	systab->BootServices->Exit = shim_exit;
 }

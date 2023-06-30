@@ -37,15 +37,6 @@ Variables you could set to customize the build:
   debugger only on the development branch and not the OS you need to boot
   to scp in a new development build.  Likewise, we look for
   SHIM_DEVEL_VERBOSE rather than SHIM_VERBOSE.
-- DISABLE_EBS_PROTECTION
-  On systems where a second stage bootloader is not used, and the Linux
-  Kernel is embedded in the same EFI image as shim and booted directly
-  from shim, shim's ExitBootServices() hook can cause problems as the
-  kernel never calls the shim's verification protocol.  In this case
-  calling the shim verification protocol is unnecessary and redundant as
-  shim has already verified the kernel when shim loaded the kernel as the
-  second stage loader.  In such a case, and only in this case, you should
-  use DISABLE_EBS_PROTECTION=y to build.
 - DISABLE_REMOVABLE_LOAD_OPTIONS
   Do not parse load options when invoked as boot*.efi. This prevents boot
   failures because of unexpected data in boot entries automatically generated
