@@ -53,7 +53,7 @@ extern list_t sbat_var;
 #define SBAT_VAR_COLUMNS ((sizeof (struct sbat_var_entry) - sizeof(list_t)) / sizeof(CHAR8 *))
 #define SBAT_VAR_REQUIRED_COLUMNS (SBAT_VAR_COLUMNS - 1)
 
-EFI_STATUS parse_sbat_var(list_t *entries);
+EFI_STATUS parse_sbat_var(list_t *entries, char *sbat_var_candidate);
 void cleanup_sbat_var(list_t *entries);
 EFI_STATUS set_sbat_uefi_variable_internal(void);
 EFI_STATUS set_sbat_uefi_variable(char *, char *);
