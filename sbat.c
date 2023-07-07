@@ -302,7 +302,7 @@ err:
 }
 
 EFI_STATUS
-parse_sbat_var(list_t *entries)
+parse_sbat_var(list_t *entries, char *sbat_var_candidate)
 {
 	UINT8 *data = 0;
 	UINTN datasize;
@@ -314,19 +314,28 @@ parse_sbat_var(list_t *entries)
 		return EFI_INVALID_PARAMETER;
 	}
 
-	efi_status = get_variable(SBAT_VAR_NAME, &data, &datasize, SHIM_LOCK_GUID);
-	if (EFI_ERROR(efi_status)) {
-		LogError(L"Failed to read SBAT variable\n", efi_status);
-		return efi_status;
+	if (sbat_var_candidate == NULL) {
+		dprint(L"sbat_var_candidate is NULL, reading variable\n");
+		efi_status = get_variable(SBAT_VAR_NAME, &data, &datasize, SHIM_LOCK_GUID);
+		if (EFI_ERROR(efi_status)) {
+			LogError(L"Failed to read SBAT variable\n", efi_status);
+			return efi_status;
+		}
+	} else {
+		datasize = strlen(sbat_var_candidate);
+		data = AllocatePool(datasize + 1);
+		memcpy(data, sbat_var_candidate, datasize);
 	}
 
 	/*
-	 * We've intentionally made sure there's a NUL byte on all variable
+	 * We've intentionally made sure there's a NULL byte on all variable
 	 * allocations, so use that here.
 	 */
 	efi_status = parse_sbat_var_data(entries, data, datasize+1);
-	if (EFI_ERROR(efi_status))
-		return efi_status;
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"parse_sbat_var_data() failed datasize: %d\n", datasize);
+		goto out;
+	}
 
 	dprint(L"SBAT variable entries:\n");
 	list_for_each(pos, entries) {
@@ -337,6 +346,8 @@ parse_sbat_var(list_t *entries)
 		       entry->component_generation, entry->sbat_datestamp);
 	}
 
+out:
+	FreePool(data);
 	return efi_status;
 }
 
@@ -455,7 +466,7 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 	UINTN sbatsize = 0;
 	UINTN sbat_policysize = 0;
 
-	char *sbat_var = NULL;
+	char *sbat_var_candidate = NULL;
 	bool reset_sbat = false;
 
 	if (sbat_policy == POLICY_NOTREAD) {
@@ -471,40 +482,40 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 	if (EFI_ERROR(efi_status)) {
 		dprint("Default sbat policy: previous\n");
 		if (secure_mode()) {
-			sbat_var = sbat_var_previous;
+			sbat_var_candidate = sbat_var_previous;
 		} else {
 			reset_sbat = true;
-			sbat_var = SBAT_VAR_ORIGINAL;
+			sbat_var_candidate = SBAT_VAR_ORIGINAL;
 		}
 	} else {
 		switch (sbat_policy) {
-		case SBAT_POLICY_LATEST:
+		case POLICY_LATEST:
 			dprint("Custom sbat policy: latest\n");
-			sbat_var = sbat_var_latest;
+			sbat_var_candidate = sbat_var_latest;
 			break;
-		case SBAT_POLICY_PREVIOUS:
+		case POLICY_PREVIOUS:
 			dprint("Custom sbat policy: previous\n");
-			sbat_var = sbat_var_previous;
+			sbat_var_candidate = sbat_var_previous;
 			break;
-		case SBAT_POLICY_RESET:
+		case POLICY_RESET:
 			if (secure_mode()) {
 				console_print(L"Cannot reset SBAT policy: "
-						"Secure Boot is enabled.\n");
-				sbat_var = sbat_var_previous;
+					       "Secure Boot is enabled.\n");
+				sbat_var_candidate = sbat_var_previous;
 			} else {
 				dprint(L"Custom SBAT policy: reset OK\n");
 				reset_sbat = true;
-				sbat_var = SBAT_VAR_ORIGINAL;
+				sbat_var_candidate = SBAT_VAR_ORIGINAL;
 			}
 			break;
 		default:
 			console_error(L"SBAT policy state %llu is invalid",
 				      EFI_INVALID_PARAMETER);
 			if (secure_mode()) {
-				sbat_var = sbat_var_previous;
+				sbat_var_candidate = sbat_var_previous;
 			} else {
 				reset_sbat = true;
-				sbat_var = SBAT_VAR_ORIGINAL;
+				sbat_var_candidate = SBAT_VAR_ORIGINAL;
 			}
 			break;
 		}
@@ -517,15 +528,36 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 	 */
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
-	} else if (preserve_sbat_uefi_variable(sbat, sbatsize, attributes, sbat_var)
-			&& !reset_sbat) {
-		dprint(L"preserving %s variable it is %d bytes, attributes "
-				"are 0x%08x\n", SBAT_VAR_NAME, sbatsize,
+	} else if (preserve_sbat_uefi_variable(sbat, sbatsize, attributes,
+				sbat_var_candidate) && !reset_sbat) {
+		dprint(L"preserving %s variable it is %d bytes, attributes are "
+				"0x%08x\n", SBAT_VAR_NAME, sbatsize,
 				attributes);
 		FreePool(sbat);
 		return EFI_SUCCESS;
 	} else {
 		FreePool(sbat);
+
+		/*
+		 * parse the candidate SbatLevel and check that shim will not
+		 * self revoke before writing SbatLevel variable
+		 */
+		dprint(L"shim SBAT reparse before application\n");
+		efi_status = parse_sbat_var(&sbat_var, sbat_var_candidate);
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"proposed SbatLevel failed to parse\n");
+			return efi_status;
+		}
+
+#ifndef SHIM_UNIT_TEST
+		char *sbat_start = (char *)&_sbat;
+		char *sbat_end = (char *)&_esbat;
+		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"shim SBAT self check fails for new SbatLevel, refusing to apply\n");
+			return efi_status;
+		}
+#endif /* SHIM_UNIT_TEST */
 
 		/* delete previous variable */
 		dprint("%s variable is %d bytes, attributes are 0x%08x\n",
@@ -542,7 +574,7 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 
 	/* set variable */
 	efi_status = set_variable(SBAT_VAR_NAME, SHIM_LOCK_GUID, SBAT_VAR_ATTRS,
-	                          strlen(sbat_var), sbat_var);
+	                          strlen(sbat_var_candidate), sbat_var_candidate);
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"%s variable writing failed %r\n", SBAT_VAR_NAME,
 				efi_status);
@@ -557,10 +589,11 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 		return efi_status;
 	}
 
-	if (sbatsize != strlen(sbat_var) ||
-	    strncmp((const char *)sbat, sbat_var, strlen(sbat_var)) != 0) {
+	if (sbatsize != strlen(sbat_var_candidate) ||
+	    strncmp((const char *)sbat, sbat_var_candidate,
+		    strlen(sbat_var_candidate)) != 0) {
 		dprint("new sbatsize is %d, expected %d\n", sbatsize,
-		       strlen(sbat_var));
+		       strlen(sbat_var_candidate));
 		efi_status = EFI_INVALID_PARAMETER;
 	} else {
 		dprint(L"%s variable initialization succeeded\n", SBAT_VAR_NAME);
