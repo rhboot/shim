@@ -1857,7 +1857,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		char *sbat_end = (char *)&_esbat;
 
 		INIT_LIST_HEAD(&sbat_var);
-		efi_status = parse_sbat_var(&sbat_var);
+		efi_status = parse_sbat_var(&sbat_var, NULL);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Parsing %s variable failed: %r\n",
 				SBAT_VAR_NAME, efi_status);
