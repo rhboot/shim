@@ -563,7 +563,9 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 		char *sbat_end = (char *)&_esbat;
 		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
 		if (EFI_ERROR(efi_status)) {
-			dprint(L"shim SBAT self check fails for new SbatLevel, refusing to apply\n");
+			CHAR16 *title = L"New SbatLevel would self-revoke current shim. Not applied";
+			CHAR16 *message = L"Press any key to continue";
+			console_countdown(title, message, 10);
 			return efi_status;
 		}
 #endif /* SHIM_UNIT_TEST */
