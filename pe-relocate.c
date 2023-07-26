@@ -376,6 +376,7 @@ read_header(void *data, unsigned int datasize,
 	unsigned long FileAlignment = 0;
 	UINT16 DllFlags;
 	size_t dos_sz = 0;
+	size_t tmpsz0, tmpsz1;
 
 	if (datasize < sizeof (*DosHdr)) {
 		perror(L"Invalid image\n");
@@ -443,31 +444,37 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	HeaderWithoutDataDir = OptHeaderSize
-			- sizeof (EFI_IMAGE_DATA_DIRECTORY) * EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES;
-	if (((UINT32)PEHdr->Pe32.FileHeader.SizeOfOptionalHeader - HeaderWithoutDataDir) !=
-			context->NumberOfRvaAndSizes * sizeof (EFI_IMAGE_DATA_DIRECTORY)) {
+	if (checked_mul(sizeof(EFI_IMAGE_DATA_DIRECTORY), EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES, &tmpsz0) ||
+	    checked_sub(OptHeaderSize, tmpsz0, &HeaderWithoutDataDir) ||
+	    checked_sub((size_t)PEHdr->Pe32.FileHeader.SizeOfOptionalHeader, HeaderWithoutDataDir, &tmpsz0) ||
+	    checked_mul((size_t)context->NumberOfRvaAndSizes, sizeof (EFI_IMAGE_DATA_DIRECTORY), &tmpsz1) ||
+	    (tmpsz0 != tmpsz1)) {
 		perror(L"Image header overflows data directory\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	SectionHeaderOffset = DosHdr->e_lfanew
-				+ sizeof (UINT32)
-				+ sizeof (EFI_IMAGE_FILE_HEADER)
-				+ PEHdr->Pe32.FileHeader.SizeOfOptionalHeader;
-	if (((UINT32)context->ImageSize - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
-			<= context->NumberOfSections) {
+	if (checked_add((size_t)DosHdr->e_lfanew, sizeof(UINT32), &tmpsz0) ||
+	    checked_add(tmpsz0, sizeof(EFI_IMAGE_FILE_HEADER), &tmpsz0) ||
+	    checked_add(tmpsz0, PEHdr->Pe32.FileHeader.SizeOfOptionalHeader, &SectionHeaderOffset)) {
 		perror(L"Image sections overflow image size\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	if ((context->SizeOfHeaders - SectionHeaderOffset) / EFI_IMAGE_SIZEOF_SECTION_HEADER
-			< (UINT32)context->NumberOfSections) {
+	if (checked_sub((size_t)context->ImageSize, SectionHeaderOffset, &tmpsz0) ||
+	    (tmpsz0 / EFI_IMAGE_SIZEOF_SECTION_HEADER <= context->NumberOfSections)) {
+		perror(L"Image sections overflow image size\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	if (checked_sub((size_t)context->SizeOfHeaders, SectionHeaderOffset, &tmpsz0) ||
+	    (tmpsz0 / EFI_IMAGE_SIZEOF_SECTION_HEADER < (UINT32)context->NumberOfSections)) {
 		perror(L"Image sections overflow section headers\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	if ((((UINT8 *)PEHdr - (UINT8 *)data) + sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION)) > datasize) {
+	if (checked_sub((size_t)(uintptr_t)PEHdr, (size_t)(uintptr_t)data, &tmpsz0) ||
+	    checked_add(tmpsz0, sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION), &tmpsz0) ||
+	    (tmpsz0 > datasize)) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
@@ -504,15 +511,25 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
         }
 
-	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)((char *)PEHdr + PEHdr->Pe32.FileHeader.SizeOfOptionalHeader + sizeof(UINT32) + sizeof(EFI_IMAGE_FILE_HEADER));
+	if (checked_add((size_t)(uintptr_t)PEHdr, PEHdr->Pe32.FileHeader.SizeOfOptionalHeader, &tmpsz0) ||
+	    checked_add(tmpsz0, sizeof(UINT32), &tmpsz0) ||
+	    checked_add(tmpsz0, sizeof(EFI_IMAGE_FILE_HEADER), &tmpsz0)) {
+		perror(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
+	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)(uintptr_t)tmpsz0;
+	if ((uint64_t)(context->FirstSection) > (uint64_t)data + datasize) {
+		perror(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	if (context->ImageSize < context->SizeOfHeaders) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	if ((unsigned long)((UINT8 *)context->SecDir - (UINT8 *)data) >
-	    (datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
+	if (checked_sub((size_t)(uintptr_t)context->SecDir, (size_t)(uintptr_t)data, &tmpsz0) ||
+	    (tmpsz0 > datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
