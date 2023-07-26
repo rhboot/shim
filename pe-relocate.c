@@ -309,7 +309,7 @@ static int
 image_is_64_bit(EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr)
 {
 	/* .Magic is the same offset in all cases */
-	if (PEHdr->Pe32Plus.OptionalHeader.Magic
+	if (PEHdr->Pe32.OptionalHeader.Magic
 			== EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC)
 		return 1;
 	return 0;
@@ -375,14 +375,34 @@ read_header(void *data, unsigned int datasize,
 	unsigned long HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
 	unsigned long FileAlignment = 0;
 	UINT16 DllFlags;
+	size_t dos_sz = 0;
 
-	if (datasize < sizeof (PEHdr->Pe32)) {
+	if (datasize < sizeof (*DosHdr)) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
-	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE)
+	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE) {
+		if (DosHdr->e_lfanew < sizeof (*DosHdr) ||
+		    DosHdr->e_lfanew > datasize - 4) {
+			perror(L"Invalid image\n");
+			return EFI_UNSUPPORTED;
+		}
+
+		dos_sz = DosHdr->e_lfanew;
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
+	}
+
+	if (datasize - dos_sz < sizeof (PEHdr->Pe32)) {
+		perror(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
+
+	if (image_is_64_bit(PEHdr) &&
+	    (datasize - dos_sz < sizeof (PEHdr->Pe32Plus))) {
+		perror(L"Invalid image\n");
+		return EFI_UNSUPPORTED;
+	}
 
 	if (!image_is_loadable(PEHdr)) {
 		perror(L"Platform does not support this image\n");
