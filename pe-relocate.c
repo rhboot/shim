@@ -472,6 +472,13 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
+	if (checked_mul((size_t)context->NumberOfSections, sizeof(EFI_IMAGE_SECTION_HEADER), &tmpsz0) ||
+	    checked_add(tmpsz0, SectionHeaderOffset, &tmpsz0) ||
+	    (tmpsz0 > datasize)) {
+		perror(L"Image sections overflow section headers\n");
+		return EFI_UNSUPPORTED;
+	}
+
 	if (checked_sub((size_t)(uintptr_t)PEHdr, (size_t)(uintptr_t)data, &tmpsz0) ||
 	    checked_add(tmpsz0, sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION), &tmpsz0) ||
 	    (tmpsz0 > datasize)) {
