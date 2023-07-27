@@ -709,6 +709,11 @@ verify_buffer_sbat (char *data, int datasize,
 
 	Section = context->FirstSection;
 	for (i = 0; i < context->NumberOfSections; i++, Section++) {
+		if ((uint64_t)&Section[1] > (uint64_t)data + datasize) {
+			perror(L"Section exceeds bounds of image\n");
+			return EFI_UNSUPPORTED;
+		}
+
 		if (CompareMem(Section->Name, ".sbat\0\0\0", 8) != 0)
 			continue;
 
