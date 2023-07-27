@@ -355,7 +355,11 @@ verify_sbat_section(char *SBATBase, size_t SBATSize)
 		return in_protocol ? EFI_SUCCESS : EFI_SECURITY_VIOLATION;
 	}
 
-	sbat_size = SBATSize + 1;
+	if (checked_add(SBATSize, 1, &sbat_size)) {
+		dprint(L"SBATSize + 1 would overflow\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+
 	sbat_data = AllocatePool(sbat_size);
 	if (!sbat_data) {
 		console_print(L"Failed to allocate .sbat section buffer\n");

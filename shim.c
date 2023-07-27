@@ -743,11 +743,17 @@ verify_buffer_sbat (char *data, int datasize,
 		 * and ignore the section if it isn't. */
 		if (Section->SizeOfRawData &&
 		    Section->SizeOfRawData >= Section->Misc.VirtualSize) {
+			uint64_t boundary;
 			SBATBase = ImageAddress(data, datasize,
 						Section->PointerToRawData);
 			SBATSize = Section->SizeOfRawData;
 			dprint(L"sbat section base:0x%lx size:0x%lx\n",
 			       SBATBase, SBATSize);
+			if (checked_add((uint64_t)SBATBase, SBATSize, &boundary) ||
+			    (boundary > (uint64_t)data + datasize)) {
+				perror(L"Section exceeds bounds of image\n");
+				return EFI_UNSUPPORTED;
+			}
 		}
 	}
 
