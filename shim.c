@@ -627,11 +627,13 @@ verify_buffer_authenticode (char *data, int datasize,
 		return EFI_SECURITY_VIOLATION;
 	}
 
-	if (context->SecDir->Size >= size) {
+	if (checked_add(context->SecDir->Size, context->SecDir->VirtualAddress, &offset) ||
+	    offset > size) {
 		perror(L"Certificate Database size is too large\n");
 		return EFI_INVALID_PARAMETER;
 	}
 
+	offset = 0;
 	ret_efi_status = EFI_NOT_FOUND;
 	do {
 		WIN_CERTIFICATE_EFI_PKCS *sig = NULL;
@@ -641,6 +643,11 @@ verify_buffer_authenticode (char *data, int datasize,
 				   context->SecDir->VirtualAddress + offset);
 		if (!sig)
 			break;
+
+		if ((uint64_t)&sig[1] > (uint64_t)data + datasize) {
+			perror(L"Certificate size is too large for secruity database");
+			return EFI_INVALID_PARAMETER;
+		}
 
 		sz = offset + offsetof(WIN_CERTIFICATE_EFI_PKCS, Hdr.dwLength)
 		     + sizeof(sig->Hdr.dwLength);
