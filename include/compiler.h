@@ -198,5 +198,21 @@
 #error shim has no cache_invalidate() implementation for this compiler
 #endif /* __GNUC__ */
 
+#define checked_add(addend0, addend1, sum) \
+	__builtin_add_overflow(addend0, addend1, sum)
+#define checked_sub(minuend, subtrahend, difference) \
+	__builtin_sub_overflow(minuend, subtrahend, difference)
+#define checked_mul(factor0, factor1, product) \
+	__builtin_mul_overflow(factor0, factor1, product)
+#define checked_div(dividend, divisor, quotient)                \
+        ({                                                      \
+                bool _ret = True;                               \
+                if ((divisor) != 0) {                           \
+                        _ret = False;                           \
+                        (quotient) = (dividend) / (divisor);    \
+                }                                               \
+                _ret;                                           \
+        })
+
 #endif /* !COMPILER_H_ */
 // vim:fenc=utf-8:tw=75:et
