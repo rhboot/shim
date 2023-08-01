@@ -1450,17 +1450,17 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
 		dprint(L"checking section \"%c%c%c%c%c%c%c%c\"\n", (char *)Section->Name);
-		check_section(".sbatp", (void **)&sbat_var_previous, Section,
+		check_section(".sbatp\0\0", (void **)&sbat_var_previous, Section,
 				data, datasize, sizeof(SBAT_VAR_ORIGINAL));
-		check_section(".sbatl", (void **)&sbat_var_latest, Section,
+		check_section(".sbatl\0\0", (void **)&sbat_var_latest, Section,
 				data, datasize, sizeof(SBAT_VAR_ORIGINAL));
-		check_section(".sspvp", (void **)&sspv_previous, Section,
+		check_section(".sspvp\0\0", (void **)&sspv_previous, Section,
 				data, datasize, SSPVER_SIZE);
-		check_section(".sspsp", (void **)&ssps_previous, Section,
+		check_section(".sspsp\0\0", (void **)&ssps_previous, Section,
 				data, datasize, SSPSIG_SIZE);
-		check_section(".sspvl", (void **)&sspv_latest, Section,
+		check_section(".sspvl\0\0", (void **)&sspv_latest, Section,
 				data, datasize, SSPVER_SIZE);
-		check_section(".sspsl", (void **)&ssps_latest, Section,
+		check_section(".sspsl\0\0", (void **)&ssps_latest, Section,
 				data, datasize, SSPSIG_SIZE);
 	}
 
