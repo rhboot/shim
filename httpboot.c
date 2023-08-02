@@ -578,7 +578,13 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	}
 
 	if (*buf_size == 0) {
-		perror(L"Failed to get Content-Lenght\n");
+		perror(L"Failed to get Content-Length\n");
+		goto error;
+	}
+
+	if (*buf_size < rx_message.BodyLength) {
+		efi_status = EFI_BAD_BUFFER_SIZE;
+		perror(L"Invalid Content-Length\n");
 		goto error;
 	}
 
