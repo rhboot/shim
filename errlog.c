@@ -32,6 +32,9 @@ VLogError(const char *file, int line, const char *func, const CHAR16 *fmt,
 	ms_va_list args2;
 	CHAR16 **newerrs;
 
+	if (file == NULL || func == NULL || fmt == NULL)
+		return EFI_INVALID_PARAMETER;
+
 	newerrs = ReallocatePool(errs, (nerrs + 1) * sizeof(*errs),
 				       (nerrs + 3) * sizeof(*errs));
 	if (!newerrs)
