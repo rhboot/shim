@@ -143,6 +143,7 @@ POST_PROCESS_PE_FLAGS =
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	DEFINES	+= -DOVERRIDE_SECURITY_POLICY
+	export
 endif
 
 ifneq ($(origin REQUIRE_TPM), undefined)
