@@ -201,4 +201,6 @@ ifneq ($(VERBOSE),)
 export VERBOSE
 endif
 
+export DEFINES
+
 # vim:filetype=make
