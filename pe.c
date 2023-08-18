@@ -410,14 +410,16 @@ generate_hash(char *data, unsigned int datasize,
 			goto done;
 		}
 
-#if 1
-	}
-#else // we have to migrate to doing this later :/
 		SumOfBytesHashed += hashsize;
 	}
 
-	/* Hash all remaining data */
-	if (datasize > SumOfBytesHashed) {
+	/* Hash all remaining data. If SecDir->Size is > 0 this code should not
+	 * be entered.  If it is, there are still things to hash.  For a file
+	 * without a SecDir, we need to hash what remains. */
+	if (datasize > SumOfBytesHashed + context->SecDir->Size) {
+		char padbuf[8];
+		ZeroMem(padbuf, 8);
+
 		hashbase = data + SumOfBytesHashed;
 		hashsize = datasize - SumOfBytesHashed;
 
@@ -431,8 +433,17 @@ generate_hash(char *data, unsigned int datasize,
 		}
 
 		SumOfBytesHashed += hashsize;
+		hashsize = ALIGN_VALUE(SumOfBytesHashed, 8) - SumOfBytesHashed;
+
+		if (hashsize) {
+			if (!(Sha256Update(sha256ctx, padbuf, hashsize)) ||
+			    !(Sha1Update(sha1ctx, padbuf, hashsize))) {
+				perror(L"Unable to generate hash\n");
+				efi_status = EFI_OUT_OF_RESOURCES;
+				goto done;
+			}
+		}
 	}
-#endif
 
 	if (!(Sha256Final(sha256ctx, sha256hash)) ||
 	    !(Sha1Final(sha1ctx, sha1hash))) {
