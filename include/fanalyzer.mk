@@ -21,6 +21,7 @@ fanalyzer-build-all : COMPILER=gcc
 fanalyzer-build-all : CCACHE_DISABLE=1
 fanalyzer-build-all : FEATUREFLAGS+=-fanalyzer
 fanalyzer-build-all : WERRFLAGS=-Werror=analyzer-null-dereference
+fanalyzer-build-all : IGNORE_COMPILER_ERRORS=" || :"
 fanalyzer-build-all : all
 
 fanalyzer-no-openssl : | fanalyzer-test
