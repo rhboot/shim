@@ -22,6 +22,7 @@ scan-build-unchecked-openssl : Cryptlib/OpenSSL/libopenssl.a
 
 scan-build-all : CCACHE_DISABLE=1
 scan-build-all : COMPILER=clang
+scan-build-all : IGNORE_COMPILER_ERRORS=" || :"
 scan-build-all : | scan-test
 scan-build-all :
 	+scan-build -o scan-results make $(MAKEARGS) $(DASHJ) CCACHE_DISABLE=1 all

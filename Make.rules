@@ -36,6 +36,6 @@ $(strip $(foreach x,$(DEFAULT_$(1)),
 endef
 
 %.o : %.S
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $< $(IGNORE_COMPILER_ERRORS)
 
 # vim:filetype=make

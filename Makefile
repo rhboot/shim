@@ -160,19 +160,19 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 		ARCH=$(ARCH_GNUEFI) \
 		TOPDIR=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
-		lib gnuefi inc
+		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)
 
 Cryptlib/libcryptlib.a:
 	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
-	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile
+	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile $(IGNORE_COMPILER_ERRORS)
 
 Cryptlib/OpenSSL/libopenssl.a:
 	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
-	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile
+	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile $(IGNORE_COMPILER_ERRORS)
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 	mkdir -p lib
-	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) -C lib -f $(TOPDIR)/lib/Makefile
+	$(MAKE) VPATH=$(TOPDIR)/lib TOPDIR=$(TOPDIR) -C lib -f $(TOPDIR)/lib/Makefile $(IGNORE_COMPILER_ERRORS)
 
 post-process-pe : $(TOPDIR)/post-process-pe.c
 	$(HOSTCC) -std=gnu11 -Og -g3 -Wall -Wextra -Wno-missing-field-initializers -Werror -o $@ $<
