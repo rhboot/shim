@@ -46,6 +46,9 @@ endif
 ifeq ($(ARCH),aarch64)
 DEFINES		+= -DMDE_CPU_AARCH64
 endif
+ifeq ($(ARCH),loongarch64)
+DEFINES		+= -DMDE_CPU_LOONGARCH64
+endif
 ifeq ($(ARCH),arm)
 DEFINES		+= -DMDE_CPU_ARM
 endif

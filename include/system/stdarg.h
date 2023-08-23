@@ -24,7 +24,8 @@ typedef __builtin_va_list __builtin_sysv_va_list;
 #endif
 
 #if defined(__aarch64__) || defined(__arm__) || defined(__i386__) || \
-	defined(__i486__) || defined(__i686__) || defined(__COVERITY__)
+	defined(__i486__) || defined(__i686__) || defined(__COVERITY__) || \
+	defined(__loongarch_lp64)
 
 typedef __builtin_va_list ms_va_list;
 typedef __builtin_va_list __builtin_ms_va_list;
@@ -42,6 +43,7 @@ typedef __builtin_va_list sysv_va_list;
  * OpenSSL's X509ConstructCertificateStack needs this.
  */
 typedef __builtin_va_list VA_LIST;
+typedef __builtin_va_list va_list;
 #define VA_COPY(dest, start)  __builtin_va_copy(dest, start)
 #define VA_START(marker, arg) __builtin_va_start(marker, arg)
 #define VA_END(marker)        __builtin_va_end(marker)

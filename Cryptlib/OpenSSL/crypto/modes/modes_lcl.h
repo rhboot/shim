@@ -30,6 +30,7 @@ typedef unsigned char u8;
      defined(__x86_64)  || defined(__x86_64__)  || \
      defined(_M_IX86)   || defined(_M_AMD64)    || defined(_M_X64) || \
      defined(__aarch64__)                       || \
+     defined(__loongarch_lp64)                  || \
      defined(__s390__)  || defined(__s390x__)
 #  undef STRICT_ALIGNMENT
 # endif

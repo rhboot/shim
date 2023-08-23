@@ -19,6 +19,8 @@ static inline uint64_t read_counter(void)
         __asm__ __volatile__ ("mrs %0, pmccntr_el0" : "=r" (val));
 #elif defined(__arm__)
         __asm__ __volatile__ ("mrc p15, 0, %0, c9, c13, 0" : "=r" (val));
+#elif defined(__loongarch_lp64)
+        __asm__ __volatile__ ( "rdtime.d %0, $zero" : "=r" (val));
 #else
 #error unsupported arch
 #endif
@@ -34,6 +36,11 @@ static inline void wait_for_debug(void)
 static inline void wait_for_debug(void)
 {
 		__asm__ __volatile__("wfi");
+}
+#elif defined(__loongarch_lp64)
+static inline void wait_for_debug(void)
+{
+		__asm__ __volatile__("idle 0");
 }
 #else
 static inline void wait_for_debug(void)

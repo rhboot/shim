@@ -45,6 +45,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	int size = context->ImageSize;
 	void *ImageEnd = (char *)orig + size;
 	int n = 0;
+	UINT64 hi12, hi20, low12, low20, value;
 
 	/* Alright, so here's how this works:
 	 *
@@ -142,6 +143,43 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 				*Fixup64 = *Fixup64 + (UINT64) Adjust;
 				break;
 
+			case EFI_IMAGE_REL_BASED_LOONGARCH64_MARK_LA:
+				/*
+				 * The 64-bit addresses of the following 4 instructions
+				 * need to be relocated and fixed together.
+
+				 * lu12i.w: [0000 000]    [imm20]      [0 0000]
+				 * ori    : [0000 0000 00][imm12][00 0000 0000]
+				 * lu32i.d: [0000 000]    [imm20]      [0 0000]
+				 * lu52i.d: [0000 0000 00][imm12][00 0000 0000]
+				 */
+
+#define IMM20_MASK 0x1ffffe0    /* 20-bit immediate mask in lu12i.w and lu32i.d */
+#define IMM12_MASK 0x3ffc00     /* 12-bit immediate mask in ori and lu52i.d */
+
+				low20 = (*(UINT32*)Fixup & IMM20_MASK ) >> 5;        /* lu12i.w 20-bits from bit5 */
+				low12 = (*((UINT32*)Fixup + 1) & IMM12_MASK ) >> 10; /* ori  12-bits from bit10 */
+				hi20 = (*((UINT32*)Fixup + 2) & IMM20_MASK) >> 5;    /* lu32i.d 20-bits from bit5 */
+				hi12 = (*((UINT32*)Fixup + 3) & IMM12_MASK) >> 10;   /* lu52i.d 12-bits from bit10 */
+
+				value = (hi12 << 52) | (hi20 << 32) | (low20 << 12) | low12;
+				value += Adjust;
+
+				/* lu12i.w */
+				*(UINT32*)Fixup = (*(UINT32*)Fixup & ~IMM20_MASK) | ((value >> 12) & 0xfffff) << 5;
+
+				/* ori */
+				Fixup += sizeof(UINT32);
+				*(UINT32*)Fixup = (*(UINT32*)Fixup & ~IMM12_MASK) | (value & 0xfff) << 10;
+
+				/* lu32i.d */
+				Fixup += sizeof(UINT32);
+				*(UINT32*)Fixup = (*(UINT32*)Fixup & ~IMM20_MASK) | ((value >> 32) & 0xfffff) << 5;
+
+				/* lu52i.d */
+				Fixup += sizeof(UINT32);
+				*(UINT32*)Fixup = (*(UINT32*)Fixup & ~IMM12_MASK) | ((value >> 52) & 0xfff) << 10;
+				break;
 			default:
 				perror(L"Reloc %d Unknown relocation\n", n);
 				return EFI_UNSUPPORTED;
@@ -272,7 +310,7 @@ get_section_vma_by_name (char *name, size_t namesz,
 static int
 allow_64_bit(void)
 {
-#if defined(__x86_64__) || defined(__aarch64__)
+#if defined(__x86_64__) || defined(__aarch64__) || defined(__loongarch_lp64)
 	return 1;
 #elif defined(__i386__) || defined(__i686__)
 	/* Right now blindly assuming the kernel will correctly detect this
@@ -298,7 +336,7 @@ allow_32_bit(void)
 #endif
 #elif defined(__i386__) || defined(__i686__)
 	return 1;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__loongarch_lp64)
 	return 0;
 #else /* assuming everything else is 32-bit... */
 	return 1;
@@ -326,6 +364,8 @@ static const UINT16 machine_type =
 	IMAGE_FILE_MACHINE_I386;
 #elif defined(__ia64__)
 	IMAGE_FILE_MACHINE_IA64;
+#elif defined(__loongarch_lp64)
+	IMAGE_FILE_MACHINE_LOONGARCH64;
 #else
 #error this architecture is not supported by shim
 #endif
