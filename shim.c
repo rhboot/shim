@@ -1256,7 +1256,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
 
-	second_stage = DEFAULT_LOADER;
+	second_stage = (optional_second_stage) ? optional_second_stage : DEFAULT_LOADER;
 	load_options = NULL;
 	load_options_size = 0;
 
@@ -1689,6 +1689,86 @@ done:
 	return efi_status;
 }
 
+/* Read optional options file */
+EFI_STATUS
+load_shim_options(EFI_HANDLE image_handle)
+{
+	EFI_STATUS efi_status;
+	EFI_HANDLE device;
+	EFI_LOADED_IMAGE *li = NULL;
+	EFI_FILE_IO_INTERFACE *drive;
+	EFI_FILE *root;
+	EFI_FILE_HANDLE ofile;
+	CHAR16 *PathName = NULL;
+	CHAR16 *buffer;
+	UINTN comma0;
+	UINT64 bs;
+
+	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+					 (void **)&li);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Unable to init protocol\n");
+		return efi_status;
+	}
+
+	efi_status = generate_path_from_image_path(li, L"options.csv", &PathName);
+	if (EFI_ERROR(efi_status))
+		goto done;
+
+	device = li->DeviceHandle;
+
+	efi_status = BS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
+					(void **) &drive);
+	if (EFI_ERROR(efi_status))
+		goto done;
+
+	efi_status = drive->OpenVolume(drive, &root);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to open fs: %r\n", efi_status);
+		goto done;
+	}
+
+	efi_status = root->Open(root, &ofile, PathName, EFI_FILE_READ_ONLY, 0);
+	if (EFI_ERROR(efi_status)) {
+		if (efi_status != EFI_NOT_FOUND)
+			perror(L"Failed to open %s - %r\n", PathName, efi_status);
+		goto done;
+	}
+
+	dprint(L"Loading optional second stage info from options.csv\n");
+	efi_status = read_file(ofile, PathName, &buffer, &bs);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Failed to read file\n");
+		goto done;
+	}
+
+	/*
+	 * This file may or may not start with the Unicode byte order marker.
+	 * Since UEFI is defined as LE, this file must also be LE.
+	 * If we find the LE byte order marker, just skip its.
+	 */
+	if (*buffer == 0xfeff)
+		buffer++;
+
+	comma0 = StrCSpn(buffer, L",");
+	if (comma0 == 0) {
+		perror(L"Invalid csv file\n");
+		goto done;
+	}
+
+	/*
+	 * Currently the options.csv file allows one entry for the optional
+	 * secondary boot stage, anything afterwards is skipped.
+	 */
+	buffer[comma0] = L'\0';
+	dprint(L"Optional 2nd stage:\"%s\"\n", buffer);
+	optional_second_stage=buffer;
+
+done:
+	FreePool(PathName);
+	return EFI_SUCCESS;
+}
+
 EFI_STATUS
 shim_init(void)
 {
@@ -1972,6 +2052,8 @@ die:
 	 * not set when we are starting up.
 	 */
 	(void) del_variable(SHIM_RETAIN_PROTOCOL_VAR_NAME, SHIM_LOCK_GUID);
+
+	load_shim_options(image_handle);
 
 	efi_status = shim_init();
 	if (EFI_ERROR(efi_status)) {

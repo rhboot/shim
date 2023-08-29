@@ -13,6 +13,7 @@ EFI_STATUS generate_path_from_image_path(EFI_LOADED_IMAGE *li,
 EFI_STATUS parse_load_options(EFI_LOADED_IMAGE *li);
 
 extern CHAR16 *second_stage;
+extern CHAR16 *optional_second_stage;
 extern void *load_options;
 extern UINT32 load_options_size;
 
