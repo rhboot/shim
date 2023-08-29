@@ -43,7 +43,7 @@ KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim
 ORIG_SOURCES	= shim.c globals.c mok.c netboot.c dp.c replacements.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o globals.o dp.o
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
-FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o
+FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o utils.o
 ORIG_FALLBACK_SRCS = fallback.c
 SBATPATH = $(TOPDIR)/data/sbat.csv
 
