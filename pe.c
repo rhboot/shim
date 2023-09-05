@@ -498,10 +498,20 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 	uefi_clear_attrs = shim_mem_attrs_to_uefi_mem_attrs (clear_attrs);
 	dprint("translating clear_attrs from 0x%lx to 0x%lx\n", clear_attrs, uefi_clear_attrs);
 	efi_status = EFI_SUCCESS;
-	if (uefi_set_attrs)
+	if (uefi_set_attrs) {
 		efi_status = proto->SetMemoryAttributes(proto, physaddr, size, uefi_set_attrs);
-	if (!EFI_ERROR(efi_status) && uefi_clear_attrs)
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"Failed to set memory attrs:0x%0x physaddr:0x%llx size:0x%0lx status:%r\n",
+				uefi_set_attrs, physaddr, size, efi_status);
+		}
+	}
+	if (!EFI_ERROR(efi_status) && uefi_clear_attrs) {
 		efi_status = proto->ClearMemoryAttributes(proto, physaddr, size, uefi_clear_attrs);
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"Failed to clear memory attrs:0x%0x physaddr:0x%llx size:0x%0lx status:%r\n",
+				uefi_clear_attrs, physaddr, size, efi_status);
+		}
+	}
 	ret = efi_status;
 
 	efi_status = get_mem_attrs (addr, size, &after);
