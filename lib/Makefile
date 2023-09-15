@@ -31,6 +31,10 @@ ifeq ($(ARCH),arm)
 DEFINES		+= -DMDE_CPU_ARM
 endif
 
+ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
+	DEFINES	+= -DOVERRIDE_SECURITY_POLICY
+endif
+
 LDFLAGS		= -nostdlib -znocombreloc
 
 
