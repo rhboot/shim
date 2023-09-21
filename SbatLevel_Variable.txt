@@ -12,7 +12,7 @@ Initialized, no revocations:
 
 sbat,1,2021030218
 
-To Revoke GRUB binaries impacted by
+To Revoke GRUB2 binaries impacted by
 
 * CVE-2021-3695
 * CVE-2021-3696
@@ -21,22 +21,88 @@ To Revoke GRUB binaries impacted by
 * CVE-2022-28734
 * CVE-2022-28735
 * CVE-2022-28736
-* CVE-2022-28737
 
 sbat,1,2022052400
 grub,2
 
-To revoke the above and also grub binaries impacted by
+and shim binaries impacted by
+
+* CVE-2022-28737
+
+sbat,1,2022052400
+shim,2
+grub,2
+
+Shim delivered both versions of these revocations with
+the same 2022052400 date stamp, once as an opt-in latest
+revocation with shim,2 and then as an automatic revocation without
+shim,2
+
+
+To revoke GRUB2 grub binaries impacted by
 
 * CVE-2022-2601
 * CVE-2022-3775
 
 sbat,1,2022111500
-grub,3
-
-An additonal bug was fixed in shim that was not considered exploitable
-and can be revoked by setting:
-
-sbat,1,2022111500
 shim,2
 grub,3
+
+To revoke Debian's grub.3 which missed
+the patches:
+
+sbat,1,2023012900
+shim,2
+grub,3
+grub.debian,4
+
+
+An additonal bug was fixed in shim that was not considered exploitable,
+can be revoked by setting:
+
+sbat,1,2023012950
+shim,3
+grub,3
+grub.debian,4
+
+shim did not deliver this payload at the time
+
+
+To Revoke GRUB2 binaries impacted by:
+
+* CVE-2023-4692
+* CVE-2023-4693
+
+These CVEs are in the ntfs module and vendors that do and do not
+ship this module as part of their signed binary are split.
+
+sbat,1,2023091900
+shim,2
+grub,4
+
+Since not everyone has shipped updated GRUB packages, shim did not
+deliver this revocation at the time.
+
+To Revoke shim binaries impacted by:
+
+* CVE-2023-40547
+* CVE-2023-40546
+* CVE-2023-40548
+* CVE-2023-40549
+* CVE-2023-40550
+* CVE-2023-40551
+
+sbat,1,2024010900
+shim,4
+grub,3
+grub.debian,4
+
+Since http boot shim CVE is considerably more serious than then GRUB
+ntfs CVEs shim is delivering the shim revocation without the updated
+GRUB revocation as a latest payload.
+
+To revoke both the impacted shim and impacted GRUB binaries:
+
+sbat,1,2024<date TBD>
+shim,4
+grub,4
