@@ -525,7 +525,8 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)(uintptr_t)tmpsz0;
-	if ((uint64_t)(context->FirstSection) > (uint64_t)data + datasize) {
+	if ((uint64_t)(uintptr_t)(context->FirstSection)
+	    > (uint64_t)(uintptr_t)data + datasize) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}

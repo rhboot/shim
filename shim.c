@@ -644,7 +644,8 @@ verify_buffer_authenticode (char *data, int datasize,
 		if (!sig)
 			break;
 
-		if ((uint64_t)&sig[1] > (uint64_t)data + datasize) {
+		if ((uint64_t)(uintptr_t)&sig[1]
+		    > (uint64_t)(uintptr_t)data + datasize) {
 			perror(L"Certificate size is too large for secruity database");
 			return EFI_INVALID_PARAMETER;
 		}
@@ -716,7 +717,8 @@ verify_buffer_sbat (char *data, int datasize,
 
 	Section = context->FirstSection;
 	for (i = 0; i < context->NumberOfSections; i++, Section++) {
-		if ((uint64_t)&Section[1] > (uint64_t)data + datasize) {
+		if ((uint64_t)(uintptr_t)&Section[1]
+		    > (uintptr_t)(uintptr_t)data + datasize) {
 			perror(L"Section exceeds bounds of image\n");
 			return EFI_UNSUPPORTED;
 		}
@@ -749,8 +751,8 @@ verify_buffer_sbat (char *data, int datasize,
 			SBATSize = Section->SizeOfRawData;
 			dprint(L"sbat section base:0x%lx size:0x%lx\n",
 			       SBATBase, SBATSize);
-			if (checked_add((uint64_t)SBATBase, SBATSize, &boundary) ||
-			    (boundary > (uint64_t)data + datasize)) {
+			if (checked_add((uint64_t)(uintptr_t)SBATBase, SBATSize, &boundary) ||
+			    (boundary > (uint64_t)(uintptr_t)data + datasize)) {
 				perror(L"Section exceeds bounds of image\n");
 				return EFI_UNSUPPORTED;
 			}
