@@ -378,7 +378,7 @@ test_parse_sbat_var_null_list(void)
 	EFI_STATUS status;
 
 	INIT_LIST_HEAD(&sbat_var);
-	status = parse_sbat_var(NULL);
+	status = parse_sbat_var(NULL, NULL);
 	cleanup_sbat_var(&sbat_var);
 	assert_equal_return(status, EFI_INVALID_PARAMETER, -1, "got %#hhx expected %#hhx\n");
 
@@ -1132,7 +1132,7 @@ test_sbat_var_asciz(void)
 	UINTN size = sizeof(buf);
 	char expected[] = SBAT_VAR_PREVIOUS;
 
-	status = set_sbat_uefi_variable();
+	status = set_sbat_uefi_variable(SBAT_VAR_PREVIOUS, SBAT_VAR_PREVIOUS);
 	if (status != EFI_SUCCESS)
 		return -1;
 

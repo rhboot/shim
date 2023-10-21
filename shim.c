@@ -1377,6 +1377,91 @@ uninstall_shim_protocols(void)
 #endif
 }
 
+void
+check_section(char *section_name, int len, void **pointer,
+		EFI_IMAGE_SECTION_HEADER *Section, void *data, int datasize, 
+		size_t minsize)
+{
+	if (CompareMem(Section->Name, section_name, len) == 0) {
+		*pointer = ImageAddress(data, datasize, Section->PointerToRawData);
+		if (Section->SizeOfRawData < minsize) {
+			dprint(L"found and rejected %.*a bad size\n", len, section_name);
+			dprint(L"minsize: %d\n", minsize);
+			dprint(L"rawsize: %d\n", Section->SizeOfRawData);
+			return ;
+		}
+		if (!*pointer) {
+			return ;
+		}
+		dprint(L"found %.*a\n", len, section_name);
+	}
+}
+EFI_STATUS
+load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	EFI_IMAGE_SECTION_HEADER *Section;
+	int datasize = 0;
+	void *data = NULL;
+	int i;
+	char *sbat_var_previous = NULL;
+	char *sbat_var_latest = NULL;
+	uint8_t *ssps_previous = NULL;
+	uint8_t *sspv_previous = NULL;
+	uint8_t *ssps_latest = NULL;
+	uint8_t *sspv_latest = NULL;
+
+	efi_status = read_image(image_handle, L"revocations", &PathName,
+				&data, &datasize);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	efi_status = verify_image(data, datasize, shim_li, &context);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"revocations failed to verify\n");
+		return efi_status;
+	}
+	dprint(L"verified revocations\n");
+
+	Section = context.FirstSection;
+	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		dprint(L"checking section %a\n", (char *)Section->Name);
+		CHECK_SECTION(".sbatp", (void **)&sbat_var_previous, Section,
+				data, datasize, sizeof(SBAT_VAR_ORIGINAL));
+		CHECK_SECTION(".sbatl", (void **)&sbat_var_latest, Section,
+				data, datasize, sizeof(SBAT_VAR_ORIGINAL));
+		CHECK_SECTION(".sspvp", (void **)&sspv_previous, Section,
+				data, datasize, SSPVER_SIZE);
+		CHECK_SECTION(".sspsp", (void **)&ssps_previous, Section,
+				data, datasize, SSPSIG_SIZE);
+		CHECK_SECTION(".sspvl", (void **)&sspv_latest, Section,
+				data, datasize, SSPVER_SIZE);
+		CHECK_SECTION(".sspsl", (void **)&ssps_latest, Section,
+				data, datasize, SSPSIG_SIZE);
+	}
+
+	if (sbat_var_latest && sbat_var_previous) {
+		dprint(L"attempting to update SBAT_LEVEL\n");
+		efi_status = set_sbat_uefi_variable(sbat_var_previous,
+				sbat_var_latest);
+	} else {
+		dprint(L"no data for SBAT_LEVEL\n");
+	}
+
+	if ((sspv_previous && ssps_previous) || (sspv_latest && ssps_latest)) {
+		dprint(L"attempting to update SkuSiPolicy\n");
+		efi_status = set_ssp_uefi_variable(sspv_previous, ssps_previous,
+				sspv_latest, ssps_latest);
+
+	} else {
+		dprint(L"no data for SkuSiPolicy\n");
+	}
+
+	FreePool(data);
+	return efi_status;
+}
+
 EFI_STATUS
 load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 {
@@ -1423,11 +1508,15 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	return EFI_SUCCESS;
 }
 
-/* Read additional certificates from files (after verifying signatures) */
+/* 
+ * Read additional certificates and SBAT Level requirements from files
+ * (after verifying signatures) 
+ */
 EFI_STATUS
-load_certs(EFI_HANDLE image_handle)
+load_unbundled_trust(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
+	EFI_STATUS sbat_status;
 	EFI_LOADED_IMAGE *li = NULL;
 	CHAR16 *PathName = NULL;
 	EFI_FILE *root, *dir;
@@ -1468,43 +1557,54 @@ load_certs(EFI_HANDLE image_handle)
 		goto done;
 	}
 
-	while (1) {
-		UINTN old = buffersize;
-		efi_status = dir->Read(dir, &buffersize, buffer);
-		if (efi_status == EFI_BUFFER_TOO_SMALL) {
-			if (buffersize == old) {
-				/*
-				 * Some UEFI drivers or firmwares are not compliant with
-				 * the EFI_FILE_PROTOCOL.Read() specs and do not return the
-				 * required buffer size along with EFI_BUFFER_TOO_SMALL.
-				 * Work around this by progressively increasing the buffer
-				 * size, up to a certain point, until the call succeeds.
-				 */
-				perror(L"Error reading directory %s - non-compliant UEFI driver or firmware!\n",
-				       PathName);
-				buffersize = (buffersize < 4) ? 4 : buffersize * 2;
-				if (buffersize > 1024)
+	sbat_status = load_revocations_file(image_handle, PathName);
+
+	if (secure_mode()) {
+		while (1) {
+			UINTN old = buffersize;
+			efi_status = dir->Read(dir, &buffersize, buffer);
+			if (efi_status == EFI_BUFFER_TOO_SMALL) {
+				if (buffersize == old) {
+					/*
+					 * Some UEFI drivers or firmwares are not compliant with
+					 * the EFI_FILE_PROTOCOL.Read() specs and do not return the
+					 * required buffer size along with EFI_BUFFER_TOO_SMALL.
+					 * Work around this by progressively increasing the buffer
+					 * size, up to a certain point, until the call succeeds.
+					 */
+					perror(L"Error reading directory %s - non-compliant UEFI driver or firmware!\n",
+							PathName);
+					buffersize = (buffersize < 4) ? 4 : buffersize * 2;
+					if (buffersize > 1024)
+						goto done;
+				}
+				buffer = ReallocatePool(buffer, old, buffersize);
+				if (buffer == NULL) {
+					perror(L"Failed to read directory %s - %r\n",
+					       PathName, EFI_OUT_OF_RESOURCES);
 					goto done;
-			}
-			buffer = ReallocatePool(buffer, old, buffersize);
-			if (buffer == NULL) {
-				perror(L"Failed to read directory %s - %r\n",
-				       PathName, EFI_OUT_OF_RESOURCES);
+				}
+				continue;
+			} else if (EFI_ERROR(efi_status)) {
+				perror(L"Failed to read directory %s - %r\n", PathName,
+						efi_status);
 				goto done;
 			}
-			continue;
-		} else if (EFI_ERROR(efi_status)) {
-			perror(L"Failed to read directory %s - %r\n", PathName,
-			       efi_status);
-			goto done;
+
+			info = (EFI_FILE_INFO *)buffer;
+			if (buffersize == 0 || !info)
+				goto done;
+
+			if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
+				load_cert_file(image_handle, info->FileName, PathName);
+			}
 		}
-
-		info = (EFI_FILE_INFO *)buffer;
-		if (buffersize == 0 || !info)
-			goto done;
-
-		if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
-			load_cert_file(image_handle, info->FileName, PathName);
+		/*
+		 * If the previous attempt failed, see if the revocations file can
+		 * be validated and loaded with additional certs in place
+		 */
+		if (EFI_ERROR(sbat_status)) {
+			load_revocations_file(image_handle, PathName);
 		}
 	}
 done:
@@ -1713,7 +1813,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
-	efi_status = set_sbat_uefi_variable();
+	efi_status = set_sbat_uefi_variable_internal();
 	if (EFI_ERROR(efi_status) && secure_mode()) {
 		perror(L"%s variable initialization failed\n", SBAT_VAR_NAME);
 		msg = SET_SBAT;
@@ -1722,13 +1822,19 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		dprint(L"%s variable initialization failed: %r\n",
 		       SBAT_VAR_NAME, efi_status);
 	}
+	efi_status = set_ssp_uefi_variable_internal();
+	if (EFI_ERROR(efi_status)) {
+                dprint(L"%s variable initialization failed: %r\n",
+                       SSPVER_VAR_NAME, efi_status);
+        }
+        dprint(L"%s variable initialization done\n", SSPVER_VAR_NAME);
 
 	if (secure_mode()) {
 		char *sbat_start = (char *)&_sbat;
 		char *sbat_end = (char *)&_esbat;
 
 		INIT_LIST_HEAD(&sbat_var);
-		efi_status = parse_sbat_var(&sbat_var);
+		efi_status = parse_sbat_var(&sbat_var, NULL);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Parsing %s variable failed: %r\n",
 				SBAT_VAR_NAME, efi_status);
@@ -1748,11 +1854,9 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 	init_openssl();
 
-	if (secure_mode()) {
-		efi_status = load_certs(global_image_handle);
-		if (EFI_ERROR(efi_status)) {
-			LogError(L"Failed to load addon certificates\n");
-		}
+	efi_status = load_unbundled_trust(global_image_handle);
+	if (EFI_ERROR(efi_status)) {
+		LogError(L"Failed to load addon certificates / sbat level\n");
 	}
 
 	/*

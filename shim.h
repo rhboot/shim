@@ -180,6 +180,7 @@
 #include "include/replacements.h"
 #include "include/sbat.h"
 #include "include/sbat_var_defs.h"
+#include "include/ssp.h"
 #if defined(OVERRIDE_SECURITY_POLICY)
 #include "include/security_policy.h"
 #endif
@@ -308,5 +309,9 @@ verify_buffer (char *data, int datasize,
 #define SHIM_RETAIN_PROTOCOL_VAR_NAME L"ShimRetainProtocol"
 
 char *translate_slashes(char *out, const char *str);
+
+#define CHECK_SECTION(section_name, pointer, section, data, datasize, minsize) \
+	check_section(section_name, sizeof(section_name) - 1, pointer, \
+			section, data, datasize, minsize)
 
 #endif /* SHIM_H_ */
