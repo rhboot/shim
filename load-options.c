@@ -249,6 +249,76 @@ done:
 }
 
 /*
+* Check if path is a valid path to a file
+* Even if it's a valid directory we cannot load a directory.
+*/
+static int 
+is_valid_path(EFI_LOADED_IMAGE *li, CHAR16 *path) 
+{
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *FileSystem;
+	EFI_FILE_PROTOCOL *RootDir, *FileHandle;
+	CHAR16 *PathName;
+	EFI_STATUS efi_status;
+
+	efi_status =BS->HandleProtocol(li->DeviceHandle, &gEfiSimpleFileSystemProtocolGuid, (VOID**)&FileSystem);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Error getting SimpleFileSystemProtocol: %r\n", efi_status);
+		return FALSE;
+    }
+
+	efi_status = generate_path_from_image_path(li, path, &PathName);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Unable to generate path %s: %r\n", path,
+		       efi_status);
+		return 0;
+	}
+
+	efi_status = FileSystem->OpenVolume(FileSystem, &RootDir);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Error opening root directory: %r\n", efi_status);
+		return FALSE;
+	}
+
+	efi_status = RootDir->Open(RootDir, &FileHandle, PathName, EFI_FILE_MODE_READ, 0);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"%s is not a valid path: %r.\n", PathName, efi_status);
+		return FALSE;
+	}
+
+	EFI_FILE_INFO *FileInfo;
+	efi_status = FileHandle->GetInfo(FileHandle, &gEfiFileInfoGuid, NULL, NULL);
+	if (efi_status == EFI_BUFFER_TOO_SMALL) {
+
+		efi_status = BS->AllocatePool(EfiRuntimeServicesData, sizeof(EFI_FILE_INFO), (void**)&FileInfo);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Error allocating memory for FileInfo: %r\n", efi_status);
+			return FALSE;
+		}
+
+		efi_status = FileHandle->GetInfo(FileHandle, &gEfiFileInfoGuid, &FileInfo->Size, NULL);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Error getting FileInfo: %r\n", efi_status);
+			return FALSE;
+		}
+
+		if (FileInfo->Attribute & EFI_FILE_DIRECTORY) {
+			dprint(L"%s is a directory\n", PathName);
+			// We cannot boot a directory so we return that the path is not valid
+			return FALSE;
+		} else {
+			dprint(L"%s is a file\n", PathName);
+			return TRUE;
+		}
+
+		BS->FreePool(FileInfo);
+    }
+
+	FileHandle->Close(FileHandle);
+
+	return TRUE;
+}
+
+/*
  * Split the supplied load options in to a NULL terminated
  * string representing the path of the second stage loader,
  * and return a pointer to the remaining load options data
@@ -449,7 +519,7 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 	 * Set up the name of the alternative loader and the LoadOptions for
 	 * the loader
 	 */
-	if (loader_str) {
+	if (loader_str && is_valid_path(li, loader_str)) {
 		second_stage = loader_str;
 		load_options = remaining;
 		load_options_size = remaining_size;
