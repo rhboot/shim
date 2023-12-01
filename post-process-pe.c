@@ -42,7 +42,7 @@ static int verbosity;
 		0;                                               \
 	})
 
-static bool set_nx_compat = true;
+static bool set_nx_compat = false;
 
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
