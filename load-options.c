@@ -442,6 +442,14 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 		}
 	}
 
+	/*
+	 * Windows bcdedit.exe puts "WINDOWS\0" (in 8-bit) in the beginning of
+	 * the options, so if we see that, we know it's not useful to us.
+	 */
+	if (li->LoadOptionsSize >= 8)
+		if (CompareMem(li->LoadOptions, "WINDOWS", 8) == 0)
+			return EFI_SUCCESS;
+
 	loader_str = split_load_options(li->LoadOptions, li->LoadOptionsSize,
 					&remaining, &remaining_size);
 
