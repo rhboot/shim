@@ -264,7 +264,7 @@ is_valid_path(EFI_LOADED_IMAGE *li, CHAR16 *path)
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Error getting SimpleFileSystemProtocol: %r\n", efi_status);
 		return FALSE;
-    }
+	}
 
 	efi_status = generate_path_from_image_path(li, path, &PathName);
 	if (EFI_ERROR(efi_status)) {
@@ -311,7 +311,7 @@ is_valid_path(EFI_LOADED_IMAGE *li, CHAR16 *path)
 		}
 
 		BS->FreePool(FileInfo);
-    }
+	}
 
 	FileHandle->Close(FileHandle);
 
