@@ -20,7 +20,7 @@ ImageAddress (void *image, uint64_t size, uint64_t address)
 
 	/* Insure our math won't overflow */
 	img_addr = (uintptr_t)image;
-	if (__builtin_add_overflow(img_addr, address, &img_addr))
+	if (checked_add(img_addr, address, &img_addr))
 		return NULL;
 
 	/* return the absolute pointer */
