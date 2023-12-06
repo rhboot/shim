@@ -1549,6 +1549,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	EFI_FILE_IO_INTERFACE *drive;
 	UINTN buffersize = 0;
 	void *buffer = NULL;
+	BOOLEAN search_revocations = TRUE;
 
 	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
 					 (void **)&li);
@@ -1584,13 +1585,6 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	if (!secure_mode())
 		goto done;
 
-	/*
-	 * In the event that there are unprocessed revocation additions, they
-	 * could be intended to ban any *new* trust anchors we find here.
-	 * With that in mind, we always want to do a pass of loading
-	 * revocations before we try to add anything new to our allowlist.
-	 */
-	load_revocations_file(image_handle, PathName);
 
 	while (true) {
 		UINTN old = buffersize;
@@ -1625,10 +1619,46 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		}
 
 		info = (EFI_FILE_INFO *)buffer;
-		if (buffersize == 0 || !info)
-			goto done;
+		if (buffersize == 0 || !info) {
+			if (search_revocations) {
+				search_revocations = FALSE;
+				efi_status = root->Open(root, &dir, PathName,
+							EFI_FILE_MODE_READ, 0);
+				if (EFI_ERROR(efi_status)) {
+					perror(L"Failed to open %s - %r\n",
+					       PathName, efi_status);
+					goto done;
+				}
+				continue;
+			} else {
+				goto done;
+			}
+		}
 
-		if (StrCaseCmp(info->FileName, L"shim_certificate.efi") == 0) {
+		/*
+		 * In the event that there are unprocessed revocation
+		 * additions, they could be intended to ban any *new* trust
+		 * anchors we find here. With that in mind, we always want to
+		 * do a pass of loading revocations before we try to add
+		 * anything new to our allowlist. This is done by making two
+		 * passes over the directory, first to search for the
+		 * revocations.efi file then to search for shim_certificate.efi
+		 */
+		if (search_revocations &&
+		    StrCaseCmp(info->FileName, L"revocations.efi") == 0) {
+			load_revocations_file(image_handle, PathName);
+			search_revocations = FALSE;
+			efi_status = root->Open(root, &dir, PathName,
+						EFI_FILE_MODE_READ, 0);
+			if (EFI_ERROR(efi_status)) {
+				perror(L"Failed to open %s - %r\n",
+				       PathName, efi_status);
+				goto done;
+			}
+		}
+
+		if (!search_revocations &&
+		    StrCaseCmp(info->FileName, L"shim_certificate.efi") == 0) {
 			load_cert_file(image_handle, info->FileName, PathName);
 		}
 	}
