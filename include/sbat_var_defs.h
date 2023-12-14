@@ -13,9 +13,9 @@
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_ORIGINAL_DATE "\n"
 
 #if defined(ENABLE_SHIM_DEVEL)
-#define SBAT_VAR_PREVIOUS_DATE "2021030218"
-#define SBAT_VAR_PREVIOUS \
-	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_PREVIOUS_DATE "\n"
+#define SBAT_VAR_AUTOMATIC_DATE "2021030218"
+#define SBAT_VAR_AUTOMATIC \
+	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_AUTOMATIC_DATE "\n"
 
 #define SBAT_VAR_LATEST_DATE "2022050100"
 #define SBAT_VAR_LATEST_REVOCATIONS "component,2\nothercomponent,2\n"
@@ -25,12 +25,12 @@
 #else /* !ENABLE_SHIM_DEVEL */
 /*
  * At this point we do not want shim to automatically apply a
- * previous revocation unless it is delivered by a separately
- * installed signed revocations binary.
+ * revocation unless it is delivered by a separately installed
+ * signed revocations binary.
  */
-#define SBAT_VAR_PREVIOUS_DATE "2021030218"
-#define SBAT_VAR_PREVIOUS \
-	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_PREVIOUS_DATE "\n"
+#define SBAT_VAR_AUTOMATIC_DATE "2021030218"
+#define SBAT_VAR_AUTOMATIC \
+	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_AUTOMATIC_DATE "\n"
 
 /*
  * Revocations for January 2024 shim CVEs

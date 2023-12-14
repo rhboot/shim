@@ -1131,9 +1131,9 @@ test_sbat_var_asciz(void)
 	char buf[1024] = "";
 	UINT32 attrs = 0;
 	UINTN size = sizeof(buf);
-	char expected[] = SBAT_VAR_PREVIOUS;
+	char expected[] = SBAT_VAR_AUTOMATIC;
 
-	status = set_sbat_uefi_variable(SBAT_VAR_PREVIOUS, SBAT_VAR_PREVIOUS);
+	status = set_sbat_uefi_variable(SBAT_VAR_AUTOMATIC, SBAT_VAR_AUTOMATIC);
 	if (status != EFI_SUCCESS)
 		return -1;
 

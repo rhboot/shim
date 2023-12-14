@@ -1430,10 +1430,10 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	int datasize = 0;
 	void *data = NULL;
 	unsigned int i;
-	char *sbat_var_previous = NULL;
+	char *sbat_var_automatic = NULL;
 	char *sbat_var_latest = NULL;
-	uint8_t *ssps_previous = NULL;
-	uint8_t *sspv_previous = NULL;
+	uint8_t *ssps_automatic = NULL;
+	uint8_t *sspv_automatic = NULL;
 	uint8_t *ssps_latest = NULL;
 	uint8_t *sspv_latest = NULL;
 
@@ -1452,13 +1452,13 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
 		dprint(L"checking section \"%c%c%c%c%c%c%c%c\"\n", (char *)Section->Name);
-		check_section(".sbatp\0\0", (void **)&sbat_var_previous, Section,
+		check_section(".sbata\0\0", (void **)&sbat_var_automatic, Section,
 				data, datasize, sizeof(SBAT_VAR_ORIGINAL));
 		check_section(".sbatl\0\0", (void **)&sbat_var_latest, Section,
 				data, datasize, sizeof(SBAT_VAR_ORIGINAL));
-		check_section(".sspvp\0\0", (void **)&sspv_previous, Section,
+		check_section(".sspva\0\0", (void **)&sspv_automatic, Section,
 				data, datasize, SSPVER_SIZE);
-		check_section(".sspsp\0\0", (void **)&ssps_previous, Section,
+		check_section(".sspsa\0\0", (void **)&ssps_automatic, Section,
 				data, datasize, SSPSIG_SIZE);
 		check_section(".sspvl\0\0", (void **)&sspv_latest, Section,
 				data, datasize, SSPVER_SIZE);
@@ -1466,17 +1466,17 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 				data, datasize, SSPSIG_SIZE);
 	}
 
-	if (sbat_var_latest && sbat_var_previous) {
+	if (sbat_var_latest && sbat_var_automatic) {
 		dprint(L"attempting to update SBAT_LEVEL\n");
-		efi_status = set_sbat_uefi_variable(sbat_var_previous,
+		efi_status = set_sbat_uefi_variable(sbat_var_automatic,
 				sbat_var_latest);
 	} else {
 		dprint(L"no data for SBAT_LEVEL\n");
 	}
 
-	if ((sspv_previous && ssps_previous) || (sspv_latest && ssps_latest)) {
+	if ((sspv_automatic && ssps_automatic) || (sspv_latest && ssps_latest)) {
 		dprint(L"attempting to update SkuSiPolicy\n");
-		efi_status = set_ssp_uefi_variable(sspv_previous, ssps_previous,
+		efi_status = set_ssp_uefi_variable(sspv_automatic, ssps_automatic,
 				sspv_latest, ssps_latest);
 
 	} else {

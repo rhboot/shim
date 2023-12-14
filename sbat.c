@@ -8,7 +8,7 @@
 #include "ssp_var_defs.h"
 
 extern struct {
-	UINT32 previous_offset;
+	UINT32 automatic_offset;
 	UINT32 latest_offset;
 } sbat_var_payload_header;
 
@@ -466,7 +466,7 @@ clear_sbat_policy()
 }
 
 EFI_STATUS
-set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
+set_sbat_uefi_variable(char *sbat_var_automatic, char *sbat_var_latest)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	UINT32 attributes = 0;
@@ -490,9 +490,9 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 	}
 
 	if (EFI_ERROR(efi_status)) {
-		dprint("Default sbat policy: previous\n");
+		dprint("Default sbat policy: automatic\n");
 		if (secure_mode()) {
-			sbat_var_candidate = sbat_var_previous;
+			sbat_var_candidate = sbat_var_automatic;
 		} else {
 			reset_sbat = true;
 			sbat_var_candidate = SBAT_VAR_ORIGINAL;
@@ -503,14 +503,14 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 			dprint("Custom sbat policy: latest\n");
 			sbat_var_candidate = sbat_var_latest;
 			break;
-		case POLICY_PREVIOUS:
-			dprint("Custom sbat policy: previous\n");
-			sbat_var_candidate = sbat_var_previous;
+		case POLICY_AUTOMATIC:
+			dprint("Custom sbat policy: automatic\n");
+			sbat_var_candidate = sbat_var_automatic;
 			break;
 		case POLICY_RESET:
 			if (secure_mode()) {
 				console_print(L"Cannot reset SBAT policy: Secure Boot is enabled.\n");
-				sbat_var_candidate = sbat_var_previous;
+				sbat_var_candidate = sbat_var_automatic;
 			} else {
 				dprint(L"Custom SBAT policy: reset OK\n");
 				reset_sbat = true;
@@ -521,7 +521,7 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 			console_error(L"SBAT policy state %llu is invalid",
 				      EFI_INVALID_PARAMETER);
 			if (secure_mode()) {
-				sbat_var_candidate = sbat_var_previous;
+				sbat_var_candidate = sbat_var_automatic;
 			} else {
 				reset_sbat = true;
 				sbat_var_candidate = SBAT_VAR_ORIGINAL;
@@ -617,15 +617,15 @@ set_sbat_uefi_variable(char *sbat_var_previous, char *sbat_var_latest)
 EFI_STATUS
 set_sbat_uefi_variable_internal(void)
 {
-	char *sbat_var_previous;
+	char *sbat_var_automatic;
 	char *sbat_var_latest;
 
-	sbat_var_previous = (char *)&sbat_var_payload_header +
-			    sbat_var_payload_header.previous_offset;
+	sbat_var_automatic = (char *)&sbat_var_payload_header +
+			    sbat_var_payload_header.automatic_offset;
 	sbat_var_latest = (char *)&sbat_var_payload_header +
 			  sbat_var_payload_header.latest_offset;
 
-	return set_sbat_uefi_variable(sbat_var_previous, sbat_var_latest);
+	return set_sbat_uefi_variable(sbat_var_automatic, sbat_var_latest);
 }
 
 static void
@@ -663,7 +663,7 @@ clear_ssp_uefi_variables(void)
 }
 
 EFI_STATUS
-set_ssp_uefi_variable(uint8_t *ssp_ver_previous, uint8_t *ssp_sig_previous,
+set_ssp_uefi_variable(uint8_t *ssp_ver_automatic, uint8_t *ssp_sig_automatic,
 		uint8_t *ssp_ver_latest, uint8_t *ssp_sig_latest)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
@@ -694,9 +694,9 @@ set_ssp_uefi_variable(uint8_t *ssp_ver_previous, uint8_t *ssp_sig_previous,
 	}
 
 	if (EFI_ERROR(efi_status)) {
-		dprint("Default SSP policy: previous\n");
-		ssp_ver = ssp_ver_previous;
-		ssp_sig = ssp_sig_previous;
+		dprint("Default SSP policy: automatic\n");
+		ssp_ver = ssp_ver_automatic;
+		ssp_sig = ssp_sig_automatic;
 	} else {
 		switch (ssp_policy) {
 			case POLICY_LATEST:
@@ -704,16 +704,16 @@ set_ssp_uefi_variable(uint8_t *ssp_ver_previous, uint8_t *ssp_sig_previous,
 				ssp_ver = ssp_ver_latest;
 				ssp_sig = ssp_sig_latest;
 				break;
-			case POLICY_PREVIOUS:
-				dprint("Custom SSP policy: previous\n");
-				ssp_ver = ssp_ver_previous;
-				ssp_sig = ssp_sig_previous;
+			case POLICY_AUTOMATIC:
+				dprint("Custom SSP policy: automatic\n");
+				ssp_ver = ssp_ver_automatic;
+				ssp_sig = ssp_sig_automatic;
 				break;
 			case POLICY_RESET:
 				if (secure_mode()) {
 					console_print(L"Cannot reset SSP policy: Secure Boot is enabled.\n");
-					ssp_ver = ssp_ver_previous;
-					ssp_sig = ssp_sig_previous;
+					ssp_ver = ssp_ver_automatic;
+					ssp_sig = ssp_sig_automatic;
 				} else {
 					dprint(L"Custom SSP policy: reset OK\n");
 					reset_ssp = true;
@@ -722,8 +722,8 @@ set_ssp_uefi_variable(uint8_t *ssp_ver_previous, uint8_t *ssp_sig_previous,
 			default:
 				console_error(L"SSP policy state %llu is invalid",
 					      EFI_INVALID_PARAMETER);
-				ssp_ver = ssp_ver_previous;
-				ssp_sig = ssp_sig_previous;
+				ssp_ver = ssp_ver_automatic;
+				ssp_sig = ssp_sig_automatic;
 				break;
 		}
 	}
