@@ -188,6 +188,9 @@ endif
 ifneq ($(origin VENDOR_DBX_FILE), undefined)
 DEFINES		+= -DVENDOR_DBX_FILE=\"$(VENDOR_DBX_FILE)\"
 endif
+ifneq ($(origin SBAT_AUTOMATIC_DATE), undefined)
+DEFINES		+= -DSBAT_AUTOMATIC_DATE=$(SBAT_AUTOMATIC_DATE)
+endif
 
 LDFLAGS		= --hash-style=sysv -nostdlib -znocombreloc -T $(EFI_LDS) -shared -Bsymbolic -L$(LOCAL_EFI_PATH) -L$(LIBDIR) -LCryptlib -LCryptlib/OpenSSL $(EFI_CRT_OBJS) --build-id=sha1 $(ARCH_LDFLAGS) --no-undefined
 
