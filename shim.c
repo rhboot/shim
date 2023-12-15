@@ -1590,6 +1590,13 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"Failed to find fs on local drive (netboot?): %r \n",
 				efi_status);
+		/*
+		 * Network boot cases do not support reading a directory. Try
+		 * to read revocations.efi to pull in any unbundled SBATLevel
+		 * updates unconditionally in those cases. This may produce
+		 * console noise when the file is not present.
+		 */
+		load_cert_file(image_handle, REVOCATIONFILE, PathName);
 		goto done;
 	}
 
@@ -1668,7 +1675,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		 * revocations.efi file then to search for shim_certificate.efi
 		 */
 		if (search_revocations &&
-		    StrCaseCmp(info->FileName, L"revocations.efi") == 0) {
+		    StrCaseCmp(info->FileName, REVOCATIONFILE) == 0) {
 			load_revocations_file(image_handle, PathName);
 			search_revocations = FALSE;
 			efi_status = root->Open(root, &dir, PathName,

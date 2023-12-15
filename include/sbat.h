@@ -38,6 +38,8 @@
 #define POLICY_RESET		3
 #define POLICY_NOTREAD		255
 
+#define REVOCATIONFILE L"revocations.efi"
+
 extern UINTN _sbat, _esbat;
 
 struct sbat_var_entry {
