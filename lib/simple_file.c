@@ -208,10 +208,13 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 
 		efi_status = root->GetInfo(root, &EFI_FILE_SYSTEM_INFO_GUID,
 					   &size, fi);
-		if (EFI_ERROR(efi_status))
-			continue;
+		/* If GetInfo fails, try to form a name from DevicePath. */
+		if (EFI_ERROR(efi_status)){
+			name = NULL;
+		} else {
+			name = fi->VolumeLabel;
+		}
 
-		name = fi->VolumeLabel;
 		if (!name || StrLen(name) == 0 || StrCmp(name, L" ") == 0)
 			name = DevicePathToStr(DevicePathFromHandle(vol_handles[i]));
 
