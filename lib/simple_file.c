@@ -184,7 +184,7 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	if (!count || !vol_handles)
 		return EFI_NOT_FOUND;
 
-	entries = AllocatePool(sizeof(CHAR16 *) * (count+1));
+	entries = AllocateZeroPool(sizeof(CHAR16 *) * (count+1));
 	if (!entries)
 		return EFI_OUT_OF_RESOURCES;
 
