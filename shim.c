@@ -1070,6 +1070,23 @@ restore_loaded_image(VOID)
 	CopyMem(shim_li, &shim_li_bak, sizeof(shim_li_bak));
 }
 
+/* If gets used on static data it probably needs boundary checking */
+void
+str16_to_str8(CHAR16 *str16, CHAR8 **str8)
+{
+	int i = 0;
+
+	while (str16[i++] != '\0');
+	*str8 = (CHAR8 *)AllocatePool((i + 1) * sizeof (CHAR8));
+
+	i = 0;
+	while (str16[i] != '\0') {
+		(*str8)[i] = (CHAR8)str16[i];
+		i++;
+	}
+	(*str8)[i] = '\0';
+}
+
 /*
  * Load and run an EFI executable
  */
@@ -1079,6 +1096,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 	EFI_STATUS efi_status;
 	void *sourcebuffer = NULL;
 	UINT64 sourcesize = 0;
+	CHAR8 *netbootname;
 
 	/*
 	 * We need to refer to the loaded image protocol on the running
@@ -1102,11 +1120,13 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 	}
 
 	if (findNetboot(shim_li->DeviceHandle)) {
-		efi_status = parseNetbootinfo(image_handle);
+		str16_to_str8(ImagePath, &netbootname);
+		efi_status = parseNetbootinfo(image_handle, netbootname);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Netboot parsing failed: %r\n", efi_status);
 			return EFI_PROTOCOL_ERROR;
 		}
+		FreePool(netbootname);
 		efi_status = FetchNetbootimage(image_handle, &sourcebuffer,
 					       &sourcesize);
 		if (EFI_ERROR(efi_status)) {
@@ -1117,12 +1137,14 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		*data = sourcebuffer;
 		*datasize = sourcesize;
 	} else if (find_httpboot(shim_li->DeviceHandle)) {
+		str16_to_str8(ImagePath, &netbootname);
 		efi_status = httpboot_fetch_buffer (image_handle,
 						    &sourcebuffer,
-						    &sourcesize);
+						    &sourcesize,
+						    netbootname);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Unable to fetch HTTP image: %r\n",
-			       efi_status);
+			perror(L"Unable to fetch HTTP image %a: %r\n",
+			       netbootname, efi_status);
 			return efi_status;
 		}
 		*data = sourcebuffer;
@@ -1566,7 +1588,8 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	efi_status = gBS->HandleProtocol(device, &EFI_SIMPLE_FILE_SYSTEM_GUID,
 					 (void **)&drive);
 	if (EFI_ERROR(efi_status)) {
-		perror(L"Failed to find fs: %r\n", efi_status);
+		dprint(L"Failed to find fs on local drive (netboot?): %r \n",
+				efi_status);
 		goto done;
 	}
 

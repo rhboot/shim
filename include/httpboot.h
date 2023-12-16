@@ -12,6 +12,6 @@
 
 extern BOOLEAN find_httpboot(EFI_HANDLE device);
 extern EFI_STATUS httpboot_fetch_buffer(EFI_HANDLE image, VOID **buffer,
-					UINT64 *buf_size);
+					UINT64 *buf_size, CHAR8 *name);
 
 #endif /* SHIM_HTTPBOOT_H */

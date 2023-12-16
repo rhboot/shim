@@ -160,25 +160,30 @@ static CHAR8 *str2ip6(CHAR8 *str)
 	return (CHAR8 *)ip;
 }
 
-static BOOLEAN extract_tftp_info(CHAR8 *url)
+static BOOLEAN extract_tftp_info(CHAR8 *url, CHAR8 *name)
 {
 	CHAR8 *start, *end;
 	CHAR8 ip6str[40];
 	CHAR8 ip6inv[16];
-	CHAR8 template[sizeof DEFAULT_LOADER_CHAR];
+	int template_len = 0;
+	CHAR8 *template;
 
-	translate_slashes(template, DEFAULT_LOADER_CHAR);
+	while (name[template_len++] != '\0');
+	template = (CHAR8 *)AllocatePool((template_len + 1) * sizeof (CHAR8));
+	translate_slashes(template, name);
 
 	// to check against str2ip6() errors
 	memset(ip6inv, 0, sizeof(ip6inv));
 
 	if (strncmp((const char *)url, (const char *)"tftp://", 7)) {
 		console_print(L"URLS MUST START WITH tftp://\n");
+		FreePool(template);
 		return FALSE;
 	}
 	start = url + 7;
 	if (*start != '[') {
 		console_print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
+		FreePool(template);
 		return FALSE;
 	}
 
@@ -188,22 +193,28 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 		end++;
 		if (end - start >= (int)sizeof(ip6str)) {
 			console_print(L"TFTP URL includes malformed IPv6 address\n");
+			FreePool(template);
 			return FALSE;
 		}
 	}
 	if (*end == '\0') {
 		console_print(L"TFTP SERVER MUST BE ENCLOSED IN [..]\n");
+		FreePool(template);
 		return FALSE;
 	}
 	memset(ip6str, 0, sizeof(ip6str));
 	memcpy(ip6str, start, end - start);
 	end++;
 	memcpy(&tftp_addr.v6, str2ip6(ip6str), 16);
-	if (memcmp(&tftp_addr.v6, ip6inv, sizeof(ip6inv)) == 0)
+	if (memcmp(&tftp_addr.v6, ip6inv, sizeof(ip6inv)) == 0) {
+		FreePool(template);
 		return FALSE;
+	}
 	full_path = AllocateZeroPool(strlen(end)+strlen(template)+1);
-	if (!full_path)
+	if (!full_path) {
+		FreePool(template);
 		return FALSE;
+	}
 	memcpy(full_path, end, strlen(end));
 	end = (CHAR8 *)strrchr((char *)full_path, '/');
 	if (!end)
@@ -211,10 +222,11 @@ static BOOLEAN extract_tftp_info(CHAR8 *url)
 	memcpy(end, template, strlen(template));
 	end[strlen(template)] = '\0';
 
+	FreePool(template);
 	return TRUE;
 }
 
-static EFI_STATUS parseDhcp6()
+static EFI_STATUS parseDhcp6(CHAR8 *name)
 {
 	EFI_PXE_BASE_CODE_DHCPV6_PACKET *packet = (EFI_PXE_BASE_CODE_DHCPV6_PACKET *)&pxe->Mode->DhcpAck.Raw;
 	CHAR8 *bootfile_url;
@@ -222,7 +234,7 @@ static EFI_STATUS parseDhcp6()
 	bootfile_url = get_v6_bootfile_url(packet);
 	if (!bootfile_url)
 		return EFI_NOT_FOUND;
-	if (extract_tftp_info(bootfile_url) == FALSE) {
+	if (extract_tftp_info(bootfile_url, name) == FALSE) {
 		FreePool(bootfile_url);
 		return EFI_NOT_FOUND;
 	}
@@ -230,14 +242,16 @@ static EFI_STATUS parseDhcp6()
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS parseDhcp4()
+static EFI_STATUS parseDhcp4(CHAR8 *name)
 {
-	CHAR8 template[sizeof DEFAULT_LOADER_CHAR];
-	INTN template_len;
+	CHAR8 *template;
+	INTN template_len = 0;
 	UINTN template_ofs = 0;
 	EFI_PXE_BASE_CODE_DHCPV4_PACKET* pkt_v4 = (EFI_PXE_BASE_CODE_DHCPV4_PACKET *)&pxe->Mode->DhcpAck.Dhcpv4;
 
-	translate_slashes(template, DEFAULT_LOADER_CHAR);
+	while (name[template_len++] != '\0');
+	template = (CHAR8 *)AllocatePool((template_len + 1) * sizeof (CHAR8));
+	translate_slashes(template, name);
 	template_len = strlen(template) + 1;
 
 	if(pxe->Mode->ProxyOfferReceived) {
@@ -270,8 +284,10 @@ static EFI_STATUS parseDhcp4()
 
 	full_path = AllocateZeroPool(dir_len + template_len);
 
-	if (!full_path)
+	if (!full_path) {
+		FreePool(template);
 		return EFI_OUT_OF_RESOURCES;
+	}
 
 	if (dir_len > 0) {
 		strncpy(full_path, (CHAR8 *)dir, dir_len);
@@ -292,10 +308,11 @@ static EFI_STATUS parseDhcp4()
 	strcat(full_path, template + template_ofs);
 	memcpy(&tftp_addr.v4, pkt_v4->BootpSiAddr, 4);
 
+	FreePool(template);
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED)
+EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED, CHAR8 *netbootname)
 {
 
 	EFI_STATUS efi_status;
@@ -310,9 +327,9 @@ EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED)
 	 * if its ipv4 or ipv6
 	 */
 	if (pxe->Mode->UsingIpv6){
-		efi_status = parseDhcp6();
+		efi_status = parseDhcp6(netbootname);
 	} else
-		efi_status = parseDhcp4();
+		efi_status = parseDhcp4(netbootname);
 	return efi_status;
 }
 
@@ -324,7 +341,7 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle UNUSED, VOID **buffer, UINT
 	BOOLEAN nobuffer = FALSE;
 	UINTN blksz = 512;
 
-	console_print(L"Fetching Netboot Image\n");
+	console_print(L"Fetching Netboot Image %a\n", full_path);
 	if (*buffer == NULL) {
 		*buffer = AllocatePool(4096 * 1024);
 		if (!*buffer)

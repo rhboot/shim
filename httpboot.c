@@ -719,18 +719,20 @@ error:
 }
 
 EFI_STATUS
-httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size)
+httpboot_fetch_buffer (EFI_HANDLE image, VOID **buffer, UINT64 *buf_size,
+		CHAR8 *name)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE nic;
-	CHAR8 next_loader[sizeof DEFAULT_LOADER_CHAR];
+	CHAR8 *next_loader;
 	CHAR8 *next_uri = NULL;
 	CHAR8 *hostname = NULL;
 
 	if (!uri)
 		return EFI_NOT_READY;
 
-	translate_slashes(next_loader, DEFAULT_LOADER_CHAR);
+	next_loader = (CHAR8 *)AllocatePool((strlen(name) + 1) * sizeof (CHAR8));
+	translate_slashes(next_loader, name);
 
 	/* Create the URI for the next loader based on the original URI */
 	efi_status = generate_next_uri(uri, next_loader, &next_uri);
