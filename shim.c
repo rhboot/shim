@@ -54,6 +54,8 @@ extern struct {
 
 #define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
 
+static CHAR16 *second_stage;
+
 typedef enum {
 	DATA_FOUND,
 	DATA_NOT_FOUND,
