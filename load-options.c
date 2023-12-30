@@ -449,7 +449,7 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 	 * Set up the name of the alternative loader and the LoadOptions for
 	 * the loader
 	 */
-	if (loader_str) {
+	if (loader_str && isprint(loader_str[0])) {
 		second_stage = loader_str;
 		load_options = remaining;
 		load_options_size = remaining_size;
