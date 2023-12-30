@@ -5,14 +5,14 @@ SBAT: Current proposal
 -------------
 
 the `.sbat` section has the following fields:
-| field | meaning |
-|---|---|
-| component_name | the name we're comparing
-| component_generation | the generation number for the comparison
-| vendor_name | human readable vendor name
-| vendor_package_name | human readable package name
-| vendor_version | human readable package version (maybe machine parseable too, not specified here)
-| vendor_url | url to look stuff up, contact, whatever.
+| field                | meaning                                                                          |
+|----------------------|----------------------------------------------------------------------------------|
+| component_name       | the name we're comparing                                                         |
+| component_generation | the generation number for the comparison                                         |
+| vendor_name          | human readable vendor name                                                       |
+| vendor_package_name  | human readable package name                                                      |
+| vendor_version       | human readable package version (maybe machine parseable too, not specified here) |
+| vendor_url           | url to look stuff up, contact, whatever.                                         |
 
 `SBAT` EFI variable
 -----------------

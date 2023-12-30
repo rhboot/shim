@@ -106,8 +106,8 @@ extern UINT32 verbose;
 	dprint_(L"%a:%d:%a() " fmt, __FILE__, __LINE__ - 1, __func__, \
 	        ##__VA_ARGS__)
 #else
-#define dprint_(...)
-#define dprint(fmt, ...)
+#define dprint_(...) ({ ; })
+#define dprint(fmt, ...) ({ ; })
 #endif
 
 extern EFI_STATUS EFIAPI vdprint_(const CHAR16 *fmt, const char *file, int line,
@@ -122,7 +122,9 @@ extern EFI_STATUS EFIAPI vdprint_(const CHAR16 *fmt, const char *file, int line,
 extern EFI_STATUS print_crypto_errors(EFI_STATUS rc, char *file, const char *func, int line);
 #define crypterr(rc) print_crypto_errors((rc), __FILE__, __func__, __LINE__)
 
-extern VOID msleep(unsigned long msecs);
+#ifndef SHIM_UNIT_TEST
+extern VOID usleep(unsigned long usecs);
+#endif
 
 /* This is used in various things to determine if we should print to the
  * console */

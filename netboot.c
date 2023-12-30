@@ -263,7 +263,7 @@ static EFI_STATUS parseDhcp4()
 	UINT8 *dir = pkt_v4->BootpBootFile;
 
 	for (i = dir_len; i >= 0; i--) {
-		if (dir[i] == '/')
+		if ((dir[i] == '/') || (dir[i] == '\\'))
 			break;
 	}
 	dir_len = (i >= 0) ? i + 1 : 0;
@@ -277,6 +277,15 @@ static EFI_STATUS parseDhcp4()
 		strncpy(full_path, (CHAR8 *)dir, dir_len);
 		if (full_path[dir_len-1] == '/' && template[0] == '/')
 			full_path[dir_len-1] = '\0';
+		/*
+		 * If the path from DHCP is using backslash instead of slash,
+		 * accept that and use it in the template in the same position
+		 * as well.
+		 */
+		if (full_path[dir_len-1] == '\\' && template[0] == '/') {
+			full_path[dir_len-1] = '\0';
+			template[0] = '\\';
+		}
 	}
 	if (dir_len == 0 && dir[0] != '/' && template[0] == '/')
 		template_ofs++;

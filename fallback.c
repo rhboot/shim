@@ -1006,14 +1006,14 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	EFI_HANDLE image_handle;
 
 	if (get_fallback_verbose()) {
-		int fallback_verbose_wait = 500000; /* default to 0.5s */
+		unsigned long fallback_verbose_wait = 500000; /* default to 0.5s */
 #ifdef FALLBACK_VERBOSE_WAIT
 		fallback_verbose_wait = FALLBACK_VERBOSE_WAIT;
 #endif
 		console_print(L"Verbose enabled, sleeping for %d mseconds... "
 			      L"Press the Pause key now to hold for longer.\n",
 			      fallback_verbose_wait);
-		msleep(fallback_verbose_wait);
+		usleep(fallback_verbose_wait);
 	}
 
 	if (!first_new_option) {
@@ -1036,7 +1036,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 		}
 		console_print(L"\n");
 
-		msleep(500000000);
+		usleep(500000000);
 		return efi_status;
 	}
 
@@ -1051,7 +1051,7 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 	efi_status = BS->StartImage(image_handle, NULL, NULL);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"StartImage failed: %r\n", efi_status);
-		msleep(500000000);
+		usleep(500000000);
 	}
 	return efi_status;
 }
@@ -1211,14 +1211,14 @@ reset:
 	console_print(L"Reset System\n");
 
 	if (get_fallback_verbose()) {
-		int fallback_verbose_wait = 500000; /* default to 0.5s */
+		unsigned long fallback_verbose_wait = 500000; /* default to 0.5s */
 #ifdef FALLBACK_VERBOSE_WAIT
 		fallback_verbose_wait = FALLBACK_VERBOSE_WAIT;
 #endif
 		console_print(L"Verbose enabled, sleeping for %d mseconds... "
 			      L"Press the Pause key now to hold for longer.\n",
 			      fallback_verbose_wait);
-		msleep(fallback_verbose_wait);
+		usleep(fallback_verbose_wait);
 	}
 
 	RT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);

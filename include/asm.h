@@ -40,11 +40,11 @@ static inline void wait_for_debug(void)
 {
         uint64_t a, b;
         int x;
-        extern void msleep(unsigned long msecs);
+        extern void usleep(unsigned long usecs);
 
         a = read_counter();
         for (x = 0; x < 1000; x++) {
-                msleep(1000);
+                usleep(1000);
                 b = read_counter();
                 if (a != b)
                         break;

@@ -305,6 +305,8 @@ verify_buffer (char *data, int datasize,
 #define DEBUG_VAR_NAME L"SHIM_DEBUG"
 #endif
 
+#define SHIM_RETAIN_PROTOCOL_VAR_NAME L"ShimRetainProtocol"
+
 char *translate_slashes(char *out, const char *str);
 
 #endif /* SHIM_H_ */

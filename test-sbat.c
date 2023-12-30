@@ -196,6 +196,22 @@ free_mock_sbat_entries(list_t *entries)
  * parse_sbat_section() tests
  */
 int
+test_parse_sbat_tiny(void)
+{
+	char section_base[] = "\0a\00";
+	size_t section_size = 2;
+	struct sbat_section_entry **entries;
+	size_t n = 0;
+	EFI_STATUS status;
+
+	status = parse_sbat_section(section_base, section_size, &n, &entries);
+	assert_equal_return(status, EFI_SUCCESS, -1, "got %#hhx expected %#hhx\n");
+	assert_equal_return(n, 0, -1, "got %#hhx expected %#hhx\n");
+
+	return 0;
+}
+
+int
 test_parse_sbat_section_null_sbat_base(void)
 {
 	char *section_base = NULL;
@@ -1141,7 +1157,9 @@ int
 main(void)
 {
 	int status = 0;
+
 	// parse_sbat section tests
+	test(test_parse_sbat_tiny);
 	test(test_parse_sbat_section_null_sbat_base);
 	test(test_parse_sbat_section_zero_sbat_size);
 	test(test_parse_sbat_section_null_entries);
@@ -1187,7 +1205,7 @@ main(void)
 
 	test(test_sbat_var_asciz);
 
-	return 0;
+	return status;
 }
 
 // vim:fenc=utf-8:tw=75:noet

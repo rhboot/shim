@@ -15,7 +15,7 @@ parse_sbat_section(char *section_base, size_t section_size,
 		   size_t *n_entries,
 		   struct sbat_section_entry ***entriesp)
 {
-	struct sbat_section_entry *entry = NULL, **entries;
+	struct sbat_section_entry *entry = NULL, **entries = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	list_t csv, *pos = NULL;
 	char * end = section_base + section_size - 1;
@@ -67,6 +67,13 @@ parse_sbat_section(char *section_base, size_t section_size,
 		n++;
 	}
 
+	/*
+	 * Not necessarily actually an *error* since we eat newlines and
+	 * the like; it could actually just be /empty/.
+	 */
+	if (n == 0)
+		goto out;
+
 	strtab = AllocateZeroPool(allocsz);
 	if (!strtab) {
 		efi_status = EFI_OUT_OF_RESOURCES;
@@ -101,6 +108,7 @@ parse_sbat_section(char *section_base, size_t section_size,
 		entry++;
 		n++;
 	}
+out:
 	*entriesp = entries;
 	*n_entries = n;
 err:

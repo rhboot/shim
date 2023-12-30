@@ -20,3 +20,4 @@ sbat_var_payload_header:
 .Lsbat_var_latest:
 	.ascii SBAT_VAR_LATEST
 	.byte 0
+	.section .note.GNU-stack,"a"

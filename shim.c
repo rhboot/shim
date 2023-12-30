@@ -753,11 +753,11 @@ verify_buffer (char *data, int datasize,
 {
 	EFI_STATUS efi_status;
 
-	efi_status = verify_buffer_sbat(data, datasize, context);
+	efi_status = verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	return verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash);
+	return verify_buffer_sbat(data, datasize, context);
 }
 
 static int
@@ -1207,7 +1207,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 		if (EFI_ERROR(efi_status)) {
 			console_print(L"start_image() returned %r\n", efi_status);
-			msleep(2000000);
+			usleep(2000000);
 			return efi_status;
 		}
 
@@ -1222,7 +1222,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		console_print(
 			L"start_image() returned %r, falling back to default loader\n",
 			efi_status);
-		msleep(2000000);
+		usleep(2000000);
 		load_options = NULL;
 		load_options_size = 0;
 		efi_status = start_image(image_handle, DEFAULT_LOADER);
@@ -1230,7 +1230,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"start_image() returned %r\n", efi_status);
-		msleep(2000000);
+		usleep(2000000);
 	}
 
 	return efi_status;
@@ -1275,24 +1275,10 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 	return EFI_SUCCESS;
 }
 
-static void *
-ossl_malloc(size_t num)
-{
-	return AllocatePool(num);
-}
-
-static void
-ossl_free(void *addr)
-{
-	FreePool(addr);
-}
-
 static void
 init_openssl(void)
 {
-	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
 	OPENSSL_init();
-	CRYPTO_set_mem_functions(ossl_malloc, NULL, ossl_free);
 	ERR_load_ERR_strings();
 	ERR_load_BN_strings();
 	ERR_load_RSA_strings();
@@ -1486,18 +1472,27 @@ load_certs(EFI_HANDLE image_handle)
 		UINTN old = buffersize;
 		efi_status = dir->Read(dir, &buffersize, buffer);
 		if (efi_status == EFI_BUFFER_TOO_SMALL) {
-			if (buffersize != old) {
-				buffer = ReallocatePool(buffer, old, buffersize);
-				if (buffer == NULL) {
-					perror(L"Failed to read directory %s - %r\n",
-					       PathName, EFI_OUT_OF_RESOURCES);
+			if (buffersize == old) {
+				/*
+				 * Some UEFI drivers or firmwares are not compliant with
+				 * the EFI_FILE_PROTOCOL.Read() specs and do not return the
+				 * required buffer size along with EFI_BUFFER_TOO_SMALL.
+				 * Work around this by progressively increasing the buffer
+				 * size, up to a certain point, until the call succeeds.
+				 */
+				perror(L"Error reading directory %s - non-compliant UEFI driver or firmware!\n",
+				       PathName);
+				buffersize = (buffersize < 4) ? 4 : buffersize * 2;
+				if (buffersize > 1024)
 					goto done;
-				}
-				continue;
 			}
-			perror(L"Failed to read directory %s - buggy firmware\n",
-			       PathName);
-			goto done;
+			buffer = ReallocatePool(buffer, old, buffersize);
+			if (buffer == NULL) {
+				perror(L"Failed to read directory %s - %r\n",
+				       PathName, EFI_OUT_OF_RESOURCES);
+				goto done;
+			}
+			continue;
 		} else if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to read directory %s - %r\n", PathName,
 			       efi_status);
@@ -1647,7 +1642,7 @@ devel_egress(devel_egress_action action UNUSED)
 	console_print(L"Waiting to %a...", reasons[action]);
 	for (size_t sleepcount = 0; sleepcount < 10; sleepcount++) {
 		console_print(L"%d...", 10 - sleepcount);
-		msleep(1000000);
+		usleep(1000000);
 	}
 	console_print(L"\ndoing %a\n", action);
 
@@ -1785,11 +1780,17 @@ die:
 #if defined(ENABLE_SHIM_DEVEL)
 		devel_egress(COLD_RESET);
 #else
-		msleep(5000000);
+		usleep(5000000);
 		RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				0, NULL);
 #endif
 	}
+
+	/*
+	 * This variable is supposed to be set by second stages, so ensure it is
+	 * not set when we are starting up.
+	 */
+	(void) del_variable(SHIM_RETAIN_PROTOCOL_VAR_NAME, SHIM_LOCK_GUID);
 
 	efi_status = shim_init();
 	if (EFI_ERROR(efi_status)) {
@@ -1802,7 +1803,7 @@ die:
 	 */
 	if (user_insecure_mode) {
 		console_print(L"Booting in insecure mode\n");
-		msleep(2000000);
+		usleep(2000000);
 	}
 
 	/*

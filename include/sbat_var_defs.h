@@ -35,8 +35,12 @@
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_PREVIOUS_DATE "\n" \
 	SBAT_VAR_PREVIOUS_REVOCATIONS
 
-#define SBAT_VAR_LATEST_DATE "2022111500"
-#define SBAT_VAR_LATEST_REVOCATIONS "shim,2\ngrub,3\n"
+/*
+ * Debian's grub.3 update was broken - some binaries included the SBAT
+ * data update but not the security patches :-(
+ */
+#define SBAT_VAR_LATEST_DATE "2023012900"
+#define SBAT_VAR_LATEST_REVOCATIONS "shim,2\ngrub,3\ngrub.debian,4\n"
 #define SBAT_VAR_LATEST \
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE "\n" \
 	SBAT_VAR_LATEST_REVOCATIONS
