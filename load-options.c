@@ -447,7 +447,9 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 
 	/*
 	 * Set up the name of the alternative loader and the LoadOptions for
-	 * the loader
+	 * the loader. But before that check the first char of loader_str
+	 * for non printable character. If this is a case do not set up 
+	 * alternative loader
 	 */
 	if (loader_str && isprint(loader_str[0])) {
 		second_stage = loader_str;
