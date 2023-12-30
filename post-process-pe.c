@@ -43,6 +43,7 @@ static int verbosity;
 	})
 
 static bool set_nx_compat = true;
+static bool set_ms_validation = true;
 
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
@@ -361,6 +362,32 @@ set_dll_characteristics(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 }
 
 static void
+ms_validation(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
+{
+	EFI_IMAGE_SECTION_HEADER *Section;
+	int i;
+
+	debug(INFO, "%14s: %s\n","NX-Compat-Flag",
+		EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT == 
+		ctx->PEHdr->Pe32.OptionalHeader.DllCharacteristics ?
+		"PASS":"FAIL");
+	
+	debug(INFO, "%14s: %s\n","4K-Alignment",
+		PAGE_SIZE == ctx->PEHdr->Pe32Plus.OptionalHeader.SectionAlignment ?
+		"PASS":"FAIL");
+
+	Section = ctx->FirstSection;
+	for (i=0, Section = ctx->FirstSection; i < ctx->NumberOfSections; i++, Section++) {
+		if ((Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) &&
+		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
+		    debug(INFO, "%14s: %s\n","Section-Wr-Exe", "FAIL");
+	    	    return;
+		}
+	}
+	debug(INFO, "%14s: %s\n","Section-Wr-Exe", "PASS");
+}
+
+static void
 fix_timestamp(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 {
 	uint32_t ts;
@@ -449,6 +476,9 @@ handle_one(char *f)
 
 	set_dll_characteristics(&ctx);
 
+	if (set_ms_validation)
+		ms_validation(&ctx);
+
 	fix_timestamp(&ctx);
 
 	fix_checksum(&ctx, map, sz);
@@ -483,6 +513,8 @@ static void __attribute__((__noreturn__)) usage(int status)
 	fprintf(out, "       -v    Be more verbose\n");
 	fprintf(out, "       -N    Disable the NX compatibility flag\n");
 	fprintf(out, "       -n    Enable the NX compatibility flag\n");
+	fprintf(out, "       -M    Disable test for Microsoft's signing requirements\n");
+	fprintf(out, "       -m    Enable test for Microsoft's signing requirements\n");
 	fprintf(out, "       -h    Print this help text and exit\n");
 
 	exit(status);
@@ -504,6 +536,12 @@ int main(int argc, char **argv)
 		{.name = "enable-nx-compat",
 		 .val = 'n',
 		},
+		{.name = "disable ms-validation",
+		 .val = 'M',
+		},
+		{.name = "enable ms-validation",
+		 .val = 'm',
+		},
 		{.name = "quiet",
 		 .val = 'q',
 		},
@@ -514,7 +552,7 @@ int main(int argc, char **argv)
 	};
 	int longindex = -1;
 
-	while ((i = getopt_long(argc, argv, "hNnqv", options, &longindex)) != -1) {
+	while ((i = getopt_long(argc, argv, "hNnMmqv", options, &longindex)) != -1) {
 		switch (i) {
 		case 'h':
 		case '?':
@@ -526,6 +564,12 @@ int main(int argc, char **argv)
 		case 'n':
 			set_nx_compat = true;
 			break;
+		case 'M':
+		        set_ms_validation = false;	
+			break;
+		case 'm':
+			set_ms_validation = true;
+			break;	
 		case 'q':
 			verbosity = MAX(verbosity - 1, MIN_VERBOSITY);
 			break;
