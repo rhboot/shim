@@ -624,7 +624,11 @@ verify_buffer_authenticode (char *data, int datasize,
 
 	if (context->SecDir->Size == 0) {
 		dprint(L"No signatures found\n");
+#ifdef ALLOW_SECURE_BOOT_SIGNATURE_VERIFY_ERROR
+		return EFI_SUCCESS;
+#else
 		return EFI_SECURITY_VIOLATION;
+#endif
 	}
 
 	if (context->SecDir->Size >= size) {
@@ -689,7 +693,11 @@ verify_buffer_authenticode (char *data, int datasize,
 		PrintErrors();
 		ClearErrors();
 		crypterr(EFI_SECURITY_VIOLATION);
+#ifdef ALLOW_SECURE_BOOT_SIGNATURE_VERIFY_ERROR
+		return EFI_SUCCESS;
+#else
 		ret_efi_status = EFI_SECURITY_VIOLATION;
+#endif
 	}
 	drain_openssl_errors();
 	return ret_efi_status;
