@@ -1498,8 +1498,10 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 		return efi_status;
 
 	efi_status = verify_image(data, datasize, shim_li, &context);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		FreePool(data);
 		return efi_status;
+	}
 
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
