@@ -1488,6 +1488,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	EFI_SIGNATURE_LIST *certlist;
 	void *pointer;
 	UINT32 original;
+	UINT32 offset;
 	int datasize = 0;
 	void *data = NULL;
 	int i;
@@ -1505,22 +1506,40 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
+		UINT32 sec_size = MIN(Section->Misc.VirtualSize, Section->SizeOfRawData);
+
 		if (CompareMem(Section->Name, ".db\0\0\0\0\0", 8) == 0) {
-			original = user_cert_size;
-			if (Section->SizeOfRawData < sizeof(EFI_SIGNATURE_LIST)) {
-				continue;
+			offset = 0;
+			while ((sec_size - offset) >= sizeof(EFI_SIGNATURE_LIST)) {
+				UINT8 *tmp;
+
+				original = user_cert_size;
+				pointer = ImageAddress(data, datasize,
+						   Section->PointerToRawData + offset);
+				if (!pointer) {
+				    break;
+				}
+				certlist = pointer;
+
+				if (certlist->SignatureListSize < sizeof(EFI_SIGNATURE_LIST) ||
+					checked_add(offset, certlist->SignatureListSize, &offset) ||
+					offset > sec_size ||
+					checked_add(user_cert_size, certlist->SignatureListSize,
+						    &user_cert_size)) {
+					break;
+				}
+
+				tmp = ReallocatePool(user_cert, original,
+						     user_cert_size);
+				if (!tmp) {
+					FreePool(data);
+					return EFI_OUT_OF_RESOURCES;
+				}
+				user_cert = tmp;
+
+				CopyMem(user_cert + original, pointer,
+				    certlist->SignatureListSize);
 			}
-			pointer = ImageAddress(data, datasize,
-					       Section->PointerToRawData);
-			if (!pointer) {
-				continue;
-			}
-			certlist = pointer;
-			user_cert_size += certlist->SignatureListSize;;
-			user_cert = ReallocatePool(user_cert, original,
-						   user_cert_size);
-			CopyMem(user_cert + original, pointer,
-			        certlist->SignatureListSize);
 		}
 	}
 	FreePool(data);
