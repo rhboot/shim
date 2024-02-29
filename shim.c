@@ -144,7 +144,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 EFI_GUID guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
-	UINTN CertSize;
+	UINTN CertSize, CertListSize;
 	BOOLEAN IsFound = FALSE;
 	int i = 0;
 
@@ -152,28 +152,35 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
-			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
-			if (verify_x509(Cert->SignatureData, CertSize)) {
-				if (verify_eku(Cert->SignatureData, CertSize)) {
-					drain_openssl_errors();
-					IsFound = AuthenticodeVerify (data->CertData,
-								      data->Hdr.dwLength - sizeof(data->Hdr),
-								      Cert->SignatureData,
-								      CertSize,
-								      hash, SHA256_DIGEST_SIZE);
-					if (IsFound) {
-						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
-						tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
+			CertListSize = CertList->SignatureListSize - sizeof(EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize;
+
+			while (CertListSize >= CertList->SignatureSize) {
+				dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
+				if (verify_x509(Cert->SignatureData, CertSize)) {
+					if (verify_eku(Cert->SignatureData, CertSize)) {
 						drain_openssl_errors();
-						return DATA_FOUND;
-					} else {
-						LogError(L"AuthenticodeVerify(): %d\n", IsFound);
+						IsFound = AuthenticodeVerify (data->CertData,
+									      data->Hdr.dwLength - sizeof(data->Hdr),
+									      Cert->SignatureData,
+									      CertSize,
+									      hash, SHA256_DIGEST_SIZE);
+						if (IsFound) {
+							dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
+							tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
+							drain_openssl_errors();
+							return DATA_FOUND;
+						} else {
+							LogError(L"AuthenticodeVerify(): %d\n", IsFound);
+						}
 					}
+				} else if (verbose) {
+					console_print(L"Not a DER encoded x.509 Certificate");
+					dprint(L"cert:\n");
+					dhexdumpat(Cert->SignatureData, CertSize, 0);
 				}
-			} else if (verbose) {
-				console_print(L"Not a DER encoded x.509 Certificate");
-				dprint(L"cert:\n");
-				dhexdumpat(Cert->SignatureData, CertSize, 0);
+
+				CertListSize -= CertList->SignatureSize;
+				Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
 			}
 		}
 
