@@ -69,11 +69,19 @@ ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE_WAIT=$(FALLBACK_VERBOSE_WAIT)
 endif
 
-all: confcheck $(TARGETS)
+all: confcheck certcheck $(TARGETS)
 
 confcheck:
 ifneq ($(origin EFI_PATH),undefined)
 	$(error EFI_PATH is no longer supported, you must build using the supplied copy of gnu-efi)
+endif
+
+certcheck:
+ifneq ($(origin VENDOR_CERT_FILE), undefined)
+	@if grep -q "BEGIN" $(VENDOR_CERT_FILE); then \
+		echo "$(VENDOR_CERT_FILE) is PEM-format, convert to DER!"; \
+		exit 1; \
+	fi
 endif
 
 compile_commands.json : Makefile Make.rules Make.defaults 
