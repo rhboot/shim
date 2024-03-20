@@ -170,7 +170,7 @@ simple_file_write_all(EFI_FILE *file, UINTN size, void *buffer)
 EFI_STATUS
 simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 {
-	UINTN count, i;
+	UINTN count, i, j;
 	EFI_HANDLE *vol_handles = NULL;
 	EFI_STATUS efi_status;
 	CHAR16 **entries;
@@ -184,11 +184,11 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 	if (!count || !vol_handles)
 		return EFI_NOT_FOUND;
 
-	entries = AllocatePool(sizeof(CHAR16 *) * (count+1));
+	entries = AllocateZeroPool(sizeof(CHAR16 *) * (count+1));
 	if (!entries)
 		return EFI_OUT_OF_RESOURCES;
 
-	for (i = 0; i < count; i++) {
+	for (i = 0, j = 0; i < count; i++) {
 		char buf[4096];
 		UINTN size = sizeof(buf);
 		EFI_FILE_SYSTEM_INFO *fi = (void *)buf;
@@ -208,19 +208,22 @@ simple_volume_selector(CHAR16 **title, CHAR16 **selected, EFI_HANDLE *h)
 
 		efi_status = root->GetInfo(root, &EFI_FILE_SYSTEM_INFO_GUID,
 					   &size, fi);
-		if (EFI_ERROR(efi_status))
-			continue;
+		/* If GetInfo fails, try to form a name from DevicePath. */
+		if (EFI_ERROR(efi_status)){
+			name = NULL;
+		} else {
+			name = fi->VolumeLabel;
+		}
 
-		name = fi->VolumeLabel;
 		if (!name || StrLen(name) == 0 || StrCmp(name, L" ") == 0)
 			name = DevicePathToStr(DevicePathFromHandle(vol_handles[i]));
 
-		entries[i] = AllocatePool((StrLen(name) + 2) * sizeof(CHAR16));
-		if (!entries[i])
+		entries[j] = AllocatePool((StrLen(name) + 2) * sizeof(CHAR16));
+		if (!entries[j])
 			break;
-		StrCpy(entries[i], name);
+		StrCpy(entries[j++], name);
 	}
-	entries[i] = NULL;
+	entries[j] = NULL;
 
 	val = console_select(title, entries, 0);
 
