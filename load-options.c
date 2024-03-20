@@ -6,6 +6,7 @@
 #include "shim.h"
 
 CHAR16 *second_stage;
+CHAR16 *optional_second_stage;
 void *load_options;
 UINT32 load_options_size;
 
