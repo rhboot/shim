@@ -21,6 +21,8 @@ loading.  A full list is in the file [README.tpm](README.tpm) .
 To use shim, simply place a DER-encoded public certificate in a file such as
 pub.cer and build with `make VENDOR_CERT_FILE=pub.cer`.
 
+shim also supports HTTP boot.
+
 There are a couple of build options, and a couple of ways to customize the
 build, described in [BUILDING](BUILDING).
 
