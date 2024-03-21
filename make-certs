@@ -7,6 +7,11 @@
 
 set -e
 
+if [[ ! -f `which openssl` ]]; then
+	echo "OpenSSL not found. Install it first, then run this script again."
+	exit 1
+fi
+
 DOMAIN=xn--u4h.net
 DAYS=365
 KEYTYPE=RSA
