@@ -144,7 +144,7 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 					 EFI_GUID guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
-	UINTN CertSize;
+	UINTN CertSize, CertListSize;
 	BOOLEAN IsFound = FALSE;
 	int i = 0;
 
@@ -152,28 +152,35 @@ static CHECK_STATUS check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList,
 		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
-			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
-			if (verify_x509(Cert->SignatureData, CertSize)) {
-				if (verify_eku(Cert->SignatureData, CertSize)) {
-					drain_openssl_errors();
-					IsFound = AuthenticodeVerify (data->CertData,
-								      data->Hdr.dwLength - sizeof(data->Hdr),
-								      Cert->SignatureData,
-								      CertSize,
-								      hash, SHA256_DIGEST_SIZE);
-					if (IsFound) {
-						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
-						tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
+			CertListSize = CertList->SignatureListSize - sizeof(EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize;
+
+			while (CertListSize >= CertList->SignatureSize) {
+				dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
+				if (verify_x509(Cert->SignatureData, CertSize)) {
+					if (verify_eku(Cert->SignatureData, CertSize)) {
 						drain_openssl_errors();
-						return DATA_FOUND;
-					} else {
-						LogError(L"AuthenticodeVerify(): %d\n", IsFound);
+						IsFound = AuthenticodeVerify (data->CertData,
+									      data->Hdr.dwLength - sizeof(data->Hdr),
+									      Cert->SignatureData,
+									      CertSize,
+									      hash, SHA256_DIGEST_SIZE);
+						if (IsFound) {
+							dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
+							tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
+							drain_openssl_errors();
+							return DATA_FOUND;
+						} else {
+							LogError(L"AuthenticodeVerify(): %d\n", IsFound);
+						}
 					}
+				} else if (verbose) {
+					console_print(L"Not a DER encoded x.509 Certificate");
+					dprint(L"cert:\n");
+					dhexdumpat(Cert->SignatureData, CertSize, 0);
 				}
-			} else if (verbose) {
-				console_print(L"Not a DER encoded x.509 Certificate");
-				dprint(L"cert:\n");
-				dhexdumpat(Cert->SignatureData, CertSize, 0);
+
+				CertListSize -= CertList->SignatureSize;
+				Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) Cert + CertList->SignatureSize);
 			}
 		}
 
@@ -1518,6 +1525,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	EFI_SIGNATURE_LIST *certlist;
 	void *pointer;
 	UINT32 original;
+	UINT32 offset;
 	int datasize = 0;
 	void *data = NULL;
 	int i;
@@ -1528,27 +1536,43 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 		return efi_status;
 
 	efi_status = verify_image(data, datasize, shim_li, &context);
-	if (EFI_ERROR(efi_status))
+	if (EFI_ERROR(efi_status)) {
+		FreePool(data);
 		return efi_status;
+	}
 
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
-		if (CompareMem(Section->Name, ".db\0\0\0\0\0", 8) == 0) {
-			original = user_cert_size;
-			if (Section->SizeOfRawData < sizeof(EFI_SIGNATURE_LIST)) {
-				continue;
+		if (CompareMem(Section->Name, ".db\0\0\0\0\0", 8) == 0 &&
+                    Section->Misc.VirtualSize <= Section->SizeOfRawData) {
+			offset = 0;
+			while ((Section->Misc.VirtualSize - offset) >= sizeof(EFI_SIGNATURE_LIST)) {
+				original = user_cert_size;
+				pointer = ImageAddress(data, datasize,
+						   Section->PointerToRawData + offset);
+				if (!pointer) {
+				    break;
+				}
+				certlist = pointer;
+
+				if (certlist->SignatureListSize < sizeof(EFI_SIGNATURE_LIST) ||
+					checked_add(offset, certlist->SignatureListSize, &offset) ||
+					offset > Section->Misc.VirtualSize ||
+					checked_add(user_cert_size, certlist->SignatureListSize,
+						    &user_cert_size)) {
+					break;
+				}
+
+				user_cert = ReallocatePool(user_cert, original,
+						       user_cert_size);
+				if (!user_cert) {
+					FreePool(data);
+					return EFI_OUT_OF_RESOURCES;
+				}
+
+				CopyMem(user_cert + original, pointer,
+				    certlist->SignatureListSize);
 			}
-			pointer = ImageAddress(data, datasize,
-					       Section->PointerToRawData);
-			if (!pointer) {
-				continue;
-			}
-			certlist = pointer;
-			user_cert_size += certlist->SignatureListSize;;
-			user_cert = ReallocatePool(user_cert, original,
-						   user_cert_size);
-			CopyMem(user_cert + original, pointer,
-			        certlist->SignatureListSize);
 		}
 	}
 	FreePool(data);
