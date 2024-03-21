@@ -108,7 +108,7 @@ require a specific level of resistance to UEFI Secure Boot bypasses.
 Metadata that includes the vendor, product family, product, component, version
 and generation are added to artifacts. This metadata is protected by the
 digital signature. New image authorization data structures, akin to the
-EFI_CERT_foo EFI_SIGNATURE_DATA structure (see Signature Database in UEFI
+EFI_CERT_SBAT EFI_SIGNATURE_DATA structure (see Signature Database in UEFI
 specification), describe how this metadata can be incorporated into allow or
 deny lists. In a simple implementation, 1 SBAT entry with security generations
 could be used for each revocable boot module, replacing many image hashes with
