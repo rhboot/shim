@@ -142,17 +142,14 @@ static UINT32 count_keys(void *Data, UINTN DataSize)
 	void *end = Data + DataSize;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		/* Use ptr arithmetics to ensure bounded access. Do not allow 0
-		 * SignatureListSize that will cause endless loop. */
-		if ((void *)(CertList + 1) > end
-		    || CertList->SignatureListSize == 0) {
+		/* Use ptr arithmetics to ensure bounded access. */
+		if ((void *)(CertList + 1) > end) {
 			console_notify
 			    (L"Invalid MOK detected! Ignoring MOK List.");
 			return 0;
 		}
 
-		if (CertList->SignatureListSize == 0 ||
-		    CertList->SignatureListSize <= CertList->SignatureSize) {
+		if (CertList->SignatureListSize <= CertList->SignatureSize) {
 			console_errorbox(L"Corrupted signature list");
 			return 0;
 		}
