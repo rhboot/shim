@@ -47,6 +47,8 @@
 #define SBAT_VAR_AUTOMATIC_REVOCATIONS "shim,2\ngrub,3\n"
 #elif SBAT_AUTOMATIC_DATE == 2023012900
 #define SBAT_VAR_AUTOMATIC_REVOCATIONS "shim,2\ngrub,3\ngrub.debian,4\n"
+#elif SBAT_AUTOMATIC_DATE == 2024010900
+#define SBAT_VAR_AUTOMATIC_REVOCATIONS "shim,4\ngrub,3\ngrub.debian,4\n"
 #else
 #error "Unknown SBAT_AUTOMATIC_DATE"
 #endif /* SBAT_AUTOMATIC_DATE == */
@@ -56,10 +58,10 @@
 	SBAT_VAR_AUTOMATIC_REVOCATIONS
 
 /*
- * Revocations for January 2024 shim CVEs
+ * Revocations for January 2024 shim CVEs + Debian/Ubuntu (peimage) CVE-2024-2312
  */
-#define SBAT_VAR_LATEST_DATE "2024010900"
-#define SBAT_VAR_LATEST_REVOCATIONS "shim,4\ngrub,3\ngrub.debian,4\n"
+#define SBAT_VAR_LATEST_DATE "2024040500"
+#define SBAT_VAR_LATEST_REVOCATIONS "shim,4\ngrub,3\ngrub.debian,4\ngrub.peimage,2\n"
 #define SBAT_VAR_LATEST \
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE "\n" \
 	SBAT_VAR_LATEST_REVOCATIONS
