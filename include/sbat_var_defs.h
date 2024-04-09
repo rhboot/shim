@@ -58,10 +58,13 @@
 	SBAT_VAR_AUTOMATIC_REVOCATIONS
 
 /*
- * Revocations for January 2024 shim CVEs + Debian/Ubuntu (peimage) CVE-2024-2312
+ * Revocations for:
+ * - January 2024 shim CVEs
+ * - October 2023 grub CVEs
+ * - Debian/Ubuntu (peimage) CVE-2024-2312
  */
-#define SBAT_VAR_LATEST_DATE "2024040500"
-#define SBAT_VAR_LATEST_REVOCATIONS "shim,4\ngrub,3\ngrub.debian,4\ngrub.peimage,2\n"
+#define SBAT_VAR_LATEST_DATE "2024040900"
+#define SBAT_VAR_LATEST_REVOCATIONS "shim,4\ngrub,4\ngrub.peimage,2\n"
 #define SBAT_VAR_LATEST \
 	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE "\n" \
 	SBAT_VAR_LATEST_REVOCATIONS
