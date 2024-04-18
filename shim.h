@@ -341,6 +341,7 @@ typedef struct {
 	UINTN			exit_data_size;
 	jmp_buf			longjmp_buf;
 	BOOLEAN			started;
+	EFI_DEVICE_PATH		*loaded_image_device_path;
 } SHIM_LOADED_IMAGE;
 
 #endif /* SHIM_H_ */
