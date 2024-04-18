@@ -192,6 +192,7 @@
 #include "include/ucs2.h"
 #include "include/variables.h"
 #include "include/hexdump.h"
+#include "include/lf2.h"
 
 #include "version.h"
 
@@ -339,6 +340,7 @@ typedef struct {
 	UINTN			exit_data_size;
 	jmp_buf			longjmp_buf;
 	BOOLEAN			started;
+	EFI_DEVICE_PATH		*loaded_image_device_path;
 } SHIM_LOADED_IMAGE;
 
 #endif /* SHIM_H_ */
