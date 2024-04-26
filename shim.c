@@ -1672,7 +1672,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		 * do a pass of loading revocations before we try to add
 		 * anything new to our allowlist. This is done by making two
 		 * passes over the directory, first to search for the
-		 * revocations.efi file then to search for shim_certificate.efi
+		 * revocations.efi file then to search for shim_certificate*.efi
 		 */
 		if (search_revocations &&
 		    StrCaseCmp(info->FileName, REVOCATIONFILE) == 0) {
@@ -1688,7 +1688,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		}
 
 		if (!search_revocations &&
-		    StrCaseCmp(info->FileName, L"shim_certificate.efi") == 0) {
+		    StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
 			load_cert_file(image_handle, info->FileName, PathName);
 		}
 	}
