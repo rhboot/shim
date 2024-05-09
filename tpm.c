@@ -201,11 +201,18 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			*/
 			efi_status = tpm2->hash_log_extend_event(tpm2,
 				PE_COFF_IMAGE, buf, (UINT64) size, event);
+			/* don't return an error if the firmware's event log is
+			 * full. the PCR should still be extended in this case
+			 * so there is no reason to make the system unbootable */
+			if (efi_status == EFI_VOLUME_FULL)
+				efi_status = EFI_SUCCESS;
 		}
 
 	        if (!hash || EFI_ERROR(efi_status)) {
 			efi_status = tpm2->hash_log_extend_event(tpm2,
 				0, buf, (UINT64) size, event);
+			if (efi_status == EFI_VOLUME_FULL)
+				efi_status = EFI_SUCCESS;
 		}
 		FreePool(event);
 		return efi_status;
@@ -239,10 +246,14 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			CopyMem(event->digest, hash, sizeof(event->digest));
 			efi_status = tpm->log_extend_event(tpm, 0, 0,
 				TPM_ALG_SHA, event, &eventnum, &lastevent);
+			if (efi_status == EFI_VOLUME_FULL)
+				efi_status = EFI_SUCCESS;
 		} else {
 			efi_status = tpm->log_extend_event(tpm, buf,
 				(UINT64)size, TPM_ALG_SHA, event, &eventnum,
 				&lastevent);
+			if (efi_status == EFI_VOLUME_FULL)
+				efi_status = EFI_SUCCESS;
 		}
 		if (efi_status == EFI_UNSUPPORTED) {
 			perror(L"Could not write TPM event: %r. Considering "
