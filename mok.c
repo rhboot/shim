@@ -34,6 +34,48 @@ static BOOLEAN check_var(CHAR16 *varname)
 		efi_status_;                                                        \
 	})
 
+static UINTN
+format_hsi_status(UINT8 *buf, size_t sz,
+		  struct mok_state_variable *msv UNUSED)
+{
+	UINT8 heapx[] = "heap-is-executable: X\n";
+	UINT8 stackx[] = "stack-is-executable: X\n";
+	UINT8 row[] = "ro-sections-are-writable: X\n";
+	UINT8 hasmap[] = "has-memory-attribute-protocol: X\n";
+	UINTN pos;
+
+	UINTN ret = sizeof(heapx) + sizeof(stackx) +
+		    sizeof(row) + sizeof(hasmap) - 3;
+
+	if (buf == 0 || sz < ret) {
+		return ret;
+	}
+
+	pos = sizeof(heapx) - 3;
+	heapx[pos] = (hsi_status & SHIM_HSI_STATUS_HEAPX) ? '1' : '0';
+
+	pos = sizeof(stackx) - 3;
+	stackx[pos] = (hsi_status & SHIM_HSI_STATUS_STACKX) ? '1' : '0';
+
+	pos = sizeof(row) - 3;
+	row[pos] = (hsi_status & SHIM_HSI_STATUS_ROW) ? '1' : '0';
+
+	pos = sizeof(hasmap) - 3;
+	hasmap[pos] = (hsi_status & SHIM_HSI_STATUS_HEAPX) ? '1' : '0';
+
+	memcpy(buf, heapx, sizeof(heapx) - 1);
+	pos = sizeof(heapx) - 1;
+	memcpy(buf+pos, stackx, sizeof(stackx) - 1);
+	pos += sizeof(stackx) - 1;
+	memcpy(buf+pos, row, sizeof(row) - 1);
+	pos += sizeof(row) - 1;
+	memcpy(buf+pos, hasmap, sizeof(hasmap) - 1);
+	pos += sizeof(hasmap) - 1;
+	buf[pos] = '\0';
+
+	return ret;
+}
+
 /*
  * If the OS has set any of these variables we need to drop into MOK and
  * handle them appropriately
@@ -196,6 +238,14 @@ struct mok_state_variable mok_state_variable_data[] = {
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
 	 .state = &mok_policy,
+	},
+	{.name = L"HSIStatus",
+	 .name8 = "HSIStatus",
+	 .rtname = L"HSIStatus",
+	 .rtname8 = "HSIStatus",
+	 .guid = &SHIM_LOCK_GUID,
+	 .flags = MOK_VARIABLE_CONFIG_ONLY,
+	 .format = format_hsi_status,
 	},
 	{ NULL, }
 };
