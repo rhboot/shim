@@ -164,4 +164,76 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 	return ret;
 }
 
+void
+get_hsi_mem_info(void)
+{
+	EFI_STATUS efi_status;
+	uintptr_t addr;
+	uint64_t attrs = 0;
+	uint32_t *tmp_alloc;
+
+	addr = ((uintptr_t)&get_hsi_mem_info) & ~EFI_PAGE_MASK;
+
+	efi_status = get_mem_attrs(addr, EFI_PAGE_SIZE, &attrs);
+	if (EFI_ERROR(efi_status)) {
+error:
+		/*
+		 * In this case we can't actually tell anything, so assume
+		 * and report the worst case scenario.
+		 */
+		hsi_status = SHIM_HSI_STATUS_HEAPX |
+			     SHIM_HSI_STATUS_STACKX |
+			     SHIM_HSI_STATUS_ROW;
+		dprint(L"Setting HSI to 0x%lx due to error: %r\n", hsi_status, efi_status);
+		return;
+	} else {
+		hsi_status = SHIM_HSI_STATUS_HASMAP;
+		dprint(L"Setting HSI to 0x%lx\n", hsi_status);
+	}
+
+	if (!(hsi_status & SHIM_HSI_STATUS_HASMAP)) {
+		dprint(L"No memory protocol, not testing further\n");
+		return;
+	}
+
+	hsi_status = SHIM_HSI_STATUS_HASMAP;
+	if (attrs & MEM_ATTR_W) {
+		dprint(L"get_hsi_mem_info() is on a writable page: 0x%x->0x%x\n",
+		       hsi_status, hsi_status | SHIM_HSI_STATUS_ROW);
+		hsi_status |= SHIM_HSI_STATUS_ROW;
+	}
+
+	addr = ((uintptr_t)&addr) & ~EFI_PAGE_MASK;
+	efi_status = get_mem_attrs(addr, EFI_PAGE_SIZE, &attrs);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"get_mem_attrs(0x%016llx, 0x%x, &attrs) failed.\n", addr, EFI_PAGE_SIZE);
+		goto error;
+	}
+
+	if (attrs & MEM_ATTR_X) {
+		dprint(L"Stack variable is on an executable page: 0x%x->0x%x\n",
+		       hsi_status, hsi_status | SHIM_HSI_STATUS_STACKX);
+		hsi_status |= SHIM_HSI_STATUS_STACKX;
+	}
+
+	tmp_alloc = AllocatePool(EFI_PAGE_SIZE);
+	if (!tmp_alloc) {
+		dprint(L"Failed to allocate heap variable.\n");
+		goto error;
+	}
+
+	addr = ((uintptr_t)tmp_alloc) & ~EFI_PAGE_MASK;
+	efi_status = get_mem_attrs(addr, EFI_PAGE_SIZE, &attrs);
+	FreePool(tmp_alloc);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"get_mem_attrs(0x%016llx, 0x%x, &attrs) failed.\n", addr, EFI_PAGE_SIZE);
+		goto error;
+	}
+	if (attrs & MEM_ATTR_X) {
+		dprint(L"Heap variable is on an executable page: 0x%x->0x%x\n",
+		       hsi_status, hsi_status | SHIM_HSI_STATUS_HEAPX);
+		hsi_status |= SHIM_HSI_STATUS_HEAPX;
+	}
+}
+
 // vim:fenc=utf-8:tw=75:noet

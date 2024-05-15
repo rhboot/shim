@@ -11,5 +11,7 @@ extern EFI_STATUS get_mem_attrs (uintptr_t addr, size_t size, uint64_t *attrs);
 extern EFI_STATUS update_mem_attrs(uintptr_t addr, uint64_t size,
 				   uint64_t set_attrs, uint64_t clear_attrs);
 
+extern void get_hsi_mem_info(void);
+
 #endif /* !SHIM_MEMATTRS_H_ */
 // vim:fenc=utf-8:tw=75:noet

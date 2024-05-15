@@ -34,6 +34,44 @@ static BOOLEAN check_var(CHAR16 *varname)
 		efi_status_;                                                        \
 	})
 
+static UINTN
+format_hsi_status(UINT8 *buf, size_t sz,
+		  struct mok_state_variable *msv UNUSED)
+{
+	const char heapx[] = "heap-is-executable: ";
+	const char stackx[] = "\nstack-is-executable: ";
+	const char row[] = "\nro-sections-are-writable: ";
+	const char hasmap[] = "\nhas-memory-attribute-protocol: ";
+	const char finale[] = "\n";
+	char *pos;
+
+	/*
+	 * sizeof includes the trailing NUL which is where our 0 or 1 value
+	 * fits
+	 */
+	UINTN ret = sizeof(heapx) + sizeof(stackx) +
+		    sizeof(row) + sizeof(hasmap) +
+		    sizeof(finale);
+
+	if (buf == 0 || sz < ret) {
+		return ret;
+	}
+
+	buf[0] = 0;
+	pos = (char *)buf;
+	pos = stpcpy(pos, heapx);
+	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_HEAPX) ? "1" : "0");
+	pos = stpcpy(pos, stackx);
+	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_STACKX) ? "1" : "0");
+	pos = stpcpy(pos, row);
+	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_ROW) ? "1" : "0");
+	pos = stpcpy(pos, hasmap);
+	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_HASMAP) ? "1" : "0");
+	stpcpy(pos, finale);
+
+	return ret;
+}
+
 /*
  * If the OS has set any of these variables we need to drop into MOK and
  * handle them appropriately
@@ -222,6 +260,14 @@ struct mok_state_variable mok_state_variable_data[] = {
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
 	 .state = &mok_policy,
+	},
+	{.name = L"HSIStatus",
+	 .name8 = "HSIStatus",
+	 .rtname = L"HSIStatus",
+	 .rtname8 = "HSIStatus",
+	 .guid = &SHIM_LOCK_GUID,
+	 .flags = MOK_VARIABLE_CONFIG_ONLY,
+	 .format = format_hsi_status,
 	},
 	{ NULL, }
 };
