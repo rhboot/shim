@@ -17,6 +17,7 @@ typedef enum {
 
 struct mok_state_variable;
 typedef vendor_addend_category_t (vendor_addend_categorizer_t)(struct mok_state_variable *);
+typedef UINTN (mok_variable_format_helper_t)(UINT8 *buf, size_t sz, struct mok_state_variable *);
 
 /*
  * MoK variables that need to have their storage validated.
@@ -91,6 +92,23 @@ struct mok_state_variable {
 	 * mirrored.
 	 */
 	UINT8 *state;
+
+	/*
+	 * If this is non-NULL, this function will be called during the
+	 * "import" phase to format the variable data.  It'll get called
+	 * twice, once as:
+	 *
+	 *   sz = format(NULL, 0, ptr);
+	 *
+	 * a buffer of size sz will then be allocated, and it'll be called
+	 * again to fill the buffer:
+	 *
+	 *   format(buf, sz, ptr);
+	 *
+	 * Note that as an implementation detail data and data_size must be
+	 * NULL and 0 respectively for this entry.
+	 */
+	mok_variable_format_helper_t *format;
 };
 
 extern size_t n_mok_state_variables;
