@@ -81,6 +81,8 @@ struct mok_state_variable {
 	 * MOK_MIRROR_DELETE_FIRST  delete any existing variable first
 	 * MOK_VARIABLE_MEASURE	    extend PCR 7 and log the hash change
 	 * MOK_VARIABLE_LOG	    measure into whatever .pcr says and log
+	 * MOK_VARIABLE_CONFIG_ONLY don't create a UEFI variable, only add
+	 *                          it to the config space variables.
 	 */
 	UINTN pcr;		/* PCR to measure and hash to */
 
