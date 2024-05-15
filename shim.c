@@ -2033,6 +2033,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	}
 
 	init_openssl();
+	get_hsi_mem_info();
 
 	efi_status = load_unbundled_trust(global_image_handle);
 	if (EFI_ERROR(efi_status)) {
