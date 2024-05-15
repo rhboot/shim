@@ -106,11 +106,12 @@ categorize_deauthorized(struct mok_state_variable *v)
 	return VENDOR_ADDEND_DB;
 }
 
-#define MOK_MIRROR_KEYDB	0x01
-#define MOK_MIRROR_DELETE_FIRST	0x02
-#define MOK_VARIABLE_MEASURE	0x04
-#define MOK_VARIABLE_LOG	0x08
-#define MOK_VARIABLE_INVERSE	0x10
+#define MOK_MIRROR_KEYDB		0x01
+#define MOK_MIRROR_DELETE_FIRST		0x02
+#define MOK_VARIABLE_MEASURE		0x04
+#define MOK_VARIABLE_LOG		0x08
+#define MOK_VARIABLE_INVERSE		0x10
+#define MOK_VARIABLE_CONFIG_ONLY	0x20
 
 struct mok_state_variable mok_state_variable_data[] = {
 	{.name = L"MokList",
@@ -834,7 +835,8 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 
 	dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
 	       FullDataSize, FullData, p, p-(uintptr_t)FullData);
-	if (FullDataSize && v->flags & MOK_MIRROR_KEYDB) {
+	if (FullDataSize && v->flags & MOK_MIRROR_KEYDB &&
+	    !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		dprint(L"calling mirror_mok_db(\"%s\",  datasz=%lu)\n",
 		       v->rtname, FullDataSize);
 		efi_status = mirror_mok_db(v->rtname, (CHAR8 *)v->rtname8, v->guid,
@@ -842,7 +844,8 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 					   only_first);
 		dprint(L"mirror_mok_db(\"%s\",  datasz=%lu) returned %r\n",
 		       v->rtname, FullDataSize, efi_status);
-	} else if (FullDataSize && only_first) {
+	} else if (FullDataSize && only_first &&
+		   !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		efi_status = SetVariable(v->rtname, v->guid, attrs,
 					 FullDataSize, FullData);
 	}
@@ -938,7 +941,8 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 
 	dprint(L"importing mok state for \"%s\"\n", v->name);
 
-	if (!v->data && !v->data_size) {
+	if (!v->data && !v->data_size &&
+	    !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
@@ -980,6 +984,22 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 			}
 		}
 	}
+
+	if (!v->data && !v->data_size &&
+	    (v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
+		efi_status = get_variable_attr(v->name,
+					       &v->data, &v->data_size,
+					       *v->guid, &attrs);
+		if (EFI_ERROR(efi_status)) {
+			dprint(L"Couldn't get variable \"%s\" for mirroring: %r\n",
+			       v->name, efi_status);
+			if (efi_status != EFI_NOT_FOUND)
+				return efi_status;
+			v->data = NULL;
+			v->data_size = 0;
+		}
+	}
+
 	if (delete == TRUE) {
 		perror(L"Deleting bad variable %s\n", v->name);
 		efi_status = LibDeleteVariable(v->name, v->guid);
