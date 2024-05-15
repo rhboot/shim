@@ -93,3 +93,13 @@ to trust CA keys in the MokList. BS,NV
 
 MokListTrustedRT: A copy of MokListTrusted made available to the kernel
 at runtime. BS,RT
+
+HSIStatus: Status of various security features:
+  heap-is-executable: 0: heap allocations are not executable by default
+                      1: heap allocations are executable
+  stack-is-executable: 0: UEFI stack is not executable
+                       1: UEFI stack is executable
+  ro-sections-are-writable: 0: read-only sections are not writable
+                            1: read-only sections are writable
+  has-memory-attribute-protocol: 0: platform does not provide the EFI Memory Attribute Protocol
+                                 1: platform does provide the EFI Memory Attribute Protocol
