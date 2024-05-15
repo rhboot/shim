@@ -959,6 +959,20 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 			}
 		}
 	}
+
+	if (v->format) {
+		v->data_size = v->format(NULL, 0, v);
+		if (v->data_size > 0) {
+			v->data = AllocatePool(v->data_size);
+			if (!v->data) {
+				perror(L"Could not allocate %lu bytes for %s\n",
+				       v->data_size, v->name);
+				return EFI_OUT_OF_RESOURCES;
+			}
+		}
+		v->format(v->data, v->data_size, v);
+	}
+
 	if (delete == TRUE) {
 		perror(L"Deleting bad variable %s\n", v->name);
 		efi_status = LibDeleteVariable(v->name, v->guid);
