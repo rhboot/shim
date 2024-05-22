@@ -29,6 +29,10 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <openssl/pkcs7.h>
 
 UINT8 mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
+#if defined(ENABLE_EKU_CODESIGN)
+/* EKU CodeSign */
+CHAR8 mOidCodeSign[] = "1.3.6.1.5.5.7.3.3";
+#endif
 
 #if 1
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -846,6 +850,10 @@ Pkcs7Verify (
   CONST UINT8 *Temp;
   UINTN       SignedDataSize;
   BOOLEAN     Wrapped;
+#if defined(ENABLE_EKU_CODESIGN)   
+  CONST CHAR8 *Ekus[1];
+  EFI_STATUS  EFI_Status;
+#endif  
 
   //
   // Check input parameters.
@@ -859,6 +867,9 @@ Pkcs7Verify (
   DataBio   = NULL;
   Cert      = NULL;
   CertStore = NULL;
+  #if defined(ENABLE_EKU_CODESIGN)
+  Ekus[0]   = mOidCodeSign;
+  #endif
 
   //
   // Register & Initialize necessary digest algorithms for PKCS#7 Handling
@@ -957,6 +968,13 @@ Pkcs7Verify (
   // Bypass the certificate purpose checking by enabling any purposes setting.
   //
   X509_STORE_set_purpose (CertStore, X509_PURPOSE_ANY);
+
+#if defined(ENABLE_EKU_CODESIGN) 
+  EFI_Status = VerifyEKUsInPkcs7Signature(P7Data, P7Length, Ekus, 1, TRUE);
+  if (EFI_Status != EFI_SUCCESS) {
+	  goto _Exit;
+  }
+#endif  
 
   //
   // Verifies the PKCS#7 signedData structure

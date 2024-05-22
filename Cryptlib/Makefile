@@ -37,6 +37,9 @@ endif
 ifeq ($(ARCH),arm)
 DEFINES		+= -DMDE_CPU_ARM
 endif
+ifeq ($(ENABLE_EKU_CODESIGN),1)
+DEFINES += -DENABLE_EKU_CODESIGN
+endif
 
 LDFLAGS		= -nostdlib -znocombreloc
 
@@ -66,6 +69,10 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    SysCall/TimerWrapper.o \
 		    SysCall/BaseMemAllocation.o \
 		    SysCall/BaseStrings.o
+
+ifeq ($(ENABLE_EKU_CODESIGN),1)
+	OBJS += Pk/CryptPkcs7VerifyEku.o
+endif
 
 all: $(TARGET)
 
