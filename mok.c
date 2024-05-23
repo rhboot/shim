@@ -34,6 +34,48 @@ static BOOLEAN check_var(CHAR16 *varname)
 		efi_status_;                                                        \
 	})
 
+static UINTN
+format_hsi_status(UINT8 *buf, size_t sz,
+		  struct mok_state_variable *msv UNUSED)
+{
+	UINT8 heapx[] = "heap-is-executable: X\n";
+	UINT8 stackx[] = "stack-is-executable: X\n";
+	UINT8 row[] = "ro-sections-are-writable: X\n";
+	UINT8 hasmap[] = "has-memory-attribute-protocol: X\n";
+	UINTN pos;
+
+	UINTN ret = sizeof(heapx) + sizeof(stackx) +
+		    sizeof(row) + sizeof(hasmap) - 3;
+
+	if (buf == 0 || sz < ret) {
+		return ret;
+	}
+
+	pos = sizeof(heapx) - 3;
+	heapx[pos] = (hsi_status & SHIM_HSI_STATUS_HEAPX) ? '1' : '0';
+
+	pos = sizeof(stackx) - 3;
+	stackx[pos] = (hsi_status & SHIM_HSI_STATUS_STACKX) ? '1' : '0';
+
+	pos = sizeof(row) - 3;
+	row[pos] = (hsi_status & SHIM_HSI_STATUS_ROW) ? '1' : '0';
+
+	pos = sizeof(hasmap) - 3;
+	hasmap[pos] = (hsi_status & SHIM_HSI_STATUS_HEAPX) ? '1' : '0';
+
+	memcpy(buf, heapx, sizeof(heapx) - 1);
+	pos = sizeof(heapx) - 1;
+	memcpy(buf+pos, stackx, sizeof(stackx) - 1);
+	pos += sizeof(stackx) - 1;
+	memcpy(buf+pos, row, sizeof(row) - 1);
+	pos += sizeof(row) - 1;
+	memcpy(buf+pos, hasmap, sizeof(hasmap) - 1);
+	pos += sizeof(hasmap) - 1;
+	buf[pos] = '\0';
+
+	return ret;
+}
+
 /*
  * If the OS has set any of these variables we need to drop into MOK and
  * handle them appropriately
@@ -80,11 +122,12 @@ categorize_deauthorized(struct mok_state_variable *v)
 	return VENDOR_ADDEND_DB;
 }
 
-#define MOK_MIRROR_KEYDB	0x01
-#define MOK_MIRROR_DELETE_FIRST	0x02
-#define MOK_VARIABLE_MEASURE	0x04
-#define MOK_VARIABLE_LOG	0x08
-#define MOK_VARIABLE_INVERSE	0x10
+#define MOK_MIRROR_KEYDB		0x01
+#define MOK_MIRROR_DELETE_FIRST		0x02
+#define MOK_VARIABLE_MEASURE		0x04
+#define MOK_VARIABLE_LOG		0x08
+#define MOK_VARIABLE_INVERSE		0x10
+#define MOK_VARIABLE_CONFIG_ONLY	0x20
 
 struct mok_state_variable mok_state_variable_data[] = {
 	{.name = L"MokList",
@@ -195,6 +238,14 @@ struct mok_state_variable mok_state_variable_data[] = {
 		  MOK_VARIABLE_LOG,
 	 .pcr = 14,
 	 .state = &mok_policy,
+	},
+	{.name = L"HSIStatus",
+	 .name8 = "HSIStatus",
+	 .rtname = L"HSIStatus",
+	 .rtname8 = "HSIStatus",
+	 .guid = &SHIM_LOCK_GUID,
+	 .flags = MOK_VARIABLE_CONFIG_ONLY,
+	 .format = format_hsi_status,
 	},
 	{ NULL, }
 };
@@ -767,7 +818,8 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 
 	dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
 	       FullDataSize, FullData, p, p-(uintptr_t)FullData);
-	if (FullDataSize && v->flags & MOK_MIRROR_KEYDB) {
+	if (FullDataSize && v->flags & MOK_MIRROR_KEYDB &&
+	    !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		dprint(L"calling mirror_mok_db(\"%s\",  datasz=%lu)\n",
 		       v->rtname, FullDataSize);
 		efi_status = mirror_mok_db(v->rtname, (CHAR8 *)v->rtname8, v->guid,
@@ -775,7 +827,8 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 					   only_first);
 		dprint(L"mirror_mok_db(\"%s\",  datasz=%lu) returned %r\n",
 		       v->rtname, FullDataSize, efi_status);
-	} else if (FullDataSize && only_first) {
+	} else if (FullDataSize && only_first &&
+		   !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		efi_status = SetVariable(v->rtname, v->guid, attrs,
 					 FullDataSize, FullData);
 	}
@@ -871,7 +924,8 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 
 	dprint(L"importing mok state for \"%s\"\n", v->name);
 
-	if (!v->data && !v->data_size) {
+	if (!v->data && !v->data_size &&
+	    !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		efi_status = get_variable_attr(v->name,
 					       &v->data, &v->data_size,
 					       *v->guid, &attrs);
@@ -913,6 +967,20 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 			}
 		}
 	}
+
+	if (v->format) {
+		v->data_size = v->format(NULL, 0, v);
+		if (v->data_size > 0) {
+			v->data = AllocatePool(v->data_size);
+			if (!v->data) {
+				perror(L"Could not allocate %lu bytes for %s\n",
+				       v->data_size, v->name);
+				return EFI_OUT_OF_RESOURCES;
+			}
+		}
+		v->format(v->data, v->data_size, v);
+	}
+
 	if (delete == TRUE) {
 		perror(L"Deleting bad variable %s\n", v->name);
 		efi_status = LibDeleteVariable(v->name, v->guid);
