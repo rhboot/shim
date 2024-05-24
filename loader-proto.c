@@ -224,9 +224,11 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 		goto free_image;
 	}
 
+	in_protocol = 1;
 	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
 	                          &image->entry_point, &image->alloc_address,
 	                          &image->alloc_pages);
+	in_protocol = 0;
 	if (EFI_ERROR(efi_status))
 		goto free_image;
 
