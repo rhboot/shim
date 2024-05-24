@@ -646,7 +646,7 @@ handle_image (void *data, unsigned int datasize,
 					   sha1hash);
 
 		if (EFI_ERROR(efi_status)) {
-			if (verbose)
+			if (verbose || in_protocol)
 				console_print(L"Verification failed: %r\n", efi_status);
 			else
 				console_error(L"Verification failed", efi_status);
