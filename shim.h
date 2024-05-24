@@ -55,6 +55,7 @@
 #ifndef SHIM_UNIT_TEST
 #include <efi.h>
 #include <efilib.h>
+#include <efisetjmp.h>
 #undef uefi_call_wrapper
 #include <efierr.h>
 #include <efiip.h>
@@ -172,12 +173,12 @@
 #include "include/ip4config2.h"
 #include "include/ip6config.h"
 #include "include/load-options.h"
+#include "include/loader-proto.h"
 #include "include/mok.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
 #include "include/peimage.h"
 #include "include/pe.h"
-#include "include/replacements.h"
 #include "include/sbat.h"
 #include "include/sbat_var_defs.h"
 #include "include/ssp.h"
@@ -191,6 +192,7 @@
 #include "include/ucs2.h"
 #include "include/variables.h"
 #include "include/hexdump.h"
+#include "include/lf2.h"
 
 #include "version.h"
 
@@ -248,6 +250,8 @@ extern VOID ClearErrors(VOID);
 extern VOID restore_loaded_image(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
 extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);
+extern EFI_STATUS install_shim_protocols(void);
+extern void uninstall_shim_protocols(void);
 
 extern UINT32 vendor_authorized_size;
 extern UINT8 *vendor_authorized;
@@ -323,5 +327,20 @@ verify_buffer (char *data, int datasize,
 #define SHIM_RETAIN_PROTOCOL_VAR_NAME L"ShimRetainProtocol"
 
 char *translate_slashes(char *out, const char *str);
+
+#include <efisetjmp_arch.h>
+
+typedef struct {
+	EFI_LOADED_IMAGE	li;
+	EFI_IMAGE_ENTRY_POINT	entry_point;
+	EFI_PHYSICAL_ADDRESS	alloc_address;
+	UINTN			alloc_pages;
+	EFI_STATUS		exit_status;
+	CONST CHAR16		*exit_data;
+	UINTN			exit_data_size;
+	jmp_buf			longjmp_buf;
+	BOOLEAN			started;
+	EFI_DEVICE_PATH		*loaded_image_device_path;
+} SHIM_LOADED_IMAGE;
 
 #endif /* SHIM_H_ */
