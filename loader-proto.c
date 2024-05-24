@@ -161,7 +161,7 @@ out:
 
 static EFI_STATUS EFIAPI
 shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
-                EFI_DEVICE_PATH *FilePath, VOID *SourceBuffer,
+                EFI_DEVICE_PATH *DevicePath, VOID *SourceBuffer,
                 UINTN SourceSize, EFI_HANDLE *ImageHandle)
 {
 	SHIM_LOADED_IMAGE *image;
@@ -172,9 +172,12 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 		return EFI_UNSUPPORTED;
 
 	if (!SourceBuffer || !SourceSize) {
-		if (try_load_from_sfs(FilePath, &bprop) == EFI_SUCCESS)
+		if (!DevicePath) /* Both SourceBuffer and DevicePath are NULL */
+			return EFI_NOT_FOUND;
+
+		if (try_load_from_sfs(DevicePath, &bprop) == EFI_SUCCESS)
 			;
-		else if (try_load_from_lf2(FilePath, &bprop) == EFI_SUCCESS)
+		else if (try_load_from_lf2(DevicePath, &bprop) == EFI_SUCCESS)
 			;
 		else
 			/* no buffer given and we cannot load from this device */
@@ -186,16 +189,18 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 		bprop.buffer = NULL;
 		/* even if we are using a buffer, try populating the
 		 * device_handle and file_path fields the best we can */
-		bprop.dp = FilePath;
-		efi_status = BS->LocateDevicePath(&EFI_DEVICE_PATH_GUID,
-		                                  &bprop.dp,
-		                                  &bprop.hnd);
-		if (efi_status != EFI_SUCCESS) {
-			/* can't seem to pull apart this DP */
-			bprop.dp = FilePath;
-			bprop.hnd = NULL;
-		}
+		bprop.dp = DevicePath;
 
+		if (bprop.dp) {
+			efi_status = BS->LocateDevicePath(&EFI_DEVICE_PATH_GUID,
+			                                  &bprop.dp,
+			                                  &bprop.hnd);
+			if (efi_status != EFI_SUCCESS) {
+				/* can't seem to pull apart this DP */
+				bprop.dp = DevicePath;
+				bprop.hnd = NULL;
+			}
+		}
 	}
 
 	image = AllocatePool(sizeof(*image));
@@ -210,12 +215,19 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	image->li.ParentHandle = ParentImageHandle;
 	image->li.SystemTable = systab;
 	image->li.DeviceHandle = bprop.hnd;
-	image->li.FilePath = DuplicateDevicePath(bprop.dp);
-	image->loaded_image_device_path = DuplicateDevicePath(FilePath);
-	if (!image->li.FilePath ||
-	    !image->loaded_image_device_path) {
-		efi_status = EFI_OUT_OF_RESOURCES;
-		goto free_image;
+	if (bprop.dp) {
+		image->li.FilePath = DuplicateDevicePath(bprop.dp);
+		if (!image->li.FilePath) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto free_image;
+		}
+	}
+	if (DevicePath) {
+		image->loaded_image_device_path = DuplicateDevicePath(DevicePath);
+		if (!image->loaded_image_device_path) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto free_image;
+		}
 	}
 
 	in_protocol = 1;
@@ -299,8 +311,10 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 					NULL);
 
 	BS->FreePages(image->alloc_address, image->alloc_pages);
-	BS->FreePool(image->li.FilePath);
-	BS->FreePool(image->loaded_image_device_path);
+	if (image->li.FilePath)
+		BS->FreePool(image->li.FilePath);
+	if (image->loaded_image_device_path)
+		BS->FreePool(image->loaded_image_device_path);
 	FreePool(image);
 
 	return efi_status;
