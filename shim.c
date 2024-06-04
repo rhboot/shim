@@ -1154,7 +1154,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		efi_status = load_image(shim_li, data, datasize, *PathName);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to load image %s: %r\n",
-			       PathName, efi_status);
+			       *PathName, efi_status);
 			PrintErrors();
 			ClearErrors();
 			return efi_status;
