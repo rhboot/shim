@@ -236,6 +236,7 @@ typedef struct _SHIM_LOCK {
 } SHIM_LOCK;
 
 extern EFI_STATUS shim_init(void);
+extern int is_removable_media_path(EFI_LOADED_IMAGE *li);
 extern void shim_fini(void);
 extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
                                    const CHAR16 *fmt, ...);
