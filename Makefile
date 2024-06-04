@@ -24,8 +24,8 @@ include $(TOPDIR)/include/coverity.mk
 include $(TOPDIR)/include/scan-build.mk
 include $(TOPDIR)/include/fanalyzer.mk
 
-TARGETS	= $(SHIMNAME)
-TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
+TARGETS	= $(SHIMNAME) $(SHIMNXNAME)
+TARGETS += $(SHIMNAME).debug $(SHIMNXNAME).debug $(MMNAME).debug $(FBNAME).debug
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 TARGETS += $(SHIMHASHNAME)
 endif
@@ -39,6 +39,7 @@ else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
 OBJS	= shim.o globals.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o
+OBJS_NX	= shim.o globals_nx.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c globals.c mok.c netboot.c replacements.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o globals.o
@@ -138,6 +139,7 @@ sbat_data.o : /dev/null
 	$(foreach vs,$(VENDOR_SBATS),$(call add-vendor-sbat,$(vs),$@))
 
 $(SHIMNAME) : $(SHIMSONAME) post-process-pe
+$(SHIMNXNAME) : $(SHIMNXSONAME) post-process-pe
 $(MMNAME) : $(MMSONAME) post-process-pe
 $(FBNAME) : $(FBSONAME) post-process-pe
 $(SHIMNAME) $(MMNAME) $(FBNAME) : | post-process-pe
@@ -149,6 +151,9 @@ LIBS = Cryptlib/libcryptlib.a \
        gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a
 
 $(SHIMSONAME): $(OBJS) $(LIBS)
+	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
+
+$(SHIMNXSONAME): $(OBJS_NX) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
 fallback.o: $(FALLBACK_SRCS)
@@ -235,6 +240,7 @@ install : install-deps install-debuginfo install-debugsource
 	$(INSTALL) -d -m 0755 $(DESTDIR)/$(TARGETDIR)
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(EFIBOOTDIR)/$(BOOTEFINAME)
 	$(INSTALL) -m 0644 $(SHIMNAME) $(DESTDIR)/$(TARGETDIR)/
+	$(INSTALL) -m 0644 $(SHIMNXNAME) $(DESTDIR)/$(TARGETDIR)/
 	$(INSTALL) -m 0644 $(BOOTCSVNAME) $(DESTDIR)/$(TARGETDIR)/
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 	$(INSTALL) -m 0644 $(FBNAME).signed $(DESTDIR)/$(EFIBOOTDIR)/$(FBNAME)
@@ -260,6 +266,9 @@ else
 	$(INSTALL) -m 0644 $(MMNAME) $(DESTDIR)/$(DATATARGETDIR)/$(MMNAME)
 	$(INSTALL) -m 0644 $(FBNAME) $(DESTDIR)/$(DATATARGETDIR)/$(FBNAME)
 endif
+
+# shim.nx.efi, mm.efi, fb.efi needs to have the NX flag set
+$(SHIMNXNAME) $(MMNAME) $(FBNAME): POST_PROCESS_PE_FLAGS+=-n
 
 %.efi: %.so
 ifneq ($(OBJCOPY_GTE224),1)

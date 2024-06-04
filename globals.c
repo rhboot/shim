@@ -29,7 +29,10 @@ int loader_is_participating;
 UINT8 user_insecure_mode;
 UINT8 ignore_db;
 UINT8 trust_mok_list;
-UINT8 mok_policy = 0;
+#ifndef MOK_POLICY_DEFAULT
+#define MOK_POLICY_DEFAULT 0
+#endif
+UINT8 mok_policy = MOK_POLICY_DEFAULT;
 
 UINT32 verbose = 0;
 
