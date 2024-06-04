@@ -50,6 +50,32 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (EFI_ERROR(efi_status)) {
+			/*
+			 * We don't do this in the unit tests because we
+			 * don't have simulation for console_countdown()
+			 * and similar.
+			 */
+#ifndef SHIM_UNIT_TEST
+			EFI_STATUS efi_status_2;
+			EFI_LOADED_IMAGE *li;
+			efi_status_2 = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
+							 (void **)&li);
+			if (EFI_ERROR(efi_status_2))
+				perror (L"Failed to get image: %r\n", efi_status_2);
+			else if (is_removable_media_path(li) &&
+				 efi_status == EFI_NOT_FOUND) {
+				CHAR16 *title = L"Could not find MokManager";
+				CHAR16 *message = L"MokManager is missing on removable media.";
+				/*
+				 * This occurs when system is booting on
+				 * hard disk's EFI/BOOT/BOOTxxx.EFI entry
+				 * while it should have booted on
+				 * EFI/<os>/shimxxx.efi entry
+				 */
+				console_countdown(title, message, 10);
+				RT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
+			}
+#endif
 			perror(L"Failed to start MokManager: %r\n", efi_status);
 			return efi_status;
 		}
