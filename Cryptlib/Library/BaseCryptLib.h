@@ -2403,6 +2403,7 @@ Pkcs7Verify (
   IN  UINTN        DataLength
   );
 
+#if defined(ENABLE_CODESIGN_EKU)
 /**
   This function receives a PKCS#7 formatted signature blob,
   looks for the EKU SEQUENCE blob, and if found then looks
@@ -2442,6 +2443,7 @@ VerifyEKUsInPkcs7Signature (
   IN CONST UINT32   RequiredEKUsSize,
   IN BOOLEAN        RequireAllPresent
   );
+#endif
 
 /**
   Extracts the attached content from a PKCS#7 signed data if existed. The input signed
