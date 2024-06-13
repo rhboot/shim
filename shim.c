@@ -1558,10 +1558,13 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		/*
 		 * Network boot cases do not support reading a directory. Try
 		 * to read revocations.efi to pull in any unbundled SBATLevel
-		 * updates unconditionally in those cases. This may produce
-		 * console noise when the file is not present.
+		 * updates unconditionally in those cases. Also try to read
+		 * shim_certificate.efi to load additional certificates.
+		 * This may produce console noise when the files are not
+		 * present.
 		 */
 		load_cert_file(image_handle, REVOCATIONFILE, PathName);
+		load_cert_file(image_handle, L"shim_certificate.efi", PathName);
 		goto done;
 	}
 
