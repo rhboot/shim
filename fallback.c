@@ -226,9 +226,11 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 
 		void *var = LibGetVariable(varname, &GV_GUID);
 		if (!var) {
+			int arg_size = StrLen(arguments) ? StrLen(arguments) * sizeof (CHAR16) +
+				sizeof (CHAR16) : 0;
 			int size = sizeof(UINT32) + sizeof (UINT16) +
 				StrLen(label)*2 + 2 + DevicePathSize(hddp) +
-				StrLen(arguments) * 2;
+				arg_size;
 
 			CHAR8 *data, *cursor;
 			cursor = data = AllocateZeroPool(size + 2);
@@ -252,7 +254,7 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 			if (!first_new_option) {
 				first_new_option = DuplicateDevicePath(fulldp);
 				first_new_option_args = StrDuplicate(arguments);
-				first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
+				first_new_option_size = arg_size;
 			}
 
 			efi_status = RT->SetVariable(varname, &GV_GUID,
@@ -400,9 +402,11 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
                  UINT16 *optnum)
 {
 	unsigned int label_size = StrLen(label)*2 + 2;
+	int arg_size = StrLen(arguments) ? StrLen(arguments) * sizeof (CHAR16) +
+		sizeof (CHAR16) : 0;
 	unsigned int size = sizeof(UINT32) + sizeof (UINT16) +
 		label_size + DevicePathSize(dp) +
-		StrLen(arguments) * 2;
+		arg_size;
 
 	CHAR8 *data = AllocateZeroPool(size + 2);
 	if (!data)
@@ -486,7 +490,7 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 		if (!first_new_option) {
 			first_new_option = DuplicateDevicePath(fulldp);
 			first_new_option_args = StrDuplicate(arguments);
-			first_new_option_size = StrLen(arguments) * sizeof (CHAR16);
+			first_new_option_size = arg_size;
 		}
 
 		*optnum = xtoi(varname + 4);
