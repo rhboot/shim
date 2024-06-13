@@ -421,10 +421,10 @@ shim,1,UEFI shim,shim,16,https://github.com/rhboot/shim
 ## How to add .sbat sections
 
 Components that do not have special code to construct the final PE files can
-simply add this section using objcopy(1):
+add this section at the end of a file using objcopy(1):
 
 ```
-objcopy --set-section-alignment '.sbat=512' --add-section .sbat=sbat.csv foo.efi
+objcopy --set-section-alignment '.sbat=512' --add-section .sbat=sbat.csv --adjust-section-vma .sbat+10000000 foo.efi
 
 ```
 
