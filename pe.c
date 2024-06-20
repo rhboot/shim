@@ -480,7 +480,7 @@ update_mem_attrs(uintptr_t addr, uint64_t size,
 		       &before, efi_status);
 
 	if (!IS_PAGE_ALIGNED(physaddr) || !IS_PAGE_ALIGNED(size) || size == 0) {
-		dprint(L"%a called on 0x%llx-0x%llx (size 0x%llx) +%a%a%a -%a%a%a\n",
+		perror(L"%a: Failed to update memory attrs on 0x%llx-0x%llx (size 0x%llx) +%a%a%a -%a%a%a as address or size does not align with 4K or size equals 0\n",
 		       __func__, (unsigned long long)physaddr,
 		       (unsigned long long)(physaddr + size - 1),
 		       (unsigned long long)size,
