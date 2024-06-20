@@ -1222,10 +1222,15 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 					 use_fb ? FALLBACK : second_stage);
 	}
 
-	// If the filename is invalid, or the file does not exist,
-	// just fallback to the default loader.
+	/*
+	 * If the filename is invalid, or the file does not exist, just fall
+	 * back to the default loader.  Also fall back to the default loader
+	 * if we get a TFTP error or HTTP error.
+	 */
 	if (!use_fb && (efi_status == EFI_INVALID_PARAMETER ||
-	                efi_status == EFI_NOT_FOUND)) {
+	                efi_status == EFI_NOT_FOUND ||
+	                efi_status == EFI_HTTP_ERROR ||
+	                efi_status == EFI_TFTP_ERROR)) {
 		console_print(
 			L"start_image() returned %r, falling back to default loader\n",
 			efi_status);
