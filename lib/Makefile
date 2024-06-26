@@ -32,6 +32,7 @@ DEFINES		+= -DMDE_CPU_ARM
 endif
 ifeq ($(ARCH),riscv64)
 DEFINES		+= -DMDE_CPU_RISCV64
+LIBFILES += $(ARCH)/cache.o
 endif
 
 LDFLAGS		= -nostdlib -znocombreloc
