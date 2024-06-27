@@ -207,6 +207,13 @@ test_gnvn_helper(char *testvars)
 	const char *mok_rt_vars[n_mok_state_variables];
 
 	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		/*
+		 * We don't want to filter out the variables we've added to
+		 * mok mirroring that aren't really from mok; right now
+		 * this is a reasonable heuristic for that.
+		 */
+		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY)
+			continue;
 		mok_rt_vars[i] = mok_state_variables[i].rtname8;
 	}
 
@@ -301,6 +308,13 @@ test_get_variable_0(void)
 	const char *mok_rt_vars[n_mok_state_variables];
 
 	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		/*
+		 * We don't want to filter out the variables we've added to
+		 * mok mirroring that aren't really from mok; right now
+		 * this is a reasonable heuristic for that.
+		 */
+		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY)
+			continue;
 		mok_rt_vars[i] = mok_state_variables[i].rtname8;
 	}
 
