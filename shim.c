@@ -1262,8 +1262,9 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	// default loader if we get a TFTP error or HTTP error.
 	if (!use_fb && (efi_status == EFI_INVALID_PARAMETER ||
 	                efi_status == EFI_NOT_FOUND ||
-	                // TODO: Add EFI_HTTP_ERROR when gnu-efi is updated to a version that includes it
-	                // efi_status == EFI_HTTP_ERROR ||
+					// TODO: Change to EFI_HTTP_ERROR when gnu-efi is updated to a version that includes it
+					// I already get error 35 on my test systems, even with this build of shim.
+	                efi_status == EFIERR(35) ||
 	                efi_status == EFI_TFTP_ERROR)) {
 		console_print(
 			L"start_image() returned %r, falling back to default loader\n",
