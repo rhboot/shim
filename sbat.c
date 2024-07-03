@@ -537,9 +537,9 @@ set_sbat_uefi_variable(char *sbat_var_automatic, char *sbat_var_latest)
 	 */
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"SBAT read failed %r\n", efi_status);
-	} else if (preserve_sbat_uefi_variable(sbat, sbatsize, attributes,
-	                                       sbat_var_candidate) &&
-	           !reset_sbat) {
+	} else if (!reset_sbat &&
+		   preserve_sbat_uefi_variable(sbat, sbatsize, attributes,
+	                                       sbat_var_candidate)) {
 		dprint(L"preserving %s variable it is %d bytes, attributes are 0x%08x\n",
 		       SBAT_VAR_NAME, sbatsize, attributes);
 		FreePool(sbat);
