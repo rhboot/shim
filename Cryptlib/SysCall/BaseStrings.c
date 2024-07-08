@@ -3,7 +3,7 @@
 CHAR8 *
 AsciiStrCat(CHAR8 *Destination, const CHAR8 *Source)
 {
-	UINTN dest_len = strlen((CHAR8 *)Destination);
+	UINTN dest_len = strlen((char *)Destination);
 	UINTN i;
 
 	for (i = 0; Source[i] != '\0'; i++)
@@ -61,7 +61,7 @@ WriteUnaligned32(UINT32 *Buffer, UINT32 Value)
 UINTN
 AsciiStrSize(const CHAR8 *string)
 {
-	return strlen(string) + 1;
+	return strlen((char *)string) + 1;
 }
 
 /* Based on AsciiStrDecimalToUintnS() in edk2
