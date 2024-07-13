@@ -368,7 +368,8 @@ status_from_error(UINT8 error_code)
 	}
 }
 
-EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle UNUSED, VOID **buffer, UINT64 *bufsiz)
+EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle UNUSED, VOID **buffer,
+	UINT64 *bufsiz, int flags)
 {
 	EFI_STATUS efi_status;
 	EFI_PXE_BASE_CODE_TFTP_OPCODE read = EFI_PXE_BASE_CODE_TFTP_READ_FILE;
@@ -376,7 +377,8 @@ EFI_STATUS FetchNetbootimage(EFI_HANDLE image_handle UNUSED, VOID **buffer, UINT
 	BOOLEAN nobuffer = FALSE;
 	UINTN blksz = 512;
 
-	console_print(L"Fetching Netboot Image %a\n", full_path);
+	if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+		console_print(L"Fetching Netboot Image %a\n", full_path);
 	if (*buffer == NULL) {
 		*buffer = AllocatePool(4096 * 1024);
 		if (!*buffer)
@@ -399,7 +401,8 @@ try_again:
 
 	if (EFI_ERROR(efi_status)) {
 		if (pxe->Mode->TftpErrorReceived) {
-			console_print(L"TFTP error %u: %a\n",
+			if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+				console_print(L"TFTP error %u: %a\n",
 				      pxe->Mode->TftpError.ErrorCode,
 				      pxe->Mode->TftpError.ErrorString);
 
@@ -412,7 +415,9 @@ try_again:
 			 *
 			 * https://github.com/tianocore/edk2/pull/6287
 			 */
-			console_print(L"Unknown TFTP error, treating as file not found\n");
+			if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+				console_print(L"Unknown TFTP error, treating "
+					"as file not found\n");
 			efi_status = EFI_NOT_FOUND;
 		}
 

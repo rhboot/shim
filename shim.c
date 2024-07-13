@@ -1056,7 +1056,8 @@ str16_to_str8(CHAR16 *str16, CHAR8 **str8)
  * Load and run an EFI executable
  */
 EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
-		      CHAR16 **PathName, void **data, int *datasize)
+		      CHAR16 **PathName, void **data, int *datasize,
+		      int flags)
 {
 	EFI_STATUS efi_status;
 	void *sourcebuffer = NULL;
@@ -1093,10 +1094,11 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		}
 		FreePool(netbootname);
 		efi_status = FetchNetbootimage(image_handle, &sourcebuffer,
-					       &sourcesize);
+					       &sourcesize, flags);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Unable to fetch TFTP image: %r\n",
-			       efi_status);
+			if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+				perror(L"Unable to fetch TFTP image: %r\n",
+				       efi_status);
 			return efi_status;
 		}
 		*data = sourcebuffer;
@@ -1108,8 +1110,9 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 						    &sourcesize,
 						    netbootname);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Unable to fetch HTTP image %a: %r\n",
-			       netbootname, efi_status);
+			if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+				perror(L"Unable to fetch HTTP image %a: %r\n",
+				       netbootname, efi_status);
 			return efi_status;
 		}
 		*data = sourcebuffer;
@@ -1148,7 +1151,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	int datasize = 0;
 
 	efi_status = read_image(image_handle, ImagePath, &PathName, &data,
-				&datasize);
+				&datasize, 0);
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -1430,7 +1433,8 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	uint8_t *sspv_latest = NULL;
 
 	efi_status = read_image(image_handle, L"revocations.efi", &PathName,
-				&data, &datasize);
+				&data, &datasize,
+				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -1494,7 +1498,8 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	int i;
 
 	efi_status = read_image(image_handle, filename, &PathName,
-				&data, &datasize);
+				&data, &datasize,
+				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
