@@ -170,7 +170,7 @@ specific product's component, vendors may ask for a product-specific generation
 number to be published for one of their product's components. This avoids
 triggering an industry wide re-publishing of otherwise safe components.
 
-In the example above, 1 is sbat's minimum global generation number.
+In the example above, 1 in `sbat,1` is sbat's minimum global generation number.
 
 A **product-specific minimum generation number** only applies to the instance of
 that component that is signed with that product name. Another product's
@@ -184,7 +184,8 @@ entire industry that uses that component re-release, just that product's
 minimum generation number would be incremented and that product's component
 re-released along with a UEFI variable update specifying that requirement.
 
-In the example above, 1 is grub.acme's product-specific minimum generation number.
+In the example above, 1 in `grub.acme,1` is grub.acme's product-specific minimum
+generation number.
 
 The global and product-specific generation number name spaces are not tied to
 each other. The global number is managed externally, and the vast majority of
@@ -213,68 +214,95 @@ product. Setting a product-specific generation number for such an event
 eliminates the need for other vendors to have to re-release the binaries for
 their products with an incremented global number.
 
-However, once the global number is bumped for the next upstream CVE fix there
-will be no further need to carry that product-specific generation number.
-Satisfying the check of the global number will also exclude any of the older
-product-specific binaries.
+The current consensus is for both generation numbers to only ever go up and not
+be reset.
 
-For example: There is a global CVE disclosure and all vendors coordinate to
-release fixed components on the disclosure date.  This release bumps the global
-generation number for GRUB to 4.
+#### Example: a vendor forking a global project
 
-SBAT revocation data would then require a GRUB with a global generation number
-of 4.
+Let's imagine a fictional company named "Vendor C" having an active fork of the
+upstream GNU GRUB2. Therefore, Vendor C provides their own product-specific
+generation number. This is happening at the point in time, when the upstream
+product's entry starts with `grub,3`, hence why Vendor C's product ships with
+entries similar to:
+
+```
+sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,3,Free Software Foundation,[...]
+grub.vendorc,1,Vendor C,[...]
+```
+
+Suddenly there is a global CVE disclosure and all vendors coordinate
+to release fixed components on the disclosure date. This release bumps the
+global generation number for GRUB from 3 to 4. Vendor C's product's binaries
+are now shipped with the entries:
+
+```
+sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,4,Free Software Foundation,[...]
+grub.vendorc,1,Vendor C,[...]
+```
+
+In the perfect scenario, to provide the perfect security, the UEFI SBAT
+revocation variable (named *SbatLevel*) would then be set, so that GRUB with a
+global generation number of only 4 or higher would be able to be booted. (In
+reality there's naturally going to be a certain grace period)
 
 However, Vendor C mis-merges the patches into one of their products and does
 not become aware of the fact that this mis-merge created an additional
-vulnerability until after they have published a signed binary in that,
-vulnerable, state.
+vulnerability until after they have published a signed binary in that vulnerable
+state. Vendor C's GRUB binary can now be used to compromise everyone's systems.
 
-Vendor C's GRUB binary can now be used to compromise anyone's system.
+To remedy this, Vendor C will release a security-fixed binary with the same
+global generation number and an updated product-specific generation number (set
+to 2):
 
-To remedy this, Vendor C will release a fixed binary with the same global
-generation number and the product-specific generation number set to 1.
+```
+sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,4,Free Software Foundation,[...]
+grub.vendorc,2,Vendor C,[...]
+```
 
-SBAT revocation data would then require a GRUB with a global generation number
-of 4, as well as a product-specific generation number of 1 for the product that
-had the vulnerable binary.
+Again, in the perfect scenario, to provide the perfect security, the UEFI SBAT
+revocation variable would then be set, so that GRUB with a global generation
+number of only 4 or higher would be able to be booted, as well as Vendor C's
+products with their number of only 2 or higher. See for yourself, how this looks
+like, in the [SbatLevel_Variable.txt](./SbatLevel_Variable.txt) file.
 
-If and when there is another upstream fix for a CVE that would bump the global
-number, this product-specific number can be dropped from the UEFI revocation
-variable.
+If and when there is another upstream fix for a CVE that would bump the GRUB
+global number to 5, this product-specific number can be dropped from the UEFI
+*SbatLevel* variable (because the binaries starting with upstream's `grub,4`
+entry would get denylisted anyway), but with the current consensus it's
+important to keep the product-specific number shipped with the product's binary,
+like in the case of Vendor C:
 
-If this same Vendor C has a similar event after the global number is
-incremented, they would again set their product-specific or **version-specific
-number** to 1. If they have a second event on the same component, they would
-set their product-specific or version-specific number to 2.
+```
+sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md
+grub,5,Free Software Foundation,[...]
+grub.vendorc,2,Vendor C,[...]
+```
 
-In such an event, a vendor would set the product-specific or version-specific
-generation number based on whether the mis-merge occurred in all of their
-branches or in just a subset of them. The goal is generally to limit end
-customer impact with as few re-releases as possible, while not creating an
-unnecessarily large UEFI revocation variable payload.
+The goal is generally to limit end customer impact with as few
+re-releases as possible, while not creating an unnecessarily large UEFI
+revocation variable payload.
 
-|                                                                                      | prior to<br>disclosure\* | after<br>disclosure | after Vendor C's<br>first update | after Vendor C's<br>second update | after next global<br>disclosure |
-|--------------------------------------------------------------------------------------|--------------------------|---------------------|----------------------------------|-----------------------------------|---------------------------------|
-| GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                        | 4                   | 4                                | 4                                 | 5                               |
-| Vendor C's product-specific<br>generation number in artifact's<br>.sbat section      | 1                        | 1                   | 2                                | 3                                 | 1                               |
-| GRUB global<br>generation number in<br>UEFI SBAT revocation variable                 | 3                        | 4                   | 4                                | 4                                 | 5                               |
-| Vendor C's product-specific<br>generation number in<br>UEFI SBAT revocation variable | not set                  | not set             | 2                                | 3                                 | not set                         |
+|                                                                                      | prior to GRUB<br>first disclosure\* | after GRUB<br>first disclosure\* | after Vendor C's<br>first update | after Vendor C's<br>second update | after GRUB<br>second disclosure\* |
+|--------------------------------------------------------------------------------------|-------------------------------------|----------------------------------|----------------------------------|-----------------------------------|-----------------------------------|
+| GRUB global<br>generation number in<br>artifacts .sbat section                       | 3                                   | 4                                | 4                                | 4                                 | 5                                 |
+| Vendor C's product<br>generation number in<br>artifact's .sbat section               | 1                                   | 1                                | 2                                | 3                                 | 3                                 |
+| GRUB global<br>generation number in<br>UEFI *SbatLevel* variable                     | 3                                   | 4                                | 4                                | 4                                 | 5                                 |
+| Vendor C's product<br>generation number in<br>UEFI *SbatLevel* variable              | not set                             | not set                          | 2                                | 3                                 | not set                           |
 
 \* A disclosure is the event/date where a CVE and fixes for it are made public.
 
-The product-specific generation number does not reset and continues to
-monotonically increase over the course of these non-global events. Continuity of more
-specific generation numbers must be maintained in this way in order to satisfy
-checks against older revocation data.
+The product-specific generation number does not reset and continues to increase
+over the course of these non-global events. Continuity of more specific
+generation numbers must be maintained in this way in order to satisfy checks
+against older revocation data.
 
-The variable payload will be stored publicly in the shim source base and
-identify the global generation associated with a product or version-specific
-one. The payload is also built into shim to additionally limit exposure.
-
-At this time of writing, all version-numbers are set to 1. Presumably at some point,
-updated numbers will be published on the respective websites of the associated vendors
-and components.
+The UEFI *SbatLevel* variable payload will be stored publicly in the shim source
+base and identify the global generation associated with a product or
+version-specific one. The payload is also built into shim to additionally limit
+exposure.
 
 #### Retiring Signed Releases
 
