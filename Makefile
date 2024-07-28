@@ -269,6 +269,7 @@ endif
 		-j .dynamic -j .rodata -j .rel* \
 		-j .rela* -j .dyn -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat -j .sbatlevel \
+		--file-alignment 0x1000 \
 		$(FORMAT) $< $@
 	./post-process-pe -vv $(POST_PROCESS_PE_FLAGS) $@
 
@@ -288,6 +289,7 @@ endif
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		-j .note.gnu.build-id \
+		--file-alignment 0x1000 \
 		$< $@
 
 ifneq ($(origin ENABLE_SBSIGN),undefined)
