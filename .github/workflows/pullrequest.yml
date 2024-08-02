@@ -22,57 +22,57 @@ jobs:
             efiarch: aa64
             gccarch: aarch64
             makearch: aarch64
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: aa64
             gccarch: aarch64
             makearch: aarch64
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: x64
             gccarch: x86_64
             makearch: x86_64
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: x64
             gccarch: x86_64
             makearch: x86_64
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: x64
             gccarch: x86_64
             makearch: x86_64
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: ia32
             gccarch: x86_64
             makearch: ia32
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: ia32
             gccarch: x86_64
             makearch: ia32
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: ia32
             gccarch: x86_64
             makearch: ia32
-            distro: f34
+            distro: f38
 
     steps:
       - name: Checkout
@@ -118,15 +118,15 @@ jobs:
           - arch: amd64
             efiarch: x64
             makearch: x86_64
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: x64
             makearch: x86_64
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: x64
             makearch: x86_64
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: x64
             makearch: x86_64
@@ -138,15 +138,15 @@ jobs:
           - arch: amd64
             efiarch: ia32
             makearch: ia32
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: ia32
             makearch: ia32
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: ia32
             makearch: ia32
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: ia32
             makearch: ia32
