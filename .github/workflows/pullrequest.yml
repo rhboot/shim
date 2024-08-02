@@ -82,6 +82,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Work around directory ownership issue
+        id: ignore-ownership
+        run: |
+          git config --global --add safe.directory /__w/shim/shim
       - name: Update submodules on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: update-submodules
         run: |
@@ -160,6 +164,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Work around directory ownership issue
+        id: ignore-ownership
+        run: |
+          git config --global --add safe.directory /__w/shim/shim
       - name: Update submodules on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: update-submodules
         run: |
