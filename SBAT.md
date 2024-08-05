@@ -214,8 +214,7 @@ product. Setting a product-specific generation number for such an event
 eliminates the need for other vendors to have to re-release the binaries for
 their products with an incremented global number.
 
-The current consensus is for both generation numbers to only ever go up and not
-be reset.
+Both generation numbers should only ever go up; they should never be reset.
 
 #### Example: a vendor forking a global project
 
@@ -242,15 +241,13 @@ grub,4,Free Software Foundation,[...]
 grub.vendorc,1,Vendor C,[...]
 ```
 
-In the perfect scenario, to provide the perfect security, the UEFI SBAT
-revocation variable (named *SbatLevel*) would then be set, so that GRUB with a
-global generation number of only 4 or higher would be able to be booted. (In
-reality there's naturally going to be a certain grace period)
+After this, the UEFI SBAT revocation variable (named *SbatLevel*) would be
+updated to raise the mandatory minimal global generation number for GRUB to 4.
 
 However, Vendor C mis-merges the patches into one of their products and does
 not become aware of the fact that this mis-merge created an additional
 vulnerability until after they have published a signed binary in that vulnerable
-state. Vendor C's GRUB binary can now be used to compromise everyone's systems.
+state. Vendor C's GRUB binary can now be abused to compromise their systems.
 
 To remedy this, Vendor C will release a security-fixed binary with the same
 global generation number and an updated product-specific generation number (set
@@ -281,7 +278,7 @@ grub,5,Free Software Foundation,[...]
 grub.vendorc,2,Vendor C,[...]
 ```
 
-The goal is generally to limit end customer impact with as few
+The goal is generally to limit end user impact with as few
 re-releases as possible, while not creating an unnecessarily large UEFI
 revocation variable payload.
 
