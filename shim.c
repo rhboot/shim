@@ -1836,11 +1836,125 @@ devel_egress(devel_egress_action action UNUSED)
 #endif
 }
 
+static EFI_STATUS clear_memory(EFI_HANDLE image_handle __attribute__((unused)), EFI_SYSTEM_TABLE* system_table)
+{
+	UINTN map_size = 0;
+	UINTN desc_size = 0;
+	EFI_MEMORY_DESCRIPTOR *memory_map = NULL;
+	EFI_MEMORY_DESCRIPTOR *entry= NULL;
+	EFI_STATUS r = EFI_SUCCESS;
+	EFI_BOOT_SERVICES *bs = system_table->BootServices;
+
+	do {
+		r = bs->GetMemoryMap(&map_size, NULL, NULL, NULL, NULL);
+		if (r != EFI_BUFFER_TOO_SMALL)
+			return r;
+
+		/*
+		 * Add an additional buffer per UEFI spec:
+		 *
+		 * The actual size of the buffer allocated for the consequent call to GetMemoryMap() should be bigger
+		 * then the value returned in MemoryMapSize, since allocation of the new buffer may potentially
+		 * increase memory map size.
+		 */
+		map_size += 8 * sizeof(EFI_MEMORY_DESCRIPTOR);
+
+		r = bs->AllocatePool(EfiBootServicesData, map_size, (void**)&memory_map);
+		if (r != EFI_SUCCESS)
+			return r;
+
+		r = bs->GetMemoryMap(&map_size, memory_map, NULL, &desc_size, NULL);
+		if (r == EFI_SUCCESS) {
+			/*
+			 * Exit the loop on success!
+			 */
+			break;
+		} else if (r == EFI_BUFFER_TOO_SMALL) {
+			/*
+			 * Free the existing buffer and retry!
+			 */
+			bs->FreePool(memory_map);
+			continue;
+		} else {
+			/*
+			 * Return an error
+			 */
+			return r;
+		}
+	} while (true);
+
+	/*
+	 * Loop through every unoccupied memory range and clear it.
+	 * For regions that we cannot clear, we change their type to EfiRuntimeServicesData
+	 * so that they are not usable by the OS (marked as reserved in the E820 table).
+	 */
+	for (entry = memory_map; entry != ((void*)memory_map + map_size); entry = NextMemoryDescriptor(entry, desc_size)) {
+		void *addr = (void*)entry->PhysicalStart;
+		UINT64 start = entry->PhysicalStart;
+		UINT64 end = entry->PhysicalStart + PAGE_SIZE * entry->NumberOfPages;
+		if (entry->Type == EfiConventionalMemory) {
+			/*
+			 * Erase all pages.  We attempt to allocate the exact address range of the free pages as EfiLoaderData,
+			 * and then zero it out.  In some rare cases, the allocation can fail, and we simply return the error,
+			 * cold reboot the system and start all over again.
+			 */
+			r = bs->AllocatePages(AllocateAddress, EfiLoaderData, entry->NumberOfPages, (void*)&addr);
+			if (r != EFI_SUCCESS) {
+				return r;
+			}
+			bs->SetMem(addr, entry->NumberOfPages * PAGE_SIZE, 0);
+			bs->FreePages(start, entry->NumberOfPages);
+			dprint(L"cleared memory region (type=%d): 0x%08lx-0x%08lx\n", entry->Type, start, end);
+		}
+	}
+
+	for (entry = memory_map; entry != ((void*)memory_map + map_size); entry = NextMemoryDescriptor(entry, desc_size)) {
+		void *addr = (void*)entry->PhysicalStart;
+		UINT64 start = entry->PhysicalStart;
+		UINT64 end = entry->PhysicalStart + PAGE_SIZE * entry->NumberOfPages;
+		switch (entry->Type) {
+		case EfiBootServicesData:
+		case EfiBootServicesCode:
+		case EfiLoaderData:
+		case EfiLoaderCode:
+			/*
+			 * Reserve unclearable memory regions by converting its type to EfiRuntimeServicesData
+			 */
+			r = bs->FreePages(start, entry->NumberOfPages);
+			if (r != EFI_SUCCESS) {
+				dprint(L"failed to free pages: %r\n", r);
+				return r;
+			}
+			r = bs->AllocatePages(AllocateAddress, EfiRuntimeServicesData, entry->NumberOfPages, (void*)&addr);
+			if (r != EFI_SUCCESS) {
+				dprint(L"failed to convert to EfiRuntimeServicesData: %r\n", r);
+				return r;
+			}
+			dprint(L"reserved memory region (type=%d): 0x%08lx-0x%08lx\n", entry->Type, start, end);
+			break;
+		}
+	}
+
+	bs->FreePool(memory_map);
+
+	return EFI_SUCCESS;
+}
+
 EFI_STATUS
 efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE image_handle;
+
+	/*
+	 * Scrub the memory before we initialize anything and fail the boot
+	 * should we hit any error
+	 */
+	efi_status = clear_memory(passed_image_handle, passed_systab);
+	if (EFI_ERROR(efi_status)) {
+		passed_systab->RuntimeServices->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+		return efi_status;
+	}
 
 	verification_method = VERIFIED_BY_NOTHING;
 
