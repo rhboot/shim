@@ -32,6 +32,7 @@
 #include <Library/BaseCryptLib.h>
 
 #include <stdint.h>
+#include <stdio.h>
 
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
@@ -1490,7 +1491,8 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 }
 
 EFI_STATUS
-load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
+load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName,
+		int flags)
 {
 	EFI_STATUS efi_status;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
@@ -1503,8 +1505,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	int i;
 
 	efi_status = read_image(image_handle, filename, &PathName,
-				&data, &datasize,
-				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
+				&data, &datasize, flags);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -1546,6 +1547,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
 	CHAR16 *PathName = NULL;
+	static CHAR16 FileName[] = L"shim_certificate_0.efi";
 	EFI_FILE *root, *dir;
 	EFI_FILE_INFO *info;
 	EFI_HANDLE device;
@@ -1553,6 +1555,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	UINTN buffersize = 0;
 	void *buffer = NULL;
 	BOOLEAN search_revocations = TRUE;
+	int i = 0;
 
 	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
 					 (void **)&li);
@@ -1664,13 +1667,18 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Failed to open %s - %r\n",
 				       PathName, efi_status);
+				while (load_cert_file(image_handle, FileName, PathName,
+						SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+						== EFI_SUCCESS && i++ < 10) {
+					FileName[17]++;
+				}
 				goto done;
 			}
 		}
 
 		if (!search_revocations &&
 		    StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
-			load_cert_file(image_handle, info->FileName, PathName);
+			load_cert_file(image_handle, info->FileName, PathName, 0);
 		}
 	}
 done:
