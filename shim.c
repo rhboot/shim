@@ -1464,7 +1464,10 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	uint8_t *ssps_latest = NULL;
 	uint8_t *sspv_latest = NULL;
 
-	efi_status = read_image(image_handle, L"revocations.efi", &PathName,
+	efi_status = read_image(image_handle, L"revocations_sbat.efi", &PathName,
+				&data, &datasize,
+				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
+	efi_status = read_image(image_handle, L"revocations_skusi.efi", &PathName,
 				&data, &datasize,
 				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
 	if (EFI_ERROR(efi_status))
