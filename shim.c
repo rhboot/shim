@@ -1419,6 +1419,8 @@ EFI_STATUS
 load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
+	EFI_STATUS efi_status_sbat = EFI_SUCCESS;
+	EFI_STATUS efi_status_skusi = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	int datasize = 0;
@@ -1431,16 +1433,21 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	uint8_t *ssps_latest = NULL;
 	uint8_t *sspv_latest = NULL;
 
-	efi_status = read_image(image_handle, L"revocations.efi", &PathName,
+	efi_status_sbat = read_image(image_handle, L"revocations_sbat.efi", &PathName,
 				&data, &datasize,
 				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
-	if (EFI_ERROR(efi_status))
-		return efi_status;
+	if (!EFI_ERROR(efi_status_sbat))
+		efi_status_sbat = verify_image(data, datasize, shim_li, &context);
 
-	efi_status = verify_image(data, datasize, shim_li, &context);
-	if (EFI_ERROR(efi_status)) {
+	efi_status_skusi = read_image(image_handle, L"revocations_skusi.efi", &PathName,
+				&data, &datasize,
+				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
+	if (!EFI_ERROR(efi_status_skusi))
+		efi_status_skusi = verify_image(data, datasize, shim_li, &context);
+
+	if (EFI_ERROR(efi_status_sbat) && EFI_ERROR(efi_status_skusi)) {
 		dprint(L"revocations failed to verify\n");
-		return efi_status;
+		return efi_status_sbat | efi_status_skusi;
 	}
 	dprint(L"verified revocations\n");
 
