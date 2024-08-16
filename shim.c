@@ -1593,11 +1593,11 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 				efi_status);
 		/*
 		 * Network boot cases do not support reading a directory. Try
-		 * to read revocations.efi to pull in any unbundled SBATLevel
+		 * to read revocations to pull in any unbundled SBATLevel
 		 * updates unconditionally in those cases. This may produce
 		 * console noise when the file is not present.
 		 */
-		load_cert_file(image_handle, REVOCATIONFILE, PathName);
+		load_revocations_file(image_handle, REVOCATIONFILE, PathName);
 		goto done;
 	}
 
