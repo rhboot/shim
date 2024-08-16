@@ -1422,7 +1422,7 @@ check_section_helper(char *section_name, int len, void **pointer,
 	                     section, data, datasize, minsize)
 
 EFI_STATUS
-load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
+load_revocations_file(EFI_HANDLE image_handle, CHAR16 *FileName, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
@@ -1437,13 +1437,12 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	uint8_t *ssps_latest = NULL;
 	uint8_t *sspv_latest = NULL;
 
-	efi_status = read_image(image_handle, L"revocations.efi", &PathName,
+	efi_status = read_image(image_handle, FileName, &PathName,
 				&data, &datasize,
 				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
-	if (EFI_ERROR(efi_status))
-		return efi_status;
+	if (!EFI_ERROR(efi_status))
+		efi_status = verify_image(data, datasize, shim_li, &context);
 
-	efi_status = verify_image(data, datasize, shim_li, &context);
 	if (EFI_ERROR(efi_status)) {
 		dprint(L"revocations failed to verify\n");
 		return efi_status;
@@ -1597,7 +1596,8 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		 * updates unconditionally in those cases. This may produce
 		 * console noise when the file is not present.
 		 */
-		load_revocations_file(image_handle, REVOCATIONFILE, PathName);
+		load_revocations_file(image_handle, SKUSIREVOCATIONFILE, PathName);
+		load_revocations_file(image_handle, SBATREVOCATIONFILE, PathName);
 		goto done;
 	}
 
@@ -1667,17 +1667,17 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 		}
 
 		/*
-		 * In the event that there are unprocessed revocation
+		 * In the event that there are unprocessed sbat revocation
 		 * additions, they could be intended to ban any *new* trust
 		 * anchors we find here. With that in mind, we always want to
 		 * do a pass of loading revocations before we try to add
 		 * anything new to our allowlist. This is done by making two
 		 * passes over the directory, first to search for the
-		 * revocations.efi file then to search for shim_certificate*.efi
+		 * revocations_sbat.efi file then to search for shim_certificate*.efi
 		 */
 		if (search_revocations &&
-		    StrCaseCmp(info->FileName, REVOCATIONFILE) == 0) {
-			load_revocations_file(image_handle, PathName);
+		    StrCaseCmp(info->FileName, SBATREVOCATIONFILE) == 0) {
+			load_revocations_file(image_handle, SBATREVOCATIONFILE, PathName);
 			search_revocations = FALSE;
 			efi_status = root->Open(root, &dir, PathName,
 						EFI_FILE_MODE_READ, 0);
@@ -1688,9 +1688,14 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 			}
 		}
 
-		if (!search_revocations &&
-		    StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
-			load_cert_file(image_handle, info->FileName, PathName);
+		if (!search_revocations) {
+			if (StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
+				load_cert_file(image_handle, info->FileName, PathName, 0);
+			}
+			if (StrCaseCmp(info->FileName, SKUSIREVOCATIONFILE) == 0) {
+				load_revocations_file(image_handle,
+					SKUSIREVOCATIONFILE, PathName);
+			}
 		}
 	}
 done:
