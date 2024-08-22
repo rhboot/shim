@@ -131,10 +131,8 @@ cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries)
 }
 
 EFI_STATUS
-verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sbat_var_entry, bool *found)
+verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sbat_var_entry, bool *found, UINT16 *sbat_gen, UINT16 *sbat_var_gen)
 {
-	UINT16 sbat_gen, sbat_var_gen;
-
 	if (strcmp((const char *)entry->component_name, (const char *)sbat_var_entry->component_name) == 0) {
 		dprint(L"component %a has a matching SBAT variable entry, verifying\n",
 			entry->component_name);
@@ -144,12 +142,12 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 		 * atoi returns zero for failed conversion, so essentially
 		 * badly parsed component_generation will be treated as zero
 		 */
-		sbat_gen = atoi((const char *)entry->component_generation);
-		sbat_var_gen = atoi((const char *)sbat_var_entry->component_generation);
+		*sbat_gen = atoi((const char *)entry->component_generation);
+		*sbat_var_gen = atoi((const char *)sbat_var_entry->component_generation);
 
-		if (sbat_gen < sbat_var_gen) {
+		if (*sbat_gen < *sbat_var_gen) {
 			dprint(L"component %a, generation %d, was revoked by %s variable\n",
-			       entry->component_name, sbat_gen, SBAT_VAR_NAME);
+			       entry->component_name, *sbat_gen, SBAT_VAR_NAME);
 			LogError(L"image did not pass SBAT verification\n");
 			return EFI_SECURITY_VIOLATION;
 		}
@@ -177,9 +175,10 @@ cleanup_sbat_var(list_t *entries)
 }
 
 EFI_STATUS
-verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry **entries)
+verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry **entries, UINT16 *sbat_gen_expected, UINT16 *sbat_gen_found, CHAR8 **sbat_component_name)
 {
 	unsigned int i;
+	UINTN component_name_size;
 	list_t *pos = NULL;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	struct sbat_var_entry *sbat_var_entry;
@@ -192,10 +191,22 @@ verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry *
 	for (i = 0; i < n; i++) {
 		list_for_each(pos, local_sbat_var) {
 			bool found = false;
+			*sbat_gen_expected = 0;
+			*sbat_gen_found = 0;
 			sbat_var_entry = list_entry(pos, struct sbat_var_entry, list);
-			efi_status = verify_single_entry(entries[i], sbat_var_entry, &found);
-			if (EFI_ERROR(efi_status))
+			efi_status = verify_single_entry(entries[i], sbat_var_entry, &found, sbat_gen_found, sbat_gen_expected);
+			if (EFI_ERROR(efi_status)) {
+				if (found && efi_status == EFI_SECURITY_VIOLATION) {
+					component_name_size = strlen((const char *)entries[i]->component_name);
+					*sbat_component_name = AllocatePool(component_name_size + 1);
+					if (!*sbat_component_name) {
+						efi_status = EFI_OUT_OF_RESOURCES;
+						goto err;
+					}
+					memcpy(*sbat_component_name, (const char *)entries[i]->component_name, component_name_size + 1);
+				}
 				goto out;
+			}
 			if (found)
 				break;
 		}
@@ -203,15 +214,16 @@ verify_sbat_helper(list_t *local_sbat_var, size_t n, struct sbat_section_entry *
 
 out:
 	dprint(L"finished verifying SBAT data: %r\n", efi_status);
+err:
 	return efi_status;
 }
 
 EFI_STATUS
-verify_sbat(size_t n, struct sbat_section_entry **entries)
+verify_sbat(size_t n, struct sbat_section_entry **entries, UINT16 *sbat_gen_expected, UINT16 *sbat_gen_found, CHAR8 **sbat_component_name)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = verify_sbat_helper(&sbat_var, n, entries);
+	efi_status = verify_sbat_helper(&sbat_var, n, entries,  sbat_gen_expected, sbat_gen_found, sbat_component_name);
 	return efi_status;
 }
 
@@ -559,9 +571,12 @@ set_sbat_uefi_variable(char *sbat_var_automatic, char *sbat_var_latest)
 		}
 
 #ifndef SHIM_UNIT_TEST
+		UINT16 sbat_gen_expected = 0;  
+		UINT16 sbat_gen_found = 0;
+		CHAR8 *sbat_component_name = NULL;
 		char *sbat_start = (char *)&_sbat;
 		char *sbat_end = (char *)&_esbat;
-		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
+		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1, &sbat_gen_expected, &sbat_gen_found, &sbat_component_name);
 		if (EFI_ERROR(efi_status)) {
 			CHAR16 *title = L"New SbatLevel would self-revoke current shim. Not applied";
 			CHAR16 *message = L"Press any key to continue";
