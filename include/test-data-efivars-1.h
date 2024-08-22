@@ -106,5 +106,11 @@ static const unsigned char test_data_efivars_1_MokListTrustedRT[] ={
 	0x01
 };
 
+static const unsigned char test_data_efivars_1_HSIStatus[] =
+	"heap-is-executable: 0\n"
+	"stack-is-executable: 0\n"
+	"ro-sections-are-writable: 0\n"
+	"has-memory-attribute-protocol: 0\n";
+
 #endif /* !TEST_DATA_EFIVARS_1_H_ */
 // vim:fenc=utf-8:tw=75:noet

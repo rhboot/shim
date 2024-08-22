@@ -188,6 +188,10 @@ test_mok_mirror_0(void)
 		 .data_size = sizeof(test_data_efivars_1_MokListTrustedRT),
 		 .data = test_data_efivars_1_MokListTrustedRT
 		},
+		{.name = "HSIStatus",
+		 .data_size = sizeof(test_data_efivars_1_HSIStatus),
+		 .data = test_data_efivars_1_HSIStatus
+		},
 		{.name = { 0, },
 		 .data_size = 0,
 		 .data = NULL,
