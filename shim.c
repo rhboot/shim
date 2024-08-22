@@ -1996,7 +1996,7 @@ die:
 #if defined(ENABLE_SHIM_DEVEL)
 		devel_egress(COLD_RESET);
 #else
-		usleep(5000000);
+		usleep(90000000); // 90 sec
 		RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				0, NULL);
 #endif
