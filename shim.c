@@ -710,6 +710,10 @@ verify_buffer_sbat (char *data, int datasize,
 {
 	int i;
 	EFI_IMAGE_SECTION_HEADER *Section;
+	EFI_STATUS efi_status;
+	UINT16 sbat_gen_expected = 0;
+	UINT16 sbat_gen_found = 0;
+	CHAR8 *sbat_component_name = NULL;
 	char *SBATBase = NULL;
 	size_t SBATSize = 0;
 
@@ -757,7 +761,11 @@ verify_buffer_sbat (char *data, int datasize,
 		}
 	}
 
-	return verify_sbat_section(SBATBase, SBATSize);
+	efi_status = verify_sbat_section(SBATBase, SBATSize, &sbat_gen_expected, &sbat_gen_found, &sbat_component_name);
+	if (sbat_component_name) {
+		FreePool(sbat_component_name);
+	}
+	return efi_status;
 }
 
 /*
@@ -1840,6 +1848,9 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 {
 	EFI_STATUS efi_status;
 	EFI_HANDLE image_handle;
+	UINT16 sbat_gen_expected = 0;
+	UINT16 sbat_gen_found = 0;
+	CHAR8 *sbat_component_name = NULL;
 
 	verification_method = VERIFIED_BY_NOTHING;
 
@@ -1926,7 +1937,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 			goto die;
 		}
 
-		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
+		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1, &sbat_gen_expected, &sbat_gen_found, &sbat_component_name);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Verifying shim SBAT data failed: %r\n",
 			       efi_status);
@@ -1965,6 +1976,23 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 die:
 		console_print(L"Something has gone seriously wrong: %s: %r\n",
 			      msgs[msg], efi_status);
+
+		/*
+		 * Provide additional information when the SBAT self check fails
+		 */
+		if ( msg == SBAT_SELF_CHECK ) {
+			if (sbat_gen_expected == 0 &&  sbat_gen_found == 0 && sbat_component_name == NULL) {
+				// In this case something related to the .sbat section is wrong.
+				console_print(L"\n\nSomething went wrong validating SBAT. Either:\n"
+					"- The shim has no .sbat section or is corrupted\n"
+					"- Something went wrong internally");
+			} else {
+				console_print(L"\n\nYour shim has been revoked via SBAT. "
+				"Please update to a newer shim version.\n"
+				"For component \"%a\" expected at least level: %u. Current shim has: %u.\n",
+				sbat_component_name, sbat_gen_expected, sbat_gen_found);
+			}
+		}
 #if defined(ENABLE_SHIM_DEVEL)
 		devel_egress(COLD_RESET);
 #else
@@ -1972,6 +2000,9 @@ die:
 		RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION,
 				0, NULL);
 #endif
+	}
+	if (sbat_component_name) {
+		FreePool(sbat_component_name);
 	}
 
 	/*
