@@ -35,6 +35,12 @@
 
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
+// FIXME: Drop this when gnu-efi is updated to include de6f9259e8476495c78babbc25250a59de7f3942.
+#ifndef EFI_HTTP_ERROR
+#define EFI_HTTP_ERROR EFIERR(35)
+#endif
+
+
 static EFI_SYSTEM_TABLE *systab;
 static EFI_HANDLE global_image_handle;
 static EFI_LOADED_IMAGE *shim_li;
@@ -1262,9 +1268,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	// default loader if we get a TFTP error or HTTP error.
 	if (!use_fb && (efi_status == EFI_INVALID_PARAMETER ||
 	                efi_status == EFI_NOT_FOUND ||
-					// TODO: Change to EFI_HTTP_ERROR when gnu-efi is updated to a version that includes it
-					// I already get error 35 on my test systems, even with this build of shim.
-	                efi_status == EFIERR(35) ||
+	                efi_status == EFI_HTTP_ERROR ||
 	                efi_status == EFI_TFTP_ERROR)) {
 		console_print(
 			L"start_image() returned %r, falling back to default loader\n",
