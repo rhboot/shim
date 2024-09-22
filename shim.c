@@ -780,7 +780,7 @@ verify_buffer (char *data, int datasize,
 	return verify_buffer_sbat(data, datasize, context);
 }
 
-static int
+int
 is_removable_media_path(EFI_LOADED_IMAGE *li)
 {
 	unsigned int pathlen = 0;
@@ -1156,7 +1156,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		efi_status = load_image(shim_li, data, datasize, *PathName);
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to load image %s: %r\n",
-			       PathName, efi_status);
+			       *PathName, efi_status);
 			PrintErrors();
 			ClearErrors();
 			return efi_status;
