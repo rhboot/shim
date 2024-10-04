@@ -651,6 +651,7 @@ static struct {
 	{  EFI_PROTOCOL_ERROR,         L"Protocol Error"},
 	{  EFI_INCOMPATIBLE_VERSION,   L"Incompatible Version"},
 	{  EFI_SECURITY_VIOLATION,     L"Security Violation"},
+	{  EFI_HTTP_ERROR,             L"HTTP Error"},
 
 	// warnings
 	{  EFI_WARN_UNKNOWN_GLYPH,     L"Warning Unknown Glyph"},
