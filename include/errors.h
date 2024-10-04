@@ -9,5 +9,8 @@
 #ifndef EFI_SECURITY_VIOLATION
 #define EFI_SECURITY_VIOLATION		EFIERR(26)
 #endif
+#ifndef EFI_HTTP_ERROR
+#define EFI_HTTP_ERROR			EFIERR(35)
+#endif
 
 #endif /* SHIM_ERRORS_H */
