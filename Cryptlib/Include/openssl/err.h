@@ -197,6 +197,8 @@ typedef struct err_state_st {
 # define ERR_LIB_TS              47
 # define ERR_LIB_HMAC            48
 # define ERR_LIB_JPAKE           49
+# define ERR_LIB_SM2             53
+
 
 # define ERR_LIB_USER            128
 
@@ -233,6 +235,7 @@ typedef struct err_state_st {
 # define TSerr(f,r) ERR_PUT_error(ERR_LIB_TS,(f),(r),OPENSSL_FILE,OPENSSL_LINE)
 # define HMACerr(f,r) ERR_PUT_error(ERR_LIB_HMAC,(f),(r),OPENSSL_FILE,OPENSSL_LINE)
 # define JPAKEerr(f,r) ERR_PUT_error(ERR_LIB_JPAKE,(f),(r),OPENSSL_FILE,OPENSSL_LINE)
+# define SM2err(f,r) ERR_PUT_error(ERR_LIB_SM2,(f),(r),OPENSSL_FILE,OPENSSL_LINE)
 
 /*
  * Borland C seems too stupid to be able to shift and do longs in the
@@ -304,6 +307,9 @@ typedef struct err_state_st {
 # define ERR_R_PASSED_NULL_PARAMETER             (3|ERR_R_FATAL)
 # define ERR_R_INTERNAL_ERROR                    (4|ERR_R_FATAL)
 # define ERR_R_DISABLED                          (5|ERR_R_FATAL)
+# define ERR_R_INIT_FAIL                         (6|ERR_R_FATAL)
+# define ERR_R_PASSED_INVALID_ARGUMENT           (7)
+# define ERR_R_OPERATION_FAIL                    (8|ERR_R_FATAL)
 
 /*
  * 99 is the maximum possible ERR_R_... code, higher values are reserved for

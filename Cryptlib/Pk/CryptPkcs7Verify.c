@@ -878,6 +878,11 @@ Pkcs7Verify (
   if (EVP_add_digest (EVP_sha512 ()) == 0) {
     return FALSE;
   }
+#ifndef OPENSSL_NO_SM3
+  if (EVP_add_digest (EVP_sm3 ()) == 0) {
+    return FALSE;
+  }
+#endif
   if (EVP_add_digest_alias (SN_sha1WithRSAEncryption, SN_sha1WithRSA) == 0) {
     return FALSE;
   }

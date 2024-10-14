@@ -459,7 +459,43 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/ocsp/ocsp_err.o \
 		  crypto/cmac/cmac.o \
 		  crypto/cmac/cm_ameth.o \
-		  crypto/cmac/cm_pmeth.o \
+		  crypto/cmac/cm_pmeth.o
+
+ifdef ENABLE_SHIM_SM
+OBJS		+=crypto/ec/ec_ameth.o \
+		  crypto/ec/ec_cvt.o \
+		  crypto/ec/eck_prn.o \
+		  crypto/ec/ec_oct.o \
+		  crypto/ec/ecp_smpl.o \
+		  crypto/ec/ec_asn1.o \
+		  crypto/ec/ec_err.o \
+		  crypto/ec/ec_pmeth.o \
+		  crypto/ec/ec_check.o \
+		  crypto/ec/ec_lib.o \
+		  crypto/ec/ecp_mont.o \
+		  crypto/ec/ecp_oct.o \
+		  crypto/ec/ec_curve.o \
+		  crypto/ec/ec_key.o \
+		  crypto/ec/ec_mult.o \
+		  crypto/ec/ecp_nist.o \
+		  crypto/ec/ec_print.o \
+		  crypto/ecdsa/ecs_asn1.o \
+		  crypto/ecdsa/ecs_err.o \
+		  crypto/ecdsa/ecs_lib.o \
+		  crypto/ecdsa/ecs_ossl.o \
+		  crypto/ecdsa/ecs_sign.o \
+		  crypto/ecdsa/ecs_vrf.o \
+		  crypto/sm3/sm3.o \
+		  crypto/sm3/m_sm3.o \
+		  crypto/sm2/sm2_err.o \
+		  crypto/sm2/sm2_pmeth.o \
+		  crypto/sm2/sm2_sign.o
+else
+DEFINES		+=-DOPENSSL_NO_EC \
+		  -DOPENSSL_NO_ECDSA \
+		  -DOPENSSL_NO_SM2 \
+		  -DOPENSSL_NO_SM3
+endif
 
 all: $(TARGET)
 

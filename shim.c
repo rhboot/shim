@@ -458,11 +458,20 @@ BOOLEAN secure_mode (void)
 	return TRUE;
 }
 
+#ifdef ENABLE_SHIM_SM
+static EFI_STATUS
+verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
+		     UINT8 *sha256hash, UINT8 *sha1hash, UINT8 *sm3hash)
+#else
 static EFI_STATUS
 verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 		     UINT8 *sha256hash, UINT8 *sha1hash)
+#endif
 {
 	EFI_STATUS efi_status;
+#ifdef ENABLE_SHIM_SM
+	sm3hash = sm3hash;
+#endif
 
 	/*
 	 * Ensure that the binary isn't forbidden
@@ -532,11 +541,17 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 	if (vendor_cert_size) {
 		dprint("verifying against vendor_cert\n");
 	}
+#ifdef ENABLE_SHIM_SM
 	if (vendor_cert_size &&
-	    AuthenticodeVerify(sig->CertData,
-			       sig->Hdr.dwLength - sizeof(sig->Hdr),
-			       vendor_cert, vendor_cert_size,
-			       sha256hash, SHA256_DIGEST_SIZE)) {
+	    (AuthenticodeVerify(sig->CertData, sig->Hdr.dwLength - sizeof(sig->Hdr),
+							vendor_cert, vendor_cert_size, sha256hash, SHA256_DIGEST_SIZE) ||
+	     AuthenticodeVerify(sig->CertData, sig->Hdr.dwLength - sizeof(sig->Hdr),
+							vendor_cert, vendor_cert_size, sm3hash, SM3_DIGEST_SIZE))) {
+#else
+	if (vendor_cert_size &&
+	    (AuthenticodeVerify(sig->CertData, sig->Hdr.dwLength - sizeof(sig->Hdr),
+							vendor_cert, vendor_cert_size, sha256hash, SHA256_DIGEST_SIZE))) {
+#endif
 		dprint(L"AuthenticodeVerify(vendor_cert) succeeded\n");
 		update_verification_method(VERIFIED_BY_CERT);
 		tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
@@ -558,10 +573,17 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig,
 /*
  * Check that the signature is valid and matches the binary
  */
+#ifdef ENABLE_SHIM_SM
+EFI_STATUS
+verify_buffer_authenticode (char *data, int datasize,
+			    PE_COFF_LOADER_IMAGE_CONTEXT *context,
+			    UINT8 *sha256hash, UINT8 *sha1hash, UINT8 *sm3hash)
+#else
 EFI_STATUS
 verify_buffer_authenticode (char *data, int datasize,
 			    PE_COFF_LOADER_IMAGE_CONTEXT *context,
 			    UINT8 *sha256hash, UINT8 *sha1hash)
+#endif
 {
 	EFI_STATUS ret_efi_status;
 	size_t size = datasize;
@@ -578,7 +600,12 @@ verify_buffer_authenticode (char *data, int datasize,
 	 */
 	drain_openssl_errors();
 
+#ifdef ENABLE_SHIM_SM
+	ret_efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash, sm3hash);
+#else
 	ret_efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
+#endif
+
 	if (EFI_ERROR(ret_efi_status)) {
 		dprint(L"generate_hash: %r\n", ret_efi_status);
 		PrintErrors();
@@ -673,7 +700,11 @@ verify_buffer_authenticode (char *data, int datasize,
 
 			dprint(L"Attempting to verify signature %d:\n", i++);
 
+#ifdef ENABLE_SHIM_SM
+			efi_status = verify_one_signature(sig, sha256hash, sha1hash, sm3hash);
+#else
 			efi_status = verify_one_signature(sig, sha256hash, sha1hash);
+#endif
 
 			/*
 			 * If we didn't get EFI_SECURITY_VIOLATION from
@@ -766,14 +797,25 @@ verify_buffer_sbat (char *data, int datasize,
  * Check that the signature is valid and matches the binary and that
  * the binary is permitted to load by SBAT.
  */
+#ifdef ENABLE_SHIM_SM
+EFI_STATUS
+verify_buffer (char *data, int datasize,
+	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	       UINT8 *sha256hash, UINT8 *sha1hash, UINT8 *sm3hash)
+#else
 EFI_STATUS
 verify_buffer (char *data, int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       UINT8 *sha256hash, UINT8 *sha1hash)
+#endif
 {
 	EFI_STATUS efi_status;
 
+#ifdef ENABLE_SHIM_SM
+	efi_status = verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash, sm3hash);
+#else
 	efi_status = verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash);
+#endif
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -990,6 +1032,9 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+#ifdef ENABLE_SHIM_SM
+	UINT8 sm3hash[SM3_DIGEST_SIZE];
+#endif
 
 	if ((INT32)size < 0)
 		return EFI_INVALID_PARAMETER;
@@ -1001,8 +1046,13 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if (EFI_ERROR(efi_status))
 		goto done;
 
+#ifdef ENABLE_SHIM_SM
+	efi_status = generate_hash(buffer, size, &context,
+				   sha256hash, sha1hash, sm3hash);
+#else
 	efi_status = generate_hash(buffer, size, &context,
 				   sha256hash, sha1hash);
+#endif
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -1022,16 +1072,27 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 		goto done;
 	}
 
+#ifdef ENABLE_SHIM_SM
+	efi_status = verify_buffer(buffer, size,
+				   &context, sha256hash, sha1hash, sm3hash);
+#else
 	efi_status = verify_buffer(buffer, size,
 				   &context, sha256hash, sha1hash);
+#endif
 done:
 	in_protocol = 0;
 	return efi_status;
 }
 
+#ifdef ENABLE_SHIM_SM
+static EFI_STATUS shim_hash (char *data, int datasize,
+			     PE_COFF_LOADER_IMAGE_CONTEXT *context,
+			     UINT8 *sha256hash, UINT8 *sha1hash, UINT8 *sm3hash)
+#else
 static EFI_STATUS shim_hash (char *data, int datasize,
 			     PE_COFF_LOADER_IMAGE_CONTEXT *context,
 			     UINT8 *sha256hash, UINT8 *sha1hash)
+#endif
 {
 	EFI_STATUS efi_status;
 
@@ -1039,8 +1100,13 @@ static EFI_STATUS shim_hash (char *data, int datasize,
 		return EFI_INVALID_PARAMETER;
 
 	in_protocol = 1;
+#ifdef ENABLE_SHIM_SM
+	efi_status = generate_hash(data, datasize, context,
+				   sha256hash, sha1hash, sm3hash);
+#else
 	efi_status = generate_hash(data, datasize, context,
 				   sha256hash, sha1hash);
+#endif
 	in_protocol = 0;
 
 	return efi_status;

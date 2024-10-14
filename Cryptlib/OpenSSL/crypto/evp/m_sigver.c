@@ -110,6 +110,13 @@ static int do_sigver_init(EVP_MD_CTX *ctx, EVP_PKEY_CTX **pctx,
         return 1;
     if (!EVP_DigestInit_ex(ctx, type, e))
         return 0;
+    /*
+     * This indicates the current algorithm requires
+     * special treatment before hashing the tbs-message.
+     */
+    if (ctx->pctx->pmeth->digest_custom != NULL)
+        return ctx->pctx->pmeth->digest_custom(ctx->pctx, ctx);
+
     return 1;
 }
 
@@ -200,4 +207,14 @@ int EVP_DigestVerifyFinal(EVP_MD_CTX *ctx, const unsigned char *sig,
     if (vctx || !r)
         return r;
     return EVP_PKEY_verify(ctx->pctx, sig, siglen, md, mdlen);
+}
+
+int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sigret,
+                     size_t siglen, const unsigned char *tbs, size_t tbslen)
+{
+    if (ctx->pctx->pmeth->digestverify != NULL)
+        return ctx->pctx->pmeth->digestverify(ctx, sigret, siglen, tbs, tbslen);
+    if (EVP_DigestVerifyUpdate(ctx, tbs, tbslen) <= 0)
+        return -1;
+    return EVP_DigestVerifyFinal(ctx, sigret, siglen);
 }

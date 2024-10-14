@@ -99,6 +99,9 @@ static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
         ret->rfc3779_addr = NULL;
         ret->rfc3779_asid = NULL;
 #endif
+#ifndef OPENSSL_NO_SM2
+        ret->sm2_id = NULL;
+#endif
         ret->aux = NULL;
         ret->crldp = NULL;
         CRYPTO_new_ex_data(CRYPTO_EX_INDEX_X509, ret, &ret->ex_data);
@@ -122,6 +125,9 @@ static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
 #ifndef OPENSSL_NO_RFC3779
         sk_IPAddressFamily_pop_free(ret->rfc3779_addr, IPAddressFamily_free);
         ASIdentifiers_free(ret->rfc3779_asid);
+#endif
+#ifndef OPENSSL_NO_SM2
+        ASN1_OCTET_STRING_free(ret->sm2_id);
 #endif
 
         if (ret->name != NULL)

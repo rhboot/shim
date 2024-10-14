@@ -238,7 +238,7 @@ int ASN1_item_sign_ctx(const ASN1_ITEM *it,
     unsigned char *buf_in = NULL, *buf_out = NULL;
     size_t inl = 0, outl = 0, outll = 0;
     int signid, paramtype;
-    int rv;
+    int rv, pkey_id;
 
     type = EVP_MD_CTX_md(ctx);
     pkey = EVP_PKEY_CTX_get0_pkey(ctx->pctx);
@@ -268,10 +268,17 @@ int ASN1_item_sign_ctx(const ASN1_ITEM *it,
 
     if (rv == 2) {
         if (type->flags & EVP_MD_FLAG_PKEY_METHOD_SIGNATURE) {
+
+            pkey_id =
+#ifndef OPENSSL_NO_SM2
+            EVP_PKEY_id(pkey) == NID_sm2 ? NID_sm2 :
+#endif
+            pkey->ameth->pkey_id;
+
             if (!pkey->ameth ||
                 !OBJ_find_sigid_by_algs(&signid,
                                         EVP_MD_nid(type),
-                                        pkey->ameth->pkey_id)) {
+                                        pkey_id)) {
                 ASN1err(ASN1_F_ASN1_ITEM_SIGN_CTX,
                         ASN1_R_DIGEST_AND_KEY_TYPE_NOT_SUPPORTED);
                 return 0;

@@ -56,6 +56,7 @@ static const nid_triple sigoid_srt[] = {
      NID_dh_cofactor_kdf},
     {NID_dhSinglePass_cofactorDH_sha512kdf_scheme, NID_sha512,
      NID_dh_cofactor_kdf},
+    {NID_SM2_with_SM3, NID_sm3, NID_sm2},
 };
 
 static const nid_triple *const sigoid_srt_xref[] = {
@@ -96,4 +97,5 @@ static const nid_triple *const sigoid_srt_xref[] = {
     &sigoid_srt[26],
     &sigoid_srt[27],
     &sigoid_srt[28],
+    &sigoid_srt[40],
 };

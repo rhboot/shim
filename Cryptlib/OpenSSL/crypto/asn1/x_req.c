@@ -114,3 +114,16 @@ ASN1_SEQUENCE_ref(X509_REQ, 0, CRYPTO_LOCK_X509_REQ) = {
 IMPLEMENT_ASN1_FUNCTIONS(X509_REQ)
 
 IMPLEMENT_ASN1_DUP_FUNCTION(X509_REQ)
+
+#ifndef OPENSSL_NO_SM2
+void X509_REQ_set0_sm2_id(X509_REQ *x, ASN1_OCTET_STRING *sm2_id)
+{
+    ASN1_OCTET_STRING_free(x->sm2_id);
+    x->sm2_id = sm2_id;
+}
+
+ASN1_OCTET_STRING *X509_REQ_get0_sm2_id(X509_REQ *x)
+{
+    return x->sm2_id;
+}
+#endif

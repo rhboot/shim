@@ -810,6 +810,9 @@ typedef struct {
 
 #define SHA1_DIGEST_SIZE	20
 #define SHA256_DIGEST_SIZE	32
+#ifdef ENABLE_SHIM_SM
+#define SM3_DIGEST_SIZE	32
+#endif
 #define WIN_CERT_TYPE_PKCS_SIGNED_DATA 0x0002
 
 typedef struct {

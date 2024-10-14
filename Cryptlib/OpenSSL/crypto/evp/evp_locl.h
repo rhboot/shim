@@ -324,6 +324,16 @@ struct evp_pkey_method_st {
     int (*derive) (EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen);
     int (*ctrl) (EVP_PKEY_CTX *ctx, int type, int p1, void *p2);
     int (*ctrl_str) (EVP_PKEY_CTX *ctx, const char *type, const char *value);
+    int (*digestsign) (EVP_MD_CTX *ctx, unsigned char *sig, size_t *siglen,
+                       const unsigned char *tbs, size_t tbslen);
+    int (*digestverify) (EVP_MD_CTX *ctx, const unsigned char *sig,
+                         size_t siglen, const unsigned char *tbs,
+                         size_t tbslen);
+    int (*check) (EVP_PKEY *pkey);
+    int (*public_check) (EVP_PKEY *pkey);
+    int (*param_check) (EVP_PKEY *pkey);
+
+    int (*digest_custom) (EVP_PKEY_CTX *ctx, EVP_MD_CTX *mctx);
 } /* EVP_PKEY_METHOD */ ;
 
 void evp_pkey_set_cb_translate(BN_GENCB *cb, EVP_PKEY_CTX *ctx);

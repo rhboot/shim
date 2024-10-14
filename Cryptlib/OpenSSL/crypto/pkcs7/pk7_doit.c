@@ -1032,10 +1032,10 @@ int PKCS7_signatureVerify(BIO *bio, PKCS7 *p7, PKCS7_SIGNER_INFO *si,
     ASN1_OCTET_STRING *os;
     EVP_MD_CTX mdc_tmp, *mdc;
     int ret = 0, i;
-    int md_type;
+    int md_type, is_sm2 = 0;
     STACK_OF(X509_ATTRIBUTE) *sk;
     BIO *btmp;
-    EVP_PKEY *pkey;
+    EVP_PKEY *pkey = NULL;
 
     EVP_MD_CTX_init(&mdc_tmp);
 
@@ -1069,6 +1069,18 @@ int PKCS7_signatureVerify(BIO *bio, PKCS7 *p7, PKCS7_SIGNER_INFO *si,
             break;
         btmp = BIO_next(btmp);
     }
+
+#ifndef OPENSSL_NO_SM2
+    pkey = X509_get_pubkey(x509);
+    if (!pkey)
+        goto err;
+
+    if (EVP_PKEY_is_sm2(pkey)) {
+        is_sm2 = 1;
+        if (!EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2))
+            goto err;
+    }
+#endif
 
     /*
      * mdc is the digest ctx that we want, unless there are attributes, in
@@ -1110,7 +1122,12 @@ int PKCS7_signatureVerify(BIO *bio, PKCS7 *p7, PKCS7_SIGNER_INFO *si,
             goto err;
         }
 
-        if (!EVP_VerifyInit_ex(&mdc_tmp, EVP_get_digestbynid(md_type), NULL))
+        ret = is_sm2 ? EVP_DigestVerifyInit(&mdc_tmp, NULL, EVP_get_digestbynid(md_type), NULL, pkey) :
+                       EVP_VerifyInit_ex(&mdc_tmp, EVP_get_digestbynid(md_type), NULL);
+        if (!ret)
+            goto err;
+
+        if (!EVP_DigestVerifyInit(&mdc_tmp, NULL, EVP_get_digestbynid(md_type), NULL, pkey))
             goto err;
 
         alen = ASN1_item_i2d((ASN1_VALUE *)sk, &abuf,
@@ -1127,14 +1144,8 @@ int PKCS7_signatureVerify(BIO *bio, PKCS7 *p7, PKCS7_SIGNER_INFO *si,
     }
 
     os = si->enc_digest;
-    pkey = X509_get_pubkey(x509);
-    if (!pkey) {
-        ret = -1;
-        goto err;
-    }
-
-    i = EVP_VerifyFinal(&mdc_tmp, os->data, os->length, pkey);
-    EVP_PKEY_free(pkey);
+    i = is_sm2 ? EVP_DigestVerifyFinal(&mdc_tmp, os->data, os->length) :
+                 EVP_VerifyFinal(&mdc_tmp, os->data, os->length, pkey);
     if (i <= 0) {
         PKCS7err(PKCS7_F_PKCS7_SIGNATUREVERIFY, PKCS7_R_SIGNATURE_FAILURE);
         ret = -1;
@@ -1142,6 +1153,7 @@ int PKCS7_signatureVerify(BIO *bio, PKCS7 *p7, PKCS7_SIGNER_INFO *si,
     } else
         ret = 1;
  err:
+    EVP_PKEY_free(pkey);
     EVP_MD_CTX_cleanup(&mdc_tmp);
     return (ret);
 }

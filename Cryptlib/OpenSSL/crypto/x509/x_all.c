@@ -71,16 +71,161 @@
 # include <openssl/dsa.h>
 #endif
 
+#ifndef OPENSSL_NO_SM2
+
+# include "openssl/asn1.h"
+# include "openssl/evp.h"
+# include "crypto/asn1/asn1_locl.h"
+
+static int common_verify_sm2(void *data, EVP_PKEY *pkey,
+                             int mdnid, int pknid, int req)
+{
+    X509 *x = NULL;
+    X509_REQ *r = NULL;
+    EVP_MD_CTX *ctx = NULL;
+    unsigned char *buf_in = NULL;
+    int ret = -1, inl = 0;
+    size_t inll = 0;
+    EVP_PKEY_CTX *pctx = NULL;
+    const EVP_MD *type = EVP_get_digestbynid(mdnid);
+    ASN1_BIT_STRING *signature = NULL;
+    ASN1_OCTET_STRING *sm2_id = NULL;
+    ASN1_VALUE *tbv = NULL;
+
+    if (type == NULL) {
+        goto err;
+    }
+
+    if (pkey == NULL) {
+        return -1;
+    }
+
+    if (req == 1) {
+        r = (X509_REQ *)data;
+        signature = r->signature;
+        sm2_id = r->sm2_id;
+        tbv = (ASN1_VALUE *)&r->req_info;
+    } else {
+        x = (X509 *)data;
+        signature = x->signature;
+        sm2_id = x->sm2_id;
+        tbv = (ASN1_VALUE *)x->cert_info;
+    }
+
+    if (signature->type == V_ASN1_BIT_STRING && signature->flags & 0x7) {
+        return -1;
+    }
+
+    ctx = EVP_MD_CTX_new();
+    if (ctx == NULL)
+        goto err;
+
+    /* Check public key OID matches public key type */
+    if (EVP_PKEY_type(pknid) != pkey->ameth->pkey_id) {
+        goto err;
+    }
+
+    if (!EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2)) {
+        ret = 0;
+        goto err;
+    }
+
+    pctx = EVP_PKEY_CTX_new(pkey, NULL);
+    if (pctx == NULL) {
+        ret = 0;
+        goto err;
+    }
+    /* NOTE: we tolerate no actual ID, to provide maximum flexibility */
+    if (sm2_id != NULL
+            && EVP_PKEY_CTX_set1_id(pctx, sm2_id->data, sm2_id->length) != 1) {
+        ret = 0;
+        goto err;
+    }
+
+    EVP_MD_CTX_set_pkey_ctx(ctx, pctx);
+    if (!EVP_DigestVerifyInit(ctx, NULL, type, NULL, pkey)) {
+        ret = 0;
+        goto err;
+    }
+
+    inl = ASN1_item_i2d(tbv, &buf_in,
+                        req == 1 ?
+                        ASN1_ITEM_rptr(X509_REQ_INFO) :
+                        ASN1_ITEM_rptr(X509_CINF));
+    if (inl <= 0) {
+        goto err;
+    }
+    if (buf_in == NULL) {
+        goto err;
+    }
+    inll = inl;
+
+    ret = EVP_DigestVerify(ctx, signature->data,
+                           (size_t)signature->length, buf_in, inl);
+    if (ret <= 0) {
+        goto err;
+    }
+    ret = 1;
+ err:
+    OPENSSL_cleanse(buf_in, inll);
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_CTX_free(pctx);
+    return ret;
+}
+
+static int x509_verify_sm2(X509 *x, EVP_PKEY *pkey, int mdnid, int pknid)
+{
+    return common_verify_sm2(x, pkey, mdnid, pknid, 0);
+}
+
+static int x509_req_verify_sm2(X509_REQ *x, EVP_PKEY *pkey,
+                               int mdnid, int pknid)
+{
+    return common_verify_sm2(x, pkey, mdnid, pknid, 1);
+}
+
+#endif
+
+
+
 int X509_verify(X509 *a, EVP_PKEY *r)
 {
+#ifndef OPENSSL_NO_SM2
+    int mdnid, pknid;
+#endif
     if (X509_ALGOR_cmp(a->sig_alg, a->cert_info->signature))
         return 0;
+
+#ifndef OPENSSL_NO_SM2
+    /* Convert signature OID into digest and public key OIDs */
+    if (!OBJ_find_sigid_algs(OBJ_obj2nid(a->sig_alg->algorithm),
+                             &mdnid, &pknid)) {
+        return 0;
+    }
+
+    if (pknid == NID_sm2)
+        return x509_verify_sm2(a, r, mdnid, pknid);
+#endif
+
     return (ASN1_item_verify(ASN1_ITEM_rptr(X509_CINF), a->sig_alg,
                              a->signature, a->cert_info, r));
 }
 
 int X509_REQ_verify(X509_REQ *a, EVP_PKEY *r)
 {
+#ifndef OPENSSL_NO_SM2
+    int mdnid, pknid;
+
+    /* Convert signature OID into digest and public key OIDs */
+    if (!OBJ_find_sigid_algs(OBJ_obj2nid(a->sig_alg->algorithm),
+                             &mdnid, &pknid)) {
+        return 0;
+    }
+
+    if (pknid == NID_sm2)
+        return x509_req_verify_sm2(a, r, mdnid, pknid);
+#endif
+
     return (ASN1_item_verify(ASN1_ITEM_rptr(X509_REQ_INFO),
                              a->sig_alg, a->signature, a->req_info, r));
 }

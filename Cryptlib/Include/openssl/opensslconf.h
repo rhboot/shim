@@ -41,17 +41,14 @@ extern "C" {
 #ifndef OPENSSL_NO_DYNAMIC_ENGINE
 # define OPENSSL_NO_DYNAMIC_ENGINE
 #endif
-#ifndef OPENSSL_NO_EC
-# define OPENSSL_NO_EC
+#ifndef OPENSSL_NO_EC2M
+# define OPENSSL_NO_EC2M
 #endif
 #ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
 # define OPENSSL_NO_EC_NISTP_64_GCC_128
 #endif
 #ifndef OPENSSL_NO_ECDH
 # define OPENSSL_NO_ECDH
-#endif
-#ifndef OPENSSL_NO_ECDSA
-# define OPENSSL_NO_ECDSA
 #endif
 #ifndef OPENSSL_NO_ENGINE
 # define OPENSSL_NO_ENGINE

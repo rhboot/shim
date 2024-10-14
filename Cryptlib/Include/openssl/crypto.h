@@ -380,6 +380,7 @@ int CRYPTO_is_mem_check_on(void);
 # define is_MemCheck_on() CRYPTO_is_mem_check_on()
 
 # define OPENSSL_malloc(num)     CRYPTO_malloc((int)num,OPENSSL_FILE,OPENSSL_LINE)
+# define OPENSSL_zalloc(num)     CRYPTO_zalloc((int)num,OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_strdup(str)     CRYPTO_strdup((str),OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_realloc(addr,num) \
         CRYPTO_realloc((char *)addr,(int)num,OPENSSL_FILE,OPENSSL_LINE)
@@ -389,6 +390,8 @@ int CRYPTO_is_mem_check_on(void);
         CRYPTO_remalloc((char **)addr,(int)num,OPENSSL_FILE,OPENSSL_LINE)
 # define OPENSSL_freeFunc        CRYPTO_free
 # define OPENSSL_free(addr)      CRYPTO_free(addr)
+# define OPENSSL_clear_free(addr, num) \
+	CRYPTO_clear_free(addr,num,OPENSSL_FILE,OPENSSL_LINE)
 
 # define OPENSSL_malloc_locked(num) \
         CRYPTO_malloc_locked((int)num,OPENSSL_FILE,OPENSSL_LINE)
@@ -398,6 +401,8 @@ const char *SSLeay_version(int type);
 unsigned long SSLeay(void);
 
 int OPENSSL_issetugid(void);
+
+unsigned char *OPENSSL_hexstr2buf(const char *str, long *len);
 
 /* An opaque type representing an implementation of "ex_data" support */
 typedef struct st_CRYPTO_EX_DATA_IMPL CRYPTO_EX_DATA_IMPL;
@@ -533,12 +538,14 @@ void CRYPTO_get_mem_debug_functions(void (**m)
 void *CRYPTO_malloc_locked(int num, const char *file, int line);
 void CRYPTO_free_locked(void *ptr);
 void *CRYPTO_malloc(int num, const char *file, int line);
+void *CRYPTO_zalloc(int num, const char *file, int line);
 char *CRYPTO_strdup(const char *str, const char *file, int line);
 void CRYPTO_free(void *ptr);
 void *CRYPTO_realloc(void *addr, int num, const char *file, int line);
 void *CRYPTO_realloc_clean(void *addr, int old_num, int num, const char *file,
                            int line);
 void *CRYPTO_remalloc(void *addr, int num, const char *file, int line);
+void CRYPTO_clear_free(void *ptr, int num, const char *file, int line);
 
 void OPENSSL_cleanse(void *ptr, size_t len);
 
@@ -651,10 +658,13 @@ void ERR_load_CRYPTO_strings(void);
 # define CRYPTO_F_INT_DUP_EX_DATA                         106
 # define CRYPTO_F_INT_FREE_EX_DATA                        107
 # define CRYPTO_F_INT_NEW_EX_DATA                         108
+# define CRYPTO_F_OPENSSL_HEXSTR2BUF                      118
 
 /* Reason codes. */
 # define CRYPTO_R_FIPS_MODE_NOT_SUPPORTED                 101
 # define CRYPTO_R_NO_DYNLOCK_CREATE_CALLBACK              100
+# define CRYPTO_R_ILLEGAL_HEX_DIGIT                       102
+# define CRYPTO_R_ODD_NUMBER_OF_DIGITS                    103
 
 #ifdef  __cplusplus
 }

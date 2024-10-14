@@ -4192,3 +4192,36 @@
 #define LN_jurisdictionCountryName              "jurisdictionCountryName"
 #define NID_jurisdictionCountryName             957
 #define OBJ_jurisdictionCountryName             1L,3L,6L,1L,4L,1L,311L,60L,2L,1L,3L
+
+#define SN_ISO_CN               "ISO-CN"
+#define LN_ISO_CN               "ISO CN Member Body"
+#define NID_ISO_CN              958
+#define OBJ_ISO_CN              OBJ_member_body,156L
+
+#define SN_oscca                "oscca"
+#define NID_oscca               959
+#define OBJ_oscca               OBJ_ISO_CN,10197L
+
+#define SN_sm_scheme            "sm-scheme"
+#define NID_sm_scheme           960
+#define OBJ_sm_scheme           OBJ_oscca,1L
+
+#define SN_sm2          "SM2"
+#define LN_sm2          "sm2"
+#define NID_sm2         961
+#define OBJ_sm2         OBJ_sm_scheme,301L
+
+#define SN_sm3          "SM3"
+#define LN_sm3          "sm3"
+#define NID_sm3         962
+#define OBJ_sm3         OBJ_sm_scheme,401L
+
+#define SN_sm3WithRSAEncryption         "RSA-SM3"
+#define LN_sm3WithRSAEncryption         "sm3WithRSAEncryption"
+#define NID_sm3WithRSAEncryption                963
+#define OBJ_sm3WithRSAEncryption                OBJ_sm_scheme,504L
+
+#define SN_SM2_with_SM3         "SM2-SM3"
+#define LN_SM2_with_SM3         "SM2-with-SM3"
+#define NID_SM2_with_SM3                964
+#define OBJ_SM2_with_SM3                OBJ_sm_scheme,501L

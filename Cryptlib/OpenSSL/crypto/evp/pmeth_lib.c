@@ -75,7 +75,7 @@ STACK_OF(EVP_PKEY_METHOD) *app_pkey_methods = NULL;
 
 extern const EVP_PKEY_METHOD rsa_pkey_meth, dh_pkey_meth, dsa_pkey_meth;
 extern const EVP_PKEY_METHOD ec_pkey_meth, hmac_pkey_meth, cmac_pkey_meth;
-extern const EVP_PKEY_METHOD dhx_pkey_meth;
+extern const EVP_PKEY_METHOD dhx_pkey_meth, sm2_pkey_meth;
 
 static const EVP_PKEY_METHOD *standard_methods[] = {
 #ifndef OPENSSL_NO_RSA
@@ -95,7 +95,10 @@ static const EVP_PKEY_METHOD *standard_methods[] = {
     &cmac_pkey_meth,
 #endif
 #ifndef OPENSSL_NO_DH
-    &dhx_pkey_meth
+    &dhx_pkey_meth,
+#endif
+#ifndef OPENSSL_NO_SM2
+    &sm2_pkey_meth,
 #endif
 };
 
@@ -135,9 +138,9 @@ static EVP_PKEY_CTX *int_ctx_new(EVP_PKEY *pkey, ENGINE *e, int id)
     EVP_PKEY_CTX *ret;
     const EVP_PKEY_METHOD *pmeth;
     if (id == -1) {
-        if (!pkey || !pkey->ameth)
+        if (!pkey)
             return NULL;
-        id = pkey->ameth->pkey_id;
+        id = pkey->type;
     }
 #ifndef OPENSSL_NO_ENGINE
     if (pkey && pkey->engine)
@@ -365,6 +368,10 @@ int EVP_PKEY_CTX_ctrl(EVP_PKEY_CTX *ctx, int keytype, int optype,
     if ((keytype != -1) && (ctx->pmeth->pkey_id != keytype))
         return -1;
 
+/* Skip the operation checks since this is called in a very early stage */
+    if (ctx->pmeth->digest_custom != NULL)
+        goto doit;
+
     if (ctx->operation == EVP_PKEY_OP_UNDEFINED) {
         EVPerr(EVP_F_EVP_PKEY_CTX_CTRL, EVP_R_NO_OPERATION_SET);
         return -1;
@@ -375,6 +382,7 @@ int EVP_PKEY_CTX_ctrl(EVP_PKEY_CTX *ctx, int keytype, int optype,
         return -1;
     }
 
+doit:
     ret = ctx->pmeth->ctrl(ctx, cmd, p1, p2);
 
     if (ret == -2)

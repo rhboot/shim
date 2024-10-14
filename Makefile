@@ -38,6 +38,9 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
+ifneq ($(origin ENABLE_SHIM_SM),undefined)
+CFLAGS += -DENABLE_SHIM_SM
+endif
 OBJS	= shim.o globals.o mok.o netboot.o cert.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c globals.c mok.c netboot.c replacements.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
@@ -178,7 +181,7 @@ Cryptlib/libcryptlib.a:
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile $(IGNORE_COMPILER_ERRORS)
 
 Cryptlib/OpenSSL/libopenssl.a:
-	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
+	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes ec sm3 sm2 ecdsa; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile $(IGNORE_COMPILER_ERRORS)
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])

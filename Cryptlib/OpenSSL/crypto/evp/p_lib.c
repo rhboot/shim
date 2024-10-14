@@ -259,6 +259,24 @@ int EVP_PKEY_set_type_str(EVP_PKEY *pkey, const char *str, int len)
     return pkey_set_type(pkey, EVP_PKEY_NONE, str, len);
 }
 
+int EVP_PKEY_set_alias_type(EVP_PKEY *pkey, int type)
+{
+    if (pkey->type == type) {
+        return 1; /* it already is that type */
+    }
+
+    /*
+     * The application is requesting to alias this to a different pkey type,
+     * but not one that resolves to the base type.
+     */
+    if (EVP_PKEY_type(type) != EVP_PKEY_base_id(pkey)) {
+        return 0;
+    }
+
+    pkey->type = type;
+    return 1;
+}
+
 int EVP_PKEY_assign(EVP_PKEY *pkey, int type, void *key)
 {
     if (pkey == NULL || !EVP_PKEY_set_type(pkey, type))
@@ -271,6 +289,24 @@ void *EVP_PKEY_get0(EVP_PKEY *pkey)
 {
     return pkey->pkey.ptr;
 }
+
+# ifndef OPENSSL_NO_SM2
+int EVP_PKEY_is_sm2(EVP_PKEY *pkey)
+{
+    EC_KEY *eckey;
+    const EC_GROUP *group;
+    if (pkey == NULL) {
+        return 0;
+    }
+    if (EVP_PKEY_id(pkey) == EVP_PKEY_EC
+        && (eckey = EVP_PKEY_get1_EC_KEY(pkey)) != NULL
+        && (group = EC_KEY_get0_group(eckey)) != NULL
+        && EC_GROUP_get_curve_name(group) == NID_sm2) {
+            return 1;
+    }
+    return EVP_PKEY_id(pkey) == EVP_PKEY_SM2;
+}
+# endif
 
 #ifndef OPENSSL_NO_RSA
 int EVP_PKEY_set1_RSA(EVP_PKEY *pkey, RSA *key)
@@ -320,6 +356,14 @@ int EVP_PKEY_set1_EC_KEY(EVP_PKEY *pkey, EC_KEY *key)
     if (ret)
         EC_KEY_up_ref(key);
     return ret;
+}
+
+EC_KEY *EVP_PKEY_get0_EC_KEY(EVP_PKEY *pkey)
+{
+    if (EVP_PKEY_base_id(pkey) != EVP_PKEY_EC) {
+        return NULL;
+    }
+    return pkey->pkey.ec;
 }
 
 EC_KEY *EVP_PKEY_get1_EC_KEY(EVP_PKEY *pkey)
