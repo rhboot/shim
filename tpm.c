@@ -11,6 +11,7 @@ typedef struct {
 UINTN measuredcount = 0;
 VARIABLE_RECORD *measureddata = NULL;
 static BOOLEAN tpm_defective = FALSE;
+static BOOLEAN log_full_already_warned = FALSE;
 
 static BOOLEAN tpm_present(efi_tpm_protocol_t *tpm)
 {
@@ -108,6 +109,16 @@ static EFI_STATUS tpm_locate_protocol(efi_tpm_protocol_t **tpm,
 	return EFI_NOT_FOUND;
 }
 
+static void warn_first_log_full(void)
+{
+	if (!log_full_already_warned) {
+		perror(L"TPM extend operation occurred, but the event could"
+		       " not be written to one or more event logs. Applications"
+		       " reliant on a valid event log will not function.\n");
+		log_full_already_warned = TRUE;
+	}
+}
+
 static EFI_STATUS cc_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 				   UINT8 pcr, const CHAR8 *log, UINTN logsize,
 				   UINT32 type, BOOLEAN is_pe_image)
@@ -143,6 +154,14 @@ static EFI_STATUS cc_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 	CopyMem(event->Event, (VOID *)log, logsize);
 	efi_status = cc->hash_log_extend_event(cc, flags, buf, (UINT64)size,
 					       event);
+	/* Per spec: The extend operation occurred, but the event could
+	 * not be written to one or more event logs. We can still safely
+	 * boot in this case, but also show a warning to let the user know.
+	 */
+	if (efi_status == EFI_VOLUME_FULL) {
+		warn_first_log_full();
+		efi_status = EFI_SUCCESS;
+	}
 	FreePool(event);
 	return efi_status;
 }
@@ -201,11 +220,19 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			*/
 			efi_status = tpm2->hash_log_extend_event(tpm2,
 				PE_COFF_IMAGE, buf, (UINT64) size, event);
+			if (efi_status == EFI_VOLUME_FULL) {
+				warn_first_log_full();
+				efi_status = EFI_SUCCESS;
+			}
 		}
 
 	        if (!hash || EFI_ERROR(efi_status)) {
 			efi_status = tpm2->hash_log_extend_event(tpm2,
 				0, buf, (UINT64) size, event);
+			if (efi_status == EFI_VOLUME_FULL) {
+				warn_first_log_full();
+				efi_status = EFI_SUCCESS;
+			}
 		}
 		FreePool(event);
 		return efi_status;
@@ -239,10 +266,18 @@ static EFI_STATUS tpm_log_event_raw(EFI_PHYSICAL_ADDRESS buf, UINTN size,
 			CopyMem(event->digest, hash, sizeof(event->digest));
 			efi_status = tpm->log_extend_event(tpm, 0, 0,
 				TPM_ALG_SHA, event, &eventnum, &lastevent);
+			if (efi_status == EFI_VOLUME_FULL) {
+				warn_first_log_full();
+				efi_status = EFI_SUCCESS;
+			}
 		} else {
 			efi_status = tpm->log_extend_event(tpm, buf,
 				(UINT64)size, TPM_ALG_SHA, event, &eventnum,
 				&lastevent);
+			if (efi_status == EFI_VOLUME_FULL) {
+				warn_first_log_full();
+				efi_status = EFI_SUCCESS;
+			}
 		}
 		if (efi_status == EFI_UNSUPPORTED) {
 			perror(L"Could not write TPM event: %r. Considering "
