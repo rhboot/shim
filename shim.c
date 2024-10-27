@@ -563,7 +563,7 @@ verify_buffer_authenticode (char *data, int datasize,
 			    PE_COFF_LOADER_IMAGE_CONTEXT *context,
 			    UINT8 *sha256hash, UINT8 *sha1hash)
 {
-	EFI_STATUS ret_efi_status;
+	EFI_STATUS efi_status;
 	size_t size = datasize;
 	size_t offset = 0;
 	unsigned int i = 0;
@@ -578,27 +578,27 @@ verify_buffer_authenticode (char *data, int datasize,
 	 */
 	drain_openssl_errors();
 
-	ret_efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
-	if (EFI_ERROR(ret_efi_status)) {
-		dprint(L"generate_hash: %r\n", ret_efi_status);
+	efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"generate_hash: %r\n", efi_status);
 		PrintErrors();
 		ClearErrors();
-		crypterr(ret_efi_status);
-		return ret_efi_status;
+		crypterr(efi_status);
+		return efi_status;
 	}
 
 	/*
 	 * Ensure that the binary isn't forbidden by hash
 	 */
 	drain_openssl_errors();
-	ret_efi_status = check_denylist(NULL, sha256hash, sha1hash);
-	if (EFI_ERROR(ret_efi_status)) {
+	efi_status = check_denylist(NULL, sha256hash, sha1hash);
+	if (EFI_ERROR(efi_status)) {
 //		perror(L"Binary is forbidden\n");
-//		dprint(L"Binary is forbidden: %r\n", ret_efi_status);
+//		dprint(L"Binary is forbidden: %r\n", efi_status);
 		PrintErrors();
 		ClearErrors();
-		crypterr(ret_efi_status);
-		return ret_efi_status;
+		crypterr(efi_status);
+		return efi_status;
 	}
 
 	/*
@@ -606,20 +606,20 @@ verify_buffer_authenticode (char *data, int datasize,
 	 * firmware databases
 	 */
 	drain_openssl_errors();
-	ret_efi_status = check_allowlist(NULL, sha256hash, sha1hash);
-	if (EFI_ERROR(ret_efi_status)) {
-		LogError(L"check_allowlist(): %r\n", ret_efi_status);
-		dprint(L"check_allowlist: %r\n", ret_efi_status);
-		if (ret_efi_status != EFI_NOT_FOUND) {
-			dprint(L"check_allowlist(): %r\n", ret_efi_status);
+	efi_status = check_allowlist(NULL, sha256hash, sha1hash);
+	if (EFI_ERROR(efi_status)) {
+		LogError(L"check_allowlist(): %r\n", efi_status);
+		dprint(L"check_allowlist: %r\n", efi_status);
+		if (efi_status != EFI_NOT_FOUND) {
+			dprint(L"check_allowlist(): %r\n", efi_status);
 			PrintErrors();
 			ClearErrors();
-			crypterr(ret_efi_status);
-			return ret_efi_status;
+			crypterr(efi_status);
+			return efi_status;
 		}
 	} else {
 		drain_openssl_errors();
-		return ret_efi_status;
+		return efi_status;
 	}
 
 	if (context->SecDir->Size == 0) {
@@ -634,7 +634,7 @@ verify_buffer_authenticode (char *data, int datasize,
 	}
 
 	offset = 0;
-	ret_efi_status = EFI_NOT_FOUND;
+	efi_status = EFI_NOT_FOUND;
 	do {
 		WIN_CERTIFICATE_EFI_PKCS *sig = NULL;
 		size_t sz;
@@ -669,8 +669,6 @@ verify_buffer_authenticode (char *data, int datasize,
 		}
 
 		if (sig->Hdr.wCertificateType == WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
-			EFI_STATUS efi_status;
-
 			dprint(L"Attempting to verify signature %d:\n", i++);
 
 			efi_status = verify_one_signature(sig, sha256hash, sha1hash);
@@ -683,8 +681,8 @@ verify_buffer_authenticode (char *data, int datasize,
 			 * So don't clobber successes with security violation
 			 * here; that just means it isn't a success.
 			 */
-			if (ret_efi_status != EFI_SUCCESS)
-				ret_efi_status = efi_status;
+			if (efi_status == EFI_SUCCESS)
+				break;
 		} else {
 			perror(L"Unsupported certificate type %x\n",
 				sig->Hdr.wCertificateType);
@@ -692,15 +690,15 @@ verify_buffer_authenticode (char *data, int datasize,
 		offset = ALIGN_VALUE(offset + sz, 8);
 	} while (offset < context->SecDir->Size);
 
-	if (ret_efi_status != EFI_SUCCESS) {
+	if (efi_status != EFI_SUCCESS) {
 		dprint(L"Binary is not authorized\n");
 		PrintErrors();
 		ClearErrors();
 		crypterr(EFI_SECURITY_VIOLATION);
-		ret_efi_status = EFI_SECURITY_VIOLATION;
+		efi_status = EFI_SECURITY_VIOLATION;
 	}
 	drain_openssl_errors();
-	return ret_efi_status;
+	return efi_status;
 }
 
 /*
