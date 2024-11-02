@@ -1746,11 +1746,12 @@ shim_fini(void)
 	uninstall_shim_protocols();
 
 	if (secure_mode()) {
-
-		/*
-		 * Remove our hooks from system services.
-		 */
-		unhook_system_services();
+		if (vendor_authorized_size || vendor_deauthorized_size) {
+			/*
+			* Remove our hooks from system services.
+			*/
+			unhook_system_services();
+		}
 	}
 
 	unhook_exit();
