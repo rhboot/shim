@@ -1,5 +1,5 @@
 The following PCRs are extended by shim:
-
+。
 PCR4:
 - the Authenticode hash of the binary being loaded will be extended into
   PCR4 before SB verification.
