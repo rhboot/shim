@@ -115,12 +115,19 @@
 # define EVP_PKEY_DH     NID_dhKeyAgreement
 # define EVP_PKEY_DHX    NID_dhpublicnumber
 # define EVP_PKEY_EC     NID_X9_62_id_ecPublicKey
+# define EVP_PKEY_SM2    NID_sm2
 # define EVP_PKEY_HMAC   NID_hmac
 # define EVP_PKEY_CMAC   NID_cmac
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Don't free up md_ctx->pctx in EVP_MD_CTX_reset, use the reserved flag
+ * values in evp.h
+ */
+#define EVP_MD_CTX_FLAG_KEEP_PKEY_CTX   0x0400
 
 /*
  * Type needs to be a bit field Sub-type needs to be for variations on the
@@ -526,6 +533,9 @@ const EVP_MD *EVP_MD_CTX_md(const EVP_MD_CTX *ctx);
 # define EVP_MD_CTX_block_size(e)        EVP_MD_block_size(EVP_MD_CTX_md(e))
 # define EVP_MD_CTX_type(e)              EVP_MD_type(EVP_MD_CTX_md(e))
 
+void EVP_MD_CTX_set_pkey_ctx(EVP_MD_CTX *ctx, EVP_PKEY_CTX *pctx);
+void *EVP_MD_CTX_md_data(const EVP_MD_CTX *ctx);
+
 int EVP_CIPHER_nid(const EVP_CIPHER *cipher);
 # define EVP_CIPHER_name(e)              OBJ_nid2sn(EVP_CIPHER_nid(e))
 int EVP_CIPHER_block_size(const EVP_CIPHER *cipher);
@@ -583,6 +593,9 @@ int EVP_Cipher(EVP_CIPHER_CTX *c,
 # define EVP_delete_digest_alias(alias) \
         OBJ_NAME_remove(alias,OBJ_NAME_TYPE_MD_METH|OBJ_NAME_ALIAS);
 
+EVP_MD_CTX *EVP_MD_CTX_new(void);
+int EVP_MD_CTX_reset(EVP_MD_CTX *ctx);
+void EVP_MD_CTX_free(EVP_MD_CTX *ctx);
 void EVP_MD_CTX_init(EVP_MD_CTX *ctx);
 int EVP_MD_CTX_cleanup(EVP_MD_CTX *ctx);
 EVP_MD_CTX *EVP_MD_CTX_create(void);
@@ -666,6 +679,10 @@ int EVP_DigestVerifyInit(EVP_MD_CTX *ctx, EVP_PKEY_CTX **pctx,
 int EVP_DigestVerifyFinal(EVP_MD_CTX *ctx,
                           const unsigned char *sig, size_t siglen);
 
+int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sigret,
+                            size_t siglen, const unsigned char *tbs,
+                            size_t tbslen);
+
 int EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
                  const unsigned char *ek, int ekl, const unsigned char *iv,
                  EVP_PKEY *priv);
@@ -740,6 +757,9 @@ const EVP_MD *EVP_ripemd160(void);
 # endif
 # ifndef OPENSSL_NO_WHIRLPOOL
 const EVP_MD *EVP_whirlpool(void);
+# endif
+# ifndef OPENSSL_NO_SM3
+const EVP_MD *EVP_sm3(void);
 # endif
 const EVP_CIPHER *EVP_enc_null(void); /* does nothing :-) */
 # ifndef OPENSSL_NO_DES
@@ -954,9 +974,14 @@ int EVP_PKEY_base_id(const EVP_PKEY *pkey);
 int EVP_PKEY_bits(EVP_PKEY *pkey);
 int EVP_PKEY_size(EVP_PKEY *pkey);
 int EVP_PKEY_set_type(EVP_PKEY *pkey, int type);
+int EVP_PKEY_set_alias_type(EVP_PKEY *pkey, int type);
 int EVP_PKEY_set_type_str(EVP_PKEY *pkey, const char *str, int len);
 int EVP_PKEY_assign(EVP_PKEY *pkey, int type, void *key);
 void *EVP_PKEY_get0(EVP_PKEY *pkey);
+
+# ifndef OPENSSL_NO_SM2
+int EVP_PKEY_is_sm2(EVP_PKEY *pkey);
+# endif
 
 # ifndef OPENSSL_NO_RSA
 struct rsa_st;
@@ -976,6 +1001,7 @@ struct dh_st *EVP_PKEY_get1_DH(EVP_PKEY *pkey);
 # ifndef OPENSSL_NO_EC
 struct ec_key_st;
 int EVP_PKEY_set1_EC_KEY(EVP_PKEY *pkey, struct ec_key_st *key);
+struct ec_key_st *EVP_PKEY_get0_EC_KEY(EVP_PKEY *pkey);
 struct ec_key_st *EVP_PKEY_get1_EC_KEY(EVP_PKEY *pkey);
 # endif
 
@@ -1268,7 +1294,6 @@ int EVP_PKEY_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey);
 int EVP_PKEY_keygen_init(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey);
 
-void EVP_PKEY_CTX_set_cb(EVP_PKEY_CTX *ctx, EVP_PKEY_gen_cb *cb);
 EVP_PKEY_gen_cb *EVP_PKEY_CTX_get_cb(EVP_PKEY_CTX *ctx);
 
 int EVP_PKEY_CTX_get_keygen_info(EVP_PKEY_CTX *ctx, int idx);

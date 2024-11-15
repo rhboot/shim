@@ -211,6 +211,18 @@ EFI_STATUS
 	IN UINT32 size
 	);
 
+#ifdef ENABLE_SHIM_SM
+typedef
+EFI_STATUS
+(*EFI_SHIM_LOCK_HASH) (
+	IN char *data,
+	IN int datasize,
+	PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	UINT8 *sha256hash,
+	UINT8 *sha1hash,
+	UINT8 *sm3hash
+	);
+#else
 typedef
 EFI_STATUS
 (*EFI_SHIM_LOCK_HASH) (
@@ -220,6 +232,7 @@ EFI_STATUS
 	UINT8 *sha256hash,
 	UINT8 *sha1hash
 	);
+#endif
 
 typedef
 EFI_STATUS
@@ -274,10 +287,17 @@ extern UINT32 load_options_size;
 
 BOOLEAN secure_mode (void);
 
+#ifdef ENABLE_SHIM_SM
+EFI_STATUS
+verify_buffer (char *data, int datasize,
+	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	       UINT8 *sha256hash, UINT8 *sha1hash, UINT8 *sm3hash);
+#else
 EFI_STATUS
 verify_buffer (char *data, int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       UINT8 *sha256hash, UINT8 *sha1hash);
+#endif
 
 #ifndef SHIM_UNIT_TEST
 #define perror_(file, line, func, fmt, ...) ({					\

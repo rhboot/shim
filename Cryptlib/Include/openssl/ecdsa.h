@@ -90,6 +90,13 @@ ECDSA_SIG *ECDSA_SIG_new(void);
  */
 void ECDSA_SIG_free(ECDSA_SIG *sig);
 
+/** Accessor for r and s fields of ECDSA_SIG
+ *  \param  sig  pointer to ECDSA_SIG structure
+ *  \param  pr   pointer to BIGNUM pointer for r (may be NULL)
+ *  \param  ps   pointer to BIGNUM pointer for s (may be NULL)
+ */
+void ECDSA_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr, const BIGNUM **ps);
+
 /** DER encode content of ECDSA_SIG object (note: this function modifies *pp
  *  (*pp += length of the DER encoded signature)).
  *  \param  sig  pointer to the ECDSA_SIG object

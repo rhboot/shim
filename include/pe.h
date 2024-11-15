@@ -42,10 +42,17 @@ handle_image (void *data, unsigned int datasize,
 	      EFI_PHYSICAL_ADDRESS *alloc_address,
 	      UINTN *alloc_pages);
 
+#ifdef ENABLE_SHIM_SM
+EFI_STATUS
+generate_hash (char *data, unsigned int datasize,
+	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	       UINT8 *sha256hash, UINT8 *sha1hash, UINT8 *sm3hash);
+#else
 EFI_STATUS
 generate_hash (char *data, unsigned int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       UINT8 *sha256hash, UINT8 *sha1hash);
+#endif
 
 EFI_STATUS
 relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,

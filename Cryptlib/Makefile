@@ -67,6 +67,12 @@ OBJS		=   Hash/CryptMd4Null.o \
 		    SysCall/BaseMemAllocation.o \
 		    SysCall/BaseStrings.o
 
+ifdef ENABLE_SHIM_SM
+OBJS		+=  Hash/CryptSm3.o
+else
+DEFINES		+= -DOPENSSL_NO_SM3
+endif
+
 all: $(TARGET)
 
 libcryptlib.a: $(OBJS)

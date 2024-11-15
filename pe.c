@@ -44,13 +44,24 @@
  * Calculate the SHA1 and SHA256 hashes of a binary
  */
 
+#ifdef ENABLE_SHIM_SM
+EFI_STATUS
+generate_hash(char *data, unsigned int datasize,
+	      PE_COFF_LOADER_IMAGE_CONTEXT *context, UINT8 *sha256hash,
+	      UINT8 *sha1hash, UINT8 *sm3hash)
+#else
 EFI_STATUS
 generate_hash(char *data, unsigned int datasize,
 	      PE_COFF_LOADER_IMAGE_CONTEXT *context, UINT8 *sha256hash,
 	      UINT8 *sha1hash)
+#endif
 {
 	unsigned int sha256ctxsize, sha1ctxsize;
 	void *sha256ctx = NULL, *sha1ctx = NULL;
+#ifdef ENABLE_SHIM_SM
+	unsigned int sm3ctxsize;
+	void *sm3ctx = NULL;
+#endif
 	char *hashbase;
 	unsigned int hashsize;
 	unsigned int SumOfBytesHashed, SumOfSectionBytes;
@@ -74,12 +85,25 @@ generate_hash(char *data, unsigned int datasize,
 	sha1ctxsize = Sha1GetContextSize();
 	sha1ctx = AllocatePool(sha1ctxsize);
 
+#ifdef ENABLE_SHIM_SM
+	sm3ctxsize = Sm3GetContextSize();
+	sm3ctx = AllocatePool(sm3ctxsize);
+#endif
+
+#ifdef ENABLE_SHIM_SM
+	if (!sha256ctx || !sha1ctx || !sm3ctx) {
+#else
 	if (!sha256ctx || !sha1ctx) {
+#endif
 		perror(L"Unable to allocate memory for hash context\n");
 		return EFI_OUT_OF_RESOURCES;
 	}
 
+#ifdef ENABLE_SHIM_SM
+	if (!Sha256Init(sha256ctx) || !Sha1Init(sha1ctx) || !Sm3Init(sm3ctx)) {
+#else
 	if (!Sha256Init(sha256ctx) || !Sha1Init(sha1ctx)) {
+#endif
 		perror(L"Unable to initialise hash\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -91,8 +115,14 @@ generate_hash(char *data, unsigned int datasize,
 		hashbase;
 	check_size(data, datasize, hashbase, hashsize);
 
+#ifdef ENABLE_SHIM_SM
+	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+	    !(Sha1Update(sha1ctx, hashbase, hashsize)) ||
+	    !(Sm3Update(sm3ctx, hashbase, hashsize))) {
+#else
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+#endif
 		perror(L"Unable to generate hash\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -104,8 +134,14 @@ generate_hash(char *data, unsigned int datasize,
 	hashsize = (char *)context->SecDir - hashbase;
 	check_size(data, datasize, hashbase, hashsize);
 
+#ifdef ENABLE_SHIM_SM
+	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+	    !(Sha1Update(sha1ctx, hashbase, hashsize)) ||
+	    !(Sm3Update(sm3ctx, hashbase, hashsize))) {
+#else
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+#endif
 		perror(L"Unable to generate hash\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -122,8 +158,14 @@ generate_hash(char *data, unsigned int datasize,
 	}
 	check_size(data, datasize, hashbase, hashsize);
 
+#ifdef ENABLE_SHIM_SM
+	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+	    !(Sha1Update(sha1ctx, hashbase, hashsize)) ||
+	    !(Sm3Update(sm3ctx, hashbase, hashsize))) {
+#else
 	if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 	    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+#endif
 		perror(L"Unable to generate hash\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -252,8 +294,14 @@ generate_hash(char *data, unsigned int datasize,
 		hashsize  = (unsigned int) Section->SizeOfRawData;
 		check_size(data, datasize, hashbase, hashsize);
 
+#ifdef ENABLE_SHIM_SM
+		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+		    !(Sha1Update(sha1ctx, hashbase, hashsize)) ||
+		    !(Sm3Update(sm3ctx, hashbase, hashsize))) {
+#else
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+#endif
 			perror(L"Unable to generate hash\n");
 			efi_status = EFI_OUT_OF_RESOURCES;
 			goto done;
@@ -278,8 +326,14 @@ generate_hash(char *data, unsigned int datasize,
 		}
 		check_size(data, datasize, hashbase, hashsize);
 
+#ifdef ENABLE_SHIM_SM
+		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+		    !(Sha1Update(sha1ctx, hashbase, hashsize)) ||
+		    !(Sm3Update(sm3ctx, hashbase, hashsize))) {
+#else
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+#endif
 			perror(L"Unable to generate hash\n");
 			efi_status = EFI_OUT_OF_RESOURCES;
 			goto done;
@@ -298,8 +352,14 @@ generate_hash(char *data, unsigned int datasize,
 
 		check_size(data, datasize, hashbase, hashsize);
 
+#ifdef ENABLE_SHIM_SM
+		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
+		    !(Sha1Update(sha1ctx, hashbase, hashsize)) ||
+		    !(Sm3Update(sm3ctx, hashbase, hashsize))) {
+#else
 		if (!(Sha256Update(sha256ctx, hashbase, hashsize)) ||
 		    !(Sha1Update(sha1ctx, hashbase, hashsize))) {
+#endif
 			perror(L"Unable to generate hash\n");
 			efi_status = EFI_OUT_OF_RESOURCES;
 			goto done;
@@ -309,8 +369,14 @@ generate_hash(char *data, unsigned int datasize,
 	}
 #endif
 
+#ifdef ENABLE_SHIM_SM
+	if (!(Sha256Final(sha256ctx, sha256hash)) ||
+	    !(Sha1Final(sha1ctx, sha1hash)) ||
+	    !(Sm3Final(sm3ctx, sm3hash))) {
+#else
 	if (!(Sha256Final(sha256ctx, sha256hash)) ||
 	    !(Sha1Final(sha1ctx, sha1hash))) {
+#endif
 		perror(L"Unable to finalise hash\n");
 		efi_status = EFI_OUT_OF_RESOURCES;
 		goto done;
@@ -320,6 +386,10 @@ generate_hash(char *data, unsigned int datasize,
 	dhexdumpat(sha1hash, SHA1_DIGEST_SIZE, 0);
 	dprint(L"sha256 authenticode hash:\n");
 	dhexdumpat(sha256hash, SHA256_DIGEST_SIZE, 0);
+#ifdef ENABLE_SHIM_SM
+	dprint(L"sm3 authenticode hash:\n");
+	dhexdumpat(sm3hash, SM3_DIGEST_SIZE, 0);
+#endif
 
 done:
 	if (SectionHeader)
@@ -328,6 +398,10 @@ done:
 		FreePool(sha1ctx);
 	if (sha256ctx)
 		FreePool(sha256ctx);
+#ifdef ENABLE_SHIM_SM
+	if (sm3ctx)
+		FreePool(sm3ctx);
+#endif
 
 	return efi_status;
 }
@@ -545,6 +619,9 @@ EFI_STATUS verify_image(void *data, unsigned int datasize,
 	EFI_STATUS efi_status;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+#ifdef ENABLE_SHIM_SM
+	UINT8 sm3hash[SHA256_DIGEST_SIZE];
+#endif
 
 	/*
 	 * The binary header contains relevant context and section pointers
@@ -560,8 +637,13 @@ EFI_STATUS verify_image(void *data, unsigned int datasize,
 	 * in order to load it.
 	 */
 	if (secure_mode()) {
+#ifdef ENABLE_SHIM_SM
+		efi_status = verify_buffer(data, datasize,
+					   context, sha256hash, sha1hash, sm3hash);
+#else
 		efi_status = verify_buffer(data, datasize,
 					   context, sha256hash, sha1hash);
+#endif
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
 				console_print(L"Verification failed: %r\n", efi_status);
@@ -579,8 +661,13 @@ EFI_STATUS verify_image(void *data, unsigned int datasize,
 	 *  this is only useful for the TPM1.2 case. We should try to fix
 	 *  this in a follow-up.
 	 */
+#ifdef ENABLE_SHIM_SM
+	efi_status = generate_hash(data, datasize, context, sha256hash,
+				   sha1hash, sm3hash);
+#else
 	efi_status = generate_hash(data, datasize, context, sha256hash,
 				   sha1hash);
+#endif
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -621,6 +708,9 @@ handle_image (void *data, unsigned int datasize,
 	int found_entry_point = 0;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+#ifdef ENABLE_SHIM_SM
+	UINT8 sm3hash[SM3_DIGEST_SIZE];
+#endif
 
 	/*
 	 * The binary header contains relevant context and section pointers
@@ -636,8 +726,13 @@ handle_image (void *data, unsigned int datasize,
 	 * in order to load it.
 	 */
 	if (secure_mode ()) {
+#ifdef ENABLE_SHIM_SM
+		efi_status = verify_buffer(data, datasize, &context, sha256hash,
+					   sha1hash, sm3hash);
+#else
 		efi_status = verify_buffer(data, datasize, &context, sha256hash,
 					   sha1hash);
+#endif
 
 		if (EFI_ERROR(efi_status)) {
 			if (verbose)
@@ -658,8 +753,13 @@ handle_image (void *data, unsigned int datasize,
 	 *  this is only useful for the TPM1.2 case. We should try to fix
 	 *  this in a follow-up.
 	 */
+#ifdef ENABLE_SHIM_SM
+	efi_status = generate_hash(data, datasize, &context, sha256hash,
+				   sha1hash, sm3hash);
+#else
 	efi_status = generate_hash(data, datasize, &context, sha256hash,
 				   sha1hash);
+#endif
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 

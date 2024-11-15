@@ -62,12 +62,12 @@
  * [including the GNU Public Licence.]
  */
 
-#define NUM_NID 958
-#define NUM_SN 951
-#define NUM_LN 951
-#define NUM_OBJ 890
+#define NUM_NID 965
+#define NUM_SN 958
+#define NUM_LN 958
+#define NUM_OBJ 897
 
-static const unsigned char lvalues[6255]={
+static const unsigned char lvalues[6301]={
 0x2A,0x86,0x48,0x86,0xF7,0x0D,               /* [  0] OBJ_rsadsi */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,          /* [  6] OBJ_pkcs */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x02,     /* [ 13] OBJ_md2 */
@@ -952,6 +952,13 @@ static const unsigned char lvalues[6255]={
 0x2B,0x06,0x01,0x04,0x01,0x82,0x37,0x3C,0x02,0x01,0x01,/* [6221] OBJ_jurisdictionLocalityName */
 0x2B,0x06,0x01,0x04,0x01,0x82,0x37,0x3C,0x02,0x01,0x02,/* [6232] OBJ_jurisdictionStateOrProvinceName */
 0x2B,0x06,0x01,0x04,0x01,0x82,0x37,0x3C,0x02,0x01,0x03,/* [6243] OBJ_jurisdictionCountryName */
+0x2A,0x81,0x1C,                              /* [6254] OBJ_ISO_CN */
+0x2A,0x81,0x1C,0xCF,0x55,                    /* [6257] OBJ_oscca */
+0x2A,0x81,0x1C,0xCF,0x55,0x01,               /* [6262] OBJ_sm_scheme */
+0x2A,0x81,0x1C,0xCF,0x55,0x01,0x82,0x2D,     /* [6268] OBJ_sm2 */
+0x2A,0x81,0x1C,0xCF,0x55,0x01,0x83,0x11,     /* [6276] OBJ_sm3 */
+0x2A,0x81,0x1C,0xCF,0x55,0x01,0x83,0x78,     /* [6284] OBJ_sm3WithRSAEncryption */
+0x2A,0x81,0x1C,0xCF,0x55,0x01,0x83,0x75,     /* [6292] OBJ_SM2_with_SM3 */
 };
 
 static const ASN1_OBJECT nid_objs[NUM_NID]={
@@ -2514,6 +2521,14 @@ static const ASN1_OBJECT nid_objs[NUM_NID]={
 	NID_jurisdictionStateOrProvinceName,11,&(lvalues[6232]),0},
 {"jurisdictionC","jurisdictionCountryName",
 	NID_jurisdictionCountryName,11,&(lvalues[6243]),0},
+{"ISO-CN","ISO CN Member Body",NID_ISO_CN,3,&(lvalues[6254]),0},
+{"oscca","oscca",NID_oscca,5,&(lvalues[6257]),0},
+{"sm-scheme","sm-scheme",NID_sm_scheme,6,&(lvalues[6262]),0},
+{"SM2","sm2",NID_sm2,8,&(lvalues[6268]),0},
+{"SM3","sm3",NID_sm3,8,&(lvalues[6276]),0},
+{"RSA-SM3","sm3WithRSAEncryption",NID_sm3WithRSAEncryption,8,
+	&(lvalues[6284]),0},
+{"SM2-SM3","SM2-with-SM3",NID_SM2_with_SM3,8,&(lvalues[6292]),0},
 };
 
 static const unsigned int sn_objs[NUM_SN]={
@@ -2615,6 +2630,7 @@ static const unsigned int sn_objs[NUM_SN]={
 36,	/* "IDEA-ECB" */
 46,	/* "IDEA-OFB" */
 181,	/* "ISO" */
+958,	/* "ISO-CN" */
 183,	/* "ISO-US" */
 645,	/* "ITU-T" */
 646,	/* "JOINT-ISO-ITU-T" */
@@ -2685,6 +2701,10 @@ static const unsigned int sn_objs[NUM_SN]={
 668,	/* "RSA-SHA256" */
 669,	/* "RSA-SHA384" */
 670,	/* "RSA-SHA512" */
+963,	/* "RSA-SM3" */
+961,	/* "SM2" */
+964,	/* "SM2-SM3" */
+962,	/* "SM3" */
 919,	/* "RSAES-OAEP" */
 912,	/* "RSASSA-PSS" */
 777,	/* "SEED-CBC" */
@@ -3176,6 +3196,7 @@ static const unsigned int sn_objs[NUM_SN]={
 77,	/* "nsSslServerName" */
 681,	/* "onBasis" */
 491,	/* "organizationalStatus" */
+959,	/* "oscca" */
 475,	/* "otherMailbox" */
 876,	/* "owner" */
 489,	/* "pagerTelephoneNumber" */
@@ -3422,6 +3443,7 @@ static const unsigned int sn_objs[NUM_SN]={
 52,	/* "signingTime" */
 454,	/* "simpleSecurityObject" */
 496,	/* "singleLevelQuality" */
+960,	/* "sm-scheme" */
 387,	/* "snmpv2" */
 660,	/* "street" */
 85,	/* "subjectAltName" */
@@ -3519,6 +3541,7 @@ static const unsigned int ln_objs[NUM_LN]={
 294,	/* "IPSec End System" */
 295,	/* "IPSec Tunnel" */
 296,	/* "IPSec User" */
+958,	/* "ISO CN Member Body" */
 182,	/* "ISO Member Body" */
 183,	/* "ISO US Member Body" */
 667,	/* "Independent" */
@@ -3573,6 +3596,7 @@ static const unsigned int ln_objs[NUM_LN]={
  2,	/* "RSA Data Security, Inc. PKCS" */
 188,	/* "S/MIME" */
 167,	/* "S/MIME Capabilities" */
+964,    /* "SM2-with-SM3" */
 387,	/* "SNMPv2" */
 512,	/* "Secure Electronic Transactions" */
 386,	/* "Security" */
@@ -4105,6 +4129,7 @@ static const unsigned int ln_objs[NUM_LN]={
 17,	/* "organizationName" */
 491,	/* "organizationalStatus" */
 18,	/* "organizationalUnitName" */
+959,	/* "oscca" */
 475,	/* "otherMailbox" */
 876,	/* "owner" */
 935,	/* "pSpecified" */
@@ -4379,6 +4404,10 @@ static const unsigned int ln_objs[NUM_LN]={
 52,	/* "signingTime" */
 454,	/* "simpleSecurityObject" */
 496,	/* "singleLevelQuality" */
+960,	/* "sm-scheme" */
+961,	/* "sm2" */
+962,	/* "sm3" */
+963,	/* "sm3WithRSAEncryption" */
 16,	/* "stateOrProvinceName" */
 660,	/* "streetAddress" */
 498,	/* "subtreeMaximumQuality" */
@@ -4444,6 +4473,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 512,	/* OBJ_id_set                       2 23 42 */
 678,	/* OBJ_wap                          2 23 43 */
 435,	/* OBJ_pss                          0 9 2342 */
+958,	/* OBJ_ISO_CN                       1 2 156 */
 183,	/* OBJ_ISO_US                       1 2 840 */
 381,	/* OBJ_iana                         1 3 6 1 */
 677,	/* OBJ_certicom_arc                 1 3 132 */
@@ -4659,6 +4689,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 637,	/* OBJ_set_brand_Diners             2 23 42 8 30 */
 638,	/* OBJ_set_brand_AmericanExpress    2 23 42 8 34 */
 639,	/* OBJ_set_brand_JCB                2 23 42 8 35 */
+959,	/* OBJ_oscca                        1 2 156 10197 */
 805,	/* OBJ_cryptopro                    1 2 643 2 2 */
 806,	/* OBJ_cryptocom                    1 2 643 2 9 */
 184,	/* OBJ_X9_57                        1 2 840 10040 */
@@ -4733,6 +4764,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 745,	/* OBJ_wap_wsg_idm_ecid_wtls12      2 23 43 1 4 12 */
 804,	/* OBJ_whirlpool                    1 0 10118 3 0 55 */
 124,	/* OBJ_rle_compression              1 1 1 1 666 1 */
+960,	/* OBJ_sm_scheme                    1 2 156 10197 1 */
 773,	/* OBJ_kisa                         1 2 410 200004 */
 807,	/* OBJ_id_GostR3411_94_with_GostR3410_2001 1 2 643 2 2 3 */
 808,	/* OBJ_id_GostR3411_94_with_GostR3410_94 1 2 643 2 2 4 */
@@ -4836,6 +4868,10 @@ static const unsigned int obj_objs[NUM_OBJ]={
 768,	/* OBJ_camellia_256_ofb128          0 3 4401 5 3 1 9 43 */
 759,	/* OBJ_camellia_256_cfb128          0 3 4401 5 3 1 9 44 */
 437,	/* OBJ_pilot                        0 9 2342 19200300 100 */
+961,	/* OBJ_sm2                          1 2 156 10197 1 301 */
+962,	/* OBJ_sm3                          1 2 156 10197 1 401 */
+964,	/* OBJ_SM2_with_SM3                 1 2 156 10197 1 501 */
+963,	/* OBJ_sm3WithRSAEncryption         1 2 156 10197 1 504 */
 776,	/* OBJ_seed_ecb                     1 2 410 200004 1 3 */
 777,	/* OBJ_seed_cbc                     1 2 410 200004 1 4 */
 779,	/* OBJ_seed_cfb128                  1 2 410 200004 1 5 */

@@ -456,3 +456,21 @@ long CRYPTO_get_mem_debug_options(void)
         return get_debug_options_func();
     return 0;
 }
+
+void *CRYPTO_zalloc(int num, const char *file, int line)
+{
+    void *ret = CRYPTO_malloc(num, file, line);
+
+    if (ret != NULL)
+        memset(ret, 0, num);
+    return ret;
+}
+
+void CRYPTO_clear_free(void *str, int num, const char *file, int line)
+{
+    if (str == NULL)
+        return;
+    if (num)
+        OPENSSL_cleanse(str, num);
+    CRYPTO_free(str);
+}

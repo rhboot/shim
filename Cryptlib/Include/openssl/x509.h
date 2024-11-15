@@ -237,6 +237,9 @@ typedef struct X509_req_st {
     X509_ALGOR *sig_alg;
     ASN1_BIT_STRING *signature;
     int references;
+# ifndef OPENSSL_NO_SM2
+    ASN1_OCTET_STRING *sm2_id;
+# endif
 } X509_REQ;
 
 typedef struct x509_cinf_st {
@@ -296,6 +299,10 @@ struct x509_st {
     unsigned char sha1_hash[SHA_DIGEST_LENGTH];
 # endif
     X509_CERT_AUX *aux;
+    volatile int ex_cached;
+# ifndef OPENSSL_NO_SM2
+    ASN1_OCTET_STRING *sm2_id;
+# endif
 } /* X509 */ ;
 
 DECLARE_STACK_OF(X509)

@@ -254,6 +254,12 @@ BN_MONT_CTX *EC_GROUP_get_mont_data(const EC_GROUP *group);
  */
 int EC_GROUP_get_order(const EC_GROUP *group, BIGNUM *order, BN_CTX *ctx);
 
+/** Gets the order of an EC_GROUP
+ *  \param  group  EC_GROUP object
+ *  \return the group order
+ */
+const BIGNUM *EC_GROUP_get0_order(const EC_GROUP *group);
+
 /** Gets the cofactor of a EC_GROUP
  *  \param  group     EC_GROUP object
  *  \param  cofactor  BIGNUM to which the cofactor is copied
@@ -1053,6 +1059,17 @@ int EC_KEY_print_fp(FILE *fp, const EC_KEY *key, int off);
         EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_EC, \
                                 EVP_PKEY_OP_DERIVE, \
                                 EVP_PKEY_CTRL_GET_EC_KDF_UKM, 0, (void *)p)
+# define EVP_PKEY_CTX_set1_id(ctx, id, id_len) \
+        EVP_PKEY_CTX_ctrl(ctx, -1, -1, \
+                                EVP_PKEY_CTRL_SET1_ID, (int)id_len, (void*)(id))
+
+# define EVP_PKEY_CTX_get1_id(ctx, id) \
+        EVP_PKEY_CTX_ctrl(ctx, -1, -1, \
+                                EVP_PKEY_CTRL_GET1_ID, 0, (void*)(id))
+
+# define EVP_PKEY_CTX_get1_id_len(ctx, id_len) \
+        EVP_PKEY_CTX_ctrl(ctx, -1, -1, \
+                                EVP_PKEY_CTRL_GET1_ID_LEN, 0, (void*)(id_len))
 
 # define EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID             (EVP_PKEY_ALG_CTRL + 1)
 # define EVP_PKEY_CTRL_EC_PARAM_ENC                      (EVP_PKEY_ALG_CTRL + 2)
@@ -1064,6 +1081,9 @@ int EC_KEY_print_fp(FILE *fp, const EC_KEY *key, int off);
 # define EVP_PKEY_CTRL_GET_EC_KDF_OUTLEN                 (EVP_PKEY_ALG_CTRL + 8)
 # define EVP_PKEY_CTRL_EC_KDF_UKM                        (EVP_PKEY_ALG_CTRL + 9)
 # define EVP_PKEY_CTRL_GET_EC_KDF_UKM                    (EVP_PKEY_ALG_CTRL + 10)
+# define EVP_PKEY_CTRL_SET1_ID                           (EVP_PKEY_ALG_CTRL + 11)
+# define EVP_PKEY_CTRL_GET1_ID                           (EVP_PKEY_ALG_CTRL + 12)
+# define EVP_PKEY_CTRL_GET1_ID_LEN                       (EVP_PKEY_ALG_CTRL + 13)
 /* KDF types */
 # define EVP_PKEY_ECDH_KDF_NONE                          1
 # define EVP_PKEY_ECDH_KDF_X9_62                         2

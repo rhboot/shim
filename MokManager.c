@@ -1910,6 +1910,9 @@ static EFI_STATUS enroll_file(void *data, UINTN datasize, BOOLEAN hash)
 	if (hash) {
 		UINT8 sha256[SHA256_DIGEST_SIZE];
 		UINT8 sha1[SHA1_DIGEST_SIZE];
+#ifdef ENABLE_SHIM_SM
+		UINT8 sm3[SM3_DIGEST_SIZE];
+#endif
 		SHIM_LOCK *shim_lock;
 		PE_COFF_LOADER_IMAGE_CONTEXT context;
 
@@ -1929,8 +1932,13 @@ static EFI_STATUS enroll_file(void *data, UINTN datasize, BOOLEAN hash)
 		if (EFI_ERROR(efi_status))
 			goto out;
 
+#ifdef ENABLE_SHIM_SM
+		efi_status = shim_lock->Hash(data, datasize, &context, sha256,
+					     sha1, sm3);
+#else
 		efi_status = shim_lock->Hash(data, datasize, &context, sha256,
 					     sha1);
+#endif
 		if (EFI_ERROR(efi_status))
 			goto out;
 
