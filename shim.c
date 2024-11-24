@@ -1927,7 +1927,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 
 		efi_status = verify_sbat_section(sbat_start, sbat_end - sbat_start - 1);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Verifiying shim SBAT data failed: %r\n",
+			perror(L"Verifying shim SBAT data failed: %r\n",
 			       efi_status);
 			msg = SBAT_SELF_CHECK;
 			goto die;
