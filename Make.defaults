@@ -109,7 +109,7 @@ INCLUDES	= -nostdinc \
 
 override DEFAULT_FEATUREFLAGS = \
 		-std=gnu11 \
-		-ggdb \
+		-ggdb -gdwarf-4 -gstrict-dwarf \
 		-ffreestanding \
 		$(shell $(CC) -fmacro-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)') \
 		-fno-stack-protector \
