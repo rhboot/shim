@@ -24,7 +24,8 @@ UINT8 *build_cert;
  * indicator of how an image has been verified
  */
 verification_method_t verification_method;
-int loader_is_participating;
+
+SHIM_IMAGE_LOADER shim_image_loader_interface;
 
 UINT8 user_insecure_mode;
 UINT8 ignore_db;

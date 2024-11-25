@@ -992,7 +992,6 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 	if ((INT32)size < 0)
 		return EFI_INVALID_PARAMETER;
 
-	loader_is_participating = 1;
 	in_protocol = 1;
 
 	efi_status = read_header(buffer, size, &context);
@@ -1213,8 +1212,6 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto restore;
 	}
 
-	loader_is_participating = 0;
-
 	/*
 	 * The binary is trusted and relocated. Run it
 	 */
@@ -1371,13 +1368,17 @@ install_shim_protocols(void)
 	if (!EFI_ERROR(efi_status))
 		uninstall_shim_protocols();
 
+	init_image_loader();
+
 	/*
 	 * Install the protocol
 	 */
-	efi_status = BS->InstallProtocolInterface(&shim_lock_handle,
-						  &SHIM_LOCK_GUID,
-						  EFI_NATIVE_INTERFACE,
-						  &shim_lock_interface);
+	efi_status = BS->InstallMultipleProtocolInterfaces(&shim_lock_handle,
+							   &SHIM_LOCK_GUID,
+							   &shim_lock_interface,
+							   &SHIM_IMAGE_LOADER_GUID,
+							   &shim_image_loader_interface,
+							   NULL);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Could not install security protocol",
 			      efi_status);
@@ -1403,8 +1404,12 @@ uninstall_shim_protocols(void)
 	/*
 	 * If we're back here then clean everything up before exiting
 	 */
-	BS->UninstallProtocolInterface(shim_lock_handle, &SHIM_LOCK_GUID,
-				       &shim_lock_interface);
+	BS->UninstallMultipleProtocolInterfaces(shim_lock_handle,
+						&SHIM_LOCK_GUID,
+						&shim_lock_interface,
+						&SHIM_IMAGE_LOADER_GUID,
+						&shim_image_loader_interface,
+						NULL);
 
 	if (!secure_mode())
 		return;
@@ -1718,7 +1723,6 @@ shim_init(void)
 			 * validation of the next image.
 			 */
 			hook_system_services(systab);
-			loader_is_participating = 0;
 		}
 
 	}
