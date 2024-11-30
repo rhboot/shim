@@ -55,6 +55,51 @@ convert_http_status_code (EFI_HTTP_STATUS_CODE status_code)
 	return 0;
 }
 
+/* Convert an HTTP status code to an EFI status code. */
+static EFI_STATUS
+efi_status_from_http_status(EFI_HTTP_STATUS_CODE status_code)
+{
+	switch (status_code) {
+	case HTTP_STATUS_400_BAD_REQUEST:
+	case HTTP_STATUS_411_LENGTH_REQUIRED:
+	case HTTP_STATUS_413_REQUEST_ENTITY_TOO_LARGE:
+	case HTTP_STATUS_414_REQUEST_URI_TOO_LARGE:
+	case HTTP_STATUS_415_UNSUPPORTED_MEDIA_TYPE:
+	case HTTP_STATUS_416_REQUESTED_RANGE_NOT_SATISFIED:
+	case HTTP_STATUS_417_EXPECTATION_FAILED:
+		return EFI_INVALID_PARAMETER;
+	case HTTP_STATUS_401_UNAUTHORIZED:
+	case HTTP_STATUS_402_PAYMENT_REQUIRED:
+	case HTTP_STATUS_403_FORBIDDEN:
+	case HTTP_STATUS_407_PROXY_AUTHENTICATION_REQUIRED:
+		return EFI_ACCESS_DENIED;
+	case HTTP_STATUS_404_NOT_FOUND:
+	case HTTP_STATUS_410_GONE:
+		return EFI_NOT_FOUND;
+	case HTTP_STATUS_405_METHOD_NOT_ALLOWED:
+	case HTTP_STATUS_501_NOT_IMPLEMENTED:
+		return EFI_UNSUPPORTED;
+	case HTTP_STATUS_406_NOT_ACCEPTABLE:
+		return EFI_NO_MEDIA;
+	case HTTP_STATUS_408_REQUEST_TIME_OUT:
+	case HTTP_STATUS_504_GATEWAY_TIME_OUT:
+		return EFI_TIMEOUT;
+	case HTTP_STATUS_409_CONFLICT:
+	case HTTP_STATUS_412_PRECONDITION_FAILED:
+		return EFI_MEDIA_CHANGED;
+	case HTTP_STATUS_500_INTERNAL_SERVER_ERROR:
+	case HTTP_STATUS_502_BAD_GATEWAY:
+		return EFI_DEVICE_ERROR;
+	case HTTP_STATUS_503_SERVICE_UNAVAILABLE:
+		return EFI_NOT_READY;
+	case HTTP_STATUS_505_HTTP_VERSION_NOT_SUPPORTED:
+		return EFI_INCOMPATIBLE_VERSION;
+	default:
+		/* Use a generic HTTP error for anything else. */
+		return EFI_HTTP_ERROR;
+	}
+}
+
 static EFI_DEVICE_PATH *devpath;
 static EFI_MAC_ADDRESS mac_addr;
 static IPv4_DEVICE_PATH ip4_node;
@@ -565,7 +610,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	if (http_status != HTTP_STATUS_200_OK) {
 		perror(L"HTTP Status Code: %d\n",
 		       convert_http_status_code(http_status));
-		efi_status = EFI_ABORTED;
+		efi_status = efi_status_from_http_status(http_status);
 		goto error;
 	}
 
