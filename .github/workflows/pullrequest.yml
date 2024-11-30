@@ -22,66 +22,70 @@ jobs:
             efiarch: aa64
             gccarch: aarch64
             makearch: aarch64
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: aa64
             gccarch: aarch64
             makearch: aarch64
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: arm
             gccarch: arm
             makearch: arm
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: x64
             gccarch: x86_64
             makearch: x86_64
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: x64
             gccarch: x86_64
             makearch: x86_64
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: x64
             gccarch: x86_64
             makearch: x86_64
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: ia32
             gccarch: x86_64
             makearch: ia32
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: ia32
             gccarch: x86_64
             makearch: ia32
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: ia32
             gccarch: x86_64
             makearch: ia32
-            distro: f34
+            distro: f38
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Work around directory ownership issue
+        id: ignore-ownership
+        run: |
+          git config --global --add safe.directory /__w/shim/shim
       - name: Update submodules on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: update-submodules
         run: |
@@ -118,15 +122,15 @@ jobs:
           - arch: amd64
             efiarch: x64
             makearch: x86_64
-            distro: f36
+            distro: f40
           - arch: amd64
             efiarch: x64
             makearch: x86_64
-            distro: f35
+            distro: f39
           - arch: amd64
             efiarch: x64
             makearch: x86_64
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: x64
             makearch: x86_64
@@ -138,15 +142,11 @@ jobs:
           - arch: amd64
             efiarch: ia32
             makearch: ia32
-            distro: f36
+            distro: f39
           - arch: amd64
             efiarch: ia32
             makearch: ia32
-            distro: f35
-          - arch: amd64
-            efiarch: ia32
-            makearch: ia32
-            distro: f34
+            distro: f38
           - arch: amd64
             efiarch: ia32
             makearch: ia32
@@ -154,12 +154,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Work around directory ownership issue
+        id: ignore-ownership
+        run: |
+          git config --global --add safe.directory /__w/shim/shim
       - name: Update submodules on ${{ matrix.distro }} for ${{ matrix.efiarch }}
         id: update-submodules
         run: |
