@@ -207,14 +207,14 @@ get_load_option_optional_data(VOID *data, UINT32 data_size,
 		 */
 		i += dp.len;
 	}
-	if (i != fplistlen)
+	if (i > fplistlen)
 		return EFI_INVALID_PARAMETER;
 
 	/*
-	 * if there's any space left, it's "optional data"
+	 * Anything left after the file path list is optional data.
 	 */
-	*od = cur + i;
-	*ods = limit - i;
+	*od = cur + fplistlen;
+	*ods = limit - fplistlen;
 	return EFI_SUCCESS;
 }
 
