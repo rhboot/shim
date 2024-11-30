@@ -43,6 +43,7 @@ static int verbosity;
 	})
 
 static bool set_nx_compat = false;
+static bool require_nx_compat = false;
 
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
@@ -360,6 +361,50 @@ set_dll_characteristics(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 	}
 }
 
+static int
+validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
+{
+	EFI_IMAGE_SECTION_HEADER *Section;
+	int i;
+	bool nx_compat_flag;
+	const int level = require_nx_compat ? ERROR : WARNING;
+	int ret = 0;
+
+	nx_compat_flag = EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT
+			 & ctx->PEHdr->Pe32.OptionalHeader.DllCharacteristics;
+	debug(NOISE, "NX-Compat-Flag: %s\n", nx_compat_flag ? "set" : "unset");
+	if (!nx_compat_flag) {
+		debug(level, "NX Compatibility flag is not set\n");
+		if (require_nx_compat)
+			ret = -1;
+	}
+
+	debug(NOISE, "Section alignment is 0x%x, page size is 0x%x\n",
+	      ctx->PEHdr->Pe32Plus.OptionalHeader.SectionAlignment,
+	      PAGE_SIZE);
+	if (ctx->PEHdr->Pe32Plus.OptionalHeader.SectionAlignment != PAGE_SIZE) {
+		debug(level, "Section alignment is not page aligned\n");
+		if (require_nx_compat)
+			ret = -1;
+	}
+
+	Section = ctx->FirstSection;
+	for (i=0, Section = ctx->FirstSection; i < ctx->NumberOfSections; i++, Section++) {
+		debug(NOISE, "Section %d has WRITE=%d and EXECUTE=%d\n", i,
+		      (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) ? 1 : 0,
+		      (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) ? 1 : 0);
+
+		if ((Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) &&
+		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
+			debug(level, "Section %d is writable and executable\n", i);
+			if (require_nx_compat)
+				ret = -1;
+		}
+	}
+
+	return ret;
+}
+
 static void
 fix_timestamp(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 {
@@ -449,6 +494,10 @@ handle_one(char *f)
 
 	set_dll_characteristics(&ctx);
 
+	rc = validate_nx_compat(&ctx);
+	if (rc < 0)
+		err(2, "NX compatibility check failed\n");
+
 	fix_timestamp(&ctx);
 
 	fix_checksum(&ctx, map, sz);
@@ -483,6 +532,7 @@ static void __attribute__((__noreturn__)) usage(int status)
 	fprintf(out, "       -v    Be more verbose\n");
 	fprintf(out, "       -N    Disable the NX compatibility flag\n");
 	fprintf(out, "       -n    Enable the NX compatibility flag\n");
+	fprintf(out, "       -x    Error on NX compatibility\n");
 	fprintf(out, "       -h    Print this help text and exit\n");
 
 	exit(status);
@@ -510,11 +560,14 @@ int main(int argc, char **argv)
 		{.name = "verbose",
 		 .val = 'v',
 		},
+		{.name = "error-nx-compat",
+		 .val = 'x',
+		},
 		{.name = ""}
 	};
 	int longindex = -1;
 
-	while ((i = getopt_long(argc, argv, "hNnqv", options, &longindex)) != -1) {
+	while ((i = getopt_long(argc, argv, "hNnqvx", options, &longindex)) != -1) {
 		switch (i) {
 		case 'h':
 		case '?':
@@ -531,6 +584,9 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			verbosity = MIN(verbosity + 1, MAX_VERBOSITY);
+			break;
+		case 'x':
+			require_nx_compat = true;
 			break;
 		}
 	}
