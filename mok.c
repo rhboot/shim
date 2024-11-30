@@ -217,6 +217,20 @@ typedef UINTN SIZE_T;
 #define EFI_MAJOR_VERSION(tablep) ((UINT16)((((tablep)->Hdr.Revision) >> 16) & 0xfffful))
 #define EFI_MINOR_VERSION(tablep) ((UINT16)(((tablep)->Hdr.Revision) & 0xfffful))
 
+static BOOLEAN is_apple_firmware_vendor(void)
+{
+	CHAR16 *vendor = ST->FirmwareVendor;
+	if (!vendor)
+		return FALSE;
+
+	dprint(L"FirmwareVendor: \"%s\"\n", vendor);
+
+	if (StrnCmp(vendor, L"Apple", 5) == 0)
+		return TRUE;
+
+	return FALSE;
+}
+
 static EFI_STATUS
 get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 {
@@ -226,7 +240,7 @@ get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 	uint64_t max_var_sz = 0;
 
 	*max_var_szp = 0;
-	if (EFI_MAJOR_VERSION(RT) < 2) {
+	if (EFI_MAJOR_VERSION(RT) < 2 || is_apple_firmware_vendor()) {
 		dprint(L"EFI %d.%d; no RT->QueryVariableInfo().  Using 1024!\n",
 		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT));
 		max_var_sz = remaining_sz = max_storage_sz = 1024;
