@@ -86,7 +86,7 @@ endif
 
 compile_commands.json : Makefile Make.rules Make.defaults 
 	make clean
-	bear -- make COMPILER=clang test all
+	bear -- make COMPILER=clang WARNFLAGS+="-Wno-#warnings" test all
 	sed -i \
 		-e 's/"-maccumulate-outgoing-args",//g' \
 		$@
