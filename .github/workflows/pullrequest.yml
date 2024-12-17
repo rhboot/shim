@@ -182,3 +182,41 @@ jobs:
           make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
           find /destdir -type f
+
+  build-pull-request-intel-compile-commands-json:
+    runs-on: ubuntu-20.04
+    container: vathpela/efi-ci:${{ matrix.distro }}-x64
+    name: ${{ matrix.distro }} ${{ matrix.efiarch }} build compile_commands.json
+
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
+            distro: f41
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Work around directory ownership issue
+        id: ignore-ownership
+        run: |
+          git config --global --add safe.directory /__w/shim/shim
+      - name: Update submodules on ${{ matrix.distro }} for ${{ matrix.efiarch }}
+        id: update-submodules
+        run: |
+          make update
+      - name: Do 'make clean' on ${{ matrix.distro }} for ${{ matrix.efiarch }}
+        id: clean
+        run: |
+          make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true clean
+      - name: Build compile_commands.json on ${{ matrix.distro }} for ${{ matrix.efiarch }}
+        id: compile_commands
+        run: |
+          make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true compile_commands.json
