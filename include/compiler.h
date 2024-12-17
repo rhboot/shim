@@ -205,6 +205,7 @@
 #define GNUC_PREREQ(maj, min) 0
 #endif
 
+#if !defined(CLANG_PREREQ)
 #if defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__)
 #define CLANG_PREREQ(maj, min)        \
 	((__clang_major__ > (maj)) || \
@@ -212,6 +213,7 @@
 #else
 #define CLANG_PREREQ(maj, min) 0
 #endif
+#endif /* CLANG_PREREQ */
 
 #if GNUC_PREREQ(5, 1) || CLANG_PREREQ(3, 8)
 #define checked_add(addend0, addend1, sum) \
