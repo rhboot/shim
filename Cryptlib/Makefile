@@ -14,6 +14,9 @@ INCLUDES	= -I$(CRYPTDIR) -I$(CRYPTDIR)/Include \
 WARNFLAGS	+= -Wno-unused-parameter \
 		   -Wno-unused-but-set-variable
 
+WERRFLAGS	+= -Wno-error=unused-but-set-variable \
+		   -Wno-error=unused-parameter
+
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
 		  $(WARNFLAGS) \

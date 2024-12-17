@@ -26,6 +26,9 @@ WARNFLAGS	+= -Wno-empty-body \
 		   -Wno-unused-but-set-variable \
 		   -Wno-unused-parameter
 
+WERRFLAGS	+= -Wno-error=unused-but-set-variable \
+		   -Wno-error=unused-parameter
+
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
 		  $(WARNFLAGS) \
