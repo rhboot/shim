@@ -21,7 +21,7 @@ struct sbat_revocation {
 sbat_revocation *revlisthead;
 
 int
-readfile()
+readfile(char *SbatLevel_Variable)
 {
 	FILE *varfilep;
 	char line[1024];
@@ -34,7 +34,7 @@ readfile()
 
 	revlisthead = NULL;
 
-	varfilep = fopen("SbatLevel_Variable.txt", "r"); 
+	varfilep = fopen(SbatLevel_Variable, "r"); 
 	if (varfilep == NULL)
 		return -1;
 
@@ -139,9 +139,16 @@ writefile()
 
 
 int
-main()
+main(int argc, char *argv[])
 {
-	if (readfile())
+	char SbatLevel_Variable[2048];
+
+	if (argc == 2)
+		snprintf(SbatLevel_Variable, 2048, "%s/SbatLevel_Variable.txt", argv[1]);
+	else
+		snprintf(SbatLevel_Variable, 2048, "SbatLevel_Variable.txt");
+
+	if (readfile(SbatLevel_Variable))
 		return writefile();
 	else
 		return -1;

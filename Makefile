@@ -46,6 +46,7 @@ ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildca
 FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o
 ORIG_FALLBACK_SRCS = fallback.c
 SBATPATH = $(TOPDIR)/data/sbat.csv
+GEN_SBAT_DEFS = $(TOPDIR)/include/generated_sbat_var_defs.h
 
 ifeq ($(SOURCE_DATE_EPOCH),)
 	UNAME=$(shell uname -s -m -p -i -o)
@@ -69,7 +70,9 @@ ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE_WAIT=$(FALLBACK_VERBOSE_WAIT)
 endif
 
-all: confcheck certcheck $(TARGETS)
+all:
+	$(MAKE) TOPDIR=$(TOPDIR) -f $(TOPDIR)/Makefile $(GEN_SBAT_DEFS)
+	$(MAKE) TOPDIR=$(TOPDIR) -f $(TOPDIR)/Makefile confcheck certcheck shim_cert.h $(TARGETS)
 
 confcheck:
 ifneq ($(origin EFI_PATH),undefined)
@@ -84,7 +87,7 @@ ifneq ($(origin VENDOR_CERT_FILE), undefined)
 	fi
 endif
 
-compile_commands.json : Makefile Make.rules Make.defaults 
+compile_commands.json : Makefile Make.rules Make.defaults
 	make clean
 	bear -- make COMPILER=clang WARNFLAGS+="-Wno-#warnings" test all
 	sed -i \
@@ -99,6 +102,7 @@ shim.crt:
 
 shim.cer: shim.crt
 	$(OPENSSL) x509 -outform der -in $< -out $@
+
 
 .NOTPARALLEL: shim_cert.h
 shim_cert.h: shim.cer
@@ -122,6 +126,7 @@ ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
 endif
 shim.o: $(wildcard $(TOPDIR)/*.h)
+
 
 sbat.%.csv : data/sbat.%.csv
 	$(DOS2UNIX) $(D2UFLAGS) $< $@
@@ -187,6 +192,12 @@ lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
 
 post-process-pe : $(TOPDIR)/post-process-pe.c
 	$(HOSTCC) -std=gnu11 -Og -g3 -Wall -Wextra -Wno-missing-field-initializers -Werror -o $@ $<
+
+generate_sbat_var_defs: $(TOPDIR)/generate_sbat_var_defs.c
+	$(HOSTCC) -std=gnu11 -Og -g3 -Wall -Wextra -Wno-missing-field-initializers -Werror -o $@ $<
+
+$(GEN_SBAT_DEFS): generate_sbat_var_defs
+	./generate_sbat_var_defs $(TOPDIR) > $(GEN_SBAT_DEFS)
 
 buildid : $(TOPDIR)/buildid.c
 	$(HOSTCC) -I/usr/include -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
@@ -312,7 +323,7 @@ fuzz fuzz-clean fuzz-coverage fuzz-lto :
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
 		fuzz-clean $@
 
-test test-clean test-coverage test-lto :
+test test-clean test-coverage test-lto : $(GEN_SBAT_DEFS)
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
@@ -356,6 +367,7 @@ clean-lib-objs:
 clean-shim-objs:
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
 	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid post-process-pe compile_commands.json
+	@rm -vf generate_sbat_var_defs $(GEN_SBAT_DEFS)
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
