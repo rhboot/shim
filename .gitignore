@@ -38,6 +38,7 @@ Make.local
 /crash-*
 /fuzz-*
 !/fuzz-*.c
+/generate_sbat_var_defs
 /leak-*
 /post-process-pe
 /random.bin
