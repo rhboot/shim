@@ -97,6 +97,18 @@ shim,4
 grub,3
 grub.debian,4
 
+
+Revocations for:
+ - January 2024 shim CVEs
+ - October 2023 grub CVEs
+ - Debian/Ubuntu (peimage) CVE-2024-2312
+
+sbat,1,2024040900
+shim,4
+grub,4
+grub.peimage,2
+
+
 Since http boot shim CVE is considerably more serious than then GRUB
 ntfs CVEs shim is delivering the shim revocation without the updated
 GRUB revocation as a latest payload.
