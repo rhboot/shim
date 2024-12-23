@@ -7,7 +7,9 @@
 #define QUOTE(s) #s
 
 /*
- * This is the entry for the sbat data format
+ * SbatLevel Epoch and SHIM_DEVEL defintions are here
+ * Actual revocations are now soley defined in
+ * SbatLevel_Variable.txt
  */
 #define SBAT_VAR_SIG "sbat,"
 #define SBAT_VAR_VERSION "1,"
