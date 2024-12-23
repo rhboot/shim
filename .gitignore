@@ -50,3 +50,6 @@ shim_cert.h
 !/test-data/
 /test-random.h
 version.c
+/generate_sbat_var_defs
+/include/generated_sbat_var_defs.h
+
