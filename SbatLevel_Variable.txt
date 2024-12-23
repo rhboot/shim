@@ -1,6 +1,15 @@
-In order to apply SBAT based revocations on systems that will never
-run shim, code running in boot services context needs to set the
-following variable:
+This file is the single source for SbatLevel revocations the format
+follows the variable payload and should not have any leading or
+trailing whitespace on the same line.
+
+Short descriptions of the revocations as well as CVE assignments (when
+available) should be provided when an entry is added.
+
+On systems that run shim, shim will manage these revocations. Sytems
+that never run shim, primarily Windows, but this applies to any OS
+that supports UEFI Secure Boot under the UEFI CA without shim can
+apply SBAT based revocations by setting the following variable
+from code running in boot services context.
 
 Name: SbatLevel
 Attributes: (EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS)
