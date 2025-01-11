@@ -31,10 +31,6 @@
 #pragma GCC diagnostic ignored "-Wpointer-bool-conversion"
 #endif
 
-#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
-#define GNU_EFI_USE_EXTERNAL_STDARG
-#endif
-
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI
 #endif
