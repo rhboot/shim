@@ -19,7 +19,7 @@ vdprint_(const CHAR16 *fmt, const char *file, int line, const char *func,
 	if (verbose) {
 		ms_va_copy(args2, args);
 		console_print(L"%a:%d:%a() ", file, line, func);
-		efi_status = VPrint(fmt, args2);
+		efi_status = MS_VPrint(fmt, args2);
 		ms_va_end(args2);
 	}
 	return efi_status;
@@ -45,7 +45,7 @@ VLogError(const char *file, int line, const char *func, const CHAR16 *fmt,
 	if (!newerrs[nerrs])
 		return EFI_OUT_OF_RESOURCES;
 	ms_va_copy(args2, args);
-	newerrs[nerrs+1] = VPoolPrint(fmt, args2);
+	newerrs[nerrs+1] = MS_VPoolPrint(fmt, args2);
 	if (!newerrs[nerrs+1])
 		return EFI_OUT_OF_RESOURCES;
 	ms_va_end(args2);
