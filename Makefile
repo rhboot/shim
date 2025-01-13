@@ -150,8 +150,8 @@ $(SHIMNAME) $(MMNAME) $(FBNAME) : | post-process-pe
 LIBS = Cryptlib/libcryptlib.a \
        Cryptlib/OpenSSL/libopenssl.a \
        lib/lib.a \
-       gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a \
-       gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a
+       $(TOPDIR)/gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a \
+       $(TOPDIR)/gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a
 
 $(SHIMSONAME): $(OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
@@ -166,7 +166,7 @@ MokManager.o: $(MOK_SOURCES)
 $(MMSONAME): $(MOK_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
-gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
+$(TOPDIR)/gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a $(TOPDIR)/gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
 	$(MAKE) -C gnu-efi \
 		COMPILER="$(COMPILER)" \
@@ -175,6 +175,7 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 		ARCH=$(ARCH_GNUEFI) \
 		NO_GLIBC=1 \
 		TOPDIR=$(TOPDIR)/gnu-efi \
+		VPATH=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)
 
@@ -358,6 +359,7 @@ clean-gnu-efi:
 			COMPILER="$(COMPILER)" \
 			ARCH=$(ARCH_GNUEFI) \
 			TOPDIR=$(TOPDIR)/gnu-efi \
+			VPATH=$(TOPDIR)/gnu-efi \
 			-f $(TOPDIR)/gnu-efi/Makefile \
 			clean ; \
 	fi
