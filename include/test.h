@@ -185,6 +185,10 @@ guidcmp(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 	return ret;
 }
 
+#if defined(CompareGuid)
+#undef CompareGuid
+#endif
+
 #define CompareGuid(a, b) (guidcmp(a, b) == 0)
 
 #define CompareGuidForSorting(a, b) guidcmp(a, b)
