@@ -163,6 +163,7 @@
 #include "include/configtable.h"
 #include "include/console.h"
 #include "include/crypt_blowfish.h"
+#include "include/dp.h"
 #include "include/efiauthenticated.h"
 #include "include/errors.h"
 #include "include/execute.h"
