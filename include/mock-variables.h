@@ -117,6 +117,7 @@ void mock_reset_config_table(void);
 void mock_finalize_vars_and_configs(void);
 void mock_set_usage_limits(list_t *limit_list,
 			   struct mock_variable_limits *limits);
+void mock_set_default_usage_limits(void);
 
 typedef enum {
 	NONE = 0,

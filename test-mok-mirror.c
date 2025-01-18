@@ -633,6 +633,8 @@ test_mok_mirror_setvar_out_of_resources(void)
 			      test_mok_config_table,
 			      EFI_OUT_OF_RESOURCES);
 
+	mock_set_default_usage_limits();
+
 	mock_set_variable_post_hook = NULL;
 	mock_get_variable_post_hook = NULL;
 	return ret;
