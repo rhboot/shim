@@ -442,8 +442,11 @@ get_mem_attrs (uintptr_t addr, size_t size, uint64_t *attrs)
 
 	efi_status = LibLocateProtocol(&EFI_MEMORY_ATTRIBUTE_PROTOCOL_GUID,
 				       (VOID **)&proto);
-	if (EFI_ERROR(efi_status) || !proto)
+	if (EFI_ERROR(efi_status) || !proto) {
+		if (!EFI_ERROR(efi_status))
+			efi_status = EFI_UNSUPPORTED;
 		return efi_status;
+	}
 
 	if (!IS_PAGE_ALIGNED(physaddr) || !IS_PAGE_ALIGNED(size) || size == 0 || attrs == NULL) {
 		dprint(L"%a called on 0x%llx-0x%llx and attrs 0x%llx\n",
