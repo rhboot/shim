@@ -442,8 +442,11 @@ get_mem_attrs (uintptr_t addr, size_t size, uint64_t *attrs)
 
 	efi_status = LibLocateProtocol(&EFI_MEMORY_ATTRIBUTE_PROTOCOL_GUID,
 				       (VOID **)&proto);
-	if (EFI_ERROR(efi_status) || !proto)
+	if (EFI_ERROR(efi_status) || !proto) {
+		if (!EFI_ERROR(efi_status))
+			efi_status = EFI_UNSUPPORTED;
 		return efi_status;
+	}
 
 	if (!IS_PAGE_ALIGNED(physaddr) || !IS_PAGE_ALIGNED(size) || size == 0 || attrs == NULL) {
 		dprint(L"%a called on 0x%llx-0x%llx and attrs 0x%llx\n",
@@ -941,6 +944,60 @@ handle_image (void *data, unsigned int datasize,
 	}
 
 	return EFI_SUCCESS;
+}
+
+void
+get_hsi_mem_info(void)
+{
+	EFI_STATUS efi_status;
+	uintptr_t addr;
+	uint64_t attrs = 0;
+	uint32_t *tmp_alloc;
+
+	addr = ((uintptr_t)&get_hsi_mem_info) & ~EFI_PAGE_MASK;
+
+	efi_status = get_mem_attrs(addr, EFI_PAGE_SIZE, &attrs);
+	if (EFI_ERROR(efi_status)) {
+error:
+		/*
+		 * In this case we can't actually tell anything, so assume
+		 * and report the worst case scenario.
+		 */
+		hsi_status = SHIM_HSI_STATUS_HEAPX |
+			     SHIM_HSI_STATUS_STACKX |
+			     SHIM_HSI_STATUS_ROW;
+		return;
+	}
+
+	hsi_status = SHIM_HSI_STATUS_HASMAP;
+	if (attrs & MEM_ATTR_W) {
+		hsi_status |= SHIM_HSI_STATUS_ROW;
+	}
+
+	addr = ((uintptr_t)&addr) & ~EFI_PAGE_MASK;
+	efi_status = get_mem_attrs(addr, EFI_PAGE_SIZE, &attrs);
+	if (EFI_ERROR(efi_status)) {
+		goto error;
+	}
+
+	if (attrs & MEM_ATTR_X) {
+		hsi_status |= SHIM_HSI_STATUS_STACKX;
+	}
+
+	tmp_alloc = AllocatePool(EFI_PAGE_SIZE);
+	if (!tmp_alloc) {
+		goto error;
+	}
+
+	addr = ((uintptr_t)tmp_alloc) & ~EFI_PAGE_MASK;
+	efi_status = get_mem_attrs(addr, EFI_PAGE_MASK, &attrs);
+	FreePool(tmp_alloc);
+	if (EFI_ERROR(efi_status)) {
+		goto error;
+	}
+	if (attrs & MEM_ATTR_X) {
+		hsi_status |= SHIM_HSI_STATUS_HEAPX;
+	}
 }
 
 // vim:fenc=utf-8:tw=75:noet
