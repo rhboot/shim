@@ -32,6 +32,7 @@
 #include <Library/BaseCryptLib.h>
 
 #include <stdint.h>
+#include <stdio.h>
 
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
 
@@ -51,6 +52,10 @@ extern struct {
 	UINT32 vendor_authorized_offset;
 	UINT32 vendor_deauthorized_offset;
 } cert_table;
+
+#define EFI_IMAGE_SECURITY_DATABASE_GUID { 0xd719b2cb, 0x3d3a, 0x4596, { 0xa3, 0xbc, 0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f }}
+
+#define SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE 1
 
 typedef enum {
 	DATA_FOUND,
@@ -1056,7 +1061,8 @@ str16_to_str8(CHAR16 *str16, CHAR8 **str8)
  * Load and run an EFI executable
  */
 EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
-		      CHAR16 **PathName, void **data, int *datasize)
+		      CHAR16 **PathName, void **data, int *datasize,
+		      int flags)
 {
 	EFI_STATUS efi_status;
 	void *sourcebuffer = NULL;
@@ -1095,8 +1101,9 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 		efi_status = FetchNetbootimage(image_handle, &sourcebuffer,
 					       &sourcesize);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Unable to fetch TFTP image: %r\n",
-			       efi_status);
+			if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+				perror(L"Unable to fetch TFTP image: %r\n",
+				       efi_status);
 			return efi_status;
 		}
 		*data = sourcebuffer;
@@ -1108,8 +1115,9 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 						    &sourcesize,
 						    netbootname);
 		if (EFI_ERROR(efi_status)) {
-			perror(L"Unable to fetch HTTP image %a: %r\n",
-			       netbootname, efi_status);
+			if (~flags & SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+				perror(L"Unable to fetch HTTP image %a: %r\n",
+				       netbootname, efi_status);
 			return efi_status;
 		}
 		*data = sourcebuffer;
@@ -1148,7 +1156,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	int datasize = 0;
 
 	efi_status = read_image(image_handle, ImagePath, &PathName, &data,
-				&datasize);
+				&datasize, 0);
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -1417,6 +1425,8 @@ EFI_STATUS
 load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
+	EFI_STATUS efi_status_sbat = EFI_SUCCESS;
+	EFI_STATUS efi_status_skusi = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_IMAGE_SECTION_HEADER *Section;
 	int datasize = 0;
@@ -1429,15 +1439,21 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 	uint8_t *ssps_latest = NULL;
 	uint8_t *sspv_latest = NULL;
 
-	efi_status = read_image(image_handle, L"revocations.efi", &PathName,
-				&data, &datasize);
-	if (EFI_ERROR(efi_status))
-		return efi_status;
+	efi_status_sbat = read_image(image_handle, L"revocations_sbat.efi", &PathName,
+				&data, &datasize,
+				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
+	if (!EFI_ERROR(efi_status_sbat))
+		efi_status_sbat = verify_image(data, datasize, shim_li, &context);
 
-	efi_status = verify_image(data, datasize, shim_li, &context);
-	if (EFI_ERROR(efi_status)) {
+	efi_status_skusi = read_image(image_handle, L"revocations_skusi.efi", &PathName,
+				&data, &datasize,
+				SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE);
+	if (!EFI_ERROR(efi_status_skusi))
+		efi_status_skusi = verify_image(data, datasize, shim_li, &context);
+
+	if (EFI_ERROR(efi_status_sbat) && EFI_ERROR(efi_status_skusi)) {
 		dprint(L"revocations failed to verify\n");
-		return efi_status;
+		return efi_status_sbat | efi_status_skusi;
 	}
 	dprint(L"verified revocations\n");
 
@@ -1480,7 +1496,8 @@ load_revocations_file(EFI_HANDLE image_handle, CHAR16 *PathName)
 }
 
 EFI_STATUS
-load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
+load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName,
+		int flags)
 {
 	EFI_STATUS efi_status;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
@@ -1493,7 +1510,7 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName)
 	int i;
 
 	efi_status = read_image(image_handle, filename, &PathName,
-				&data, &datasize);
+				&data, &datasize, flags);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -1535,6 +1552,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	EFI_STATUS efi_status;
 	EFI_LOADED_IMAGE *li = NULL;
 	CHAR16 *PathName = NULL;
+	static CHAR16 FileName[] = L"shim_certificate_0.efi";
 	EFI_FILE *root, *dir;
 	EFI_FILE_INFO *info;
 	EFI_HANDLE device;
@@ -1542,6 +1560,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 	UINTN buffersize = 0;
 	void *buffer = NULL;
 	BOOLEAN search_revocations = TRUE;
+	int i = 0;
 
 	efi_status = gBS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
 					 (void **)&li);
@@ -1562,11 +1581,11 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 				efi_status);
 		/*
 		 * Network boot cases do not support reading a directory. Try
-		 * to read revocations.efi to pull in any unbundled SBATLevel
+		 * to read revocations to pull in any unbundled SBATLevel
 		 * updates unconditionally in those cases. This may produce
 		 * console noise when the file is not present.
 		 */
-		load_cert_file(image_handle, REVOCATIONFILE, PathName);
+		load_revocations_file(image_handle, PathName);
 		goto done;
 	}
 
@@ -1653,13 +1672,18 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Failed to open %s - %r\n",
 				       PathName, efi_status);
+				while (load_cert_file(image_handle, FileName, PathName,
+						SUPPRESS_NETBOOT_OPEN_FAILURE_NOISE)
+						== EFI_SUCCESS && i++ < 10) {
+					FileName[17]++;
+				}
 				goto done;
 			}
 		}
 
 		if (!search_revocations &&
 		    StrnCaseCmp(info->FileName, L"shim_certificate", 16) == 0) {
-			load_cert_file(image_handle, info->FileName, PathName);
+			load_cert_file(image_handle, info->FileName, PathName, 0);
 		}
 	}
 done:
