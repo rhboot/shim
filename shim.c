@@ -1826,7 +1826,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 		L"shim_init() failed",
 		L"import of SBAT data failed",
 		L"SBAT self-check failed",
-		SBAT_VAR_NAME L" UEFI variable setting failed",
+		SBAT_VAR_NAME L" UEFI variable setting failed", // NOLINT(bugprone-suspicious-missing-comma)
 		NULL
 	};
 	enum {
