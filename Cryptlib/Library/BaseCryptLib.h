@@ -2403,6 +2403,48 @@ Pkcs7Verify (
   IN  UINTN        DataLength
   );
 
+#if defined(ENABLE_CODESIGN_EKU)
+/**
+  This function receives a PKCS#7 formatted signature blob,
+  looks for the EKU SEQUENCE blob, and if found then looks
+  for all the required EKUs. This function was created so that
+  the Surface team can cut down on the number of Certificate
+  Authorities (CA's) by checking EKU's on leaf signers for
+  a specific product. This prevents one product's certificate
+  from signing another product's firmware or unlock blobs.
+
+  Note that this function does not validate the certificate chain.
+  That needs to be done before using this function.
+
+  @param[in]  Pkcs7Signature       The PKCS#7 signed information content block. An array
+                                   containing the content block with both the signature,
+                                   the signer's certificate, and any necessary intermediate
+                                   certificates.
+  @param[in]  Pkcs7SignatureSize   Number of bytes in Pkcs7Signature.
+  @param[in]  RequiredEKUs         Array of null-terminated strings listing OIDs of
+                                   required EKUs that must be present in the signature.
+  @param[in]  RequiredEKUsSize     Number of elements in the RequiredEKUs string array.
+  @param[in]  RequireAllPresent    If this is TRUE, then all of the specified EKU's
+                                   must be present in the leaf signer.  If it is
+                                   FALSE, then we will succeed if we find any
+                                   of the specified EKU's.
+
+  @retval EFI_SUCCESS              The required EKUs were found in the signature.
+  @retval EFI_INVALID_PARAMETER    A parameter was invalid.
+  @retval EFI_NOT_FOUND            One or more EKU's were not found in the signature.
+
+**/
+EFI_STATUS
+EFIAPI
+VerifyEKUsInPkcs7Signature (
+  IN CONST UINT8    *Pkcs7Signature,
+  IN CONST UINT32   SignatureSize,
+  IN CONST CHAR8    *RequiredEKUs[],
+  IN CONST UINT32   RequiredEKUsSize,
+  IN BOOLEAN        RequireAllPresent
+  );
+#endif
+
 /**
   Extracts the attached content from a PKCS#7 signed data if existed. The input signed
   data could be wrapped in a ContentInfo structure.
