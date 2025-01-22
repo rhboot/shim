@@ -76,8 +76,12 @@ libefi-test.a :
 		clean
 
 test-random.h:
-	dd if=/dev/urandom bs=512 count=17 of=random.bin
-	xxd -i random.bin test-random.h
+	dd if=/dev/urandom bs=512 count=17 status=none | ( \
+		echo "unsigned char random_bin[] = {" ; \
+		xxd -i - ; \
+		echo "};" ; \
+		echo "unsigned int random_bin_len = 8704;" ; \
+	) > test-random.h
 
 $(wildcard test-*.c) :: %.c : test-random.h
 $(patsubst %.c,%,$(wildcard test-*.c)) :: | test-random.h
@@ -119,7 +123,7 @@ test-coverage : CFLAGS_GCOV+=--coverage
 test-coverage : $(tests)
 
 test-clean :
-	@rm -vf test-random.h random.bin libefi-test.a
+	@rm -vf test-random.h libefi-test.a
 	@rm -vf *.gcda *.gcno *.gcov vgcore.*
 
 clean : test-clean
@@ -127,6 +131,5 @@ clean : test-clean
 all : test-clean test
 
 .PHONY: $(tests) all test clean
-.SECONDARY: random.bin
 
 # vim:ft=make
