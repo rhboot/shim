@@ -6,6 +6,7 @@
 #ifndef SHIM_UNIT_TEST
 #define SHIM_UNIT_TEST
 #include "sbat_var_defs.h"
+#include "generated_sbat_var_defs.h"
 #endif
 #include "shim.h"
 
