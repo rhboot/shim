@@ -39,6 +39,7 @@ Make.local
 /fuzz-*
 !/fuzz-*.c
 /generate_sbat_var_defs
+/generated_sbat_var_defs.h
 /leak-*
 /post-process-pe
 /random.bin
