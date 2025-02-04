@@ -8,6 +8,7 @@
 #include "sbat_var_defs.h"
 #endif
 #include "shim.h"
+#include "generated_sbat_var_defs.h"
 
 #include <stdio.h>
 

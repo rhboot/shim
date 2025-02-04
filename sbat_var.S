@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 
 #include "include/sbat_var_defs.h"
+#include "generated_sbat_var_defs.h"
 
 	.section .sbatlevel, "a", %progbits
 	.balignl 4, 0

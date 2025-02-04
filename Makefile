@@ -38,8 +38,6 @@ CFLAGS += -DENABLE_SHIM_CERT
 else
 TARGETS += $(MMNAME) $(FBNAME)
 endif
-# This is temporary and will go away soon
-TARGETS += generate_sbat_var_defs
 OBJS	= shim.o globals.o mok.o netboot.o cert.o dp.o replacements.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
 ORIG_SOURCES	= shim.c globals.c mok.c netboot.c dp.c replacements.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
@@ -102,6 +100,7 @@ shim.crt:
 shim.cer: shim.crt
 	$(OPENSSL) x509 -outform der -in $< -out $@
 
+
 .NOTPARALLEL: shim_cert.h
 shim_cert.h: shim.cer
 	echo "static UINT8 shim_cert[] __attribute__((__unused__)) = {" > $@
@@ -123,7 +122,9 @@ shim.o: $(SOURCES)
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
 shim.o: shim_cert.h
 endif
+$(TOPDIR)/sbat_var.S : generated_sbat_var_defs.h
 shim.o: $(wildcard $(TOPDIR)/*.h)
+
 
 sbat.%.csv : data/sbat.%.csv
 	$(DOS2UNIX) $(D2UFLAGS) $< $@
@@ -192,6 +193,10 @@ post-process-pe : $(TOPDIR)/post-process-pe.c
 
 generate_sbat_var_defs: $(TOPDIR)/generate_sbat_var_defs.c
 	$(HOSTCC) -std=gnu11 -Og -g3 -Wall -Wextra -Wno-missing-field-initializers -Werror -o $@ $<
+
+.NOTPARALLEL: generated_sbat_var_defs.h
+generated_sbat_var_defs.h: generate_sbat_var_defs
+	./generate_sbat_var_defs $(TOPDIR) > $@
 
 buildid : $(TOPDIR)/buildid.c
 	$(HOSTCC) -I/usr/include -Og -g3 -Wall -Werror -Wextra -o $@ $< -lelf
@@ -317,7 +322,7 @@ fuzz fuzz-clean fuzz-coverage fuzz-lto :
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
 		fuzz-clean $@
 
-test test-clean test-coverage test-lto :
+test test-clean test-coverage test-lto : generated_sbat_var_defs.h
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
@@ -361,7 +366,7 @@ clean-lib-objs:
 clean-shim-objs:
 	@rm -rvf $(TARGET) *.o $(SHIM_OBJS) $(MOK_OBJS) $(FALLBACK_OBJS) $(KEYS) certdb $(BOOTCSVNAME)
 	@rm -vf *.debug *.so *.efi *.efi.* *.tar.* version.c buildid post-process-pe compile_commands.json
-	@rm -vf generate_sbat_var_defs
+	@rm -vf generate_sbat_var_defs generated_sbat_var_defs.h
 	@rm -vf Cryptlib/*.[oa] Cryptlib/*/*.[oa]
 	@if [ -d .git ] ; then git clean -f -d -e 'Cryptlib/OpenSSL/*'; fi
 
