@@ -27,6 +27,7 @@ verification_method_t verification_method;
 int loader_is_participating;
 
 UINT8 user_insecure_mode;
+UINTN hsi_status = 0;
 UINT8 ignore_db;
 UINT8 trust_mok_list;
 UINT8 mok_policy = 0;

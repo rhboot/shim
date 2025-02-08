@@ -52,5 +52,7 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       EFI_IMAGE_SECTION_HEADER *Section,
 	       void *orig, void *data);
 
+void get_hsi_mem_info(void);
+
 #endif /* !PE_H_ */
 // vim:fenc=utf-8:tw=75:noet
