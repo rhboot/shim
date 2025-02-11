@@ -38,7 +38,8 @@
 #define POLICY_RESET		3
 #define POLICY_NOTREAD		255
 
-#define REVOCATIONFILE L"revocations.efi"
+#define SBATREVOCATIONFILE L"revocations_sbat.efi"
+#define SKUSIREVOCATIONFILE L"revocations_sku.efi"
 
 extern UINTN _sbat, _esbat;
 
