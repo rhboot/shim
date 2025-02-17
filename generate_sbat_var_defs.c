@@ -111,7 +111,7 @@ writefile()
 			       "#define GEN_SBAT_VAR_DEFS_H_\n"
 			       "#ifndef ENABLE_SHIM_DEVEL\n\n"
 			       "#ifndef SBAT_AUTOMATIC_DATE\n"
-			       "#define SBAT_AUTOMATIC_DATE 2023012900\n"
+			       "#define SBAT_AUTOMATIC_DATE 2024040900\n"
 			       "#endif /* SBAT_AUTOMATIC_DATE */\n"
 			       "#if SBAT_AUTOMATIC_DATE == %d\n"
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS\n",

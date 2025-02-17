@@ -118,12 +118,10 @@ grub,4
 grub.peimage,2
 
 
-Since http boot shim CVE is considerably more serious than then GRUB
-ntfs CVEs shim is delivering the shim revocation without the updated
-GRUB revocation as a latest payload.
+Revocations for:
+ - Februady 2025 GRUB CVEs
 
-To revoke both the impacted shim and impacted GRUB binaries:
-
-sbat,1,2024<date TBD>
+sbat,1,2025021800
 shim,4
-grub,4
+grub,5
+
