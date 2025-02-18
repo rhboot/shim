@@ -391,7 +391,7 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 	}
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
 	if (result) {
-		printf("%s:%d:%s():  found:%d result:%p &result->guid:%p &result->list:%p\n"
+		printf("%s:%d:%s():  found:%d result:%p &result->guid:%p &result->list:%p\n",
 		       __FILE__, __LINE__-1, __func__, found, result,
 		       &result->guid, &result->list);
 		printf("%s:%d:%s():  "GUID_FMT"-%s\n",
