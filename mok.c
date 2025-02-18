@@ -144,13 +144,6 @@ categorize_deauthorized(struct mok_state_variable *v)
 	return VENDOR_ADDEND_DB;
 }
 
-#define MOK_MIRROR_KEYDB		0x01
-#define MOK_MIRROR_DELETE_FIRST		0x02
-#define MOK_VARIABLE_MEASURE		0x04
-#define MOK_VARIABLE_LOG		0x08
-#define MOK_VARIABLE_INVERSE		0x10
-#define MOK_VARIABLE_CONFIG_ONLY	0x20
-
 struct mok_state_variable mok_state_variable_data[] = {
 	{.name = L"MokList",
 	 .name8 = "MokList",
