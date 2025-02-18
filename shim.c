@@ -375,7 +375,7 @@ static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 
 	if (check_db_hash_in_ram(db, vendor_db_size,
 				 sha256hash, SHA256_DIGEST_SIZE,
-				 EFI_CERT_SHA256_GUID, L"vendor_db",
+				 EFI_CERT_SHA256_GUID, L"db",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
 		update_verification_method(VERIFIED_BY_HASH);
@@ -385,7 +385,7 @@ static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	}
 	if (cert &&
 	    check_db_cert_in_ram(db, vendor_db_size,
-				 cert, sha256hash, L"vendor_db",
+				 cert, sha256hash, L"db",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
