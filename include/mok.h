@@ -19,6 +19,13 @@ struct mok_state_variable;
 typedef vendor_addend_category_t (vendor_addend_categorizer_t)(struct mok_state_variable *);
 typedef UINTN (mok_variable_format_helper_t)(UINT8 *buf, size_t sz, struct mok_state_variable *);
 
+#define MOK_MIRROR_KEYDB		0x01
+#define MOK_MIRROR_DELETE_FIRST		0x02
+#define MOK_VARIABLE_MEASURE		0x04
+#define MOK_VARIABLE_LOG		0x08
+#define MOK_VARIABLE_INVERSE		0x10
+#define MOK_VARIABLE_CONFIG_ONLY	0x20
+
 /*
  * MoK variables that need to have their storage validated.
  *
