@@ -85,14 +85,14 @@ extern EFI_RUNTIME_SERVICES *RT;
 static inline INT64
 guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s(): Comparing "GUID_FMT" to "GUID_FMT"\n",
 	       __FILE__, __LINE__-1, __func__,
 	       GUID_ARGS(*guid0), GUID_ARGS(*guid1));
 #endif
 
 	if (guid0->Data1 != guid1->Data1) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): returning 0x%"PRIx64"-0x%"PRIx64"->0x%"PRIx64"\n",
 		       __FILE__, __LINE__-1, __func__,
 		       (INT64)guid0->Data1, (INT64)guid1->Data1,
@@ -102,7 +102,7 @@ guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 	}
 
 	if (guid0->Data2 != guid1->Data2) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): returning 0x%"PRIx64"-0x%"PRIx64"->0x%"PRIx64"\n",
 		       __FILE__, __LINE__-1, __func__,
 		       (INT64)guid0->Data2, (INT64)guid1->Data2,
@@ -112,7 +112,7 @@ guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 	}
 
 	if (guid0->Data3 != guid1->Data3) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): returning 0x%"PRIx64"-0x%"PRIx64"->0x%"PRIx64"\n",
 		       __FILE__, __LINE__-1, __func__,
 		       (INT64)guid0->Data3, (INT64)guid1->Data3,
@@ -126,7 +126,7 @@ guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 	 * representation of it.
 	 */
 	if (guid0->Data4[1] != guid1->Data4[1]) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): returning 0x%"PRIx64"-0x%"PRIx64"->0x%"PRIx64"\n",
 		       __FILE__, __LINE__-1, __func__,
 		       (INT64)guid0->Data4[1], (INT64)guid1->Data4[1],
@@ -136,7 +136,7 @@ guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 	}
 
 	if (guid0->Data4[0] != guid1->Data4[0]) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): returning 0x%"PRIx64"-0x%"PRIx64"->0x%"PRIx64"\n",
 		       __FILE__, __LINE__-1, __func__,
 		       (INT64)guid0->Data4[0], (INT64)guid1->Data4[0],
@@ -147,7 +147,7 @@ guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 
 	for (UINTN i = 2; i < 8; i++) {
 		if (guid0->Data4[i] != guid1->Data4[i]) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 			printf("%s:%d:%s(): returning 0x%"PRIx64"-0x%"PRIx64"->0x%"PRIx64"\n",
 			       __FILE__, __LINE__-1, __func__,
 			       (INT64)guid0->Data4[i], (INT64)guid1->Data4[i],
@@ -157,7 +157,7 @@ guidcmp_helper(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 		}
 	}
 
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s(): returning 0x0\n",
 	       __FILE__, __LINE__-1, __func__);
 #endif
@@ -177,7 +177,7 @@ guidcmp(const EFI_GUID * const guid0, const EFI_GUID * const guid1)
 
 	cmp = guidcmp_helper(guida, guidb);
 	ret = cmp < 0 ? -1 : (cmp > 0 ? 1 : 0);
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s():CompareGuid("GUID_FMT","GUID_FMT")->%lld (%d)\n",
 	       __FILE__, __LINE__-1, __func__,
 	       GUID_ARGS(*guida), GUID_ARGS(*guidb), cmp, ret);
