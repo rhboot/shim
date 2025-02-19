@@ -19,7 +19,7 @@ EFI_STATUS verify_image(void *data, unsigned int datasize,
 			PE_COFF_LOADER_IMAGE_CONTEXT *context);
 
 EFI_STATUS
-verify_sbat_section(char *SBATBase, size_t SBATSize);
+verify_sbat_section(char *SBATBase, size_t SBATSize, UINT16 *sbat_gen_expected, UINT16 *sbat_gen_found, CHAR8 **sbat_component_name);
 
 EFI_STATUS
 get_section_vma (UINTN section_num,
