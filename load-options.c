@@ -311,8 +311,13 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 	UINT32 remaining_size;
 	CHAR16 *loader_str = NULL;
 
-	dprint(L"full load options:\n");
-	dhexdumpat(li->LoadOptions, li->LoadOptionsSize, 0);
+	if (!li->LoadOptions || !li->LoadOptionsSize) {
+		dprint(L"LoadOptions is empty\n");
+		return EFI_SUCCESS;
+	} else {
+		dprint(L"full LoadOptions:\n");
+		dhexdumpat(li->LoadOptions, li->LoadOptionsSize, 0);
+	}
 
 	/*
 	 * Sanity check since we make several assumptions about the length
