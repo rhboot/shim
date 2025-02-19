@@ -1182,6 +1182,8 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 		goto restore;
 	}
 
+	save_logs();
+
 	/*
 	 * The binary is trusted and relocated. Run it
 	 */

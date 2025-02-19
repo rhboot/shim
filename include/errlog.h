@@ -15,6 +15,8 @@ extern VOID LogHexdump_(const char *file, int line, const char *func,
                         const void *data, size_t sz);
 extern VOID PrintErrors(VOID);
 extern VOID ClearErrors(VOID);
+extern void save_logs(void);
+extern UINTN EFIAPI log_debug_print(const CHAR16 *fmt, ...);
 
 #endif /* !ERRLOG_H_ */
 // vim:fenc=utf-8:tw=75:noet
