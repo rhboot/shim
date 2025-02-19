@@ -99,4 +99,153 @@ ClearErrors(VOID)
 	errs = NULL;
 }
 
+static size_t
+format_error_log(UINT8 *dest, size_t dest_sz)
+{
+	size_t err_log_sz = 0;
+	size_t pos = 0;
+
+	for (UINTN i = 0; i < nerrs; i++)
+		err_log_sz += StrSize(errs[i]);
+
+	if (!dest || dest_sz < err_log_sz)
+		return err_log_sz;
+
+	ZeroMem(dest, err_log_sz);
+	for (UINTN i = 0; i < nerrs; i++) {
+		UINTN sz = StrSize(errs[i]);
+		CopyMem(&dest[pos], errs[i], sz);
+		pos += sz;
+	}
+
+	return err_log_sz;
+}
+
+static UINT8 *debug_log = NULL;
+static size_t debug_log_sz = 0;
+static size_t debug_log_alloc = 0;
+
+UINTN EFIAPI
+log_debug_print(const CHAR16 *fmt, ...)
+{
+	ms_va_list args;
+	CHAR16 *buf;
+	size_t buf_sz;
+	UINTN ret = 0;
+
+	ms_va_start(args, fmt);
+	buf = VPoolPrint(fmt, args);
+	if (!buf)
+		return 0;
+	ms_va_end(args);
+
+	ret = StrLen(buf);
+	buf_sz = StrSize(buf);
+	if (debug_log_sz + buf_sz > debug_log_alloc) {
+		size_t new_alloc_sz = debug_log_alloc;
+		CHAR16 *new_debug_log;
+
+		new_alloc_sz += buf_sz;
+		new_alloc_sz = ALIGN_UP(new_alloc_sz, EFI_PAGE_SIZE);
+
+		new_debug_log = ReallocatePool(debug_log, debug_log_alloc, new_alloc_sz);
+		if (!new_debug_log)
+			return 0;
+		debug_log = (UINT8 *)new_debug_log;
+		debug_log_alloc = new_alloc_sz;
+	}
+
+	CopyMem(&debug_log[debug_log_sz], buf, buf_sz);
+	debug_log_sz += buf_sz;
+	FreePool(buf);
+	return ret;
+}
+
+static size_t
+format_debug_log(UINT8 *dest, size_t dest_sz)
+{
+	if (!dest || dest_sz < debug_log_sz)
+		return debug_log_sz;
+
+	ZeroMem(dest, debug_log_sz);
+	CopyMem(dest, debug_log, debug_log_sz);
+	return debug_log_sz;
+}
+
+void
+save_logs(void)
+{
+	struct mok_variable_config_entry *cfg_table = NULL;
+	struct mok_variable_config_entry *new_table = NULL;
+	struct mok_variable_config_entry *entry = NULL;
+	size_t new_table_sz;
+	UINTN pos = 0;
+	EFI_STATUS efi_status;
+	EFI_CONFIGURATION_TABLE *CT;
+	EFI_GUID bogus_guid = { 0x29f2f0db, 0xd025, 0x4aa6, { 0x99, 0x58, 0xa0, 0x21, 0x8b, 0x1d, 0xec, 0x0e }};
+	size_t errlog_sz, dbglog_sz;
+
+	errlog_sz = format_error_log(NULL, 0);
+	dbglog_sz = format_debug_log(NULL, 0);
+
+	if (errlog_sz == 0 && dbglog_sz == 0) {
+		console_print(L"No console or debug log?!?!?\n");
+		return;
+	}
+
+	for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
+		CT = &ST->ConfigurationTable[i];
+
+		if (CompareGuid(&MOK_VARIABLE_STORE, &CT->VendorGuid) == 0) {
+			cfg_table = CT->VendorTable;
+			break;
+		}
+		CT = NULL;
+	}
+
+	entry = cfg_table;
+	while (entry && entry->name[0] != 0) {
+		size_t entry_sz;
+		entry = (struct mok_variable_config_entry *)((uintptr_t)cfg_table + pos);
+
+		entry_sz = sizeof(*entry);
+		entry_sz += entry->data_size;
+
+		if (entry->name[0] != 0)
+			pos += entry_sz;
+	}
+
+	new_table_sz = pos + 3 * sizeof(*entry) + errlog_sz + dbglog_sz;
+	new_table = AllocateZeroPool(new_table_sz);
+	if (!new_table)
+		return;
+
+	CopyMem(new_table, cfg_table, pos);
+
+	entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
+	if (errlog_sz) {
+		strcpy(entry->name, "shim-err.txt");
+		entry->data_size = errlog_sz;
+		format_error_log(&entry->data[0], errlog_sz);
+
+		pos += sizeof(*entry) + errlog_sz;
+		entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
+	}
+	if (dbglog_sz) {
+		strcpy(entry->name, "shim-dbg.txt");
+		entry->data_size = dbglog_sz;
+		format_debug_log(&entry->data[0], dbglog_sz);
+
+		pos += sizeof(*entry) + dbglog_sz;
+		// entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
+	}
+
+	if (CT) {
+		CopyMem(&CT->VendorGuid, &bogus_guid, sizeof(bogus_guid));
+	}
+	efi_status = BS->InstallConfigurationTable(&MOK_VARIABLE_STORE, new_table);
+	if (EFI_ERROR(efi_status))
+		console_print(L"Could not re-install MoK configuration table: %r\n", efi_status);
+}
+
 // vim:fenc=utf-8:tw=75

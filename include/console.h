@@ -98,6 +98,7 @@ extern UINT32 verbose;
 #ifndef SHIM_UNIT_TEST
 #define dprint_(fmt, ...) ({							\
 		UINTN __dprint_ret = 0;						\
+		log_debug_print((fmt), ##__VA_ARGS__);				\
 		if (verbose)							\
 			__dprint_ret = console_print((fmt), ##__VA_ARGS__);	\
 		__dprint_ret;							\
