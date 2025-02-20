@@ -141,6 +141,12 @@ extern UINTN hsi_status;
 #define SHIM_HSI_STATUS_ROW		0x00000004ULL
 /* platform provides the EFI Memory Attribute Protocol */
 #define SHIM_HSI_STATUS_HASMAP		0x00000008ULL
+/* platform provides DXE Services Table */
+#define SHIM_HSI_STATUS_HASDST		0x00000010ULL
+/* platform has DST->GetMemorySpaceDescriptor */
+#define SHIM_HSI_STATUS_HASDSTGMSD	0x00000020ULL
+/* platform has DST->SetMemorySpaceAttributes */
+#define SHIM_HSI_STATUS_HASDSTSMSA	0x00000040ULL
 
 #endif /* !SHIM_MOK_H_ */
 // vim:fenc=utf-8:tw=75:noet
