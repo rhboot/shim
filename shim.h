@@ -176,6 +176,7 @@
 #include "include/ip6config.h"
 #include "include/load-options.h"
 #include "include/loader-proto.h"
+#include "include/memattrs.h"
 #include "include/mok.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
