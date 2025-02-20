@@ -50,7 +50,7 @@ get_dxe_services_table(EFI_DXE_SERVICES_TABLE **dstp)
 	static EFI_DXE_SERVICES_TABLE *dst = NULL;
 
 	if (dst == NULL) {
-	dprint(L"Looking for configuration table " LGUID_FMT L"\n", GUID_ARGS(gEfiDxeServicesTableGuid));
+		dprint(L"Looking for configuration table " LGUID_FMT L"\n", GUID_ARGS(gEfiDxeServicesTableGuid));
 
 		for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
 			EFI_CONFIGURATION_TABLE *ct = &ST->ConfigurationTable[i];
@@ -408,6 +408,7 @@ get_hsi_mem_info(void)
 	uint64_t attrs = 0;
 	uint32_t *tmp_alloc;
 	EFI_MEMORY_ATTRIBUTE_PROTOCOL *efiproto = NULL;
+	EFI_DXE_SERVICES_TABLE *dst = NULL;
 
 	get_efi_mem_attr_protocol(&efiproto);
 	if (efiproto) {
@@ -415,7 +416,18 @@ get_hsi_mem_info(void)
 		dprint(L"Setting HSI to 0x%lx\n", hsi_status);
 	}
 
-	if (!(hsi_status & SHIM_HSI_STATUS_HASMAP)) {
+	get_dxe_services_table(&dst);
+	if (dst) {
+		hsi_status |= SHIM_HSI_STATUS_HASDST;
+		if (dst->GetMemorySpaceDescriptor)
+			hsi_status |= SHIM_HSI_STATUS_HASDSTGMSD;
+		if (dst->SetMemorySpaceAttributes)
+			hsi_status |= SHIM_HSI_STATUS_HASDSTSMSA;
+	}
+
+	if (!(hsi_status & SHIM_HSI_STATUS_HASMAP) &&
+	    !(hsi_status & SHIM_HSI_STATUS_HASDSTGMSD &&
+	      hsi_status & SHIM_HSI_STATUS_HASDSTSMSA)) {
 		dprint(L"No memory protocol, not testing further\n");
 		return;
 	}

@@ -103,3 +103,9 @@ HSIStatus: Status of various security features:
                             1: read-only sections are writable
   has-memory-attribute-protocol: 0: platform does not provide the EFI Memory Attribute Protocol
                                  1: platform does provide the EFI Memory Attribute Protocol
+  has-dxe-services-table: 0: platform does not provide the DXE Services Table
+                          1: platform does provide the DXE Services Table
+  has-get-memory-space-descriptor: 0: platform's DST does not populate GetMemorySpaceDescriptor
+                                   1: platform's DST does populate GetMemorySpaceDescriptor
+  has-set-memory-space-descriptor: 0: platform's DST does not populate SetMemorySpaceDescriptor
+                                   1: platform's DST does populate SetMemorySpaceDescriptor
