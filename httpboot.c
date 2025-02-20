@@ -562,7 +562,7 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	EFI_HTTP_RESPONSE_DATA response;
 	EFI_HTTP_STATUS_CODE http_status;
 	BOOLEAN response_done;
-	UINTN i, downloaded;
+	UINTN i, j, downloaded;
 	CHAR8 rx_buffer[9216];
 	EFI_STATUS efi_status;
 	EFI_STATUS event_status;
@@ -619,6 +619,15 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 		if (!strcasecmp(rx_message.Headers[i].FieldName,
 				(CHAR8 *)"Content-Length")) {
 			*buf_size = ascii_to_int(rx_message.Headers[i].FieldValue);
+			for(j = 0; j < i; j++) {
+				if (!strcasecmp(rx_message.Headers[i].FieldName,
+						(CHAR8 *)"Content-Length")) {
+					if (*buf_size != ascii_to_int(rx_message.Headers[j].FieldValue)) {
+						perror(L"Content-Length is invalid\n");
+						goto error;
+					}
+				}
+			}
 		}
 	}
 
