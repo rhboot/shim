@@ -109,3 +109,5 @@ HSIStatus: Status of various security features:
                                    1: platform's DST does populate GetMemorySpaceDescriptor
   has-set-memory-space-descriptor: 0: platform's DST does not populate SetMemorySpaceDescriptor
                                    1: platform's DST does populate SetMemorySpaceDescriptor
+  shim-has-nx-compat-set: 0: the running shim binary does not have NX_COMPAT bit set
+                          1: the running shim binary does have the NX_COMPAT bit set

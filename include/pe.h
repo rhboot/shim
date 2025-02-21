@@ -53,5 +53,8 @@ relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       EFI_IMAGE_SECTION_HEADER *Section,
 	       void *orig, void *data);
 
+void
+get_shim_nx_capability(EFI_HANDLE image_handle);
+
 #endif /* !PE_H_ */
 // vim:fenc=utf-8:tw=75:noet

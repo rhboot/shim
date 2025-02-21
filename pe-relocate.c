@@ -375,7 +375,6 @@ read_header(void *data, unsigned int datasize,
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 	unsigned long HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
 	unsigned long FileAlignment = 0;
-	UINT16 DllFlags;
 	size_t dos_sz = 0;
 	size_t tmpsz0, tmpsz1;
 
@@ -504,17 +503,17 @@ read_header(void *data, unsigned int datasize,
 		context->EntryPoint = PEHdr->Pe32Plus.OptionalHeader.AddressOfEntryPoint;
 		context->RelocDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
 		context->SecDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
-		DllFlags = PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics;
+		context->DllCharacteristics = PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics;
 	} else {
 		context->ImageAddress = PEHdr->Pe32.OptionalHeader.ImageBase;
 		context->EntryPoint = PEHdr->Pe32.OptionalHeader.AddressOfEntryPoint;
 		context->RelocDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
 		context->SecDir = &PEHdr->Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
-		DllFlags = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
+		context->DllCharacteristics = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
 	}
 
 	if ((mok_policy & MOK_POLICY_REQUIRE_NX) &&
-	    !(DllFlags & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
+	    !(context->DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
 		perror(L"Policy requires NX, but image does not support NX\n");
 		return EFI_UNSUPPORTED;
         }
@@ -554,5 +553,35 @@ read_header(void *data, unsigned int datasize,
 	}
 	return EFI_SUCCESS;
 }
+
+void
+get_shim_nx_capability(EFI_HANDLE image_handle)
+{
+	EFI_LOADED_IMAGE_PROTOCOL*li = NULL;
+	EFI_STATUS efi_status;
+	PE_COFF_LOADER_IMAGE_CONTEXT context;
+
+	efi_status = BS->HandleProtocol(image_handle, &gEfiLoadedImageProtocolGuid, (void **)&li);
+	if (EFI_ERROR(efi_status) || !li) {
+		dprint(L"Could not get loaded image protocol: %r\n", efi_status);
+		return;
+	}
+
+	ZeroMem(&context, sizeof(context));
+	efi_status = read_header(li->ImageBase, li->ImageSize, &context, false);
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"Couldn't parse image header: %r\n", efi_status);
+		return;
+	}
+
+	dprint(L"DllCharacteristics:0x%lx\n", context.DllCharacteristics);
+	if (context.DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT) {
+		dprint(L"Setting HSI from %a to %a\n",
+		       decode_hsi_bits(hsi_status),
+		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_NX));
+		hsi_status |= SHIM_HSI_STATUS_NX;
+	}
+}
+
 
 // vim:fenc=utf-8:tw=75:noet
