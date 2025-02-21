@@ -414,6 +414,7 @@ decode_hsi_bits(UINTN hsi)
 		{.bit = SHIM_HSI_STATUS_HASDST, .name = "HASDST"},
 		{.bit = SHIM_HSI_STATUS_HASDSTGMSD, .name = "HASDSTGMSD"},
 		{.bit = SHIM_HSI_STATUS_HASDSTSMSA, .name = "HASDSTSMSA"},
+		{.bit = SHIM_HSI_STATUS_NX, .name = "NX"},
 		{.bit = 0, .name = ""},
 	};
 	static int x = 0;

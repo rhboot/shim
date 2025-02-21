@@ -1993,6 +1993,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
+	get_shim_nx_capability(image_handle);
+
 	efi_status = set_sbat_uefi_variable_internal();
 	if (EFI_ERROR(efi_status) && secure_mode()) {
 		perror(L"%s variable initialization failed\n", SBAT_VAR_NAME);
