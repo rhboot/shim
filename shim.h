@@ -166,6 +166,7 @@
 #include "include/crypt_blowfish.h"
 #include "include/dp.h"
 #include "include/efiauthenticated.h"
+#include "include/errlog.h"
 #include "include/errors.h"
 #include "include/execute.h"
 #include "include/guid.h"
@@ -175,6 +176,7 @@
 #include "include/ip6config.h"
 #include "include/load-options.h"
 #include "include/loader-proto.h"
+#include "include/memattrs.h"
 #include "include/mok.h"
 #include "include/netboot.h"
 #include "include/passwordcrypt.h"
@@ -240,14 +242,6 @@ typedef struct _SHIM_LOCK {
 
 extern EFI_STATUS shim_init(void);
 extern void shim_fini(void);
-extern EFI_STATUS EFIAPI LogError_(const char *file, int line, const char *func,
-                                   const CHAR16 *fmt, ...);
-extern EFI_STATUS EFIAPI VLogError(const char *file, int line, const char *func,
-                                   const CHAR16 *fmt, ms_va_list args);
-extern VOID LogHexdump_(const char *file, int line, const char *func,
-                        const void *data, size_t sz);
-extern VOID PrintErrors(VOID);
-extern VOID ClearErrors(VOID);
 extern VOID restore_loaded_image(VOID);
 extern EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath);
 extern EFI_STATUS import_mok_state(EFI_HANDLE image_handle);

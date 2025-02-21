@@ -8,6 +8,7 @@
 #include "mock-variables.h"
 #include "test-data-efivars-1.h"
 
+#include <err.h>
 #include <stdio.h>
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -219,11 +220,12 @@ check_config_table(struct mock_mok_variable_config_entry *test_configs,
 		   uint8_t *config_pos)
 {
 	size_t i = 0;
+	struct mok_variable_config_entry *mok_entry = NULL;
+	struct mock_mok_variable_config_entry *mock_entry = NULL;
+
 	while (config_pos) {
-		struct mock_mok_variable_config_entry *mock_entry =
-			&test_configs[i];
-		struct mok_variable_config_entry *mok_entry =
-			(struct mok_variable_config_entry *)config_pos;
+		mock_entry = &test_configs[i];
+		mok_entry = (struct mok_variable_config_entry *)config_pos;
 
 		/*
 		 * If the tables are different lengths, this will trigger.
@@ -258,6 +260,11 @@ check_config_table(struct mock_mok_variable_config_entry *test_configs,
 
 	return EFI_SUCCESS;
 err:
+	warnx("Failed on entry %zu mok.name:\"%s\" mock.name:\"%s\"", i,
+	      mok_entry->name, mock_entry->name);
+	if ((mok_entry && mock_entry) && (!mok_entry->name[0] || !mock_entry->name[0]))
+		warnx("Entry is missing in %s variable list.", mok_entry->name[0] ? "expected" : "found");
+
 	return EFI_INVALID_PARAMETER;
 }
 
@@ -391,6 +398,11 @@ test_mok_mirror_with_enough_space(void)
 			  EFI_VARIABLE_RUNTIME_ACCESS,
 		 .ops = { NONE, },
 		},
+		{.guid = SHIM_LOCK_GUID,
+		 .name = L"HSIStatus",
+		 .attrs = 0,
+		 .ops = { NONE, },
+		},
 		{.guid = { 0, },
 		 .name = NULL,
 		}
@@ -416,6 +428,10 @@ test_mok_mirror_with_enough_space(void)
 		{.name = "MokListTrustedRT",
 		 .data_size = sizeof(test_data_efivars_1_MokListTrustedRT),
 		 .data = test_data_efivars_1_MokListTrustedRT
+		},
+		{.name = "HSIStatus",
+		 .data_size = sizeof(test_data_efivars_1_HSIStatus),
+		 .data = test_data_efivars_1_HSIStatus
 		},
 		{.name = { 0, },
 		 .data_size = 0,
@@ -606,6 +622,10 @@ test_mok_mirror_setvar_out_of_resources(void)
 		{.name = "MokListTrustedRT",
 		 .data_size = sizeof(test_data_efivars_1_MokListTrustedRT),
 		 .data = test_data_efivars_1_MokListTrustedRT
+		},
+		{.name = "HSIStatus",
+		 .data_size = sizeof(test_data_efivars_1_HSIStatus),
+		 .data = test_data_efivars_1_HSIStatus
 		},
 		{.name = { 0, },
 		 .data_size = 0,
