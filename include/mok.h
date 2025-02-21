@@ -17,6 +17,14 @@ typedef enum {
 
 struct mok_state_variable;
 typedef vendor_addend_category_t (vendor_addend_categorizer_t)(struct mok_state_variable *);
+typedef UINTN (mok_variable_format_helper_t)(UINT8 *buf, size_t sz, struct mok_state_variable *);
+
+#define MOK_MIRROR_KEYDB		0x01
+#define MOK_MIRROR_DELETE_FIRST		0x02
+#define MOK_VARIABLE_MEASURE		0x04
+#define MOK_VARIABLE_LOG		0x08
+#define MOK_VARIABLE_INVERSE		0x10
+#define MOK_VARIABLE_CONFIG_ONLY	0x20
 
 /*
  * MoK variables that need to have their storage validated.
@@ -81,6 +89,8 @@ struct mok_state_variable {
 	 * MOK_MIRROR_DELETE_FIRST  delete any existing variable first
 	 * MOK_VARIABLE_MEASURE	    extend PCR 7 and log the hash change
 	 * MOK_VARIABLE_LOG	    measure into whatever .pcr says and log
+	 * MOK_VARIABLE_CONFIG_ONLY don't create a UEFI variable, only add
+	 *                          it to the config space variables.
 	 */
 	UINTN pcr;		/* PCR to measure and hash to */
 
@@ -89,6 +99,23 @@ struct mok_state_variable {
 	 * mirrored.
 	 */
 	UINT8 *state;
+
+	/*
+	 * If this is non-NULL, this function will be called during the
+	 * "import" phase to format the variable data.  It'll get called
+	 * twice, once as:
+	 *
+	 *   sz = format(NULL, 0, ptr);
+	 *
+	 * a buffer of size sz will then be allocated, and it'll be called
+	 * again to fill the buffer:
+	 *
+	 *   format(buf, sz, ptr);
+	 *
+	 * Note that as an implementation detail data and data_size must be
+	 * NULL and 0 respectively for this entry.
+	 */
+	mok_variable_format_helper_t *format;
 };
 
 extern size_t n_mok_state_variables;
@@ -104,6 +131,16 @@ struct mok_variable_config_entry {
  * bit definitions for MokPolicy
  */
 #define MOK_POLICY_REQUIRE_NX	1
+
+extern UINTN hsi_status;
+/* heap is executable */
+#define SHIM_HSI_STATUS_HEAPX		0x00000001ULL
+/* stack is executable */
+#define SHIM_HSI_STATUS_STACKX		0x00000002ULL
+/* read-only sections are writable */
+#define SHIM_HSI_STATUS_ROW		0x00000004ULL
+/* platform provides the EFI Memory Attribute Protocol */
+#define SHIM_HSI_STATUS_HASMAP		0x00000008ULL
 
 #endif /* !SHIM_MOK_H_ */
 // vim:fenc=utf-8:tw=75:noet
