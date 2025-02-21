@@ -163,7 +163,7 @@ variable_cmp(const struct mock_variable * const v0,
 
 	ret = CompareGuid(&v0->guid, &v1->guid);
 	ret <<= 8ul;
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG > 3)
 	printf("%s:%d:%s():  "GUID_FMT" %s "GUID_FMT" (0x%011"PRIx64" %"PRId64")\n",
 	       __FILE__, __LINE__-1, __func__,
 	       GUID_ARGS(v0->guid),
@@ -177,7 +177,7 @@ variable_cmp(const struct mock_variable * const v0,
 	}
 
 	ret = StrCmp(v0->name, v1->name);
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if (defined(SHIM_DEBUG) && SHIM_DEBUG > 3)
 	printf("%s:%d:%s():   \"%s\" %s \"%s\" (0x%02hhx (%d)\n",
 	       __FILE__, __LINE__-1, __func__,
 	       Str2str(v0->name),
@@ -284,7 +284,7 @@ mock_gnvn_set_result(UINTN *size, CHAR16 *name, EFI_GUID *guid,
 		*size = StrSize(result->name);
 		status = EFI_BUFFER_TOO_SMALL;
 		mock_gnvn_post_hook(size, name, guid, &status);
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 3
 		printf("%s:%d:%s():  returning %lx\n",
 		       __FILE__, __LINE__-1, __func__, status);
 #endif
@@ -297,7 +297,7 @@ mock_gnvn_set_result(UINTN *size, CHAR16 *name, EFI_GUID *guid,
 
 	status = EFI_SUCCESS;
 	mock_gnvn_post_hook(size, name, guid, &status);
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 3
 	printf("%s:%d:%s():  returning %lx\n",
 	       __FILE__, __LINE__-1, __func__, status);
 #endif
@@ -351,15 +351,20 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 		struct mock_variable *var;
 
 		var = list_entry(pos, struct mock_variable, list);
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG)
+# if SHIM_DEBUG > 1
 		printf("%s:%d:%s():  candidate var:%p &var->guid:%p &var->list:%p\n",
 			__FILE__, __LINE__-1, __func__, var, &var->guid, &var->list);
+# elif SHIM_DEBUG > 0
+		printf("%s:%d:%s():  candidate var:%p var->guid:" GUID_FMT"\n",
+			__FILE__, __LINE__-1, __func__, var, GUID_ARGS(var->guid));
+# endif
 #endif
 		if (name[0] == 0) {
 			if (CompareGuid(&var->guid, guid) == 0) {
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
-				printf("%s:%d:%s():  found\n",
-				       __FILE__, __LINE__-1, __func__);
+				printf("%s:%d:%s():  found guid in entry var:%p var->name:%p\n",
+				       __FILE__, __LINE__-1, __func__, var, var->name);
 #endif
 				result = var;
 				found = true;
@@ -374,14 +379,14 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 				continue;
 			}
 
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): varcmp("GUID_FMT"-%s, "GUID_FMT"-%s)\n",
 		       __FILE__, __LINE__-1, __func__,
 		       GUID_ARGS(goal.guid), Str2str(goal.name),
 		       GUID_ARGS(var->guid), Str2str(var->name));
 #endif
 			if (variable_cmp(&goal, var) == 0) {
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 				printf("%s:%d:%s():  found\n",
 				       __FILE__, __LINE__-1, __func__);
 #endif
@@ -391,15 +396,15 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 	}
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
 	if (result) {
-		printf("%s:%d:%s():  found:%d result:%p &result->guid:%p &result->list:%p\n"
+		printf("%s:%d:%s():  found:%d result:%p &result->guid:%p &result->list:%p\n",
 		       __FILE__, __LINE__-1, __func__, found, result,
 		       &result->guid, &result->list);
 		printf("%s:%d:%s():  "GUID_FMT"-%s\n",
 		       __FILE__, __LINE__-1, __func__, GUID_ARGS(result->guid),
 		       Str2str(result->name));
 	} else {
-		printf("%s:%d:%s():  not found\n",
-		       __FILE__, __LINE__-1, __func__);
+		printf("%s:%d:%s():  not found (found:%d status:0x%016x)\n",
+		       __FILE__, __LINE__-1, __func__, found, status);
 	}
 #endif
 
@@ -408,13 +413,25 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 			status = EFI_NOT_FOUND;
 		else
 			status = EFI_INVALID_PARAMETER;
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
+		printf("%s:%d:%s():  not found (found:%d status:0x%016x)\n",
+		       __FILE__, __LINE__-1, __func__, found, status);
+#endif
 		mock_gnvn_post_hook(size, name, guid, &status);
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
+		printf("%s:%d:%s():  not found (found:%d status:0x%016x)\n",
+		       __FILE__, __LINE__-1, __func__, found, status);
+#endif
 		return status;
 	}
 
 	if (!result) {
 		status = EFI_NOT_FOUND;
 		mock_gnvn_post_hook(size, name, guid, &status);
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
+		printf("%s:%d:%s():  found (found:%d status:0x%016x)\n",
+		       __FILE__, __LINE__-1, __func__, found, status);
+#endif
 		return status;
 	}
 
@@ -678,7 +695,7 @@ mock_new_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	}
 	var = (struct mock_variable *)buf;
 
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s():  var:%p &var->guid:%p &var->list:%p\n",
 	       __FILE__, __LINE__-1, __func__, var, &var->guid, &var->list);
 #endif
@@ -695,7 +712,7 @@ mock_new_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	var->attrs = attrs;
 	INIT_LIST_HEAD(&var->list);
 
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s():  var: "GUID_FMT"-%s\n",
 	       __FILE__, __LINE__-1, __func__,
 	       GUID_ARGS(var->guid), Str2str(var->name));
@@ -772,7 +789,7 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	}
 #endif
 
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s():Setting "GUID_FMT"-%s size:0x%"PRIx64"\n",
 	       __FILE__, __LINE__ - 1, __func__,
 	       GUID_ARGS(*guid), Str2str(name), size);
@@ -800,7 +817,7 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 	list_for_each_safe(pos, tmp, &mock_variables) {
 		found = false;
 		var = list_entry(pos, struct mock_variable, list);
-#if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s(): varcmp("GUID_FMT"-%s, "GUID_FMT"-%s)\n",
 		       __FILE__, __LINE__-1, __func__,
 		       GUID_ARGS(goal.guid), Str2str(goal.name),
@@ -832,14 +849,14 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 		if (found)
 			break;
 	}
-#if defined(SHIM_DEBUG) && SHIM_DEBUG != 0
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 	printf("%s:%d:%s():var_list:%p &mock_variables:%p cmp:%ld\n",
 	       __FILE__, __LINE__ - 1, __func__,
 	       var_list, &mock_variables, cmp);
 #endif
 	if (cmp != 0 || (cmp == 0 && var_list == &mock_variables)) {
 		size_t totalsz = size + StrSize(name);
-#if defined(SHIM_DEBUG) && SHIM_DEBUG != 0
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
 		printf("%s:%d:%s():var:%p attrs:0x%lx\n",
 		       __FILE__, __LINE__ - 1, __func__, var, attrs);
 #endif
@@ -857,7 +874,7 @@ mock_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attrs, UINTN size,
 			return status;
 		}
 
-#if defined(SHIM_DEBUG) && SHIM_DEBUG != 0
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
 		printf("%s:%d:%s(): Adding "GUID_FMT"-%s %s %s\n",
 		       __FILE__, __LINE__ - 1, __func__,
 		       GUID_ARGS(var->guid), Str2str(var->name),
@@ -1088,7 +1105,8 @@ mock_load_one_variable(int dfd, const char * const dirname, char * const name)
 
 	name[namelen-1] = 0;
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
-	printf("loading %s-%s\n", &name[namelen], name);
+	printf("%s:%d:%s(): loading %s-%s\n", __FILE__, __LINE__, __func__,
+	       &name[namelen], name);
 #endif
 	for (size_t i = 0; i < namelen; i++)
 		namebuf[i] = name[i];
@@ -1118,6 +1136,9 @@ mock_load_variables(const char *const dirname, const char *filters[],
 	DIR *d;
 	struct dirent *entry;
 
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+	printf("Started loading variablles from \"%s\"\n", dirname);
+#endif
 	d = opendir(dirname);
 	if (!d)
 		err(1, "Could not open directory \"%s\"", dirname);
@@ -1130,6 +1151,11 @@ mock_load_variables(const char *const dirname, const char *filters[],
 	while ((entry = readdir(d)) != NULL) {
 		size_t len = strlen(entry->d_name);
 		bool found = false;
+		if (entry->d_type != DT_REG)
+			continue;
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+		printf("%s:%d:%s(): maybe adding entry \"%s\"\n", __FILE__, __LINE__, __func__, entry->d_name);
+#endif
 		if (filters && len > guidstr_size + 1) {
 			char spacebuf[len];
 
@@ -1140,6 +1166,9 @@ mock_load_variables(const char *const dirname, const char *filters[],
 				if (strlen(filters[i]) > len)
 					continue;
 				if (!strncmp(entry->d_name, filters[i], len)) {
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 2
+					printf("%s:%d:%s(): filter matched for \"%s\" && \"%s\"\n", __FILE__, __LINE__, __func__, entry->d_name, filters[i]);
+#endif
 					found = true;
 					break;
 				}
@@ -1147,9 +1176,23 @@ mock_load_variables(const char *const dirname, const char *filters[],
 		}
 		if ((found == false && filter_out == true) ||
 		    (found == true && filter_out == false)) {
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+			printf("%s:%d:%s(): Adding \"%s\" because filter %s\n",
+			       __FILE__, __LINE__-1, __func__, entry->d_name,
+			       found ? "matched" : "did not match");
+#endif
 			mock_load_one_variable(dfd, dirname, entry->d_name);
+		} else {
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+			printf("%s:%d:%s(): Skipping \"%s\" because filter %s\n",
+			       __FILE__, __LINE__-1, __func__, entry->d_name,
+			       found ? "matched" : "did not match");
+#endif
 		}
 	}
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+	printf("Done loading variablles from \"%s\"\n", dirname);
+#endif
 
 	closedir(d);
 #if 0

@@ -207,19 +207,35 @@ test_gnvn_helper(char *testvars)
 	const char *mok_rt_vars[n_mok_state_variables];
 
 	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		/*
+		 * We don't want to filter out the variables we've added to
+		 * mok mirroring that aren't really from mok; right now
+		 * this is a reasonable heuristic for that.
+		 */
+		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY)
+			continue;
 		mok_rt_vars[i] = mok_state_variables[i].rtname8;
 	}
 
 	mock_load_variables(testvars, mok_rt_vars, true);
 
+#if defined(SHIM_DEBUG) && SHIM_DEBUG != 0
+	dump_mock_variables(__FILE__, __LINE__, __func__);
+#endif
+
+	/*
+	 * This tests the sort policy, filtering for only variables in the
+	 * EFI "global" namespace.  If ascending the first thing should
+	 * be Boot0000, if descending it should be dbxDefault
+	 */
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+	printf("Testing mock variable sorting in the global namespace\n");
+#endif
 	size = sizeof(buf);
 	buf[0] = L'\0';
 	status = RT->GetNextVariableName(&size, buf, &GV_GUID);
 	assert_equal_goto(status, EFI_SUCCESS, err, "0x%lx != 0x%lx\n");
 
-#if defined(SHIM_DEBUG) && SHIM_DEBUG != 0
-	dump_mock_variables(__FILE__, __LINE__, __func__);
-#endif
 	switch (mock_variable_sort_policy) {
 	case MOCK_SORT_DESCENDING:
 		dump_mock_variables_if_wrong(__FILE__, __LINE__, __func__,
@@ -236,6 +252,14 @@ test_gnvn_helper(char *testvars)
 		break;
 	}
 
+	/*
+	 * Do it again but test for only variables in the Secure Boot
+	 * policy guid namespace.  Ascending should be "db", descending
+	 * "dbx".
+	 */
+#if defined(SHIM_DEBUG) && SHIM_DEBUG >= 1
+	printf("Testing mock variable sorting in the Secure Boot GUID namespace\n");
+#endif
 	size = sizeof(buf);
 	buf[0] = 0;
 	status = RT->GetNextVariableName(&size, buf, &EFI_SECURE_BOOT_DB_GUID);
@@ -284,6 +308,13 @@ test_get_variable_0(void)
 	const char *mok_rt_vars[n_mok_state_variables];
 
 	for (size_t i = 0; i < n_mok_state_variables; i++) {
+		/*
+		 * We don't want to filter out the variables we've added to
+		 * mok mirroring that aren't really from mok; right now
+		 * this is a reasonable heuristic for that.
+		 */
+		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY)
+			continue;
 		mok_rt_vars[i] = mok_state_variables[i].rtname8;
 	}
 

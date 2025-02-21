@@ -175,13 +175,18 @@
 #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
 #endif
 
-#ifndef ALIGN
+#ifndef __ALIGN
 #define __ALIGN_MASK(x, mask)   (((x) + (mask)) & ~(mask))
 #define __ALIGN(x, a)           __ALIGN_MASK(x, (typeof(x))(a) - 1)
+#endif
+#ifndef ALIGN
 #define ALIGN(x, a)             __ALIGN((x), (a))
 #endif
 #ifndef ALIGN_DOWN
 #define ALIGN_DOWN(x, a)        __ALIGN((x) - ((a) - 1), (a))
+#endif
+#ifndef ALIGN_UP
+#define ALIGN_UP(addr, align) (((addr) + (typeof (addr)) (align) - 1) & ~((typeof (addr)) (align) - 1))
 #endif
 
 #define MIN(a, b) ({(a) < (b) ? (a) : (b);})

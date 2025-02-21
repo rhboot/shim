@@ -3,6 +3,16 @@
 #ifndef SHIM_GUID_H
 #define SHIM_GUID_H
 
+#define LGUID_FMT L"%08x-%04hx-%04hx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+#define GUID_FMT "%08x-%04hx-%04hx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+
+#define GUID_ARGS(guid) \
+  ((EFI_GUID)guid).Data1, ((EFI_GUID)guid).Data2, ((EFI_GUID)guid).Data3, \
+  ((EFI_GUID)guid).Data4[1], ((EFI_GUID)guid).Data4[0], \
+  ((EFI_GUID)guid).Data4[2], ((EFI_GUID)guid).Data4[3], \
+  ((EFI_GUID)guid).Data4[4], ((EFI_GUID)guid).Data4[5], \
+  ((EFI_GUID)guid).Data4[6], ((EFI_GUID)guid).Data4[7]
+
 extern EFI_GUID BDS_GUID;
 extern EFI_GUID GV_GUID;
 extern EFI_GUID SIG_DB;
