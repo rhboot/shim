@@ -13,13 +13,19 @@ PCR7:
   - MokListX - the Mok denylist, logged as "MokListX"
   - vendor_dbx - shim's built-in vendor denylist, logged as "dbx"
   - DB - the system allowlist, logged as "db"
-  - vendor_db - shim's built-in vendor allowlist, logged as "db"
+  - vendor_db - shim's built-in vendor allowlist, logged as "vendor_db"
   - MokList the Mok allowlist, logged as "MokList"
   - vendor_cert - shim's built-in vendor allowlist, logged as "Shim"
   - shim_cert - shim's build-time generated allowlist, logged as "Shim"
 - MokSBState will be extended into PCR7 if it is set, logged as
   "MokSBState".
 - SBAT will be extended into PCR7 if it is set, logged as "SBAT"
+
+Note: In the past this document called out that vendor_db was logged as
+      "db", when in fact the code didn't do that. Since changing the code
+      risks breaking recorded logs, the documentation is update to reflect
+      reality.  vendor_dbx is in fact logged as "dbx".
+
 
 PCR8:
 - If you're using the grub2 TPM patchset we cary in Fedora, the kernel command
