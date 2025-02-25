@@ -28,7 +28,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	memcpy(data_copy, data, size);
 	data_copy[size] = 0;
 
-	status = read_header(data_copy, size, &context);
+	status = read_header(data_copy, size, &context, true);
 
 	free(data_copy);
 

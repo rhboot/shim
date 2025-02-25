@@ -368,7 +368,8 @@ image_is_loadable(EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr)
  */
 EFI_STATUS
 read_header(void *data, unsigned int datasize,
-	    PE_COFF_LOADER_IMAGE_CONTEXT *context)
+	    PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	    bool check_secdir)
 {
 	EFI_IMAGE_DOS_HEADER *DosHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
@@ -542,9 +543,12 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
-	if (context->SecDir->VirtualAddress > datasize ||
-	    (context->SecDir->VirtualAddress == datasize &&
-	     context->SecDir->Size > 0)) {
+	if (check_secdir &&
+	    (context->SecDir->VirtualAddress > datasize ||
+	     (context->SecDir->VirtualAddress == datasize &&
+	      context->SecDir->Size > 0))) {
+		dprint(L"context->SecDir->VirtualAddress:0x%llx context->SecDir->Size:0x%llx datasize:0x%llx\n",
+		       context->SecDir->VirtualAddress, context->SecDir->Size, datasize);
 		perror(L"Malformed security header\n");
 		return EFI_INVALID_PARAMETER;
 	}
