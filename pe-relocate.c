@@ -378,11 +378,18 @@ read_header(void *data, unsigned int datasize,
 	size_t dos_sz = 0;
 	size_t tmpsz0, tmpsz1;
 
+	/*
+	 * It has to be big enough to hold the DOS header; right now we
+	 * don't support images without it.
+	 */
 	if (datasize < sizeof (*DosHdr)) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * It must have a valid DOS header
+	 */
 	if (DosHdr->e_magic == EFI_IMAGE_DOS_SIGNATURE) {
 		if (DosHdr->e_lfanew < sizeof (*DosHdr) ||
 		    DosHdr->e_lfanew > datasize - 4) {
@@ -394,11 +401,17 @@ read_header(void *data, unsigned int datasize,
 		PEHdr = (EFI_IMAGE_OPTIONAL_HEADER_UNION *)((char *)data + DosHdr->e_lfanew);
 	}
 
+	/*
+	 * Has to be big enough to hold a PE header
+	 */
 	if (datasize - dos_sz < sizeof (PEHdr->Pe32)) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * If it's 64-bit, it has to hold the PE32+ header
+	 */
 	if (image_is_64_bit(PEHdr) &&
 	    (datasize - dos_sz < sizeof (PEHdr->Pe32Plus))) {
 		perror(L"Invalid image\n");
@@ -426,6 +439,13 @@ read_header(void *data, unsigned int datasize,
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
 	}
 
+	/*
+	 * Set up our file alignment and section alignment expectations to
+	 * be mostly sane.
+	 *
+	 * This probably should have a check for /power/ of two not just
+	 * multiple, but in practice it hasn't been an issue.
+	 */
 	if (FileAlignment % 2 != 0) {
 		perror(L"File Alignment is invalid (%d)\n", FileAlignment);
 		return EFI_UNSUPPORTED;
@@ -439,11 +459,24 @@ read_header(void *data, unsigned int datasize,
 
 	context->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
+	/*
+	 * Check and make sure the space for data directory entries is as
+	 * large as we expect.
+	 *
+	 * In truth we could set this number smaller if we needed to -
+	 * currently it's 16 but we only care about #4 and #5 (the fifth
+	 * and sixth ones) - but it hasn't been a problem.  If it's too
+	 * weird we'll fail trying to allocate it.
+	 */
 	if (EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES < context->NumberOfRvaAndSizes) {
 		perror(L"Image header too large\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the OptionalHeaderSize and the end of the Data
+	 * Directory match up sanely
+	 */
 	if (checked_mul(sizeof(EFI_IMAGE_DATA_DIRECTORY), EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES, &tmpsz0) ||
 	    checked_sub(OptHeaderSize, tmpsz0, &HeaderWithoutDataDir) ||
 	    checked_sub((size_t)PEHdr->Pe32.FileHeader.SizeOfOptionalHeader, HeaderWithoutDataDir, &tmpsz0) ||
@@ -453,6 +486,9 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the SectionHeaderOffset field is within the image.
+	 */
 	if (checked_add((size_t)DosHdr->e_lfanew, sizeof(UINT32), &tmpsz0) ||
 	    checked_add(tmpsz0, sizeof(EFI_IMAGE_FILE_HEADER), &tmpsz0) ||
 	    checked_add(tmpsz0, PEHdr->Pe32.FileHeader.SizeOfOptionalHeader, &SectionHeaderOffset)) {
@@ -460,18 +496,29 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the sections headers themselves are within the image
+	 */
 	if (checked_sub((size_t)context->ImageSize, SectionHeaderOffset, &tmpsz0) ||
 	    (tmpsz0 / EFI_IMAGE_SIZEOF_SECTION_HEADER <= context->NumberOfSections)) {
 		perror(L"Image sections overflow image size\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the section headers fit within the total headers
+	 */
 	if (checked_sub((size_t)context->SizeOfHeaders, SectionHeaderOffset, &tmpsz0) ||
 	    (tmpsz0 / EFI_IMAGE_SIZEOF_SECTION_HEADER < (UINT32)context->NumberOfSections)) {
 		perror(L"Image sections overflow section headers\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the section headers are actually within the data
+	 * we've read.  Might be duplicative of the ImageSize one, but it
+	 * won't hurt.
+	 */
 	if (checked_mul((size_t)context->NumberOfSections, sizeof(EFI_IMAGE_SECTION_HEADER), &tmpsz0) ||
 	    checked_add(tmpsz0, SectionHeaderOffset, &tmpsz0) ||
 	    (tmpsz0 > datasize)) {
@@ -479,6 +526,9 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the optional header fits in the image.
+	 */
 	if (checked_sub((size_t)(uintptr_t)PEHdr, (size_t)(uintptr_t)data, &tmpsz0) ||
 	    checked_add(tmpsz0, sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION), &tmpsz0) ||
 	    (tmpsz0 > datasize)) {
@@ -486,11 +536,17 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that this claims to be a PE binary
+	 */
 	if (PEHdr->Te.Signature != EFI_IMAGE_NT_SIGNATURE) {
 		perror(L"Unsupported image type\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that relocations aren't stripped, because that won't work.
+	 */
 	if (PEHdr->Pe32.FileHeader.Characteristics & EFI_IMAGE_FILE_RELOCS_STRIPPED) {
 		perror(L"Unsupported image - Relocations have been stripped\n");
 		return EFI_UNSUPPORTED;
@@ -512,18 +568,28 @@ read_header(void *data, unsigned int datasize,
 		context->DllCharacteristics = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
 	}
 
+	/*
+	 * If NX_COMPAT is required, check that it's set.
+	 */
 	if ((mok_policy & MOK_POLICY_REQUIRE_NX) &&
 	    !(context->DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
 		perror(L"Policy requires NX, but image does not support NX\n");
 		return EFI_UNSUPPORTED;
         }
 
+	/*
+	 * Check that the file header fits within the image.
+	 */
 	if (checked_add((size_t)(uintptr_t)PEHdr, PEHdr->Pe32.FileHeader.SizeOfOptionalHeader, &tmpsz0) ||
 	    checked_add(tmpsz0, sizeof(UINT32), &tmpsz0) ||
 	    checked_add(tmpsz0, sizeof(EFI_IMAGE_FILE_HEADER), &tmpsz0)) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
+
+	/*
+	 * Check that the first section header is within the image data
+	 */
 	context->FirstSection = (EFI_IMAGE_SECTION_HEADER *)(uintptr_t)tmpsz0;
 	if ((uint64_t)(uintptr_t)(context->FirstSection)
 	    > (uint64_t)(uintptr_t)data + datasize) {
@@ -531,17 +597,29 @@ read_header(void *data, unsigned int datasize,
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the headers fit within the image.
+	 */
 	if (context->ImageSize < context->SizeOfHeaders) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * check that the data directory fits within the image.
+	 */
 	if (checked_sub((size_t)(uintptr_t)context->SecDir, (size_t)(uintptr_t)data, &tmpsz0) ||
 	    (tmpsz0 > datasize - sizeof(EFI_IMAGE_DATA_DIRECTORY))) {
 		perror(L"Invalid image\n");
 		return EFI_UNSUPPORTED;
 	}
 
+	/*
+	 * Check that the certificate table is within the binary -
+	 * "VirtualAddress" is a misnomer here, it's a relative offset to
+	 * the image's load address, so compared to datasize it should be
+	 * absolute.
+	 */
 	if (check_secdir &&
 	    (context->SecDir->VirtualAddress > datasize ||
 	     (context->SecDir->VirtualAddress == datasize &&
