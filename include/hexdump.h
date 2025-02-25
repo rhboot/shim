@@ -89,8 +89,12 @@ vhexdumpf(const char *file, int line, const char *func, const CHAR16 *const fmt,
 	if (verbose == 0)
 		return;
 
-	if (!data || !size) {
+	if (!data) {
 		dprint(L"hexdump of a NULL pointer!\n");
+		return;
+	}
+	if (!size) {
+		dprint(L"hexdump of a 0 size region!\n");
 		return;
 	}
 

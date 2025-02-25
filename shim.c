@@ -961,7 +961,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 
 	in_protocol = 1;
 
-	efi_status = read_header(buffer, size, &context);
+	efi_status = read_header(buffer, size, &context, true);
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -1016,7 +1016,7 @@ static EFI_STATUS shim_read_header(void *data, unsigned int datasize,
 	EFI_STATUS efi_status;
 
 	in_protocol = 1;
-	efi_status = read_header(data, datasize, context);
+	efi_status = read_header(data, datasize, context, true);
 	in_protocol = 0;
 
 	return efi_status;
@@ -1992,6 +1992,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
 	 */
 	debug_hook();
+
+	get_shim_nx_capability(image_handle);
 
 	efi_status = set_sbat_uefi_variable_internal();
 	if (EFI_ERROR(efi_status) && secure_mode()) {

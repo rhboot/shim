@@ -12,7 +12,8 @@ ImageAddress (void *image, uint64_t size, uint64_t address);
 
 EFI_STATUS
 read_header(void *data, unsigned int datasize,
-	    PE_COFF_LOADER_IMAGE_CONTEXT *context);
+	    PE_COFF_LOADER_IMAGE_CONTEXT *context,
+	    bool check_secdir);
 
 EFI_STATUS verify_image(void *data, unsigned int datasize,
 			EFI_LOADED_IMAGE *li,
@@ -51,6 +52,9 @@ EFI_STATUS
 relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	       EFI_IMAGE_SECTION_HEADER *Section,
 	       void *orig, void *data);
+
+void
+get_shim_nx_capability(EFI_HANDLE image_handle);
 
 #endif /* !PE_H_ */
 // vim:fenc=utf-8:tw=75:noet

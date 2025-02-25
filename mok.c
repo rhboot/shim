@@ -45,6 +45,7 @@ format_hsi_status(UINT8 *buf, size_t sz,
 	const char hasdxeservices[] = "\nhas-dxe-services-table: ";
 	const char hasdsgmsd[] = "\nhas-get-memory-space-descriptor: ";
 	const char hasdssmsa[] = "\nhas-set-memory-space-attributes: ";
+	const char shimhasnx[] = "\nshim-has-nx-compat-set: ";
 	const char finale[] = "\n";
 	char *pos;
 
@@ -55,7 +56,7 @@ format_hsi_status(UINT8 *buf, size_t sz,
 	UINTN ret = sizeof(heapx) + sizeof(stackx) +
 		    sizeof(row) + sizeof(hasmap) +
 		    sizeof(hasdxeservices) + sizeof(hasdsgmsd) +
-		    sizeof(hasdssmsa) +
+		    sizeof(hasdssmsa) + sizeof(shimhasnx) +
 		    sizeof(finale);
 
 	if (buf == 0 || sz < ret) {
@@ -78,6 +79,8 @@ format_hsi_status(UINT8 *buf, size_t sz,
 	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_HASDSTGMSD) ? "1" : "0");
 	pos = stpcpy(pos, hasdssmsa);
 	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_HASDSTSMSA) ? "1" : "0");
+	pos = stpcpy(pos, shimhasnx);
+	pos = stpcpy(pos, (hsi_status & SHIM_HSI_STATUS_NX) ? "1" : "0");
 	stpcpy(pos, finale);
 
 	return ret;

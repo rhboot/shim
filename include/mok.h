@@ -147,6 +147,8 @@ extern UINTN hsi_status;
 #define SHIM_HSI_STATUS_HASDSTGMSD	0x00000020ULL
 /* platform has DST->SetMemorySpaceAttributes */
 #define SHIM_HSI_STATUS_HASDSTSMSA	0x00000040ULL
+/* This shim has the NX_COMPAT bit set */
+#define SHIM_HSI_STATUS_NX		0x00000100ULL
 
 #endif /* !SHIM_MOK_H_ */
 // vim:fenc=utf-8:tw=75:noet

@@ -144,12 +144,12 @@ typedef struct {
 
 ///
 /// @attention
-/// EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC means PE32 and 
+/// EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC means PE32 and
 /// EFI_IMAGE_OPTIONAL_HEADER32 must be used. The data structures only vary
 /// after NT additional fields.
 ///
 #define EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC 0x10b
-          
+
 ///
 /// Optional Header Standard Fields for PE32.
 ///
@@ -195,7 +195,7 @@ typedef struct {
 
 ///
 /// @attention
-/// EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC means PE32+ and 
+/// EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC means PE32+ and
 /// EFI_IMAGE_OPTIONAL_HEADER64 must be used. The data structures only vary
 /// after NT additional fields.
 ///
@@ -465,7 +465,7 @@ typedef struct {
 #define EFI_IMAGE_COMDAT_SELECT_SAME_SIZE       3
 #define EFI_IMAGE_COMDAT_SELECT_EXACT_MATCH     4
 #define EFI_IMAGE_COMDAT_SELECT_ASSOCIATIVE     5
-                                       
+
 //
 // the following values only be referred in PeCoff, not defined in PECOFF.
 //
@@ -500,9 +500,9 @@ typedef struct {
 #define EFI_IMAGE_REL_I386_SECREL   0x000B
 #define EFI_IMAGE_REL_I386_REL32    0x0014  ///< PC-relative 32-bit reference to the symbols virtual address.
 
-// 
+//
 // x64 processor relocation types.
-// 
+//
 #define IMAGE_REL_AMD64_ABSOLUTE  0x0000
 #define IMAGE_REL_AMD64_ADDR64    0x0001
 #define IMAGE_REL_AMD64_ADDR32    0x0002

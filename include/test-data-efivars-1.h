@@ -114,6 +114,7 @@ static const unsigned char test_data_efivars_1_HSIStatus[] =
 	"has-dxe-services-table: 0\n"
 	"has-get-memory-space-descriptor: 0\n"
 	"has-set-memory-space-attributes: 0\n"
+	"shim-has-nx-compat-set: 0\n"
 	;
 
 #endif /* !TEST_DATA_EFIVARS_1_H_ */
