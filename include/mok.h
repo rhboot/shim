@@ -127,6 +127,9 @@ struct mok_variable_config_entry {
 	UINT8 data[];
 };
 
+extern EFI_PHYSICAL_ADDRESS mok_config_table;
+extern UINTN mok_config_table_pages;
+
 /*
  * bit definitions for MokPolicy
  */

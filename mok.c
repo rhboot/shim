@@ -1305,6 +1305,8 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 			config_table = NULL;
 		} else {
 			ZeroMem(config_table, npages << EFI_PAGE_SHIFT);
+			mok_config_table = (EFI_PHYSICAL_ADDRESS)(uintptr_t)config_table;
+			mok_config_table_pages = npages;
 		}
 	}
 

@@ -173,16 +173,41 @@ format_debug_log(UINT8 *dest, size_t dest_sz)
 }
 
 void
+replace_config_table(EFI_CONFIGURATION_TABLE *CT, EFI_PHYSICAL_ADDRESS new_table, UINTN new_table_pages)
+{
+	EFI_GUID bogus_guid = { 0x29f2f0db, 0xd025, 0x4aa6, { 0x99, 0x58, 0xa0, 0x21, 0x8b, 0x1d, 0xec, 0x0e }};
+	EFI_STATUS efi_status;
+
+	if (CT) {
+		CopyMem(&CT->VendorGuid, &bogus_guid, sizeof(bogus_guid));
+		if (CT->VendorTable &&
+		    CT->VendorTable == (void *)(uintptr_t)mok_config_table) {
+			BS->FreePages(mok_config_table, mok_config_table_pages);
+			CT->VendorTable = NULL;
+		}
+	}
+
+	efi_status = BS->InstallConfigurationTable(&MOK_VARIABLE_STORE,
+						   (void *)(uintptr_t)new_table);
+	if (EFI_ERROR(efi_status)) {
+		console_print(L"Could not re-install MoK configuration table: %r\n", efi_status);
+	} else {
+		mok_config_table = new_table;
+		mok_config_table_pages = new_table_pages;
+	}
+}
+
+void
 save_logs(void)
 {
 	struct mok_variable_config_entry *cfg_table = NULL;
 	struct mok_variable_config_entry *new_table = NULL;
 	struct mok_variable_config_entry *entry = NULL;
+	EFI_PHYSICAL_ADDRESS physaddr = 0;
+	UINTN new_table_pages = 0;
 	size_t new_table_sz;
 	UINTN pos = 0;
 	EFI_STATUS efi_status;
-	EFI_CONFIGURATION_TABLE *CT;
-	EFI_GUID bogus_guid = { 0x29f2f0db, 0xd025, 0x4aa6, { 0x99, 0x58, 0xa0, 0x21, 0x8b, 0x1d, 0xec, 0x0e }};
 	size_t errlog_sz, dbglog_sz;
 
 	errlog_sz = format_error_log(NULL, 0);
@@ -194,6 +219,7 @@ save_logs(void)
 	}
 
 	for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
+		EFI_CONFIGURATION_TABLE *CT;
 		CT = &ST->ConfigurationTable[i];
 
 		if (CompareGuid(&MOK_VARIABLE_STORE, &CT->VendorGuid) == 0) {
@@ -208,18 +234,28 @@ save_logs(void)
 		size_t entry_sz;
 		entry = (struct mok_variable_config_entry *)((uintptr_t)cfg_table + pos);
 
-		entry_sz = sizeof(*entry);
-		entry_sz += entry->data_size;
-
-		if (entry->name[0] != 0)
+		if (entry->name[0] != 0) {
+			entry_sz = sizeof(*entry);
+			entry_sz += entry->data_size;
 			pos += entry_sz;
+		}
 	}
 
-	new_table_sz = pos + 3 * sizeof(*entry) + errlog_sz + dbglog_sz;
-	new_table = AllocateZeroPool(new_table_sz);
+	new_table_sz = pos +
+		(errlog_sz ? sizeof(*entry) + errlog_sz : 0) +
+		(dbglog_sz ? sizeof(*entry) + dbglog_sz : 0) +
+		sizeof(*entry);
+	new_table = NULL;
+	new_table_pages = ALIGN_UP(new_table_sz + 4*EFI_PAGE_SIZE, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
+	efi_status = BS->AllocatePages(AllocateAnyPages, EfiRuntimeServicesData, new_table_pages, &physaddr);
+	if (EFI_ERROR(efi_status)) {
+		perror(L"Couldn't allocate %llu pages\n", new_table_pages);
+		return;
+	}
+	new_table = (void *)(uintptr_t)physaddr;
 	if (!new_table)
 		return;
-
+	ZeroMem(new_table, new_table_pages * EFI_PAGE_SIZE);
 	CopyMem(new_table, cfg_table, pos);
 
 	entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
@@ -237,15 +273,11 @@ save_logs(void)
 		format_debug_log(&entry->data[0], dbglog_sz);
 
 		pos += sizeof(*entry) + dbglog_sz;
-		// entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
+
+		entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
 	}
 
-	if (CT) {
-		CopyMem(&CT->VendorGuid, &bogus_guid, sizeof(bogus_guid));
-	}
-	efi_status = BS->InstallConfigurationTable(&MOK_VARIABLE_STORE, new_table);
-	if (EFI_ERROR(efi_status))
-		console_print(L"Could not re-install MoK configuration table: %r\n", efi_status);
+	replace_config_table((EFI_CONFIGURATION_TABLE *)cfg_table, physaddr, new_table_pages);
 }
 
 // vim:fenc=utf-8:tw=75
