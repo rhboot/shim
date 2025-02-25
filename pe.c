@@ -406,7 +406,7 @@ EFI_STATUS verify_image(void *data, unsigned int datasize,
 	/*
 	 * The binary header contains relevant context and section pointers
 	 */
-	efi_status = read_header(data, datasize, context);
+	efi_status = read_header(data, datasize, context, true);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to read header: %r\n", efi_status);
 		return efi_status;
@@ -482,7 +482,7 @@ handle_image (void *data, unsigned int datasize,
 	/*
 	 * The binary header contains relevant context and section pointers
 	 */
-	efi_status = read_header(data, datasize, &context);
+	efi_status = read_header(data, datasize, &context, true);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to read header: %r\n", efi_status);
 		return efi_status;

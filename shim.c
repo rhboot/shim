@@ -961,7 +961,7 @@ EFI_STATUS shim_verify (void *buffer, UINT32 size)
 
 	in_protocol = 1;
 
-	efi_status = read_header(buffer, size, &context);
+	efi_status = read_header(buffer, size, &context, true);
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -1016,7 +1016,7 @@ static EFI_STATUS shim_read_header(void *data, unsigned int datasize,
 	EFI_STATUS efi_status;
 
 	in_protocol = 1;
-	efi_status = read_header(data, datasize, context);
+	efi_status = read_header(data, datasize, context, true);
 	in_protocol = 0;
 
 	return efi_status;
