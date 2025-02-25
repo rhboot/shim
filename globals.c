@@ -35,4 +35,7 @@ UINT8 mok_policy = 0;
 
 UINT32 verbose = 0;
 
+EFI_PHYSICAL_ADDRESS mok_config_table = 0;
+UINTN mok_config_table_pages = 0;
+
 // vim:fenc=utf-8:tw=75:noet
