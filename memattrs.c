@@ -400,6 +400,46 @@ get_mem_attrs(uintptr_t addr, size_t size, uint64_t *attrs)
 	return efi_status;
 }
 
+char *
+decode_hsi_bits(UINTN hsi)
+{
+	static const struct {
+		UINTN bit;
+		char name[16];
+	} bits[] = {
+		{.bit = SHIM_HSI_STATUS_HEAPX, .name = "HEAPX"},
+		{.bit = SHIM_HSI_STATUS_STACKX, .name = "STACKX"},
+		{.bit = SHIM_HSI_STATUS_ROW, .name = "ROW"},
+		{.bit = SHIM_HSI_STATUS_HASMAP, .name = "HASMAP"},
+		{.bit = SHIM_HSI_STATUS_HASDST, .name = "HASDST"},
+		{.bit = SHIM_HSI_STATUS_HASDSTGMSD, .name = "HASDSTGMSD"},
+		{.bit = SHIM_HSI_STATUS_HASDSTSMSA, .name = "HASDSTSMSA"},
+		{.bit = 0, .name = ""},
+	};
+	static int x = 0;
+	static char retbufs[2][sizeof(bits)];
+	char *retbuf = &retbufs[x % 2][0];
+	char *prev = &retbuf[0];
+	char *pos = &retbuf[0];
+
+	x = ( x + 1 ) % 2;
+
+	ZeroMem(retbuf, sizeof(bits));
+
+	if (hsi == 0) {
+		prev = stpcpy(retbuf, "0");
+	} else {
+		for (UINTN i = 0; bits[i].bit != 0; i++) {
+			if (hsi & bits[i].bit) {
+				prev = stpcpy(pos, bits[i].name);
+				pos = stpcpy(prev, "|");
+			}
+		}
+	}
+	prev[0] = '\0';
+	return retbuf;
+}
+
 void
 get_hsi_mem_info(void)
 {
@@ -412,17 +452,30 @@ get_hsi_mem_info(void)
 
 	get_efi_mem_attr_protocol(&efiproto);
 	if (efiproto) {
-		hsi_status = SHIM_HSI_STATUS_HASMAP;
-		dprint(L"Setting HSI to 0x%lx\n", hsi_status);
+		dprint(L"Setting HSI from %a to %a\n",
+		       decode_hsi_bits(hsi_status),
+		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_HASMAP));
+		hsi_status |= SHIM_HSI_STATUS_HASMAP;
 	}
 
 	get_dxe_services_table(&dst);
 	if (dst) {
+		dprint(L"Setting HSI from %a to %a\n",
+		       decode_hsi_bits(hsi_status),
+		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_HASDST));
 		hsi_status |= SHIM_HSI_STATUS_HASDST;
-		if (dst->GetMemorySpaceDescriptor)
+		if (dst->GetMemorySpaceDescriptor) {
+			dprint(L"Setting HSI from %a to %a\n",
+			       decode_hsi_bits(hsi_status),
+			       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_HASDSTGMSD));
 			hsi_status |= SHIM_HSI_STATUS_HASDSTGMSD;
-		if (dst->SetMemorySpaceAttributes)
+		}
+		if (dst->SetMemorySpaceAttributes) {
+			dprint(L"Setting HSI from %a to %a\n",
+			       decode_hsi_bits(hsi_status),
+			       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_HASDSTSMSA));
 			hsi_status |= SHIM_HSI_STATUS_HASDSTSMSA;
+		}
 	}
 
 	if (!(hsi_status & SHIM_HSI_STATUS_HASMAP) &&
@@ -440,8 +493,9 @@ get_hsi_mem_info(void)
 	}
 
 	if (attrs & MEM_ATTR_W) {
-		dprint(L"get_hsi_mem_info() is on a writable page: 0x%x->0x%x\n",
-		       hsi_status, hsi_status | SHIM_HSI_STATUS_ROW);
+		dprint(L"get_hsi_mem_info() is on a writable page: %a->%a\n",
+		       decode_hsi_bits(hsi_status),
+		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_ROW));
 		hsi_status |= SHIM_HSI_STATUS_ROW;
 	}
 
@@ -453,8 +507,9 @@ get_hsi_mem_info(void)
 	}
 
 	if (attrs & MEM_ATTR_X) {
-		dprint(L"Stack variable is on an executable page: 0x%x->0x%x\n",
-		       hsi_status, hsi_status | SHIM_HSI_STATUS_STACKX);
+		dprint(L"Stack variable is on an executable page: %a->%a\n",
+		       decode_hsi_bits(hsi_status),
+		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_STACKX));
 		hsi_status |= SHIM_HSI_STATUS_STACKX;
 	}
 
@@ -472,8 +527,9 @@ get_hsi_mem_info(void)
 		goto error;
 	}
 	if (attrs & MEM_ATTR_X) {
-		dprint(L"Heap variable is on an executable page: 0x%x->0x%x\n",
-		       hsi_status, hsi_status | SHIM_HSI_STATUS_HEAPX);
+		dprint(L"Heap variable is on an executable page: %a->%a\n",
+		       decode_hsi_bits(hsi_status),
+		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_HEAPX));
 		hsi_status |= SHIM_HSI_STATUS_HEAPX;
 	}
 
@@ -487,7 +543,7 @@ error:
 	hsi_status = SHIM_HSI_STATUS_HEAPX |
 		     SHIM_HSI_STATUS_STACKX |
 		     SHIM_HSI_STATUS_ROW;
-	dprint(L"Setting HSI to 0x%lx due to error: %r\n", hsi_status, efi_status);
+	dprint(L"Setting HSI to 0x%lx due to error: %r\n", decode_hsi_bits(hsi_status), efi_status);
 }
 
 // vim:fenc=utf-8:tw=75:noet
