@@ -119,8 +119,8 @@ make_full_path(CHAR16 *dirname, CHAR16 *filename, CHAR16 **out, UINT64 *outlen)
 	return EFI_SUCCESS;
 }
 
-CHAR16 *bootorder = NULL;
-int nbootorder = 0;
+UINT16 *bootorder = NULL;
+UINTN nbootorder = 0;
 
 EFI_DEVICE_PATH *first_new_option = NULL;
 VOID *first_new_option_args = NULL;
@@ -128,7 +128,8 @@ UINTN first_new_option_size = 0;
 
 EFI_STATUS
 add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
-		CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
+		CHAR16 *filename, CHAR16 *label, CHAR16 *arguments,
+		UINT16 **newbootentries, UINTN *nnewbootentries)
 {
 	static int i = 0;
 	CHAR16 varname[] = L"Boot0000";
@@ -188,24 +189,21 @@ add_boot_option(EFI_DEVICE_PATH *hddp, EFI_DEVICE_PATH *fulldp,
 				return efi_status;
 			}
 
-			CHAR16 *newbootorder = AllocateZeroPool(sizeof (CHAR16)
-							* (nbootorder + 1));
+			UINT16 *newbootorder = AllocateZeroPool(sizeof (UINT16) * (*nnewbootentries + 1));
 			if (!newbootorder)
 				return EFI_OUT_OF_RESOURCES;
 
-			int j = 0;
-			newbootorder[0] = i & 0xffff;
-			if (nbootorder) {
-				for (j = 0; j < nbootorder; j++)
-					newbootorder[j+1] = bootorder[j];
-				FreePool(bootorder);
-			}
-			bootorder = newbootorder;
-			nbootorder += 1;
-			VerbosePrint(L"nbootorder: %d\nBootOrder: ",
-				      nbootorder);
-			for (j = 0 ; j < nbootorder ; j++)
-				VerbosePrintUnprefixed(L"%04x ", bootorder[j]);
+			UINTN j = 0;
+			CopyMem(newbootorder, *newbootentries, sizeof (UINT16) * (*nnewbootentries));
+			newbootorder[*nnewbootentries] = i & 0xffff;
+			if (*newbootentries)
+				FreePool(*newbootentries);
+			*newbootentries = newbootorder;
+			*nnewbootentries += 1;
+			VerbosePrint(L"nnewbootentries: %d\nnewbootentries: ",
+				      *nnewbootentries);
+			for (j = 0 ; j < *nnewbootentries ; j++)
+				VerbosePrintUnprefixed(L"%04x ", (*newbootentries)[j]);
 			VerbosePrintUnprefixed(L"\n");
 
 			return EFI_SUCCESS;
@@ -424,13 +422,13 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 EFI_STATUS
 set_boot_order(void)
 {
-	CHAR16 *oldbootorder;
+	UINT16 *oldbootorder;
 	UINTN size;
 
 	oldbootorder = LibGetVariableAndSize(L"BootOrder", &GV_GUID, &size);
 	if (oldbootorder) {
-		int i;
-		nbootorder = size / sizeof (CHAR16);
+		UINTN i;
+		nbootorder = size / sizeof (UINT16);
 		bootorder = oldbootorder;
 
 		VerbosePrint(L"Original nbootorder: %d\nOriginal BootOrder: ",
@@ -444,23 +442,41 @@ set_boot_order(void)
 }
 
 EFI_STATUS
-update_boot_order(void)
+update_boot_order(UINT16 *newbootentries, UINTN nnewbootentries)
 {
 	UINTN size;
 	UINTN len = 0;
-	CHAR16 *newbootorder = NULL;
+	UINT16 *newbootorder = NULL;
 	EFI_STATUS efi_status;
+	UINTN i;
 
-	size = nbootorder * sizeof(CHAR16);
+	VerbosePrint(L"old boot order: ");
+	for (i = 0; i < nbootorder; i++)
+		VerbosePrintUnprefixed(L"%04x ", bootorder[i]);
+	VerbosePrintUnprefixed(L"\n");
+	VerbosePrint(L"new boot entries: ");
+	for (i = 0; i < nnewbootentries; i++)
+		VerbosePrintUnprefixed(L"%04x ", newbootentries[i]);
+	VerbosePrintUnprefixed(L"\n");
+
+	size = nbootorder * sizeof(UINT16) + nnewbootentries * sizeof(UINT16);
 	newbootorder = AllocateZeroPool(size);
 	if (!newbootorder)
 		return EFI_OUT_OF_RESOURCES;
-	CopyMem(newbootorder, bootorder, size);
+	for (i = 0 ; i < nnewbootentries; i++) {
+		newbootorder[i] = newbootentries[i];
+	}
+	CopyMem(&newbootorder[i], bootorder, nbootorder * sizeof(UINT16));
 
-	VerbosePrint(L"nbootorder: %d\nBootOrder: ", size / sizeof (CHAR16));
-	UINTN j;
-	for (j = 0 ; j < size / sizeof (CHAR16); j++)
-		VerbosePrintUnprefixed(L"%04x ", newbootorder[j]);
+	if (bootorder)
+		FreePool(bootorder);
+	nbootorder = nnewbootentries + nbootorder;
+	bootorder = newbootorder;
+
+	VerbosePrint(L"updated nbootorder: %d\n", nbootorder);
+	VerbosePrint(L"updated bootoder: ");
+	for (i = 0; i < nbootorder; i++)
+		VerbosePrintUnprefixed(L"%04x ", bootorder[i]);
 	VerbosePrintUnprefixed(L"\n");
 	efi_status = RT->GetVariable(L"BootOrder", &GV_GUID, NULL, &len, NULL);
 	if (efi_status == EFI_BUFFER_TOO_SMALL)
@@ -470,13 +486,13 @@ update_boot_order(void)
 				     EFI_VARIABLE_NON_VOLATILE |
 				     EFI_VARIABLE_BOOTSERVICE_ACCESS |
 				     EFI_VARIABLE_RUNTIME_ACCESS,
-				     size, newbootorder);
-	FreePool(newbootorder);
+				     size, bootorder);
 	return efi_status;
 }
 
 EFI_STATUS
-add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *arguments)
+add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *arguments,
+		 UINT16 **newbootentries, UINTN *nnewbootentries)
 {
 	CHAR16 *fullpath = NULL;
 	UINT64 pathlen = 0;
@@ -535,19 +551,19 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 				      arguments, &option);
 	if (EFI_ERROR(efi_status)) {
 		add_boot_option(dp, full_device_path, fullpath, label,
-				arguments);
+				arguments, newbootentries, nnewbootentries);
 		goto done;
 	}
 
 	UINT16 bootnum;
-	CHAR16 *newbootorder;
+	UINT16 *newbootorder;
 	/* Search for the option in the current bootorder */
 	for (bootnum = 0; bootnum < nbootorder; bootnum++)
 		if (bootorder[bootnum] == option)
 			break;
 	if (bootnum == nbootorder) {
 		/* Option not found, prepend option and copy the rest */
-		newbootorder = AllocateZeroPool(sizeof(CHAR16)
+		newbootorder = AllocateZeroPool(sizeof(UINT16)
 						* (nbootorder + 1));
 		if (!newbootorder) {
 			efi_status = EFI_OUT_OF_RESOURCES;
@@ -555,30 +571,30 @@ add_to_boot_list(CHAR16 *dirname, CHAR16 *filename, CHAR16 *label, CHAR16 *argum
 		}
 		newbootorder[0] = option;
 		CopyMem(newbootorder + 1, bootorder,
-			sizeof(CHAR16) * nbootorder);
+			sizeof(UINT16) * nbootorder);
 		FreePool(bootorder);
 		bootorder = newbootorder;
 		nbootorder += 1;
 	} else {
 		/* Option found, put first and slice the rest */
 		newbootorder = AllocateZeroPool(
-			sizeof(CHAR16) * nbootorder);
+			sizeof(UINT16) * nbootorder);
 		if (!newbootorder) {
 			efi_status = EFI_OUT_OF_RESOURCES;
 			goto done;
 		}
 		newbootorder[0] = option;
 		CopyMem(newbootorder + 1, bootorder,
-			sizeof(CHAR16) * bootnum);
+			sizeof(UINT16) * bootnum);
 		CopyMem(newbootorder + 1 + bootnum,
 			bootorder + bootnum + 1,
-			sizeof(CHAR16) * (nbootorder - bootnum - 1));
+			sizeof(UINT16) * (nbootorder - bootnum - 1));
 		FreePool(bootorder);
 		bootorder = newbootorder;
 	}
 	VerbosePrint(L"New nbootorder: %d\nBootOrder: ",
 		      nbootorder);
-	for (int i = 0 ; i < nbootorder ; i++)
+	for (UINTN i = 0 ; i < nbootorder ; i++)
 		VerbosePrintUnprefixed(L"%04x ", bootorder[i]);
 	VerbosePrintUnprefixed(L"\n");
 
@@ -593,7 +609,8 @@ done:
 }
 
 EFI_STATUS
-populate_stanza(CHAR16 *dirname, CHAR16 *filename UNUSED, CHAR16 *csv)
+populate_stanza(CHAR16 *dirname, CHAR16 *filename UNUSED, CHAR16 *csv,
+		UINT16 **newbootentries, UINTN *nnewbootentries)
 {
 	CHAR16 *file = csv;
 	VerbosePrint(L"CSV data: \"%s\"\n", csv);
@@ -617,13 +634,14 @@ populate_stanza(CHAR16 *dirname, CHAR16 *filename UNUSED, CHAR16 *csv)
 	/* This one is optional, so don't check if comma2 is 0 */
 	VerbosePrint(L"arguments: \"%s\"\n", arguments);
 
-	add_to_boot_list(dirname, file, label, arguments);
+	add_to_boot_list(dirname, file, label, arguments, newbootentries, nnewbootentries);
 
 	return EFI_SUCCESS;
 }
 
 EFI_STATUS
-try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
+try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename,
+	     UINT16 **newbootentries, UINTN *nnewbootentries)
 {
 	CHAR16 *fullpath = NULL;
 	UINT64 pathlen = 0;
@@ -672,7 +690,7 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 		CHAR16 c = start[l];
 		start[l] = L'\0';
 
-		populate_stanza(dirname, filename, start);
+		populate_stanza(dirname, filename, start, newbootentries, nnewbootentries);
 
 		start[l] = c;
 		start += l;
@@ -683,7 +701,8 @@ try_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname, CHAR16 *filename)
 }
 
 EFI_STATUS
-find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
+find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname,
+	      UINT16 **newbootentries, UINTN *nnewbootentries)
 {
 	EFI_STATUS efi_status;
 	void *buffer = NULL;
@@ -782,7 +801,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 			console_print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
 				      dirname, bootarchcsv, efi_status);
 		} else {
-			efi_status = try_boot_csv(fh2, dirname, bootarchcsv);
+			efi_status = try_boot_csv(fh2, dirname, bootarchcsv,
+						  newbootentries, nnewbootentries);
 			fh2->Close(fh2);
 			if (EFI_ERROR(efi_status))
 				console_print(L"Could not process \\EFI\\%s\\%s: %r\n",
@@ -797,7 +817,8 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname)
 			console_print(L"Couldn't open \\EFI\\%s\\%s: %r\n",
 				      dirname, bootcsv, efi_status);
 		} else {
-			efi_status = try_boot_csv(fh2, dirname, bootcsv);
+			efi_status = try_boot_csv(fh2, dirname, bootcsv,
+						  newbootentries, nnewbootentries);
 			fh2->Close(fh2);
 			if (EFI_ERROR(efi_status))
 				console_print(L"Could not process \\EFI\\%s\\%s: %r\n",
@@ -812,6 +833,8 @@ find_boot_options(EFI_HANDLE device)
 {
 	EFI_STATUS efi_status;
 	EFI_FILE_IO_INTERFACE *fio = NULL;
+	UINT16 *newbootentries = NULL;
+	UINTN nnewbootentries = 0;
 
 	efi_status = BS->HandleProtocol(device, &FileSystemProtocol,
 					(void **) &fio);
@@ -903,7 +926,8 @@ find_boot_options(EFI_HANDLE device)
 			continue;
 		}
 
-		efi_status = find_boot_csv(fh3, fi->FileName);
+		efi_status = find_boot_csv(fh3, fi->FileName,
+					   &newbootentries, &nnewbootentries);
 		fh3->Close(fh3);
 		FreePool(buffer);
 		buffer = NULL;
@@ -912,8 +936,8 @@ find_boot_options(EFI_HANDLE device)
 
 	} while (1);
 
-	if (!EFI_ERROR(efi_status) && nbootorder > 0)
-		efi_status = update_boot_order();
+	if (!EFI_ERROR(efi_status) && (nbootorder > 0 || nnewbootentries > 0))
+		efi_status = update_boot_order(newbootentries, nnewbootentries);
 
 	fh2->Close(fh2);
 	fh->Close(fh);
