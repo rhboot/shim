@@ -384,7 +384,7 @@ clean-cryptlib-objs:
 
 clean: clean-shim-objs clean-fuzz-objs clean-test-objs clean-gnu-efi clean-openssl-objs clean-cryptlib-objs clean-lib-objs
 
-GITTAG = $(VERSION)
+GITTAG = $(shell echo $(VERSION) | sed 's/~/-/g')
 
 test-archive:
 	@./make-archive $(if $(call get-config,shim.origin),--origin "$(call get-config,shim.origin)") --test "$(VERSION)"
