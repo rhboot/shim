@@ -1,5 +1,7 @@
 #!/bin/sh
-set -e
+set -eu
+set -o pipefail
+set -x
 
 usage() {
 	status="${1}"
@@ -78,10 +80,11 @@ main() {
 	rm -rf "${ARCHIVE_DIR}/shim-${VERSION}" "${ARCHIVE_DIR}/shim-${VERSION}"
 	mkdir -p "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi"
 	cd gnu-efi || exit 1
+	git fetch
 	if [ "x" = "x${GNUEFI_GIT_TAG}" ] ; then
 		git archive --format=tar "$(git log -1 --pretty=format:%h)" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi" ; tar x )
 	else
-		git archive --format=tar "${ORIGIN}/${GNUEFI_GIT_TAG}" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi" ; tar x )
+		git archive --format=tar "${GNUEFI_GIT_TAG}" | ( cd "${ARCHIVE_DIR}/shim-${VERSION}/gnu-efi" ; tar x )
 	fi
 	cd ..
 	if [ "x" = "x${SHIM_GIT_TAG}" ] ; then
