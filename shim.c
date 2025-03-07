@@ -778,6 +778,7 @@ verify_buffer (char *data, int datasize,
 	return verify_buffer_sbat(data, datasize, context);
 }
 
+#ifndef DISABLE_FALLBACK
 static int
 should_use_fallback(EFI_HANDLE image_handle)
 {
@@ -834,6 +835,7 @@ error:
 
 	return ret;
 }
+#endif
 /*
  * Open the second stage bootloader and read it into a buffer
  */
@@ -1210,7 +1212,11 @@ done:
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
+#ifndef DISABLE_FALLBACK
 	int use_fb = should_use_fallback(image_handle);
+#else
+	int use_fb = 0;
+#endif
 
 	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
 	if (efi_status == EFI_SECURITY_VIOLATION ||
