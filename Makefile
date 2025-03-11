@@ -69,6 +69,11 @@ ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE_WAIT=$(FALLBACK_VERBOSE_WAIT)
 endif
 
+ifneq ($(origin MOK_POLICY), undefined)
+$(warning Setting default MOK policy to $(MOK_POLICY))
+	CFLAGS += -DMOK_POLICY_DEFAULT=$(MOK_POLICY)
+endif
+
 all: confcheck certcheck $(TARGETS)
 
 confcheck:
