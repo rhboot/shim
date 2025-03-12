@@ -769,6 +769,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	uint8_t *FullData = NULL;
 	size_t FullDataSize = 0;
+	bool allocated_full_data = false;
 	vendor_addend_category_t addend_category = VENDOR_ADDEND_NONE;
 	uint8_t *p = NULL;
 	uint32_t attrs = EFI_VARIABLE_BOOTSERVICE_ACCESS |
@@ -833,6 +834,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			if (efi_status != EFI_BUFFER_TOO_SMALL) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
+				goto err;
 				return efi_status;
 			}
 			FullDataSize += addend_esl_sz;
@@ -917,6 +919,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 				       FullDataSize, v->name);
 				return EFI_OUT_OF_RESOURCES;
 			}
+			allocated_full_data = true;
 			p = FullData;
 		}
 	}
@@ -946,7 +949,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
-				return efi_status;
+				goto err;
 			}
 			p += addend_esl_sz;
 			dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
@@ -973,7 +976,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			if (EFI_ERROR(efi_status)) {
 				perror(L"Could not add built-in cert to %s: %r\n",
 				       v->name, efi_status);
-				return efi_status;
+				goto err;
 			}
 			p += build_cert_esl_sz;
 			dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
@@ -1012,7 +1015,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 		if (EFI_ERROR(efi_status)) {
 			perror(L"Failed to allocate %lu bytes for %s\n",
 			       FullDataSize, v->name);
-			return efi_status;
+			goto err;
 		}
 		p = FullData + FullDataSize;
 		dprint(L"FullDataSize:%lu FullData:0x%llx p:0x%llx pos:%lld\n",
@@ -1045,7 +1048,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 			if (EFI_ERROR(efi_status)) {
 				dprint(L"tpm_measure_variable(\"%s\",%lu,0x%llx)->%r\n",
 				       v->name, FullDataSize, FullData, efi_status);
-				return efi_status;
+				goto err;
 			}
 		}
 
@@ -1062,7 +1065,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 				dprint(L"tpm_log_event(0x%llx, %lu, %lu, \"%s\")->%r\n",
 				       FullData, FullDataSize, v->pcr, v->name,
 				       efi_status);
-				return efi_status;
+				goto err;
 			}
 		}
 
@@ -1075,6 +1078,10 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 	v->data = FullData;
 	v->data_size = FullDataSize;
 	dprint(L"returning %r\n", efi_status);
+	return efi_status;
+err:
+	if (FullData && allocated_full_data)
+		FreePool(FullData);
 	return efi_status;
 }
 
