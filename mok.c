@@ -604,7 +604,7 @@ mirror_mok_db(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 		return efi_status;
 	}
 
-	CHAR16 *namen;
+	CHAR16 *namen = NULL;
 	UINTN namelen, namesz;
 
 	namelen = StrLen(name);
@@ -725,6 +725,9 @@ mirror_mok_db(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 		if (only_first)
 			break;
 		i++;
+	}
+	if (namen && namen != name) {
+		FreePool(namen);
 	}
 
 	if (EFI_ERROR(efi_status)) {
