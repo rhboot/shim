@@ -27,8 +27,9 @@ readfile(char *SbatLevel_Variable)
 	FILE *varfilep;
 	char line[1024];
 	int date;
+	int ret = -1;
 
-	int revocationsp = 0;
+	unsigned int revocationsp = 0;
 
 	sbat_revocation *revlistlast = NULL;
 	sbat_revocation *revlistentry = NULL;
@@ -44,7 +45,7 @@ readfile(char *SbatLevel_Variable)
 			revlistentry = (sbat_revocation *)malloc(
 				sizeof(sbat_revocation));
 			if (revlistentry == NULL)
-				return -1;
+				goto err;
 			if (revlisthead == NULL)
 				revlisthead = revlistentry;
 			else
@@ -55,11 +56,14 @@ readfile(char *SbatLevel_Variable)
 			revlistentry->date = date;
 			while (line[0] != '\n' &&
 			       fgets(line, sizeof(line), varfilep) != NULL) {
-				revlistentry->revocations = (char *)realloc(
-					revlistentry->revocations,
-					revocationsp + strlen(line) + 1);
-				if (revlistentry->revocations == NULL)
-					return -1;
+				char *new = NULL;
+				new = realloc(revlistentry->revocations,
+				              revocationsp + strlen(line) + 1);
+				if (new == NULL) {
+					ret = -1;
+					goto err;
+				}
+				revlistentry->revocations = new;
 				if (strlen(line) > 1) {
 					line[strlen(line) - 1] = 0;
 					sprintf(revlistentry->revocations +
@@ -73,7 +77,21 @@ readfile(char *SbatLevel_Variable)
 		}
 	}
 
-	return 1;
+	ret = 1;
+err:
+	if (ret < 0 && revlisthead) {
+		sbat_revocation *rle = revlisthead;
+		while (rle) {
+			sbat_revocation *next = rle->next;
+			if (rle->revocations)
+				free(rle->revocations);
+			free(rle);
+			rle = next;
+		}
+		revlisthead = NULL;
+	}
+	fclose(varfilep);
+	return ret;
 }
 
 int
