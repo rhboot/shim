@@ -578,7 +578,7 @@ mirror_one_esl(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 }
 
 static EFI_STATUS
-mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
+mirror_mok_db(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	      UINT8 *FullData, SIZE_T FullDataSize, BOOLEAN only_first)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
@@ -605,26 +605,18 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 	}
 
 	CHAR16 *namen;
-	CHAR8 *namen8;
 	UINTN namelen, namesz;
 
 	namelen = StrLen(name);
 	namesz = namelen * 2;
 	if (only_first) {
 		namen = name;
-		namen8 = name8;
 	} else {
 		namelen += 18;
 		namesz += 34;
 		namen = AllocateZeroPool(namesz);
 		if (!namen) {
 			LogError(L"Could not allocate %lu bytes", namesz);
-			return EFI_OUT_OF_RESOURCES;
-		}
-		namen8 = AllocateZeroPool(namelen);
-		if (!namen8) {
-			FreePool(namen);
-			LogError(L"Could not allocate %lu bytes", namelen);
 			return EFI_OUT_OF_RESOURCES;
 		}
 	}
@@ -668,11 +660,6 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 		if (!only_first) {
 			SPrint(namen, namelen, L"%s%lu", name, i);
 			namen[namelen-1] = 0;
-			/* uggggh */
-			UINTN j;
-			for (j = 0; j < namelen; j++)
-				namen8[j] = (CHAR8)(namen[j] & 0xff);
-			namen8[namelen - 1] = 0;
 		}
 
 		/*
@@ -685,7 +672,6 @@ mirror_mok_db(CHAR16 *name, CHAR8 *name8, EFI_GUID *guid, UINT32 attrs,
 				 efi_status);
 			if (!only_first) {
 				FreePool(namen);
-				FreePool(namen8);
 			}
 			return efi_status;
 		}
@@ -1039,7 +1025,7 @@ mirror_one_mok_variable(struct mok_state_variable *v,
 	    !(v->flags & MOK_VARIABLE_CONFIG_ONLY)) {
 		dprint(L"calling mirror_mok_db(\"%s\",  datasz=%lu)\n",
 		       v->rtname, FullDataSize);
-		efi_status = mirror_mok_db(v->rtname, (CHAR8 *)v->rtname8, v->guid,
+		efi_status = mirror_mok_db(v->rtname, v->guid,
 					   attrs, FullData, FullDataSize,
 					   only_first);
 		dprint(L"mirror_mok_db(\"%s\",  datasz=%lu) returned %r\n",
