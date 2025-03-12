@@ -288,7 +288,7 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 		goto out;
 	ptr = next = *entries;
 
-	for (i = 0; i < tot; i++) {
+	for (i = 0; next && i < tot; i++) {
 		int len = StrLen(next->FileName);
 
 		for (c = 0; c < filtercount; c++) {
@@ -311,7 +311,7 @@ simple_dir_filter(EFI_HANDLE image, CHAR16 *name, CHAR16 *filter,
 	*count = 0;
 	ptr = next = *entries;
 
-	for (i = 0; i < tot; i++) {
+	for (i = 0; next && i < tot; i++) {
 		int len = StrLen(next->FileName);
 
 		if (StrCmp(next->FileName, L".") == 0)
