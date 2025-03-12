@@ -42,8 +42,7 @@ readfile(char *SbatLevel_Variable)
 
 	while (fgets(line, sizeof(line), varfilep) != NULL) {
 		if (sscanf(line, "sbat,1,%d\n", &date) && strlen(line) == 18) {
-			revlistentry = (sbat_revocation *)malloc(
-				sizeof(sbat_revocation));
+			revlistentry = calloc(1, sizeof(sbat_revocation));
 			if (revlistentry == NULL)
 				goto err;
 			if (revlisthead == NULL)
