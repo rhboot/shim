@@ -170,7 +170,7 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 {
 	SHIM_LOADED_IMAGE *image;
 	EFI_STATUS efi_status;
-	buffer_properties_t bprop;
+	buffer_properties_t bprop = { NULL, NULL, NULL, 0 };
 
 	if (BootPolicy)
 		return EFI_UNSUPPORTED;
