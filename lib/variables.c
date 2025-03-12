@@ -226,6 +226,8 @@ SetSecureVariable(const CHAR16 * const var, UINT8 *Data, UINTN len,
 	}
 	efi_status = CreateTimeBasedPayload(&DataSize, (UINT8 **)&Cert);
 	if (EFI_ERROR(efi_status)) {
+		if (Cert && Cert != (EFI_SIGNATURE_LIST *)Data)
+			FreePool(Cert);
 		console_print(L"Failed to create time based payload %d\n",
 			      efi_status);
 		return efi_status;
