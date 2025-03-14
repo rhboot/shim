@@ -31,7 +31,11 @@ UINT8 user_insecure_mode;
 UINTN hsi_status = 0;
 UINT8 ignore_db;
 UINT8 trust_mok_list;
+#ifdef MOK_POLICY_DEFAULT
+UINT8 mok_policy = MOK_POLICY_DEFAULT;
+#else
 UINT8 mok_policy = 0;
+#endif
 
 UINT32 verbose = 0;
 
