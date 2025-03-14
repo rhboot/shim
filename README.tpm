@@ -14,7 +14,7 @@ PCR7:
   - vendor_dbx - shim's built-in vendor denylist, logged as "dbx"
   - DB - the system allowlist, logged as "db"
   - vendor_db - shim's built-in vendor allowlist, logged as "vendor_db"
-  - MokList the Mok allowlist, logged as "MokList"
+  - MokListRT the runtime Mok allowlist, logged as "MokListRT"
   - vendor_cert - shim's built-in vendor allowlist, logged as "Shim"
   - shim_cert - shim's build-time generated allowlist, logged as "Shim"
 - MokSBState will be extended into PCR7 if it is set, logged as
