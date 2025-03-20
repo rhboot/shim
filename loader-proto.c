@@ -311,8 +311,8 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 	// image unconditionally.
 	//
 	BS->UninstallMultipleProtocolInterfaces(ImageHandle,
-	                                &EFI_LOADED_IMAGE_GUID, image,
-	                                &SHIM_LOADED_IMAGE_GUID, &image->li,
+	                                &SHIM_LOADED_IMAGE_GUID, image,
+	                                &EFI_LOADED_IMAGE_GUID, &image->li,
 	                                &gEfiLoadedImageDevicePathProtocolGuid,
 					image->loaded_image_device_path,
 					NULL);
