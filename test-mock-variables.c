@@ -212,8 +212,10 @@ test_gnvn_helper(char *testvars)
 		 * mok mirroring that aren't really from mok; right now
 		 * this is a reasonable heuristic for that.
 		 */
-		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY)
+		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY) {
+			mok_rt_vars[i] = "";
 			continue;
+		}
 		mok_rt_vars[i] = mok_state_variables[i].rtname8;
 	}
 
@@ -313,8 +315,10 @@ test_get_variable_0(void)
 		 * mok mirroring that aren't really from mok; right now
 		 * this is a reasonable heuristic for that.
 		 */
-		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY)
+		if (mok_state_variables[i].flags & MOK_VARIABLE_CONFIG_ONLY) {
+			mok_rt_vars[i] = "";
 			continue;
+		}
 		mok_rt_vars[i] = mok_state_variables[i].rtname8;
 	}
 
