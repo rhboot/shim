@@ -1157,11 +1157,7 @@ mock_load_variables(const char *const dirname, const char *filters[],
 		printf("%s:%d:%s(): maybe adding entry \"%s\"\n", __FILE__, __LINE__, __func__, entry->d_name);
 #endif
 		if (filters && len > guidstr_size + 1) {
-			char spacebuf[len];
-
 			len -= guidstr_size;
-			SetMem(spacebuf, sizeof(spacebuf)-1, ' ');
-			spacebuf[len] = '\0';
 			for (size_t i = 0; filters[i]; i++) {
 				if (strlen(filters[i]) > len)
 					continue;
