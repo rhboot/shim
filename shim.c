@@ -760,6 +760,109 @@ verify_buffer_sbat (char *data, int datasize,
 	return verify_sbat_section(SBATBase, SBATSize);
 }
 
+typedef struct {
+	UINT8 digest[32]; // SHA256
+} PE_SECTION_DIGEST;
+
+static UINTN num_section_digests = 0;
+static PE_SECTION_DIGEST *section_digests = NULL;
+
+static EFI_STATUS save_image_section_digests(
+	char *data,
+	int datasize,
+	PE_COFF_LOADER_IMAGE_CONTEXT *context)
+{
+	EFI_STATUS efi_status = EFI_SUCCESS;
+
+	unsigned int sha256ctxsize;
+	void *sha256ctx = NULL;
+
+	EFI_IMAGE_SECTION_HEADER *Section;
+	int i;
+
+	sha256ctxsize = Sha256GetContextSize();
+	sha256ctx = AllocatePool(sha256ctxsize);
+	if (sha256ctx == NULL) {
+		efi_status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+
+	Section = context->FirstSection;
+	for (i = 0; i < context->NumberOfSections; i++, Section++) {
+		void *base;
+		UINTN size;
+		uint64_t boundary;
+		UINTN new_size_of_section_digests;
+		PE_SECTION_DIGEST *new_section_digests;
+
+
+		if ((uint64_t)(uintptr_t)&Section[1] > (uintptr_t)(uintptr_t)data + datasize) {
+			perror(L"Section exceeds bounds of image\n");
+			efi_status = EFI_UNSUPPORTED;
+			goto out;
+		}
+
+		base = ImageAddress(data, datasize, Section->PointerToRawData);
+		size = Section->SizeOfRawData;
+		if (checked_add((uint64_t)(uintptr_t)base, size, &boundary) ||
+			(boundary > (uint64_t)(uintptr_t)data + datasize)) {
+			perror(L"Section exceeds bounds of image\n");
+			efi_status = EFI_UNSUPPORTED;
+			goto out;
+		}
+
+		// Not using ReallocatePool so that OOM does not free the old allowlist
+		if (checked_add(num_section_digests, 1, &new_size_of_section_digests) ||
+			checked_mul(new_size_of_section_digests, sizeof (PE_SECTION_DIGEST), &new_size_of_section_digests) ||
+			(new_section_digests = AllocatePool(new_size_of_section_digests)) == NULL) {
+			efi_status = EFI_OUT_OF_RESOURCES;
+			goto out;
+		}
+		CopyMem(new_section_digests, section_digests, num_section_digests * sizeof (PE_SECTION_DIGEST));
+		FreePool(section_digests);
+		section_digests = new_section_digests;
+
+		Sha256Init(sha256ctx);
+		Sha256Update(sha256ctx, base, size);
+		Sha256Final(sha256ctx, section_digests[num_section_digests].digest);
+		num_section_digests += 1;
+	}
+
+out:
+	if (sha256ctx != NULL)
+		FreePool(sha256ctx);
+	return efi_status;
+}
+
+static BOOLEAN image_previously_verified_as_section(char *data, int datasize)
+{
+	unsigned int sha256ctxsize;
+	void *sha256ctx = NULL;
+	UINT8 sha256digest[SHA256_DIGEST_SIZE];
+
+	PE_SECTION_DIGEST *cur_section_digest;
+	UINTN i;
+
+	// get image hash
+	sha256ctxsize = Sha256GetContextSize();
+	sha256ctx = AllocatePool(sha256ctxsize);
+	if (sha256ctx == NULL)
+		return FALSE;
+	Sha256Init(sha256ctx);
+	Sha256Update(sha256ctx, data, datasize);
+	Sha256Final(sha256ctx, sha256digest);
+	FreePool(sha256ctx);
+
+	cur_section_digest = section_digests;
+	for (i = 0; i < num_section_digests; ++cur_section_digest, ++i) {
+		if (memcmp(cur_section_digest->digest, sha256digest, SHA256_DIGEST_SIZE) == 0) {
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 /*
  * Check that the signature is valid and matches the binary and that
  * the binary is permitted to load by SBAT.
@@ -771,11 +874,24 @@ verify_buffer (char *data, int datasize,
 {
 	EFI_STATUS efi_status;
 
+	/* Bypass verification if the image data was */
+	if (image_previously_verified_as_section(data, datasize))
+		return EFI_SUCCESS;
+
 	efi_status = verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	return verify_buffer_sbat(data, datasize, context);
+	efi_status = verify_buffer_sbat(data, datasize, context);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	/* Save section hashes for all verified images */
+	efi_status = save_image_section_digests(data, datasize, context);
+	if (EFI_ERROR(efi_status))
+		return efi_status;
+
+	return EFI_SUCCESS;
 }
 
 static int
@@ -1833,6 +1949,12 @@ shim_init(void)
 void
 shim_fini(void)
 {
+	if (num_section_digests > 0 && section_digests != NULL) {
+		FreePool(section_digests);
+		num_section_digests = 0;
+		section_digests = NULL;
+	}
+
 	if (secure_mode())
 		cleanup_sbat_var(&sbat_var);
 
