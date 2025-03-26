@@ -157,15 +157,20 @@ static CHAR8 *str2ip6(CHAR8 *str)
 		if (b[1] == ':' )
 			break;
 	}
-	a = b = (str + len);
-	for (j = len, p = 7; j > i; j--, a--) {
-		if (*a != ':')
-			continue;
-		t = *b;
-		*b = '\0';
-		ip[p--] = str2ns(a+1);
-		*b = t;
-		b = a;
+
+	if (i == len) {
+		ip[p++] = str2ns(a);
+	} else {
+		a = b = (str + len);
+		for (j = len, p = 7; j > i; j--, a--) {
+			if (*a != ':')
+				continue;
+			t = *b;
+			*b = '\0';
+			ip[p--] = str2ns(a+1);
+			*b = t;
+			b = a;
+		}
 	}
 	return (CHAR8 *)ip;
 }
