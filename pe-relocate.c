@@ -654,6 +654,8 @@ get_shim_nx_capability(EFI_HANDLE image_handle)
 
 	dprint(L"DllCharacteristics:0x%lx\n", context.DllCharacteristics);
 	if (context.DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT) {
+		mok_policy|=MOK_POLICY_REQUIRE_NX;
+		dprint("Enforcing NX policy for all images\n");
 		dprint(L"Setting HSI from %a to %a\n",
 		       decode_hsi_bits(hsi_status),
 		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_NX));
