@@ -333,7 +333,7 @@ done:
 }
 
 EFI_STATUS
-verify_sbat_section(char *SBATBase, size_t SBATSize)
+verify_sbat_section(char *SBATBase, size_t SBATSize, UINT16 *sbat_gen_expected, UINT16 *sbat_gen_found, CHAR8 **sbat_component_name)
 {
 	unsigned int i;
 	EFI_STATUS efi_status;
@@ -385,7 +385,7 @@ verify_sbat_section(char *SBATBase, size_t SBATSize)
 		       entries[i]->vendor_url);
 	}
 
-	efi_status = verify_sbat(n, entries);
+	efi_status = verify_sbat(n, entries, sbat_gen_expected, sbat_gen_found, sbat_component_name);
 
 	cleanup_sbat_section_entries(n, entries);
 
