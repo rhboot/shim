@@ -241,14 +241,6 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 		}
 	}
 
-	in_protocol = 1;
-	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
-	                          &image->entry_point, &image->alloc_address,
-	                          &image->alloc_pages, parent_verified);
-	in_protocol = 0;
-	if (EFI_ERROR(efi_status))
-		goto free_image;
-
 	*ImageHandle = NULL;
 	efi_status = BS->InstallMultipleProtocolInterfaces(ImageHandle,
 					&SHIM_LOADED_IMAGE_GUID, image,
@@ -256,6 +248,15 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 					&gEfiLoadedImageDevicePathProtocolGuid,
 					image->loaded_image_device_path,
 					NULL);
+	if (EFI_ERROR(efi_status))
+		goto free_image;
+
+	in_protocol = 1;
+	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
+				  *ImageHandle, &image->entry_point,
+				  &image->alloc_address, &image->alloc_pages,
+				  parent_verified);
+	in_protocol = 0;
 	if (EFI_ERROR(efi_status))
 		goto free_alloc;
 
@@ -310,6 +311,8 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 		efi_status = image->exit_status;
 	}
 
+	flush_cached_sections(ImageHandle);
+
 	//
 	// We only support EFI applications, so we can unload and free the
 	// image unconditionally.
@@ -343,6 +346,7 @@ shim_unload_image(EFI_HANDLE ImageHandle)
 	if (efi_status == EFI_UNSUPPORTED)
 		return system_unload_image(ImageHandle);
 
+	flush_cached_sections(ImageHandle);
 	BS->FreePages(image->alloc_address, image->alloc_pages);
 	FreePool(image);
 

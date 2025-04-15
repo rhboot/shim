@@ -38,10 +38,16 @@ get_section_vma_by_name (char *name, size_t namesz,
 
 EFI_STATUS
 handle_image (void *data, unsigned int datasize,
-	      EFI_LOADED_IMAGE *li,
+	      EFI_LOADED_IMAGE *li, EFI_HANDLE image_handle,
 	      EFI_IMAGE_ENTRY_POINT *entry_point,
 	      EFI_PHYSICAL_ADDRESS *alloc_address,
 	      UINTN *alloc_pages, bool parent_verified);
+
+EFI_STATUS
+validate_cached_section(EFI_HANDLE parent_image_handle,
+			void *addr, UINTN size);
+void
+flush_cached_sections(EFI_HANDLE parent_image_handle);
 
 EFI_STATUS
 generate_hash (char *data, unsigned int datasize,
