@@ -57,7 +57,7 @@ readfile(char *SbatLevel_Variable)
 			       fgets(line, sizeof(line), varfilep) != NULL) {
 				char *new = NULL;
 				new = realloc(revlistentry->revocations,
-				              revocationsp + strlen(line) + 1);
+				              revocationsp + strlen(line) + 2);
 				if (new == NULL) {
 					ret = -1;
 					goto err;
