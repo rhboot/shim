@@ -605,6 +605,7 @@ handle_image (void *data, unsigned int datasize,
 	int found_entry_point = 0;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+	bool nx_compat = 0;
 
 	/*
 	 * The binary header contains relevant context and section pointers
@@ -697,12 +698,16 @@ handle_image (void *data, unsigned int datasize,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
+	nx_compat = (context.DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT);
 	buffer = (void *)ALIGN_VALUE((unsigned long)*alloc_address, *alloc_alignment);
 	dprint(L"Loading 0x%llx bytes at 0x%llx\n",
 	       (unsigned long long)context.ImageSize,
 	       (unsigned long long)(uintptr_t)buffer);
-	update_mem_attrs((uintptr_t)buffer, alloc_size, MEM_ATTR_R|MEM_ATTR_W,
-			 MEM_ATTR_X);
+	if (nx_compat)
+		update_mem_attrs((uintptr_t)buffer, alloc_size,
+				 MEM_ATTR_R|MEM_ATTR_W, MEM_ATTR_X);
+	else
+		perror(L"Image does not support NX\n");
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
@@ -872,7 +877,6 @@ handle_image (void *data, unsigned int datasize,
 		uint64_t clear_attrs = MEM_ATTR_W|MEM_ATTR_X;
 		uintptr_t addr;
 		uint64_t raw_length;
-		uint64_t length;
 
 		/*
 		 * Skip discardable sections with zero size
@@ -899,17 +903,25 @@ handle_image (void *data, unsigned int datasize,
 		// granularity, but the section length (unlike the section
 		// address) is not required to be aligned.
 		raw_length = (uintptr_t)end - (uintptr_t)base + 1;
-		length = ALIGN_VALUE(raw_length, PAGE_SIZE);
 
-		if (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) {
-			set_attrs |= MEM_ATTR_W;
-			clear_attrs &= ~MEM_ATTR_W;
+		/*
+		 * Now set the page permissions appropriately if we're
+		 * enforcing NX compat.
+		 */
+		if (!nx_compat) {
+			uint64_t length;
+			length = ALIGN_VALUE(raw_length, PAGE_SIZE);
+
+			if (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) {
+				set_attrs |= MEM_ATTR_W;
+				clear_attrs &= ~MEM_ATTR_W;
+			}
+			if (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) {
+				set_attrs |= MEM_ATTR_X;
+				clear_attrs &= ~MEM_ATTR_X;
+			}
+			update_mem_attrs(addr, length, set_attrs, clear_attrs);
 		}
-		if (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) {
-			set_attrs |= MEM_ATTR_X;
-			clear_attrs &= ~MEM_ATTR_X;
-		}
-		update_mem_attrs(addr, length, set_attrs, clear_attrs);
 
 		/*
 		 * We only cache CODE and INITIALIZED data sections that
