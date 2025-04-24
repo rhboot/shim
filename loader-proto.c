@@ -45,6 +45,23 @@ typedef struct {
 } buffer_properties_t;
 
 static EFI_STATUS
+try_load_from_cached_section(EFI_HANDLE parent_image_handle,
+			     EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
+{
+	EFI_STATUS status;
+
+	status = validate_cached_section(parent_image_handle,
+					 bprop->buffer, bprop->size);
+	if (EFI_ERROR(status))
+		return status;
+
+	bprop->allocated_buffer = false;
+	bprop->dp = dp;
+
+	return EFI_SUCCESS;
+}
+
+static EFI_STATUS
 try_load_from_sfs(EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
 {
 	EFI_STATUS status = EFI_SUCCESS;
@@ -179,37 +196,60 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	if (BootPolicy)
 		return EFI_UNSUPPORTED;
 
-	if (!SourceBuffer || !SourceSize) {
-		if (!DevicePath) /* Both SourceBuffer and DevicePath are NULL */
-			return EFI_NOT_FOUND;
-
-		if (try_load_from_sfs(DevicePath, &bprop) == EFI_SUCCESS)
-			;
-		else if (try_load_from_lf2(DevicePath, &bprop) == EFI_SUCCESS)
-			;
-		else
-			/* no buffer given and we cannot load from this device */
+	/*
+	 * First we're checking if it's cached - since that is quite fast
+	 * unless we have a match, and any match is okay, we don't need to
+	 * do anything more complicated.
+	 */
+	if (SourceSize && SourceBuffer) {
+		bprop.buffer = SourceBuffer;
+		bprop.size = SourceSize;
+		efi_status = try_load_from_cached_section(ParentImageHandle,
+							  DevicePath, &bprop);
+		if (!EFI_ERROR(efi_status)) {
+			parent_verified = true;
+		} else if (efi_status != EFI_NOT_FOUND) {
 			return EFI_LOAD_ERROR;
+		}
+	}
 
-		SourceBuffer = bprop.buffer;
-		SourceSize = bprop.size;
-	} else {
-		bprop.buffer = NULL;
-		/*
-		 * Even if we are using a buffer, try populating the
-		 * device_handle and file_path fields the best we can
-		 */
+	/*
+	 * If we don't already have a cached, verified copy of the object
+	 * being loaded, go about it the old way.
+	 */
+	if (!parent_verified) {
+		if (!SourceBuffer || !SourceSize) {
+			if (!DevicePath) /* Both SourceBuffer and DevicePath are NULL */
+				return EFI_NOT_FOUND;
 
-		bprop.dp = DevicePath;
+			if (try_load_from_sfs(DevicePath, &bprop) == EFI_SUCCESS)
+				;
+			else if (try_load_from_lf2(DevicePath, &bprop) == EFI_SUCCESS)
+				;
+			else
+				/* no buffer given and we cannot load from this device */
+				return EFI_LOAD_ERROR;
 
-		if (bprop.dp) {
-			efi_status = BS->LocateDevicePath(&gEfiDevicePathProtocolGuid,
-			                                  &bprop.dp,
-			                                  &bprop.hnd);
-			if (efi_status != EFI_SUCCESS) {
-				/* can't seem to pull apart this DP */
-				bprop.dp = DevicePath;
-				bprop.hnd = NULL;
+			SourceBuffer = bprop.buffer;
+			SourceSize = bprop.size;
+		} else {
+			bprop.buffer = NULL;
+			/*
+			 * Even if we are using a buffer, try populating the
+			 * device_handle and file_path fields the best we can
+			 */
+
+			bprop.dp = DevicePath;
+
+			if (bprop.dp) {
+				efi_status = BS->LocateDevicePath(&gEfiDevicePathProtocolGuid,
+								  &bprop.dp,
+								  &bprop.hnd);
+				if (efi_status != EFI_SUCCESS) {
+					/* can't seem to pull apart this DP */
+					bprop.dp = DevicePath;
+					bprop.hnd = NULL;
+				}
 			}
 		}
 	}
