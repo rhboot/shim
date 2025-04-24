@@ -174,6 +174,7 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	SHIM_LOADED_IMAGE *image;
 	EFI_STATUS efi_status;
 	buffer_properties_t bprop = { NULL, NULL, NULL, 0 };
+	bool parent_verified = false;
 
 	if (BootPolicy)
 		return EFI_UNSUPPORTED;
@@ -243,7 +244,7 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	in_protocol = 1;
 	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
 	                          &image->entry_point, &image->alloc_address,
-	                          &image->alloc_pages);
+	                          &image->alloc_pages, parent_verified);
 	in_protocol = 0;
 	if (EFI_ERROR(efi_status))
 		goto free_image;
