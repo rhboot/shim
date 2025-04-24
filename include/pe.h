@@ -41,7 +41,7 @@ handle_image (void *data, unsigned int datasize,
 	      EFI_LOADED_IMAGE *li,
 	      EFI_IMAGE_ENTRY_POINT *entry_point,
 	      EFI_PHYSICAL_ADDRESS *alloc_address,
-	      UINTN *alloc_pages);
+	      UINTN *alloc_pages, bool parent_verified);
 
 EFI_STATUS
 generate_hash (char *data, unsigned int datasize,

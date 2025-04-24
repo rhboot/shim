@@ -13,7 +13,8 @@
 EFI_STATUS
 verify_buffer (char *data, int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	       UINT8 *sha256hash, UINT8 *sha1hash);
+	       UINT8 *sha256hash, UINT8 *sha1hash,
+	       bool parent_verified);
 
 void
 init_openssl(void);

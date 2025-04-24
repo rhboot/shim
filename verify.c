@@ -522,7 +522,8 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
 static EFI_STATUS
 verify_buffer_authenticode (char *data, int datasize,
 			    PE_COFF_LOADER_IMAGE_CONTEXT *context,
-			    UINT8 *sha256hash, UINT8 *sha1hash)
+			    UINT8 *sha256hash, UINT8 *sha1hash,
+			    bool parent_verified)
 {
 	EFI_STATUS ret_efi_status;
 	size_t size = datasize;
@@ -561,6 +562,9 @@ verify_buffer_authenticode (char *data, int datasize,
 		crypterr(ret_efi_status);
 		return ret_efi_status;
 	}
+
+	if (parent_verified)
+		return EFI_SUCCESS;
 
 	/*
 	 * Check whether the binary is authorized by hash in any of the
@@ -730,11 +734,14 @@ verify_buffer_sbat (char *data, int datasize,
 EFI_STATUS
 verify_buffer (char *data, int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	       UINT8 *sha256hash, UINT8 *sha1hash)
+	       UINT8 *sha256hash, UINT8 *sha1hash,
+	       bool parent_verified)
 {
 	EFI_STATUS efi_status;
 
-	efi_status = verify_buffer_authenticode(data, datasize, context, sha256hash, sha1hash);
+	efi_status = verify_buffer_authenticode(data, datasize, context,
+						sha256hash, sha1hash,
+						parent_verified);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -784,7 +791,8 @@ shim_verify(void *buffer, UINT32 size)
 	}
 
 	efi_status = verify_buffer(buffer, size,
-				   &context, sha256hash, sha1hash);
+				   &context, sha256hash, sha1hash,
+				   false);
 done:
 	in_protocol = 0;
 	return efi_status;
