@@ -41,6 +41,7 @@ typedef struct {
 	EFI_DEVICE_PATH *dp;
 	void *buffer;
 	size_t size;
+	bool allocated_buffer;
 } buffer_properties_t;
 
 static EFI_STATUS
@@ -97,6 +98,7 @@ try_load_from_sfs(EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
 		status = EFI_OUT_OF_RESOURCES;
 		goto out;
 	}
+	bprop->allocated_buffer = true;
 
 	/* read file */
 	status = file->Read(file, &bprop->size, bprop->buffer);
@@ -151,6 +153,7 @@ try_load_from_lf2(EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
 		status = EFI_OUT_OF_RESOURCES;
 		goto out;
 	}
+	bprop->allocated_buffer = true;
 
 	/* read file */
 	status = lf2->LoadFile(lf2, bprop->dp, /*BootPolicy=*/false, &bprop->size, bprop->buffer);
@@ -255,7 +258,7 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	if (EFI_ERROR(efi_status))
 		goto free_alloc;
 
-	if (bprop.buffer)
+	if (bprop.buffer && bprop.allocated_buffer)
 		FreePool(bprop.buffer);
 
 	return EFI_SUCCESS;
@@ -269,7 +272,7 @@ free_image:
 		FreePool(image->li.FilePath);
 	FreePool(image);
 free_buffer:
-	if (bprop.buffer)
+	if (bprop.buffer && bprop.allocated_buffer)
 		FreePool(bprop.buffer);
 	return efi_status;
 }
