@@ -363,8 +363,9 @@ static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGu
 	if (measureddata == NULL) {
 		measureddata = AllocatePool(sizeof(*measureddata));
 	} else {
-		measureddata = ReallocatePool(measureddata, measuredcount * sizeof(*measureddata),
-					      (measuredcount + 1) * sizeof(*measureddata));
+		measureddata = ReallocatePool(measuredcount * sizeof(*measureddata),
+					      (measuredcount + 1) * sizeof(*measureddata),
+					      measureddata);
 	}
 
 	if (measureddata == NULL)

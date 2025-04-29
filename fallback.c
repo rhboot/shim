@@ -359,9 +359,9 @@ find_boot_option(EFI_DEVICE_PATH *dp, EFI_DEVICE_PATH *fulldp,
 			if (efi_status == EFI_BUFFER_TOO_SMALL) {
 				VerbosePrint(L"Buffer too small for next variable name, re-allocating it to be %d bytes and retrying\n",
 					     varname_size);
-				varname = ReallocatePool(varname,
-							 buffer_size,
-							 varname_size);
+				varname = ReallocatePool(buffer_size,
+							 varname_size,
+							 varname);
 				if (!varname)
 					return EFI_OUT_OF_RESOURCES;
 				buffer_size = varname_size;
