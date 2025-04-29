@@ -10,7 +10,7 @@ on:
 
 jobs:
   cross-build-pull-request:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container: vathpela/efi-ci:${{ matrix.distro }}-x64
     name: ${{ matrix.distro }} ${{ matrix.efiarch }} cross-build
 
@@ -112,7 +112,7 @@ jobs:
           find /destdir -type f
 
   build-pull-request-intel:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container: vathpela/efi-ci:${{ matrix.distro }}-x64
     name: ${{ matrix.distro }} ${{ matrix.efiarch }} build
 
@@ -184,7 +184,7 @@ jobs:
           find /destdir -type f
 
   build-pull-request-intel-compile-commands-json:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container: vathpela/efi-ci:${{ matrix.distro }}-x64
     name: ${{ matrix.distro }} ${{ matrix.efiarch }} build compile_commands.json
 
