@@ -742,8 +742,9 @@ load_cert_file(EFI_HANDLE image_handle, CHAR16 *filename, CHAR16 *PathName,
 					break;
 				}
 
-				tmp = ReallocatePool(user_cert, original,
-						     user_cert_size);
+				tmp = ReallocatePool(original,
+						     user_cert_size,
+						     user_cert);
 				if (!tmp) {
 					FreePool(data);
 					return EFI_OUT_OF_RESOURCES;
@@ -847,7 +848,7 @@ load_unbundled_trust(EFI_HANDLE image_handle)
 				if (buffersize > 1024)
 					goto done;
 			}
-			buffer = ReallocatePool(buffer, old, buffersize);
+			buffer = ReallocatePool(old, buffersize, buffer);
 			if (buffer == NULL) {
 				perror(L"Failed to read directory %s - %r\n",
 				       PathName, EFI_OUT_OF_RESOURCES);
