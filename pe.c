@@ -478,6 +478,7 @@ handle_image (void *data, unsigned int datasize,
 	int found_entry_point = 0;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+	bool nx_compat = 0;
 
 	/*
 	 * The binary header contains relevant context and section pointers
@@ -562,12 +563,16 @@ handle_image (void *data, unsigned int datasize,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
+	nx_compat = (context.DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT);
 	buffer = (void *)ALIGN_VALUE((unsigned long)*alloc_address, alignment);
 	dprint(L"Loading 0x%llx bytes at 0x%llx\n",
 	       (unsigned long long)context.ImageSize,
 	       (unsigned long long)(uintptr_t)buffer);
-	update_mem_attrs((uintptr_t)buffer, alloc_size, MEM_ATTR_R|MEM_ATTR_W,
-			 MEM_ATTR_X);
+	if (nx_compat)
+		update_mem_attrs((uintptr_t)buffer, alloc_size,
+				 MEM_ATTR_R|MEM_ATTR_W, MEM_ATTR_X);
+	else
+		perror(L"Image does not support NX\n");
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
 
@@ -730,6 +735,8 @@ handle_image (void *data, unsigned int datasize,
 	/*
 	 * Now set the page permissions appropriately.
 	 */
+	if (!nx_compat)
+		goto skip_set_page_permissions;
 	Section = context.FirstSection;
 	for (i = 0; i < context.NumberOfSections; i++, Section++) {
 		uint64_t set_attrs = MEM_ATTR_R;
@@ -774,7 +781,7 @@ handle_image (void *data, unsigned int datasize,
 		update_mem_attrs(addr, length, set_attrs, clear_attrs);
 	}
 
-
+skip_set_page_permissions:
 	/*
 	 * grub needs to know its location and size in memory, so fix up
 	 * the loaded image protocol values
