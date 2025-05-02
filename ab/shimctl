@@ -1,0 +1,205 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+
+# Handle rotation of shims to make updates more reliable - older shim(s) are
+# kept around, but moved later in the boot order.  Also record what shims are
+# booted when to enable boot counting.
+
+import glob
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+from typing import Any
+
+# TODO: configure this from from RPM (efi-rpm-macros)
+ESP_DIR = "/boot/efi/EFI/fedora"
+ESP_BOOT = "/boot/efi/EFI/BOOT"
+LABEL_BASE = "Fedora"
+
+def eprint(o: Any) -> None:
+    return print(o, file=sys.stdout)
+
+def getoutput(s: list[str]) -> list[str]:
+    out = subprocess.check_output(s, stderr=subprocess.STDOUT)
+    lines = out.decode("utf-8").split("\n")
+    while len(lines) > 0 and lines[-1] == '':
+        del(lines[-1])
+    return lines
+
+class Efibootmgr:
+    current: str
+    order: list[str]
+    entries: dict[str, tuple[str, str]] # { XXXX: (label, entry) }
+
+    def __init__(self) -> None:
+        # ensure these are mounted
+        os.listdir(ESP_DIR)
+        os.listdir(ESP_BOOT)
+
+        # newer efibootmgr doesn't need -v anymore
+        res = getoutput(["efibootmgr", "-v"])
+        lines = [line for line in res if line.startswith("Boot")]
+
+        ind = lines.pop(0)
+        self.current = ind[len("BootCurrent: "):]
+
+        ind = lines.pop(0)
+        self.order = ind[len("BootOrder: "):].split(",")
+
+        entries = {}
+        for e in lines:
+            boot = e[len("Boot"):len("BootXXXX")]
+            e = e[len("BootXXXX") + 2:]
+            label, entry = e.split("\t")
+            entries[boot] = (label, entry)
+        self.entries = entries
+        return
+
+# This is best-effort since RPM doesn't provide a comparison interface we can
+# depend on.
+def nvr_to_tup(s: str) -> tuple[int, int, int, str]:
+    # /usr/lib/shim-x64-major.minor-release
+    _, _, version, release = s.split("-", 3)
+    major, minor = version.split(".")
+
+    release_int = release
+    release_remaining = ""
+    for i, c in enumerate(release):
+        if c < '0' or c > '9':
+            release_int = release[:i]
+            release_remaining = release[i:]
+            break
+    return int(major), int(minor), int(release_int), release_remaining
+
+def where_esp() -> tuple[str, str]: # (disk, partition)
+    _, mntline = getoutput(["findmnt", "/boot/efi"])
+    _, part, _, _ = mntline.split()
+
+    # heuristic: digits at the end are the partition
+    offset = len(part)
+    while '0' <= part[offset - 1] <= '9':
+        offset -= 1
+    assert(offset < len(part))
+    return part, part[offset:]
+
+def booted() -> None:
+    boot = Efibootmgr()
+    cur_label, cur_entry = boot.entries[boot.current]
+
+    # What is that label, though?
+    path = cur_entry[cur_entry.index("File(") + len("File("):-1]
+    path = "/boot/efi/" + path.replace("\\", "/")
+    with open(path, "rb") as f:
+        booted_data = f.read()
+
+    os.chdir("/usr/lib")
+    shims = glob.glob("shim-*/shim*.efi")
+    thisone = None
+    latest = True
+    for shim in sorted(shims, key=nvr_to_tup, reverse=True):
+        # python kind of has a method for this, but its behavior isn't
+        # documented tightly enough to depend on it
+        with open(shim, "rb") as f:
+            cur_data = f.read()
+        if booted_data == cur_data:
+            thisone = shim
+            break
+        latest = False
+
+    if thisone is None:
+        thisone = "shim-UNKNOWN"
+    else:
+        thisone = thisone.rsplit("/")[-2]
+
+    with open("/var/log/shim_boots", "a") as f:
+        # rfc3339-compliant dates
+        tstr = time.strftime("%Y-%m-%d %H:%M:%S%z")
+        tstr = f"{tstr[:-2]}:{tstr[-2:]}" # python doesn't have %:z
+        f.write(f"{tstr}\t{cur_label}\t{thisone}\n")
+
+    if not latest:
+        eprint(f"ERROR: booted old {thisone} - newer shim likely failed!")
+
+    return
+
+def inst(g: str, dest: str) -> None:
+    [f] = glob.glob(g)
+    shutil.copy(f, dest)
+    return
+
+def install(nvr: str) -> None:
+    boot = Efibootmgr()
+
+    srcdir = f"/usr/lib/{nvr}"
+    for p in [ESP_DIR, ESP_BOOT, srcdir]:
+        if not os.path.exists(p):
+            eprint(f"Path {p} does not exist; cannot install new shim")
+            exit(1)
+
+    os.chdir(srcdir)
+
+    # Move in files and replace as needed.
+    inst("fb*.efi", ESP_BOOT)
+    inst("BOOT*.EFI", ESP_BOOT)
+    inst("BOOT*.CSV", ESP_DIR)
+    inst("mm*.efi", ESP_DIR)
+
+    # Matches shim.efi (if present) and e.g. shimx64.efi (which sorts later)
+    shims = sorted(glob.glob("shim*.efi"))
+    shim_src = shims[-1]
+    for shim in shims[:-1]:
+        shutil.copy(shim, ESP_BOOT)
+
+    # hopefully we don't need 8.3 naming...
+    primary = f"{ESP_DIR}/{shim_src}"
+    fallback = f"{ESP_DIR}/{shim_src[:-4]}_b.efi"
+    if os.path.exists(primary):
+        shutil.move(primary, fallback)
+    shutil.copy(shim_src, primary)
+
+    # Make sure we have primary and fallback entries.
+    disk, partition = where_esp()
+    primary_i = -1
+    fallback_i = -1
+    current_i = 0
+    for i, bn in enumerate(boot.order):
+        label, entry = boot.entries[bn]
+        if label == f"{LABEL_BASE}":
+            primary_i = i
+        elif label == f"{LABEL_BASE} fallback":
+            fallback_i = i
+        if bn == boot.current:
+            current_i = i
+
+    if primary_i == -1:
+        getoutput(["efibootmgr", "-cw", "--index", str(current_i),
+                   "-L", LABEL_BASE, "-d", disk, "-p", partition,
+                   "-l", primary[len("/boot/efi"):]])
+        primary_i = current_i
+        current_i += 1
+    if fallback_i == -1:
+        fallback_i = primary_i + 1
+        getoutput(["efibootmgr", "-cw", "--index", str(fallback_i),
+                   "-L", f"{LABEL_BASE} fallback", "-d", disk,
+                   "-p", partition, "-l", fallback[len("/boot/efi"):]])
+
+    return
+
+def usage() -> None:
+    eprint("Usage: one of the following forms:")
+    eprint("\tshimctl booted        # register system as booted")
+    eprint("\tshimctl install NVR   # install a new shim")
+    exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2 and len(sys.argv) != 3:
+        usage()
+    elif len(sys.argv) == 2 and sys.argv[1] == "booted":
+        booted()
+    elif len(sys.argv) == 3 and sys.argv[1] == "install":
+        install(sys.argv[2])
+    else:
+        usage()
