@@ -41,7 +41,25 @@ typedef struct {
 	EFI_DEVICE_PATH *dp;
 	void *buffer;
 	size_t size;
+	bool allocated_buffer;
 } buffer_properties_t;
+
+static EFI_STATUS
+try_load_from_cached_section(EFI_HANDLE parent_image_handle,
+			     EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
+{
+	EFI_STATUS status;
+
+	status = validate_cached_section(parent_image_handle,
+					 bprop->buffer, bprop->size);
+	if (EFI_ERROR(status))
+		return status;
+
+	bprop->allocated_buffer = false;
+	bprop->dp = dp;
+
+	return EFI_SUCCESS;
+}
 
 static EFI_STATUS
 try_load_from_sfs(EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
@@ -97,6 +115,7 @@ try_load_from_sfs(EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
 		status = EFI_OUT_OF_RESOURCES;
 		goto out;
 	}
+	bprop->allocated_buffer = true;
 
 	/* read file */
 	status = file->Read(file, &bprop->size, bprop->buffer);
@@ -151,6 +170,7 @@ try_load_from_lf2(EFI_DEVICE_PATH *dp, buffer_properties_t *bprop)
 		status = EFI_OUT_OF_RESOURCES;
 		goto out;
 	}
+	bprop->allocated_buffer = true;
 
 	/* read file */
 	status = lf2->LoadFile(lf2, bprop->dp, /*BootPolicy=*/false, &bprop->size, bprop->buffer);
@@ -171,41 +191,65 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	SHIM_LOADED_IMAGE *image;
 	EFI_STATUS efi_status;
 	buffer_properties_t bprop = { NULL, NULL, NULL, 0 };
+	bool parent_verified = false;
 
 	if (BootPolicy)
 		return EFI_UNSUPPORTED;
 
-	if (!SourceBuffer || !SourceSize) {
-		if (!DevicePath) /* Both SourceBuffer and DevicePath are NULL */
-			return EFI_NOT_FOUND;
-
-		if (try_load_from_sfs(DevicePath, &bprop) == EFI_SUCCESS)
-			;
-		else if (try_load_from_lf2(DevicePath, &bprop) == EFI_SUCCESS)
-			;
-		else
-			/* no buffer given and we cannot load from this device */
+	/*
+	 * First we're checking if it's cached - since that is quite fast
+	 * unless we have a match, and any match is okay, we don't need to
+	 * do anything more complicated.
+	 */
+	if (SourceSize && SourceBuffer) {
+		bprop.buffer = SourceBuffer;
+		bprop.size = SourceSize;
+		efi_status = try_load_from_cached_section(ParentImageHandle,
+							  DevicePath, &bprop);
+		if (!EFI_ERROR(efi_status)) {
+			parent_verified = true;
+		} else if (efi_status != EFI_NOT_FOUND) {
 			return EFI_LOAD_ERROR;
+		}
+	}
 
-		SourceBuffer = bprop.buffer;
-		SourceSize = bprop.size;
-	} else {
-		bprop.buffer = NULL;
-		/*
-		 * Even if we are using a buffer, try populating the
-		 * device_handle and file_path fields the best we can
-		 */
+	/*
+	 * If we don't already have a cached, verified copy of the object
+	 * being loaded, go about it the old way.
+	 */
+	if (!parent_verified) {
+		if (!SourceBuffer || !SourceSize) {
+			if (!DevicePath) /* Both SourceBuffer and DevicePath are NULL */
+				return EFI_NOT_FOUND;
 
-		bprop.dp = DevicePath;
+			if (try_load_from_sfs(DevicePath, &bprop) == EFI_SUCCESS)
+				;
+			else if (try_load_from_lf2(DevicePath, &bprop) == EFI_SUCCESS)
+				;
+			else
+				/* no buffer given and we cannot load from this device */
+				return EFI_LOAD_ERROR;
 
-		if (bprop.dp) {
-			efi_status = BS->LocateDevicePath(&gEfiDevicePathProtocolGuid,
-			                                  &bprop.dp,
-			                                  &bprop.hnd);
-			if (efi_status != EFI_SUCCESS) {
-				/* can't seem to pull apart this DP */
-				bprop.dp = DevicePath;
-				bprop.hnd = NULL;
+			SourceBuffer = bprop.buffer;
+			SourceSize = bprop.size;
+		} else {
+			bprop.buffer = NULL;
+			/*
+			 * Even if we are using a buffer, try populating the
+			 * device_handle and file_path fields the best we can
+			 */
+
+			bprop.dp = DevicePath;
+
+			if (bprop.dp) {
+				efi_status = BS->LocateDevicePath(&gEfiDevicePathProtocolGuid,
+								  &bprop.dp,
+								  &bprop.hnd);
+				if (efi_status != EFI_SUCCESS) {
+					/* can't seem to pull apart this DP */
+					bprop.dp = DevicePath;
+					bprop.hnd = NULL;
+				}
 			}
 		}
 	}
@@ -237,14 +281,6 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 		}
 	}
 
-	in_protocol = 1;
-	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
-	                          &image->entry_point, &image->alloc_address,
-	                          &image->alloc_pages);
-	in_protocol = 0;
-	if (EFI_ERROR(efi_status))
-		goto free_image;
-
 	*ImageHandle = NULL;
 	efi_status = BS->InstallMultipleProtocolInterfaces(ImageHandle,
 					&SHIM_LOADED_IMAGE_GUID, image,
@@ -253,9 +289,18 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 					image->loaded_image_device_path,
 					NULL);
 	if (EFI_ERROR(efi_status))
+		goto free_image;
+
+	in_protocol = 1;
+	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
+				  *ImageHandle, &image->entry_point,
+				  &image->alloc_address, &image->alloc_pages,
+				  parent_verified);
+	in_protocol = 0;
+	if (EFI_ERROR(efi_status))
 		goto free_alloc;
 
-	if (bprop.buffer)
+	if (bprop.buffer && bprop.allocated_buffer)
 		FreePool(bprop.buffer);
 
 	return EFI_SUCCESS;
@@ -269,7 +314,7 @@ free_image:
 		FreePool(image->li.FilePath);
 	FreePool(image);
 free_buffer:
-	if (bprop.buffer)
+	if (bprop.buffer && bprop.allocated_buffer)
 		FreePool(bprop.buffer);
 	return efi_status;
 }
@@ -306,6 +351,8 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 		efi_status = image->exit_status;
 	}
 
+	flush_cached_sections(ImageHandle);
+
 	//
 	// We only support EFI applications, so we can unload and free the
 	// image unconditionally.
@@ -339,6 +386,7 @@ shim_unload_image(EFI_HANDLE ImageHandle)
 	if (efi_status == EFI_UNSUPPORTED)
 		return system_unload_image(ImageHandle);
 
+	flush_cached_sections(ImageHandle);
 	BS->FreePages(image->alloc_address, image->alloc_pages);
 	FreePool(image);
 
