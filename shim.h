@@ -326,6 +326,7 @@ typedef struct {
 	EFI_IMAGE_ENTRY_POINT	entry_point;
 	EFI_PHYSICAL_ADDRESS	alloc_address;
 	UINTN			alloc_pages;
+	unsigned int		alloc_alignment;
 	EFI_STATUS		exit_status;
 	CONST CHAR16		*exit_data;
 	UINTN			exit_data_size;
