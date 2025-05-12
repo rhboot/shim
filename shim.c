@@ -1148,6 +1148,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	CHAR16 *PathName = NULL;
 	void *data = NULL;
 	int datasize = 0;
+	unsigned int alloc_alignment;
 
 	efi_status = read_image(image_handle, ImagePath, &PathName, &data,
 				&datasize, 0);
@@ -1174,7 +1175,7 @@ EFI_STATUS start_image(EFI_HANDLE image_handle, CHAR16 *ImagePath)
 	 * Verify and, if appropriate, relocate and execute the executable
 	 */
 	efi_status = handle_image(data, datasize, shim_li, &entry_point,
-				  &alloc_address, &alloc_pages);
+				  &alloc_address, &alloc_pages, &alloc_alignment);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Failed to load image: %r\n", efi_status);
 		PrintErrors();

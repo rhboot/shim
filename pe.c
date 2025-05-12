@@ -465,7 +465,7 @@ handle_image (void *data, unsigned int datasize,
 	      EFI_LOADED_IMAGE *li,
 	      EFI_IMAGE_ENTRY_POINT *entry_point,
 	      EFI_PHYSICAL_ADDRESS *alloc_address,
-	      UINTN *alloc_pages)
+	      UINTN *alloc_pages, unsigned int *alloc_alignment)
 {
 	EFI_STATUS efi_status;
 	char *buffer;
@@ -474,7 +474,7 @@ handle_image (void *data, unsigned int datasize,
 	char *base, *end;
 	UINT32 size;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
-	unsigned int alignment, alloc_size;
+	unsigned int alloc_size;
 	int found_entry_point = 0;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
@@ -547,9 +547,9 @@ handle_image (void *data, unsigned int datasize,
 	 *
 	 * We only support one page size, so if it's zero, nerf it to 4096.
 	 */
-	alignment = context.SectionAlignment;
-	if (!alignment)
-		alignment = 4096;
+	*alloc_alignment = context.SectionAlignment;
+	if (!*alloc_alignment)
+		*alloc_alignment = 4096;
 
 	alloc_size = ALIGN_VALUE(context.ImageSize + context.SectionAlignment,
 				 PAGE_SIZE);
@@ -562,7 +562,7 @@ handle_image (void *data, unsigned int datasize,
 		return EFI_OUT_OF_RESOURCES;
 	}
 
-	buffer = (void *)ALIGN_VALUE((unsigned long)*alloc_address, alignment);
+	buffer = (void *)ALIGN_VALUE((unsigned long)*alloc_address, *alloc_alignment);
 	dprint(L"Loading 0x%llx bytes at 0x%llx\n",
 	       (unsigned long long)context.ImageSize,
 	       (unsigned long long)(uintptr_t)buffer);
