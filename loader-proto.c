@@ -183,6 +183,28 @@ out:
 	return status;
 }
 
+static void
+free_pages_alloc_image(SHIM_LOADED_IMAGE *image)
+{
+	char *buffer;
+
+	if (!image || !image->alloc_address || !image->alloc_pages)
+		return;
+
+	/* EDKII overwrites memory pages with a fixed pattern in at least
+	 * production Debian/Ubuntu builds as of 2025.02. If the W- X+ bits
+	 * are set on a loaded image, this will cause a page fault when it
+	 * is freed. Ensure W+ X- are set instead before freeing. */
+
+	buffer = (void *)ALIGN_VALUE((unsigned long)image->alloc_address, image->alloc_alignment);
+	update_mem_attrs((uintptr_t)buffer, image->alloc_pages * PAGE_SIZE, MEM_ATTR_R|MEM_ATTR_W,
+			 MEM_ATTR_X);
+
+	BS->FreePages(image->alloc_address, image->alloc_pages);
+	image->alloc_address = 0;
+	image->alloc_pages = 0;
+}
+
 static EFI_STATUS EFIAPI
 shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
                 EFI_DEVICE_PATH *DevicePath, VOID *SourceBuffer,
@@ -295,7 +317,7 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	efi_status = handle_image(SourceBuffer, SourceSize, &image->li,
 				  *ImageHandle, &image->entry_point,
 				  &image->alloc_address, &image->alloc_pages,
-				  parent_verified);
+				  &image->alloc_alignment, parent_verified);
 	in_protocol = 0;
 	if (EFI_ERROR(efi_status))
 		goto free_alloc;
@@ -306,7 +328,7 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	return EFI_SUCCESS;
 
 free_alloc:
-	BS->FreePages(image->alloc_address, image->alloc_pages);
+	free_pages_alloc_image(image);
 free_image:
 	if (image->loaded_image_device_path)
 		FreePool(image->loaded_image_device_path);
@@ -364,7 +386,7 @@ shim_start_image(IN EFI_HANDLE ImageHandle, OUT UINTN *ExitDataSize,
 					image->loaded_image_device_path,
 					NULL);
 
-	BS->FreePages(image->alloc_address, image->alloc_pages);
+	free_pages_alloc_image(image);
 	if (image->li.FilePath)
 		BS->FreePool(image->li.FilePath);
 	if (image->loaded_image_device_path)
@@ -387,7 +409,7 @@ shim_unload_image(EFI_HANDLE ImageHandle)
 		return system_unload_image(ImageHandle);
 
 	flush_cached_sections(ImageHandle);
-	BS->FreePages(image->alloc_address, image->alloc_pages);
+	free_pages_alloc_image(image);
 	FreePool(image);
 
 	return EFI_SUCCESS;
