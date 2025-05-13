@@ -668,21 +668,21 @@ verify_buffer_authenticode (char *data, int datasize,
 
 		if (sig->Hdr.wCertificateType == WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
 			EFI_STATUS efi_status;
-
+			
 			dprint(L"Attempting to verify signature %d:\n", i++);
 
-			efi_status = verify_one_signature(sig, sha256hash, sha1hash);
-
-			/*
-			 * If we didn't get EFI_SECURITY_VIOLATION from
-			 * checking the hashes above, then any dbx entries are
-			 * for a certificate, not this individual binary.
-			 *
-			 * So don't clobber successes with security violation
-			 * here; that just means it isn't a success.
-			 */
-			if (ret_efi_status != EFI_SUCCESS)
-				ret_efi_status = efi_status;
+			if (ret_efi_status != EFI_SUCCESS) {
+			    efi_status = verify_one_signature(sig, sha256hash, sha1hash);
+			    /*
+			     * If we didn't get EFI_SECURITY_VIOLATION from
+			     * checking the hashes above, then any dbx entries are
+			     * for a certificate, not this individual binary.
+			     *
+			     * So don't clobber successes with security violation
+			     * here; that just means it isn't a success.
+			     */	
+                            ret_efi_status = efi_status;
+			}
 		} else {
 			perror(L"Unsupported certificate type %x\n",
 				sig->Hdr.wCertificateType);
