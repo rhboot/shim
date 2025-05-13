@@ -119,7 +119,7 @@ grub.peimage,2
 
 
 Revocations for:
- - Februady 2025 GRUB CVEs
+ - February 2025 GRUB CVEs
 
 sbat,1,2025021800
 shim,4
