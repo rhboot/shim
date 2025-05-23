@@ -25,7 +25,7 @@ include $(TOPDIR)/include/scan-build.mk
 include $(TOPDIR)/include/fanalyzer.mk
 
 TARGETS	= $(SHIMNAME)
-TARGETS += $(SHIMNAME).debug $(MMNAME).debug $(FBNAME).debug
+TARGETS += $(SHIMNAME).debug $(if $(DISABLE_MOK),,$(MMNAME).debug) $(if $(DISABLE_FALLBACK),,$(FBNAME).debug)
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 TARGETS += $(SHIMHASHNAME)
 endif
@@ -33,14 +33,25 @@ ifneq ($(origin ENABLE_SHIM_DEVEL),undefined)
 CFLAGS += -DENABLE_SHIM_DEVEL
 endif
 ifneq ($(origin ENABLE_SHIM_CERT),undefined)
-TARGETS	+= $(MMNAME).signed $(FBNAME).signed
+TARGETS	+= $(if $(DISABLE_MOK),,$(MMNAME).signed) $(if $(DISABLE_FALLBACK),,$(FBNAME).signed)
 CFLAGS += -DENABLE_SHIM_CERT
 else
-TARGETS += $(MMNAME) $(FBNAME)
+TARGETS += $(if $(DISABLE_MOK),,$(MMNAME)) $(if $(DISABLE_FALLBACK),,$(FBNAME))
 endif
-OBJS	= shim.o globals.o memattrs.o mok.o netboot.o cert.o dp.o loader-proto.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o utils.o
+
+ifneq ($(origin DISABLE_FALLBACK),undefined)
+$(warning Building shim without fallback image support)
+CFLAGS += -DDISABLE_FALLBACK
+endif
+
+ifneq ($(origin DISABLE_MOK),undefined)
+$(warning Building shim without mok support)
+CFLAGS += -DDISABLE_MOK
+endif
+
+OBJS	= shim.o globals.o memattrs.o $(if $(DISABLE_MOK),,mok.o) netboot.o cert.o dp.o loader-proto.o tpm.o version.o errlog.o sbat.o sbat_data.o sbat_var.o pe.o pe-relocate.o httpboot.o csv.o load-options.o utils.o
 KEYS	= shim_cert.h ocsp.* ca.* shim.crt shim.csr shim.p12 shim.pem shim.key shim.cer
-ORIG_SOURCES	= shim.c globals.c memattrs.c mok.c netboot.c dp.c loader-proto.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
+ORIG_SOURCES	= shim.c globals.c memattrs.c $(if $(DISABLE_MOK),,mok.c) netboot.c dp.c loader-proto.c tpm.c errlog.c sbat.c pe.c pe-relocate.c httpboot.c shim.h version.h $(wildcard include/*.h) cert.S sbat_var.S
 MOK_OBJS = MokManager.o PasswordCrypt.o crypt_blowfish.o errlog.o sbat_data.o globals.o dp.o
 ORIG_MOK_SOURCES = MokManager.c PasswordCrypt.c crypt_blowfish.c shim.h $(wildcard include/*.h)
 FALLBACK_OBJS = fallback.o tpm.o errlog.o sbat_data.o globals.o utils.o

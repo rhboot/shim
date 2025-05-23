@@ -316,6 +316,7 @@ static EFI_STATUS check_denylist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		LogError(L"cert sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
+#ifndef DISABLE_MOK
 	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in Mok dbx\n");
@@ -327,7 +328,7 @@ static EFI_STATUS check_denylist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		LogError(L"cert sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-
+#endif
 	drain_openssl_errors();
 	return EFI_SUCCESS;
 }
@@ -394,7 +395,7 @@ static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 		LogError(L"check_db_cert(vendor_db, sha256hash) != DATA_FOUND\n");
 	}
 #endif
-
+#ifndef DISABLE_MOK
 	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
 				== DATA_FOUND) {
@@ -412,7 +413,7 @@ static EFI_STATUS check_allowlist (WIN_CERTIFICATE_EFI_PKCS *cert,
 	} else if (cert) {
 		LogError(L"check_db_cert(MokListRT, sha256hash) != DATA_FOUND\n");
 	}
-
+#endif
 	update_verification_method(VERIFIED_BY_NOTHING);
 	return EFI_NOT_FOUND;
 }
@@ -778,6 +779,7 @@ verify_buffer (char *data, int datasize,
 	return verify_buffer_sbat(data, datasize, context);
 }
 
+#ifndef DISABLE_FALLBACK
 static int
 should_use_fallback(EFI_HANDLE image_handle)
 {
@@ -834,6 +836,7 @@ error:
 
 	return ret;
 }
+#endif
 /*
  * Open the second stage bootloader and read it into a buffer
  */
@@ -1210,9 +1213,14 @@ done:
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
+#ifndef DISABLE_FALLBACK
 	int use_fb = should_use_fallback(image_handle);
+#else
+	int use_fb = 0;
+#endif
 
 	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
+#ifndef DISABLE_MOK
 	if (efi_status == EFI_SECURITY_VIOLATION ||
 	    efi_status == EFI_ACCESS_DENIED) {
 		efi_status = start_image(image_handle, MOK_MANAGER);
@@ -1225,7 +1233,7 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle,
 					 use_fb ? FALLBACK : second_stage);
 	}
-
+#endif
 	/*
 	 * If the filename is invalid, or the file does not exist, just fall
 	 * back to the default loader.  Also fall back to the default loader
@@ -2048,7 +2056,11 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Before we do anything else, validate our non-volatile,
 	 * boot-services-only state variables are what we think they are.
 	 */
+#ifndef DISABLE_MOK
 	efi_status = import_mok_state(image_handle);
+#else
+	efi_status = EFI_SUCCESS;
+#endif
 	if (!secure_mode() &&
 	    (efi_status == EFI_INVALID_PARAMETER ||
 	     efi_status == EFI_OUT_OF_RESOURCES)) {
