@@ -78,12 +78,14 @@ parse_sbat_section(char *section_base, size_t section_size, size_t *n,
 		   struct sbat_section_entry ***entriesp);
 void cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries);
 
-EFI_STATUS verify_sbat(size_t n, struct sbat_section_entry **entries);
+EFI_STATUS verify_sbat(size_t n, struct sbat_section_entry **entries, UINT16 *sbat_gen_expected, UINT16 *sbat_gen_found, CHAR8 **sbat_component_name);
 
 #ifdef SHIM_UNIT_TEST
 EFI_STATUS parse_sbat_var_data(list_t *entries, UINT8 *data, UINTN datasize);
-EFI_STATUS verify_sbat_helper(list_t *sbat_var, size_t n,
-                              struct sbat_section_entry **entries);
+EFI_STATUS verify_sbat_helper(list_t *local_sbat_var, size_t n,
+							struct sbat_section_entry **entries,
+							UINT16 *sbat_gen_expected, UINT16 *sbat_gen_found,
+							CHAR8 **sbat_component_name);
 #endif /* !SHIM_UNIT_TEST */
 #endif /* !SBAT_H_ */
 // vim:fenc=utf-8:tw=75:noet

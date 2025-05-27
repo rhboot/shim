@@ -469,10 +469,19 @@ test_verify_sbat_null_sbat_section(void)
 	status = parse_sbat_var_data(&test_sbat_var, sbat_var_data, sizeof(sbat_var_data));
 	assert_equal_goto(status, EFI_SUCCESS, err, "got %#x expected %#x\n");
 
-	status = verify_sbat_helper(&test_sbat_var, n, entries);
+	UINT16 sbat_gen_expected = 0;
+	UINT16 sbat_gen_found = 0;
+	CHAR8 *sbat_component_name = NULL;
+	status = verify_sbat_helper(&test_sbat_var, n, entries, &sbat_gen_expected, &sbat_gen_found, &sbat_component_name);
+	assert_equal_goto(sbat_component_name, NULL, err, "got %#x expected %#x\n");
+	assert_equal_goto(sbat_gen_expected, 0, err, "got %#x expected %#x\n");
+	assert_equal_goto(sbat_gen_found, 0, err, "got %#x expected %#x\n");
 	assert_equal_goto(status, EFI_SUCCESS, err, "got %#x expected %#x\n");
 	rc = 0;
 err:
+	if (sbat_component_name) {
+		free(sbat_component_name);
+	}
 	cleanup_sbat_var(&test_sbat_var);
 
 	return rc;
@@ -974,12 +983,22 @@ test_parse_and_verify(void)
 	if (status != EFI_SUCCESS || list_empty(&sbat_var))
 		return -1;
 
-	status = verify_sbat(n_section_entries, section_entries);
+	UINT16 sbat_gen_expected = 0;
+	UINT16 sbat_gen_found = 0;
+	CHAR8 *sbat_component_name = NULL;
+	status = verify_sbat(n_section_entries, section_entries, &sbat_gen_expected, &sbat_gen_found, &sbat_component_name);
+	assert_nonzero_goto(sbat_component_name, err, "not expected component name to be NULL");
+	assert_goto(strcmp(sbat_component_name, "test1") == 0, err, "expected 'test1' got '%s'", sbat_component_name);
+	assert_equal_goto(sbat_gen_expected, 5, err, "expected %#x got %#x\n");
+	assert_equal_goto(sbat_gen_found, 1, err, "expected %#x got %#x\n");
 	assert_equal_goto(status, EFI_SECURITY_VIOLATION, err, "expected %#x got %#x\n");
 
 	rc = 0;
 err:
 	cleanup_sbat_section_entries(n_section_entries, section_entries);
+	if (sbat_component_name) {
+		free(sbat_component_name);
+	}
 	cleanup_sbat_var(&sbat_var);
 
 	return rc;
