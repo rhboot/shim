@@ -328,6 +328,13 @@ shim_load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	return EFI_SUCCESS;
 
 free_alloc:
+	BS->UninstallMultipleProtocolInterfaces(ImageHandle,
+	                                &SHIM_LOADED_IMAGE_GUID, image,
+	                                &EFI_LOADED_IMAGE_GUID, &image->li,
+	                                &gEfiLoadedImageDevicePathProtocolGuid,
+					image->loaded_image_device_path,
+					NULL);
+	*ImageHandle = NULL;
 	free_pages_alloc_image(image);
 free_image:
 	if (image->loaded_image_device_path)
