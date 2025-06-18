@@ -1,4 +1,4 @@
 [submodule "gnu-efi"]
 	path = gnu-efi
-	url = https://github.com/rhboot/gnu-efi.git
-	branch = shim-16.1
+	url = https://github.com/ncroxon/gnu-efi.git
+	branch = master
