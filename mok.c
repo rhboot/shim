@@ -213,15 +213,15 @@ format_variable_info(UINT8 *buf, size_t bufsz,
 		var_set_t *var_set = &var_sets[i];
 		UINTN rc;
 		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
-				 "%a_max_storage_sz: 0x%lx\n",
+				 (const CHAR8 *)"%a_max_storage_sz: 0x%lx\n",
 				 var_set->prefix, var_set->max_storage_sz);
 		pos += rc;
 		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
-				 "%a_remaining_sz: 0x%lx\n",
+				 (const CHAR8 *)"%a_remaining_sz: 0x%lx\n",
 				 var_set->prefix, var_set->remaining_sz);
 		pos += rc;
 		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
-				 "%a_max_var_sz: 0x%lx\n",
+				 (const CHAR8 *)"%a_max_var_sz: 0x%lx\n",
 				 var_set->prefix, var_set->max_var_sz);
 		pos += rc;
 	}

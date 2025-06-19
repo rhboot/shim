@@ -261,7 +261,7 @@ save_logs(void)
 
 	entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
 	if (errlog_sz) {
-		strcpy(entry->name, "shim-err.txt");
+		strcpy((char *)entry->name, "shim-err.txt");
 		entry->data_size = errlog_sz;
 		format_error_log(&entry->data[0], errlog_sz);
 
@@ -269,7 +269,7 @@ save_logs(void)
 		entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
 	}
 	if (dbglog_sz) {
-		strcpy(entry->name, "shim-dbg.txt");
+		strcpy((char *)entry->name, "shim-dbg.txt");
 		entry->data_size = dbglog_sz;
 		format_debug_log(&entry->data[0], dbglog_sz);
 
