@@ -135,7 +135,7 @@ log_debug_print(const CHAR16 *fmt, ...)
 	UINTN ret = 0;
 
 	ms_va_start(args, fmt);
-	buf = VPoolPrint(fmt, args);
+	buf = MS_VPoolPrint(fmt, args);
 	if (!buf)
 		return 0;
 	ms_va_end(args);
