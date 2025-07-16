@@ -52,3 +52,8 @@ shim_cert.h
 !/test-data/
 /test-random.h
 version.c
+/.mkosi-private/
+/mkosi/mkosi.builddir/
+/mkosi/mkosi.cache/
+/mkosi/mkosi.local.conf
+/mkosi/mkosi.output/

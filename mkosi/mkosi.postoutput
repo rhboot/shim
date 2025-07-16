@@ -1,0 +1,80 @@
+#!/bin/bash
+set -e
+shopt -s nullglob
+
+ARGS=(
+    --secure-boot
+    --no-microsoft
+    --output "$OUTPUTDIR/ovmf_vars.fd"
+    --enroll-cert "$SRCDIR/mkosi/mkosi.crt"
+    --add-db OvmfEnrollDefaultKeys "$SRCDIR/mkosi/mkosi.crt"
+)
+
+if [ "$ARCHITECTURE" = "x86-64" ]; then
+    if [ -f /usr/share/OVMF/OVMF_VARS_4M.fd ]; then
+        ARGS+=(--input /usr/share/OVMF/OVMF_VARS_4M.fd)
+    elif [ -f /usr/share/OVMF/OVMF_VARS.fd ]; then
+        ARGS+=(--input /usr/share/OVMF/OVMF_VARS.fd)
+    else
+        echo "No OVMF vars template found for $ARCHITECTURE"
+        exit 1
+    fi
+elif [ "$ARCHITECTURE" = "x86" ]; then
+    if [ -f /usr/share/OVMF/OVMF32_VARS_4M.fd ]; then
+        ARGS+=(--input /usr/share/OVMF/OVMF32_VARS_4M.fd)
+    elif [ -f /usr/share/edk2/ovmf-ia32/OVMF_VARS.fd ]; then
+        ARGS+=(--input /usr/share/edk2/ovmf-ia32/OVMF_VARS.fd)
+    else
+        echo "No OVMF vars template found for $ARCHITECTURE"
+        exit 1
+    fi
+elif [ "$ARCHITECTURE" = "arm64" ]; then
+    if [ -f /usr/share/AAVMF/AAVMF_VARS.fd ]; then
+        ARGS+=(--input /usr/share/AAVMF/AAVMF_VARS.fd)
+    else
+        echo "No OVMF vars template found for $ARCHITECTURE"
+        exit 1
+    fi
+elif [ "$ARCHITECTURE" = "arm" ]; then
+    if [ -f /usr/share/AAVMF/AAVMF32_VARS.fd ]; then
+        ARGS+=(--input /usr/share/AAVMF/AAVMF32_VARS.fd)
+    elif [ -f /usr/share/edk2/arm/QEMU_VARS.fd ]; then
+        ARGS+=(--input /usr/share/edk2/arm/QEMU_VARS.fd)
+    else
+        echo "No OVMF vars template found for $ARCHITECTURE"
+        exit 1
+    fi
+elif [ "$ARCHITECTURE" = "riscv64" ]; then
+    if [ -f /usr/share/qemu-efi-riscv64/RISCV_VIRT_VARS.fd ]; then
+        ARGS+=(--input /usr/share/qemu-efi-riscv64/RISCV_VIRT_VARS.fd)
+    elif [ -f /usr/share/edk2/riscv/RISCV_VIRT_VARS.fd ]; then
+        ARGS+=(--input /usr/share/edk2/riscv/RISCV_VIRT_VARS.fd)
+    else
+        echo "No OVMF vars template found for $ARCHITECTURE"
+        exit 1
+    fi
+elif [ "$ARCHITECTURE" = "loongarch64" ]; then
+    if [ -f /usr/share/qemu-efi-loongarch64/QEMU_VARS.fd ]; then
+        ARGS+=(--input /usr/share/qemu-efi-loongarch64/QEMU_VARS.fd)
+    elif [ -f /usr/share/edk2/loongarch64/QEMU_VARS.fd ]; then
+        ARGS+=(--input /usr/share/edk2/loongarch64/QEMU_VARS.fd)
+    else
+        echo "No OVMF vars template found for $ARCHITECTURE"
+        exit 1
+    fi
+else
+    echo "Unsupported architecture for OVMF vars template: $ARCHITECTURE"
+    exit 1
+fi
+
+if [ "$MKOSI_DEBUG" = "1" ]; then
+    ARGS+=(--loglevel DEBUG)
+else
+    ARGS+=(--loglevel WARNING)
+fi
+
+for cert in "$SRCDIR"/mkosi/mkosi.conf.d/"$DISTRIBUTION"/certs/mok/*.crt "$OUTPUTDIR"/mok/*.crt; do
+    ARGS+=(--add-mok 605dab50-e046-4300-abb6-3dd810dd8b23 "$cert")
+done
+
+virt-fw-vars "${ARGS[@]}"

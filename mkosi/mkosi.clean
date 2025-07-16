@@ -1,0 +1,4 @@
+#!/bin/sh
+
+rm -f "$OUTPUTDIR/ovmf_vars.fd"
+rm -rf "$OUTPUTDIR/mok/"

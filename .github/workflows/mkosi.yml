@@ -1,0 +1,88 @@
+name: mkosi
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  boot:
+    runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.distro }}-${{ matrix.bootloader }}-${{ matrix.uki }}-${{ matrix.runner }}-${{ github.ref }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - fedora
+          - centos
+          - ubuntu
+          - debian
+        bootloader:
+          # Locally signed systemd-boot
+          - systemd-boot
+          # Distro signed grub2
+          - grub-signed
+        uki:
+          # BLS #1 boot, kernel + initrd
+          - none
+          # BLS #2 boot, locally built UKI (unsigned because it is not provided by the distro)
+          - unsigned
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+        include:
+          # Debian provides distro-signed systemd-boot
+          - distro: debian
+            bootloader: systemd-boot-signed
+            uki: unsigned
+            runner: ubuntu-24.04
+          - distro: debian
+            bootloader: systemd-boot-signed
+            uki: unsigned
+            runner: ubuntu-24.04-arm
+        exclude:
+          # The systemd-boot version in 24.04 fails to boot the arm64 compressed kernel
+          - distro: ubuntu
+            bootloader: systemd-boot
+            uki: none
+            runner: ubuntu-24.04-arm
+          # grub fails to load UKI with: error: ../../grub-core/script/function.c:119:can't find command `chainloader'
+          - distro: centos
+            bootloader: grub-signed
+            uki: unsigned
+            runner: ubuntu-24.04-arm
+          - distro: fedora
+            bootloader: grub-signed
+            uki: unsigned
+            runner: ubuntu-24.04-arm
+          # kernel is not signed
+          - distro: fedora
+            bootloader: grub-signed
+            uki: none
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          submodules: recursive
+      - uses: systemd/mkosi@7be5159f246d4b1283f62f8a0ab3f0ae90651e38
+
+      - name: Generate key
+        run: mkosi genkey
+
+      - name: Summary
+        run: mkosi summary
+
+      - name: Build tools tree
+        run: mkosi -f sandbox -- true
+
+      - name: Build image
+        run: mkosi sandbox -- mkosi --distribution ${{ matrix.distro }} --bootloader ${{ matrix.bootloader }} --unified-kernel-images ${{ matrix.uki }} --kernel-command-line=systemd.unit=mkosi-test.service -f build
+
+      - name: Run smoke tests
+        run: test "$(timeout -k 30 5m mkosi sandbox -- mkosi --firmware-variables mkosi/mkosi.output/ovmf_vars.fd --distribution ${{ matrix.distro }} --kernel-command-line-extra=systemd.unit=mkosi-test.service qemu 1>&2; echo $?)" -eq 123
