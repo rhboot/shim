@@ -1,0 +1,12 @@
+[Unit]
+Description=Smoke tests for shim
+After=multi-user.target
+Requires=multi-user.target
+SuccessAction=exit
+FailureAction=exit
+SuccessActionExitStatus=123
+
+[Service]
+StandardOutput=journal+console
+Type=oneshot
+ExecStart=/usr/bin/mkosi-test.sh

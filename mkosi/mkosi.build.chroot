@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+if [ "$ARCHITECTURE" = "x86-64" ]; then
+    EFI_ARCHITECTURE="x64"
+elif [ "$ARCHITECTURE" = "x86" ]; then
+    EFI_ARCHITECTURE="ia32"
+elif [ "$ARCHITECTURE" = "arm64" ]; then
+    EFI_ARCHITECTURE="aa64"
+else
+    EFI_ARCHITECTURE="$ARCHITECTURE"
+fi
+
+cd "$BUILDDIR"
+
+openssl x509 -inform PEM -in "$SRCDIR/mkosi/mkosi.conf.d/$DISTRIBUTION/certs/shim.crt" -outform DER -out shim.der
+
+export VENDOR_CERT_FILE=$PWD/shim.der
+export EFIDIR=$DISTRIBUTION
+export DEBUG=1
+
+make TOPDIR="$SRCDIR" -f "$SRCDIR/Makefile" -j1
+
+for b in shim fb mm; do
+    install -D "${b}${EFI_ARCHITECTURE}.efi" -t "$DESTDIR/usr/lib/shim/" -m 0755
+done

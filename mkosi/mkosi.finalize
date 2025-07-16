@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+if [ "$ARCHITECTURE" = "x86-64" ]; then
+    EFI_ARCHITECTURE="x64"
+elif [ "$ARCHITECTURE" = "x86" ]; then
+    EFI_ARCHITECTURE="ia32"
+elif [ "$ARCHITECTURE" = "arm64" ]; then
+    EFI_ARCHITECTURE="aa64"
+else
+    EFI_ARCHITECTURE="$ARCHITECTURE"
+fi
+
+touch -r "$BUILDROOT/usr" "$BUILDROOT/etc/.updated" "$BUILDROOT/var/.updated"
+
+mkdir -p "$OUTPUTDIR/mok/"
+openssl req -new -x509 -newkey rsa:2048 -keyout "$OUTPUTDIR/mok/mkosi.key" -out "$OUTPUTDIR/mok/mkosi.crt" -days 3650 -nodes \
+    -subj "/CN=mkosi MOK key" -addext "subjectAltName=DNS:mkosi.local"
+chmod 0644 "$OUTPUTDIR/mok/mkosi.crt"
+chmod 0600 "$OUTPUTDIR/mok/mkosi.key"
+
+mkdir -p "$BUILDROOT/boot/loader/addons"
+ukify build \
+    --stub "/usr/lib/systemd/boot/efi//addon${EFI_ARCHITECTURE}.efi.stub" \
+    --cmdline="foobarbaz" \
+    --output "$BUILDROOT/boot/loader/addons/test.addon.efi" \
+    --secureboot-certificate "$OUTPUTDIR/mok/mkosi.crt" \
+    --secureboot-private-key "$OUTPUTDIR/mok/mkosi.key" \
