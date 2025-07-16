@@ -5,7 +5,7 @@
 
 .SUFFIXES:
 
-include Make.defaults
+include $(TOPDIR)/Make.defaults
 
 CC = gcc
 VALGRIND ?=
