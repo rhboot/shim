@@ -13,6 +13,7 @@ extern EFI_STATUS update_mem_attrs(uintptr_t addr, uint64_t size,
 
 extern void get_hsi_mem_info(void);
 extern char *decode_hsi_bits(UINTN hsi);
+extern void set_shim_nx_policy(void);
 
 #endif /* !SHIM_MEMATTRS_H_ */
 // vim:fenc=utf-8:tw=75:noet

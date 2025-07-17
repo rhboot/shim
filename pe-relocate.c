@@ -661,5 +661,32 @@ get_shim_nx_capability(EFI_HANDLE image_handle)
 	}
 }
 
+static inline bool
+hsi_nx_is_enforced(void)
+{
+	return !((hsi_status & SHIM_HSI_STATUS_HEAPX) ||
+		 (hsi_status & SHIM_HSI_STATUS_STACKX) ||
+		 (hsi_status & SHIM_HSI_STATUS_ROW));
+}
+
+static inline bool
+hsi_api_is_present(void)
+{
+	return (hsi_status & SHIM_HSI_STATUS_HASMAP) ||
+		((hsi_status & SHIM_HSI_STATUS_HASDSTGMSD &&
+		  hsi_status & SHIM_HSI_STATUS_HASDSTSMSA));
+}
+
+void
+set_shim_nx_policy(void)
+{
+	if ((hsi_status & SHIM_HSI_STATUS_NX) &&
+	    hsi_nx_is_enforced() &&
+	    hsi_api_is_present())
+	{
+		mok_policy |= MOK_POLICY_REQUIRE_NX;
+		dprint("Enforcing NX policy for all images\n");
+	}
+}
 
 // vim:fenc=utf-8:tw=75:noet
