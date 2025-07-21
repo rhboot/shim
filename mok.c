@@ -6,6 +6,50 @@
 
 #include "shim.h"
 
+#define EFI_MAJOR_VERSION(tablep) ((UINT16)((((tablep)->Hdr.Revision) >> 16) & 0xfffful))
+#define EFI_MINOR_VERSION(tablep) ((UINT16)(((tablep)->Hdr.Revision) & 0xfffful))
+
+static BOOLEAN is_apple_firmware_vendor(void)
+{
+	CHAR16 vendorbuf[6] = L"";
+	CHAR16 *vendor = ST->FirmwareVendor;
+	if (!vendor)
+		return FALSE;
+
+	ZeroMem(vendorbuf, sizeof(vendorbuf));
+
+	/*
+	 * We've had a problem where ST->FirmwareVendor is only as big as
+	 * it needs to be (or at least less than the 200 bytes we formerly
+	 * defined vendorbuf as) and it's up against a page that's not
+	 * mapped readable, so we take a fault and reset when copying from
+	 * it.
+	 *
+	 * We modeled this after kernel, which has the 200 byte CHAR16
+	 * array and copies 198 bytes into it, so that there's a NUL
+	 * terminator.  They solve this issue by mapping the whole 200
+	 * bytes unconditionally and then unmapping it after the copy, but
+	 * we can't take that approach because we don't necessarily have
+	 * page permission primitives at all.
+	 *
+	 * The 200 bytes (CHAR16 [100]) is an arbitrary number anyway, but
+	 * it's likely larger than any sane vendor name, and we still want
+	 * to do the copy into an array larger than our copied data because
+	 * that's how we guard against failure to terminate with a NUL.
+	 *
+	 * So right now we're only copying ten bytes, because Apple is the
+	 * only vendor we're testing against.
+	 */
+	CopyMem(vendorbuf, vendor, 10);
+
+	dprint(L"FirmwareVendor: \"%s\"\n", vendor);
+
+	if (StrnCmp(vendor, L"Apple", 5) == 0)
+		return TRUE;
+
+	return FALSE;
+}
+
 /*
  * Check if a variable exists
  */
@@ -440,50 +484,6 @@ should_mirror_build_cert(struct mok_state_variable *v)
 static const uint8_t null_sha256[32] = { 0, };
 
 typedef UINTN SIZE_T;
-
-#define EFI_MAJOR_VERSION(tablep) ((UINT16)((((tablep)->Hdr.Revision) >> 16) & 0xfffful))
-#define EFI_MINOR_VERSION(tablep) ((UINT16)(((tablep)->Hdr.Revision) & 0xfffful))
-
-static BOOLEAN is_apple_firmware_vendor(void)
-{
-	CHAR16 vendorbuf[6] = L"";
-	CHAR16 *vendor = ST->FirmwareVendor;
-	if (!vendor)
-		return FALSE;
-
-	ZeroMem(vendorbuf, sizeof(vendorbuf));
-
-	/*
-	 * We've had a problem where ST->FirmwareVendor is only as big as
-	 * it needs to be (or at least less than the 200 bytes we formerly
-	 * defined vendorbuf as) and it's up against a page that's not
-	 * mapped readable, so we take a fault and reset when copying from
-	 * it.
-	 *
-	 * We modeled this after kernel, which has the 200 byte CHAR16
-	 * array and copies 198 bytes into it, so that there's a NUL
-	 * terminator.  They solve this issue by mapping the whole 200
-	 * bytes unconditionally and then unmapping it after the copy, but
-	 * we can't take that approach because we don't necessarily have
-	 * page permission primitives at all.
-	 *
-	 * The 200 bytes (CHAR16 [100]) is an arbitrary number anyway, but
-	 * it's likely larger than any sane vendor name, and we still want
-	 * to do the copy into an array larger than our copied data because
-	 * that's how we guard against failure to terminate with a NUL.
-	 *
-	 * So right now we're only copying ten bytes, because Apple is the
-	 * only vendor we're testing against.
-	 */
-	CopyMem(vendorbuf, vendor, 10);
-
-	dprint(L"FirmwareVendor: \"%s\"\n", vendor);
-
-	if (StrnCmp(vendor, L"Apple", 5) == 0)
-		return TRUE;
-
-	return FALSE;
-}
 
 static EFI_STATUS
 get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
