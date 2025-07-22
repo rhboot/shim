@@ -495,8 +495,9 @@ get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 
 	*max_var_szp = 0;
 	if (EFI_MAJOR_VERSION(RT) < 2 || is_apple_firmware_vendor()) {
-		dprint(L"EFI %d.%d; no RT->QueryVariableInfo().  Using 1024!\n",
-		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT));
+		dprint(L"EFI %d.%d; no RT->QueryVariableInfo()%a.  Using 1024!\n",
+		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT),
+		       is_apple_firmware_vendor() ? " (Apple)" : "");
 		max_var_sz = remaining_sz = max_storage_sz = 1024;
 		efi_status = EFI_SUCCESS;
 	} else {
