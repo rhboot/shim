@@ -130,6 +130,105 @@ format_hsi_status(UINT8 *buf, size_t sz,
 	return ret;
 }
 
+static UINTN
+format_variable_info(UINT8 *buf, size_t bufsz,
+		  struct mok_state_variable *msv UNUSED)
+{
+	typedef enum {
+		BS,
+		BS_NV,
+		BS_RT,
+		BS_RT_NV,
+		STOP
+	} variable_attr_t;
+	typedef struct {
+		uint64_t attrs;
+		char prefix[10];
+		uint64_t max_storage_sz;
+		uint64_t remaining_sz;
+		uint64_t max_var_sz;
+		bool valid;
+	} var_set_t;
+	var_set_t var_sets[] = {
+		[BS] = { EFI_VARIABLE_BOOTSERVICE_ACCESS,
+			"bs", 0, 0, 0, false },
+		[BS_NV] = { EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_NON_VOLATILE,
+			"bs_rt", 0, 0, 0, false },
+		[BS_RT] = { EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
+			"bs_nv", 0, 0, 0, false },
+		[BS_RT_NV] = { EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS | EFI_VARIABLE_NON_VOLATILE,
+			"bs_nv_rt", 0, 0, 0, false },
+		[STOP] = { 0, "", 0, 0, 0, false }
+	};
+	UINTN sz = 0;
+	UINTN pos = 0;
+
+	if (EFI_MAJOR_VERSION(RT) < 2 || is_apple_firmware_vendor()) {
+		dprint(L"EFI %d.%d; no RT->QueryVariableInfo() %a\n",
+		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT),
+		       is_apple_firmware_vendor() ? "(Apple)" : "");
+		if (sz > 0)
+			buf[0] = '\0';
+		return 0;
+	} else {
+		EFI_STATUS efi_status;
+		variable_attr_t i;
+		for (i = BS; i < STOP; i++) {
+			var_set_t *var_set = &var_sets[i];
+			dprint(L"calling RT->QueryVariableInfo() for %a\n",
+			       var_set->prefix);
+			efi_status = RT->QueryVariableInfo(var_set->attrs,
+							   &var_set->max_storage_sz,
+							   &var_set->remaining_sz,
+							   &var_set->max_var_sz);
+			if (EFI_ERROR(efi_status)) {
+				perror(L"Could not get variable storage info: %r\n",
+				       efi_status);
+				var_set->max_storage_sz = 0;
+				var_set->remaining_sz = 0;
+				var_set->max_var_sz = 0;
+			} else {
+				var_set->valid = true;
+				sz += strlen(var_set->prefix)
+					+ strlen("-max_storage_sz: ")
+					+ strlen("0x0123456701234567\n");
+				sz += strlen(var_set->prefix)
+					+ strlen("-remaining_sz: ")
+					+ strlen("0x0123456701234567\n");
+				sz += strlen(var_set->prefix)
+					+ strlen("-max_var_sz: ")
+					+ strlen("0x0123456701234567\n");
+			}
+		}
+		sz += 1;
+	}
+
+	if (!buf || bufsz < sz) {
+		dprint(L"buf:0x%lx bufsz:0x%lx returning 0x%lx\n", buf, bufsz, sz);
+		return sz;
+	}
+
+	variable_attr_t i;
+	for (i = BS; i < STOP; i++) {
+		var_set_t *var_set = &var_sets[i];
+		UINTN rc;
+		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
+				 "%a_max_storage_sz: 0x%lx\n",
+				 var_set->prefix, var_set->max_storage_sz);
+		pos += rc;
+		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
+				 "%a_remaining_sz: 0x%lx\n",
+				 var_set->prefix, var_set->remaining_sz);
+		pos += rc;
+		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
+				 "%a_max_var_sz: 0x%lx\n",
+				 var_set->prefix, var_set->max_var_sz);
+		pos += rc;
+	}
+
+	return pos;
+}
+
 /*
  * If the OS has set any of these variables we need to drop into MOK and
  * handle them appropriately
@@ -466,6 +565,17 @@ struct mok_state_variable mok_state_variable_data[] = {
 	 .rtname8 = "Kernel_SkuSiStatus",
 	 .guid = &SECUREBOOT_EFI_NAMESPACE_GUID,
 	 .flags = MOK_VARIABLE_CONFIG_ONLY,
+	},
+	/*
+	 * Keep this entry last, or it'll be wrong.
+	 */
+	{.name = L"VariableInfo",
+	 .name8 = "VariableInfo",
+	 .rtname = L"VariableInfo",
+	 .rtname8 = "VariableInfo",
+	 .guid = &SHIM_LOCK_GUID,
+	 .flags = MOK_VARIABLE_CONFIG_ONLY,
+	 .format = format_variable_info,
 	},
 	{ NULL, }
 };
