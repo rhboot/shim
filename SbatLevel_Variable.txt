@@ -125,3 +125,10 @@ sbat,1,2025021800
 shim,4
 grub,5
 
+Revocations for
+- July 2025 Proxmox-specific Grub issue (PSA-2025-00012-1)
+
+sbat,1,2025051000
+shim,4
+grub,5
+grub.proxmox,2
