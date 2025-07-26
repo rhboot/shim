@@ -82,4 +82,14 @@ It will sometimes be requested by reviewers that a build includes extra
 name sbat.FOO.csv, where foo is your EFI subdirectory name.  The build
 system will automatically include any such files.
 
+Building and booting local VM to test shim changes with other 2nd/3rd stages:
+- pick the target distribution of your choice, currently supported are Fedora/CentOS/Debian/Ubuntu
+- ensure the package manager for the target distribution is installed locally - dnf+rpm or apt+dpkg
+- install python3
+- have mkosi available, either via the distribution, or pip, or having bin/mkosi in PATH from git clone of https://github.com/systemd/mkosi
+- (one time step) mkosi genkey
+- mkosi sandbox -- mkosi --firmware-variables mkosi/mkosi.output/ovmf_vars.fd --distribution <distro> qemu
+- this will build and cache a local VM, build shim in it, and boot it with systemd-boot and a UKI by default
+- to pick different 2nd/3rd stages, run mkosi sandbox -- mkosi --distribution <distro> --bootloader <2nd stage> --unified-kernel-images <unsigned/no> -f -i build
+
 # vim:filetype=mail:tw=74
