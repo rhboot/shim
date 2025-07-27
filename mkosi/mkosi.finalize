@@ -21,8 +21,8 @@ chmod 0600 "$OUTPUTDIR/mok/mkosi.key"
 
 mkdir -p "$BUILDROOT/boot/loader/addons"
 ukify build \
-    --stub "/usr/lib/systemd/boot/efi//addon${EFI_ARCHITECTURE}.efi.stub" \
+    --stub "/usr/lib/systemd/boot/efi/addon${EFI_ARCHITECTURE}.efi.stub" \
     --cmdline="foobarbaz" \
     --output "$BUILDROOT/boot/loader/addons/test.addon.efi" \
     --secureboot-certificate "$OUTPUTDIR/mok/mkosi.crt" \
-    --secureboot-private-key "$OUTPUTDIR/mok/mkosi.key" \
+    --secureboot-private-key "$OUTPUTDIR/mok/mkosi.key"
