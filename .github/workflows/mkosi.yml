@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           submodules: recursive
-      - uses: systemd/mkosi@7be5159f246d4b1283f62f8a0ab3f0ae90651e38
+      - uses: systemd/mkosi@main
 
       - name: Generate key
         run: mkosi genkey
@@ -85,4 +85,4 @@ jobs:
         run: mkosi sandbox -- mkosi --distribution ${{ matrix.distro }} --bootloader ${{ matrix.bootloader }} --unified-kernel-images ${{ matrix.uki }} --kernel-command-line=systemd.unit=mkosi-test.service -f build
 
       - name: Run smoke tests
-        run: test "$(timeout -k 30 5m mkosi sandbox -- mkosi --firmware-variables mkosi/mkosi.output/ovmf_vars.fd --distribution ${{ matrix.distro }} --kernel-command-line-extra=systemd.unit=mkosi-test.service qemu 1>&2; echo $?)" -eq 123
+        run: test "$(timeout -k 30 5m mkosi sandbox -- mkosi --distribution ${{ matrix.distro }} --kernel-command-line-extra=systemd.unit=mkosi-test.service qemu 1>&2; echo $?)" -eq 123
