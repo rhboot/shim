@@ -167,7 +167,7 @@ format_variable_info(UINT8 *buf, size_t bufsz,
 		dprint(L"EFI %d.%d; no RT->QueryVariableInfo() %a\n",
 		       EFI_MAJOR_VERSION(RT), EFI_MINOR_VERSION(RT),
 		       is_apple_firmware_vendor() ? "(Apple)" : "");
-		if (sz > 0)
+		if (bufsz > 0)
 			buf[0] = '\0';
 		return 0;
 	} else {
