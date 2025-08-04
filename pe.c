@@ -50,9 +50,14 @@ _do_sha256_sum(void *addr, UINTN size, UINT8 *digest)
 	if (sha256ctx == NULL)
 		return EFI_OUT_OF_RESOURCES;
 
-	Sha256Init(sha256ctx);
-	Sha256Update(sha256ctx, addr, size);
-	Sha256Final(sha256ctx, digest);
+	if (!Sha256Init(sha256ctx))
+		return EFI_OUT_OF_RESOURCES;
+
+	if (!Sha256Update(sha256ctx, addr, size))
+		return EFI_OUT_OF_RESOURCES;
+
+	if (!Sha256Final(sha256ctx, digest))
+		return EFI_OUT_OF_RESOURCES;
 
 	FreePool(sha256ctx);
 	return EFI_SUCCESS;
