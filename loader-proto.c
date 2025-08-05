@@ -419,6 +419,10 @@ shim_unload_image(EFI_HANDLE ImageHandle)
 
 	flush_cached_sections(ImageHandle);
 	free_pages_alloc_image(image);
+	if (image->li.FilePath)
+		BS->FreePool(image->li.FilePath);
+	if (image->loaded_image_device_path)
+		BS->FreePool(image->loaded_image_device_path);
 	FreePool(image);
 
 	return EFI_SUCCESS;
