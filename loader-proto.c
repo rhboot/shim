@@ -414,6 +414,8 @@ shim_unload_image(EFI_HANDLE ImageHandle)
 
 	if (efi_status == EFI_UNSUPPORTED)
 		return system_unload_image(ImageHandle);
+	else if (efi_status != EFI_SUCCESS)
+		return efi_status;
 
 	flush_cached_sections(ImageHandle);
 	free_pages_alloc_image(image);
