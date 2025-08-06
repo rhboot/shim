@@ -414,9 +414,15 @@ shim_unload_image(EFI_HANDLE ImageHandle)
 
 	if (efi_status == EFI_UNSUPPORTED)
 		return system_unload_image(ImageHandle);
+	else if (efi_status != EFI_SUCCESS)
+		return efi_status;
 
 	flush_cached_sections(ImageHandle);
 	free_pages_alloc_image(image);
+	if (image->li.FilePath)
+		BS->FreePool(image->li.FilePath);
+	if (image->loaded_image_device_path)
+		BS->FreePool(image->loaded_image_device_path);
 	FreePool(image);
 
 	return EFI_SUCCESS;
