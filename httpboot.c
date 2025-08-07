@@ -562,10 +562,12 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	EFI_HTTP_RESPONSE_DATA response;
 	EFI_HTTP_STATUS_CODE http_status;
 	BOOLEAN response_done;
-	UINTN i, j, downloaded;
+	UINTN i, downloaded;
 	CHAR8 rx_buffer[9216];
 	EFI_STATUS efi_status;
 	EFI_STATUS event_status;
+	UINT64 new_buf_size;
+	BOOLEAN buf_size_set = false;
 
 	/* Initialize the rx message and buffer */
 	response.StatusCode = HTTP_STATUS_UNSUPPORTED_STATUS;
@@ -618,16 +620,13 @@ receive_http_response(EFI_HTTP_PROTOCOL *http, VOID **buffer, UINT64 *buf_size)
 	for (i = 0; i < rx_message.HeaderCount; i++) {
 		if (!strcasecmp(rx_message.Headers[i].FieldName,
 				(CHAR8 *)"Content-Length")) {
-			*buf_size = ascii_to_int(rx_message.Headers[i].FieldValue);
-			for(j = 0; j < i; j++) {
-				if (!strcasecmp(rx_message.Headers[i].FieldName,
-						(CHAR8 *)"Content-Length")) {
-					if (*buf_size != ascii_to_int(rx_message.Headers[j].FieldValue)) {
-						perror(L"Content-Length is invalid\n");
-						goto error;
-					}
-				}
+			new_buf_size = ascii_to_int(rx_message.Headers[i].FieldValue);
+			if (buf_size_set && new_buf_size != *buf_size) {
+				perror(L"Content-Length is invalid\n");
+				goto error;
 			}
+			*buf_size = new_buf_size;
+			buf_size_set = true;
 		}
 	}
 
