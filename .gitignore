@@ -52,7 +52,10 @@ shim_cert.h
 !/test-data/
 /test-random.h
 version.c
+/.vscode/
 /.mkosi-private/
+/mkosi.tools/
+/mkosi.tools.manifest
 /mkosi/mkosi.builddir/
 /mkosi/mkosi.cache/
 /mkosi/mkosi.local.conf
