@@ -717,7 +717,7 @@ handle_image (void *data, unsigned int datasize,
 	dprint(L"Loading 0x%llx bytes at 0x%llx\n",
 	       (unsigned long long)context.ImageSize,
 	       (unsigned long long)(uintptr_t)buffer);
-	update_mem_attrs((uintptr_t)buffer, alloc_size, MEM_ATTR_R|MEM_ATTR_W,
+	update_mem_attrs((uintptr_t)buffer, context.ImageSize, MEM_ATTR_R|MEM_ATTR_W,
 			 MEM_ATTR_X);
 
 	CopyMem(buffer, data, context.SizeOfHeaders);
