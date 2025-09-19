@@ -931,7 +931,7 @@ test_strncpy(void)
 
 	memset(s0, 0, sizeof(s0));
 	memcpy(s0, s, sizeof(s));
-#if __GNUC_PREREQ(8, 1)
+#if GNUC_PREREQ(8, 1)
 # pragma GCC diagnostic push
 # pragma GCC diagnostic ignored "-Wstringop-truncation"
 #endif
@@ -1033,7 +1033,7 @@ test_strncpy(void)
 	assert_equal_return(s1[16], '\000', -1, "got %#02hhx expected %02hhx\n");
 	assert_equal_return(s1[17], '0', -1, "got %#02hhx expected %02hhx\n");
 	assert_equal_return(s1[18], '1', -1, "got %#02hhx expected %02hhx\n");
-#if __GNUC_PREREQ(8, 1)
+#if GNUC_PREREQ(8, 1)
 # pragma GCC diagnostic pop
 #endif
 	return 0;
