@@ -481,16 +481,19 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 /*
  * Check the load options to specify the second stage loader
  */
-EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
+EFI_STATUS set_second_stage (__attribute__((unused)) EFI_HANDLE image_handle)
 {
-	EFI_STATUS efi_status;
-	EFI_LOADED_IMAGE *li = NULL;
-
 	second_stage = (optional_second_stage) ? optional_second_stage : DEFAULT_LOADER;
 	load_options = NULL;
 	load_options_size = 0;
 
-	efi_status = BS->HandleProtocol(image_handle, &LoadedImageProtocol,
+#ifndef DISABLE_ALL_LOAD_OPTIONS
+	/*
+	 * to avoid errors when parsing the load options on some systems,
+	 * or if it is not needed, the function can be completely disabled.
+	 */
+	EFI_LOADED_IMAGE *li = NULL;
+	EFI_STATUS efi_status = BS->HandleProtocol(image_handle, &LoadedImageProtocol,
 					(void **) &li);
 	if (EFI_ERROR(efi_status)) {
 		perror (L"Failed to get load options: %r\n", efi_status);
@@ -513,6 +516,7 @@ EFI_STATUS set_second_stage (EFI_HANDLE image_handle)
 		perror (L"Failed to get load options: %r\n", efi_status);
 		return efi_status;
 	}
+#endif
 
 	return EFI_SUCCESS;
 }
