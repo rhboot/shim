@@ -13,6 +13,8 @@ DEBUG_PRINTS ?= 0
 OPTIMIZATIONS=-O2 -ggdb
 CFLAGS_LTO =
 CFLAGS_GCOV =
+LIBS = -lefivar
+
 CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
 	 $(EFI_INCLUDES) \
@@ -45,6 +47,11 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -DGNU_EFI_USE_MS_ABI -DPAGE_SIZE=4096 \
 	 -DSHIM_UNIT_TEST \
 	 "-DDEFAULT_DEBUG_PRINT_STATE=$(DEBUG_PRINTS)"
+
+ifneq ($(origin ENABLE_LIBUNWIND), undefined)
+CFLAGS += -DENABLE_LIBUNWIND
+LIBS += -lunwind
+endif
 
 # On some systems (e.g. Arch Linux), limits.h is in the "include-fixed" instead
 # of the "include" directory
@@ -109,7 +116,7 @@ tests := $(patsubst %.c,%,$(wildcard test-*.c))
 $(tests) :: test-% : | libefi-test.a
 
 $(tests) :: test-% : test.c test-%.c $(test-%_FILES)
-	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(test-$*_FILES)) libefi-test.a -lefivar
+	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(test-$*_FILES)) libefi-test.a $(LIBS)
 	$(VALGRIND) ./$@
 
 test : $(tests)
