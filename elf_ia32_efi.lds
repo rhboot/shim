@@ -5,7 +5,8 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  .hash : { *(.hash) }	/* this MUST come first! */
+  /* .hash and/or .gnu.hash MUST come first! */
+  .hash : { *(.hash) }
   . = ALIGN(4096);
   .text :
   {
@@ -14,11 +15,6 @@ SECTIONS
    *(.text.*)
    *(.gnu.linkonce.t.*)
    _etext = .;
-  }
-  . = ALIGN(4096);
-  .reloc :
-  {
-   *(.reloc)
   }
   . = ALIGN(4096);
   .note.gnu.build-id : {
@@ -51,6 +47,11 @@ SECTIONS
    *(.dynbss)
    *(.bss)
    *(COMMON)
+  }
+  . = ALIGN(4096);
+  .reloc :
+  {
+   *(.reloc)
   }
 
   . = ALIGN(4096);
