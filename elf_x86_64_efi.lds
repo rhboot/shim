@@ -6,7 +6,8 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  .hash : { *(.hash) }	/* this MUST come first! */
+  /* this MUST come first! */
+  .hash : { *(.hash) }
   . = ALIGN(4096);
   .eh_frame :
   {
@@ -20,11 +21,6 @@ SECTIONS
    *(.text.*)
    *(.gnu.linkonce.t.*)
    _etext = .;
-  }
-  . = ALIGN(4096);
-  .reloc :
-  {
-   *(.reloc)
   }
   . = ALIGN(4096);
   .note.gnu.build-id : {
@@ -57,6 +53,11 @@ SECTIONS
    *(.bss)
    *(COMMON)
    *(.rel.local)
+  }
+  . = ALIGN(4096);
+  .reloc :
+  {
+   *(.reloc)
   }
 
   . = ALIGN(4096);
@@ -93,9 +94,7 @@ SECTIONS
   .ignored.reloc :
   {
     *(.rela.reloc)
-    *(.eh_frame)
     *(.note.GNU-stack)
   }
   .comment 0 : { *(.comment) }
-  .note.gnu.build-id : { *(.note.gnu.build-id) }
 }

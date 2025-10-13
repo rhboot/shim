@@ -3,9 +3,10 @@ OUTPUT_ARCH(arm)
 ENTRY(_start)
 SECTIONS
 {
-  .text 0x0 : {
-    _text = .;
+  .text 0 : {
     *(.text.head)
+    . = 0x1000;
+    _text = .;
     *(.text)
     *(.text.*)
     *(.gnu.linkonce.t.*)
@@ -45,6 +46,16 @@ SECTIONS
   _edata = .;
   _data_vsize = _evdata - _data;
   _data_size = . - _data;
+  . = ALIGN(4096);
+  _reloc = .;
+  .areloc : {
+    *(.areloc)
+    _evreloc = .;
+    . = ALIGN(4096);
+    _ereloc = .;
+  } =0
+  _reloc_vsize = _evreloc - _reloc;
+  _reloc_size = _ereloc - _reloc;
 
   /*
    * Note that _sbat must be the beginning of the data, and _esbat must be the
@@ -99,7 +110,8 @@ SECTIONS
   _erodata = .;
   _rodata_size = . - _rodata;
   _rodata_vsize = _evrodata - _rodata;
-  _alldata_size = . - _data;
+  _image_end = .;
+  _alldata_size = _image_end - _data;
 
   /DISCARD/ :
   {
