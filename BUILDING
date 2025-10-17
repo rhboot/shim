@@ -75,6 +75,17 @@ Variables you could set to customize the build:
 - ENABLE_CODESIGN_EKU
   This changes the certificate validation logic to require Extended Key
   Usage 1.3.6.1.5.5.7.3.3 ("Code Signing").
+- DISABLE_APPEND_V_DBX_TO_MOKX
+  This building option avoids the vendor_dbx being appended to MokListRT.
+  Instead, the vendor_dbx will be exposed through the mok config table space.
+  As the vendor-dbx grows, it caused some problems when writing such
+  a large variable. Some firmwares lie the avaiable space(*1), and some
+  even crash(*2) for no good reason after the writing of MokListXRT. If
+  your shim and kernel don't rely on MokListXRT to block anything, you can
+  use this building option to expose vendor_dbx through the mok config table
+  instead of appending it to MokListRT.
+  (*1) https://bugzilla.suse.com/show_bug.cgi?id=1185261
+  (*2) https://github.com/rhboot/shim/pull/369#issuecomment-855275115
 
 Vendor SBAT data:
 It will sometimes be requested by reviewers that a build includes extra
