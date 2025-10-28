@@ -381,6 +381,14 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 			ret = -1;
 	}
 
+	debug(NOISE, "File alignment is 0x%x, page size is 0x%x\n",
+	      ctx->FileAlignment, PAGE_SIZE);
+	if (ctx->FileAlignment % PAGE_SIZE != 0) {
+		debug(level, "File alignment is not a multiple of page size\n");
+		if (require_nx_compat)
+			ret = -1;
+	}
+
 	debug(NOISE, "Section alignment is 0x%x, page size is 0x%x\n",
 	      ctx->SectionAlignment, PAGE_SIZE);
 	if (ctx->SectionAlignment != PAGE_SIZE) {
