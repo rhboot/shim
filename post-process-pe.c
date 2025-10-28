@@ -124,7 +124,6 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 	EFI_IMAGE_DOS_HEADER *DOSHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 	size_t HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
-	size_t FileAlignment = 0;
 	size_t sz0 = 0, sz1 = 0;
 	uintptr_t loc = 0;
 
@@ -164,7 +163,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		ctx->SectionAlignment =
 			PEHdr->Pe32Plus.OptionalHeader.SectionAlignment;
 		ctx->DllCharacteristics = PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics;
-		FileAlignment = PEHdr->Pe32Plus.OptionalHeader.FileAlignment;
+		ctx->FileAlignment = PEHdr->Pe32Plus.OptionalHeader.FileAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
 	} else {
 		debug(NOISE, "image is 32bit\n");
@@ -175,19 +174,19 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		ctx->SectionAlignment =
 			PEHdr->Pe32.OptionalHeader.SectionAlignment;
 		ctx->DllCharacteristics = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
-		FileAlignment = PEHdr->Pe32.OptionalHeader.FileAlignment;
+		ctx->FileAlignment = PEHdr->Pe32.OptionalHeader.FileAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
 	}
 
-	if (FileAlignment % 2 != 0)
-		errx(1, "%s: Invalid file alignment %zu", file, FileAlignment);
+	if (ctx->FileAlignment % 2 != 0)
+		errx(1, "%s: Invalid file alignment 0x%08x", file, ctx->FileAlignment);
 
-	if (FileAlignment == 0)
-		FileAlignment = 0x200;
+	if (ctx->FileAlignment == 0)
+		ctx->FileAlignment = 0x200;
 	if (ctx->SectionAlignment == 0)
 		ctx->SectionAlignment = PAGE_SIZE;
-	if (ctx->SectionAlignment < FileAlignment)
-		ctx->SectionAlignment = FileAlignment;
+	if (ctx->SectionAlignment < ctx->FileAlignment)
+		ctx->SectionAlignment = ctx->FileAlignment;
 
 	ctx->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
@@ -382,10 +381,19 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 			ret = -1;
 	}
 
+	debug(NOISE, "File alignment is 0x%x, page size is 0x%x\n",
+	      ctx->FileAlignment, PAGE_SIZE);
+	if (ctx->FileAlignment % PAGE_SIZE != 0) {
+		debug(level, "File alignment is not a multiple of page size\n");
+		if (require_nx_compat)
+			ret = -1;
+	}
+
 	debug(NOISE, "Section alignment is 0x%x, page size is 0x%x\n",
 	      ctx->SectionAlignment, PAGE_SIZE);
-	if (ctx->SectionAlignment != PAGE_SIZE) {
-		debug(level, "Section alignment is not page aligned\n");
+	if (ctx->SectionAlignment & (PAGE_SIZE - 1)) {
+		debug(level, "Section alignment is not page aligned: SectionAlignment & PAGE_MASK = 0x%08x & 0x%08x = 0x%08x\n",
+		      ctx->SectionAlignment, PAGE_SIZE-1, ctx->SectionAlignment & (PAGE_SIZE-1));
 		if (require_nx_compat)
 			ret = -1;
 	}
@@ -401,6 +409,13 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 			debug(level, "Section %d is writable and executable\n", i);
 			if (require_nx_compat)
 				ret = -1;
+		}
+
+		debug(NOISE, "Section %d has VA of 0x%08x\n", i, Section->VirtualAddress);
+		if (Section->VirtualAddress != 0 &&
+		    ((Section->VirtualAddress) & (ctx->SectionAlignment - 1))) {
+			debug(level, "Section %d has Virtual Address 0x%08x that isn't section aligned (0x%08x)\n",
+			      i, Section->VirtualAddress, ctx->SectionAlignment);
 		}
 	}
 
@@ -589,6 +604,9 @@ int main(int argc, char **argv)
 			break;
 		case 'x':
 			require_nx_compat = true;
+			break;
+		default:
+			usage(1);
 			break;
 		}
 	}
