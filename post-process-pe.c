@@ -590,6 +590,9 @@ int main(int argc, char **argv)
 		case 'x':
 			require_nx_compat = true;
 			break;
+		default:
+			usage(1);
+			break;
 		}
 	}
 
