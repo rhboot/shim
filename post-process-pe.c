@@ -391,8 +391,9 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 
 	debug(NOISE, "Section alignment is 0x%x, page size is 0x%x\n",
 	      ctx->SectionAlignment, PAGE_SIZE);
-	if (ctx->SectionAlignment != PAGE_SIZE) {
-		debug(level, "Section alignment is not page aligned\n");
+	if (ctx->SectionAlignment & (PAGE_SIZE - 1)) {
+		debug(level, "Section alignment is not page aligned: SectionAlignment & PAGE_MASK = 0x%08x & 0x%08x = 0x%08x\n",
+		      ctx->SectionAlignment, PAGE_SIZE-1, ctx->SectionAlignment & (PAGE_SIZE-1));
 		if (require_nx_compat)
 			ret = -1;
 	}
