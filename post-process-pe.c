@@ -410,6 +410,13 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 			if (require_nx_compat)
 				ret = -1;
 		}
+
+		debug(NOISE, "Section %d has VA of 0x%08x\n", i, Section->VirtualAddress);
+		if (Section->VirtualAddress != 0 &&
+		    ((Section->VirtualAddress) & (ctx->SectionAlignment - 1))) {
+			debug(level, "Section %d has Virtual Address 0x%08x that isn't section aligned (0x%08x)\n",
+			      i, Section->VirtualAddress, ctx->SectionAlignment);
+		}
 	}
 
 	return ret;
