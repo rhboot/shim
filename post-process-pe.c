@@ -124,7 +124,6 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 	EFI_IMAGE_DOS_HEADER *DOSHdr = data;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
 	size_t HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
-	size_t FileAlignment = 0;
 	size_t sz0 = 0, sz1 = 0;
 	uintptr_t loc = 0;
 
@@ -164,7 +163,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		ctx->SectionAlignment =
 			PEHdr->Pe32Plus.OptionalHeader.SectionAlignment;
 		ctx->DllCharacteristics = PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics;
-		FileAlignment = PEHdr->Pe32Plus.OptionalHeader.FileAlignment;
+		ctx->FileAlignment = PEHdr->Pe32Plus.OptionalHeader.FileAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
 	} else {
 		debug(NOISE, "image is 32bit\n");
@@ -175,19 +174,19 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		ctx->SectionAlignment =
 			PEHdr->Pe32.OptionalHeader.SectionAlignment;
 		ctx->DllCharacteristics = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
-		FileAlignment = PEHdr->Pe32.OptionalHeader.FileAlignment;
+		ctx->FileAlignment = PEHdr->Pe32.OptionalHeader.FileAlignment;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
 	}
 
-	if (FileAlignment % 2 != 0)
-		errx(1, "%s: Invalid file alignment %zu", file, FileAlignment);
+	if (ctx->FileAlignment % 2 != 0)
+		errx(1, "%s: Invalid file alignment 0x%08x", file, ctx->FileAlignment);
 
-	if (FileAlignment == 0)
-		FileAlignment = 0x200;
+	if (ctx->FileAlignment == 0)
+		ctx->FileAlignment = 0x200;
 	if (ctx->SectionAlignment == 0)
 		ctx->SectionAlignment = PAGE_SIZE;
-	if (ctx->SectionAlignment < FileAlignment)
-		ctx->SectionAlignment = FileAlignment;
+	if (ctx->SectionAlignment < ctx->FileAlignment)
+		ctx->SectionAlignment = ctx->FileAlignment;
 
 	ctx->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
