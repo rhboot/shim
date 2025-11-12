@@ -456,7 +456,7 @@ preserve_ssp_uefi_variable(UINT8 *ssp_applied, UINTN sspversize, UINT32 attribut
 }
 
 static void
-clear_sbat_policy()
+clear_sbat_policy(void)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 
