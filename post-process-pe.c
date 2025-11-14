@@ -122,7 +122,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
         PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 {
 	EFI_IMAGE_DOS_HEADER *DOSHdr = data;
-	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr = data;
+	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
 	size_t HeaderWithoutDataDir, SectionHeaderOffset, OptHeaderSize;
 	size_t FileAlignment = 0;
 	size_t sz0 = 0, sz1 = 0;
@@ -390,7 +390,6 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 			ret = -1;
 	}
 
-	Section = ctx->FirstSection;
 	for (i=0, Section = ctx->FirstSection; i < ctx->NumberOfSections; i++, Section++) {
 		debug(NOISE, "Section %d has WRITE=%d and EXECUTE=%d\n", i,
 		      (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) ? 1 : 0,
