@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0+ OR BSD-2-Clause */
+/* SPDX-License-Identifier: GPL-2.0-or-later OR BSD-2-Clause */
 
 OUTPUT_FORMAT("elf64-littleriscv", "elf64-littleriscv", "elf64-littleriscv")
 OUTPUT_ARCH(riscv)
@@ -26,11 +26,7 @@ SECTIONS
   _etext = .;
   _text_size = _etext - _text;
   . = ALIGN(65536);
-  .reloc :
-  {
-    KEEP (*(.reloc))
-  }
-  . = ALIGN(4096);
+  _DYNAMIC = .;
   .dynamic  : { *(.dynamic) }
   . = ALIGN(4096);
   .data :
@@ -83,6 +79,11 @@ SECTIONS
    . = ALIGN(16);
 
    _bss_end = .;
+  }
+  . = ALIGN(4096);
+  .reloc :
+  {
+    KEEP (*(.reloc))
   }
 
   . = ALIGN(4096);
