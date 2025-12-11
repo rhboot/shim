@@ -29,15 +29,6 @@ typedef __builtin_va_list sysv_va_list;
 #define sysv_va_end(marker)        __builtin_va_end(marker)
 
 /*
- * gnu-efi needs this.
- */
-typedef __builtin_va_list va_list;
-# define va_start(v,l)	__builtin_va_start(v,l)
-# define va_end(v)	__builtin_va_end(v)
-# define va_arg(v,l)	__builtin_va_arg(v,l)
-# define va_copy(d,s)	__builtin_va_copy(d,s)
-
-/*
  * OpenSSL's X509ConstructCertificateStack needs this.
  */
 typedef __builtin_va_list VA_LIST;
