@@ -155,7 +155,7 @@ endif
 
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
-FORMAT		?= --target efi-app-$(ARCH)
+FORMAT		?= --output-target efi-app-$(ARCH)
 LOCAL_EFI_PATH	= gnu-efi/$(ARCH_GNUEFI)/gnuefi
 LIBDIR		= gnu-efi/$(ARCH_GNUEFI)/lib
 
