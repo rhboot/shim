@@ -18,9 +18,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #if defined(__x86_64__)
 /* shim.h will check if the compiler is new enough in some other CU */
 
-#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
-#define GNU_EFI_USE_EXTERNAL_STDARG
-#endif
 
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI

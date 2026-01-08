@@ -96,7 +96,7 @@ console_print(const CHAR16 *fmt, ...)
 		setup_console(1);
 
 	ms_va_start(args, fmt);
-	ret = VPrint(fmt, args);
+	ret = MS_VPrint(fmt, args);
 	ms_va_end(args);
 
 	return ret;
@@ -116,7 +116,7 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 		co->SetCursorPosition(co, col, row);
 
 	ms_va_start(args, fmt);
-	ret = VPrint(fmt, args);
+	ret = MS_VPrint(fmt, args);
 	ms_va_end(args);
 
 	return ret;
