@@ -166,7 +166,6 @@ MokManager.o: $(MOK_SOURCES)
 $(MMSONAME): $(MOK_OBJS) $(LIBS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(EFI_LIBS) lib/lib.a
 
-gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a: CFLAGS+=-DGNU_EFI_USE_EXTERNAL_STDARG
 gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
 	$(MAKE) -C gnu-efi \
@@ -174,6 +173,7 @@ gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a gnu-efi/$(ARCH_GNUEFI)/lib/libefi.a:
 		CCC_CC="$(COMPILER)" \
 		CC="$(CC)" \
 		ARCH=$(ARCH_GNUEFI) \
+		NO_GLIBC=1 \
 		TOPDIR=$(TOPDIR)/gnu-efi \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)

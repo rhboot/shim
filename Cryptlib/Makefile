@@ -40,6 +40,9 @@ endif
 ifeq ($(ARCH),arm)
 DEFINES		+= -DMDE_CPU_ARM
 endif
+ifeq ($(ARCH),riscv64)
+DEFINES		+= -DMDE_CPU_RISCV64
+endif
 ifeq ($(ENABLE_CODESIGN_EKU),1)
 DEFINES += -DENABLE_CODESIGN_EKU
 endif

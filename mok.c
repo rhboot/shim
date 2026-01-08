@@ -213,15 +213,15 @@ format_variable_info(UINT8 *buf, size_t bufsz,
 		var_set_t *var_set = &var_sets[i];
 		UINTN rc;
 		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
-				 "%a_max_storage_sz: 0x%lx\n",
+				 (const CHAR8 *)"%a_max_storage_sz: 0x%lx\n",
 				 var_set->prefix, var_set->max_storage_sz);
 		pos += rc;
 		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
-				 "%a_remaining_sz: 0x%lx\n",
+				 (const CHAR8 *)"%a_remaining_sz: 0x%lx\n",
 				 var_set->prefix, var_set->remaining_sz);
 		pos += rc;
 		rc = AsciiSPrint((CHAR8 *)buf + pos, bufsz - pos,
-				 "%a_max_var_sz: 0x%lx\n",
+				 (const CHAR8 *)"%a_max_var_sz: 0x%lx\n",
 				 var_set->prefix, var_set->max_var_sz);
 		pos += rc;
 	}
@@ -1422,7 +1422,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		struct mok_state_variable *v = &mok_state_variables[i];
 
 		ZeroMem(&config_template, sizeof(config_template));
-		strncpy(config_template.name, (CHAR8 *)v->rtname8, 255);
+		strncpy((char *)config_template.name, v->rtname8, 255);
 		config_template.name[255] = '\0';
 
 		config_template.data_size = v->data_size;

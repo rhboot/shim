@@ -18,9 +18,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #if defined(__x86_64__)
 /* shim.h will check if the compiler is new enough in some other CU */
 
-#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
-#define GNU_EFI_USE_EXTERNAL_STDARG
-#endif
 
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI
@@ -61,7 +58,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 #define CONFIG_HEADER_BN_H
 
-#if defined(MDE_CPU_X64) || defined(MDE_CPU_AARCH64) || defined(MDE_CPU_IA64)
+#if defined(MDE_CPU_X64) || defined(MDE_CPU_AARCH64) || \
+    defined(MDE_CPU_IA64) || defined(MDE_CPU_RISCV64)
 //
 // With GCC we would normally use SIXTY_FOUR_BIT_LONG, but MSVC needs
 // SIXTY_FOUR_BIT, because 'long' is 32-bit and only 'long long' is
