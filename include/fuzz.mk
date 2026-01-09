@@ -75,6 +75,9 @@ libefi-test.a :
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
+fuzz-netboot_FILES = lib/string.c
+fuzz-netboot :: FUZZ_ARGS+=-dict=$(TOPDIR)/data/netboot-fuzz-dict.txt
+
 fuzz-pe-relocate_FILES = globals.c
 
 generated_sbat_var_defs.h :
