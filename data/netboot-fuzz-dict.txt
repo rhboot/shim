@@ -1,0 +1,7 @@
+"tftp://"
+"tftp://["
+"tftp://[]"
+"tftp://[ABCD]"
+# TFTP bootfile URL option, in network byteorder
+"\x3b\x00"
+"/"
