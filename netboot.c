@@ -26,9 +26,16 @@
 #define TFTP_ERROR_EXISTS       6  /* File already exists. */
 #define TFTP_ERROR_NO_USER      7  /* No such user. */
 
-static EFI_PXE_BASE_CODE *pxe;
+/* Fuzzing harness needs access to some variables that are normally static */
+#ifdef SHIM_ENABLE_LIBFUZZER
+#define __expose_libfuzzer
+#else
+#define __expose_libfuzzer static
+#endif
+
+__expose_libfuzzer EFI_PXE_BASE_CODE *pxe;
 static EFI_IP_ADDRESS tftp_addr;
-static CHAR8 *full_path;
+__expose_libfuzzer CHAR8 *full_path;
 
 
 typedef struct {
@@ -193,7 +200,7 @@ static CHAR8 *str2ip6(CHAR8 *str)
 	return (CHAR8 *)ip;
 }
 
-static BOOLEAN extract_tftp_info(CHAR8 *url, CHAR8 *name)
+static BOOLEAN extract_tftp_info(CHAR8 *url, CONST CHAR8 *name)
 {
 	CHAR8 *start, *end;
 	CHAR8 ip6str[40];
@@ -259,7 +266,7 @@ static BOOLEAN extract_tftp_info(CHAR8 *url, CHAR8 *name)
 	return TRUE;
 }
 
-static EFI_STATUS parseDhcp6(CHAR8 *name)
+static EFI_STATUS parseDhcp6(CONST CHAR8 *name)
 {
 	EFI_PXE_BASE_CODE_DHCPV6_PACKET *packet = (EFI_PXE_BASE_CODE_DHCPV6_PACKET *)&pxe->Mode->DhcpAck.Raw;
 	CHAR8 *bootfile_url;
@@ -275,7 +282,7 @@ static EFI_STATUS parseDhcp6(CHAR8 *name)
 	return EFI_SUCCESS;
 }
 
-static EFI_STATUS parseDhcp4(CHAR8 *name)
+static EFI_STATUS parseDhcp4(CONST CHAR8 *name)
 {
 	CHAR8 *template;
 	INTN template_len = 0;
@@ -345,7 +352,7 @@ static EFI_STATUS parseDhcp4(CHAR8 *name)
 	return EFI_SUCCESS;
 }
 
-EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED, CHAR8 *netbootname)
+EFI_STATUS parseNetbootinfo(EFI_HANDLE image_handle UNUSED, CONST CHAR8 *netbootname)
 {
 
 	EFI_STATUS efi_status;
