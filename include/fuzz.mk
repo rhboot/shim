@@ -72,6 +72,9 @@ libefi-test.a :
 fuzz-sbat_FILES = csv.c lib/variables.c lib/guid.c sbat_var.S mock-variables.c
 fuzz-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
 
+fuzz-netboot_FILES = lib/string.c
+fuzz-netboot :: FUZZ_ARGS+=-dict=$(TOPDIR)/data/netboot-fuzz-dict.txt
+
 fuzzers := $(patsubst %.c,%,$(wildcard fuzz-*.c))
 
 $(fuzzers) :: fuzz-% : | libefi-test.a

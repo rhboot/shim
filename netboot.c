@@ -26,9 +26,16 @@
 #define TFTP_ERROR_EXISTS       6  /* File already exists. */
 #define TFTP_ERROR_NO_USER      7  /* No such user. */
 
-static EFI_PXE_BASE_CODE *pxe;
+/* Fuzzing harness needs access to some variables that are normally static */
+#ifdef SHIM_ENABLE_LIBFUZZER
+#define __expose_libfuzzer
+#else
+#define __expose_libfuzzer static
+#endif
+
+__expose_libfuzzer EFI_PXE_BASE_CODE *pxe;
 static EFI_IP_ADDRESS tftp_addr;
-static CHAR8 *full_path;
+__expose_libfuzzer CHAR8 *full_path;
 
 
 typedef struct {
