@@ -737,7 +737,7 @@ done:
 	return efi_status;
 }
 
-static INTN reset_system()
+static INTN reset_system(void)
 {
 	RT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
 	console_notify(L"Failed to reboot\n");
@@ -2152,7 +2152,7 @@ static BOOLEAN verify_pw(BOOLEAN * protected)
 	return TRUE;
 }
 
-static int draw_countdown()
+static int draw_countdown(void)
 {
 	CHAR16 *message = L"Press any key to perform MOK management";
 	CHAR16 *title;
