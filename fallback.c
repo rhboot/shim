@@ -68,7 +68,7 @@ static EFI_STATUS
 FindSubDevicePath(EFI_DEVICE_PATH *In, UINT8 Type, UINT8 SubType,
 		  EFI_DEVICE_PATH **Out)
 {
-	EFI_DEVICE_PATH *dp = In;
+	EFI_DEVICE_PATH *dp;
 	if (!In || !Out)
 		return EFI_INVALID_PARAMETER;
 
