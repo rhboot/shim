@@ -6,9 +6,19 @@
 
 #include "shim.h"
 
-#include <execinfo.h>
 #include <stdio.h>
 #include <string.h>
+
+#if defined(ENABLE_LIBUNWIND)
+#include <stddef.h>
+#include <dlfcn.h>
+/* no backtrace() prototype in libunwind.h, however the library adds the symbol */
+extern int backtrace(void **buffer, int size);
+#elif defined(__GLIBC__)
+#include <execinfo.h>
+#else
+static int backtrace(void **buffer, int size) { (void)buffer; (void)size; return 0; }
+#endif
 
 #define BT_BUF_SIZE (4096/sizeof(void *))
 
@@ -20,19 +30,33 @@ int debug = DEFAULT_DEBUG_PRINT_STATE;
 void
 print_traceback(int skip)
 {
-	int nptrs;
-	char **strings;
-
-	nptrs = backtrace(frames, BT_BUF_SIZE);
-	if (nptrs < skip)
+	int nptrs = backtrace(frames, BT_BUF_SIZE);
+	if (nptrs <= skip)
 		return;
 
-	strings = backtrace_symbols(frames, nptrs);
-	for (int i = skip; strings != NULL && i < nptrs; i++) {
-		printf("%p %s\n", (void *)frames[i], strings[i]);
+#if defined(ENABLE_LIBUNWIND)
+	for (int i = skip; i < nptrs; ++i) {
+		void *addr = frames[i];
+		Dl_info dlinfo;
+
+		if (!dladdr(addr, &dlinfo)) {
+			printf("%p\n", addr);
+			continue;
+		}
+
+		ptrdiff_t offset = addr - dlinfo.dli_saddr;
+		printf("%p %s(%s%c%#tx)\n", addr,
+			dlinfo.dli_fname ?: "",
+			dlinfo.dli_sname ?: "",
+			offset < 0 ? '-' : '+',
+			offset < 0 ? -offset : offset);
 	}
-	if (strings)
-		free(strings);
+#elif defined(__GLIBC__)
+	char **strings = backtrace_symbols(frames, nptrs);
+	for (int i = skip; strings != NULL && i < nptrs; i++)
+		printf("%p %s\n", (void *)frames[i], strings[i]);
+	free(strings);
+#endif
 }
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
