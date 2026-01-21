@@ -6,12 +6,12 @@ SECTIONS
   . = 0;
   ImageBase = .;
   .hash : { *(.hash) }	/* this MUST come first! */
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .eh_frame :
   {
     *(.eh_frame)
   }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .text :
   {
    _text = .;
@@ -20,26 +20,26 @@ SECTIONS
    *(.gnu.linkonce.t.*)
    _etext = .;
   }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .reloc :
   {
    *(.reloc)
   }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .note.gnu.build-id : {
     *(.note.gnu.build-id)
   }
 
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .data.ident : {
     *(.data.ident)
   }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .sbatlevel : {
     *(.sbatlevel)
   }
 
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .data :
   {
    _data = .;
@@ -58,14 +58,14 @@ SECTIONS
    *(.rel.local)
   }
 
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .vendor_cert :
   {
    *(.vendor_cert)
   }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .dynamic  : { *(.dynamic) }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .rela :
   {
     *(.rela.data*)
@@ -74,7 +74,7 @@ SECTIONS
   }
   _edata = .;
   _data_size = . - _data;
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .sbat :
   {
     _sbat = .;
@@ -84,11 +84,11 @@ SECTIONS
   _esbat = .;
   _sbat_size = . - _sbat;
 
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .dynsym   : { *(.dynsym) }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .dynstr   : { *(.dynstr) }
-  . = ALIGN(4096);
+  . = ALIGN(65536);
   .ignored.reloc :
   {
     *(.rela.reloc)
