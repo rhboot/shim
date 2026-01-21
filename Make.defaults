@@ -153,6 +153,10 @@ ifneq ($(origin DISABLE_REMOVABLE_LOAD_OPTIONS), undefined)
 	DEFINES  += -DDISABLE_REMOVABLE_LOAD_OPTIONS
 endif
 
+ifneq ($(origin DISABLE_APPEND_V_DBX_TO_MOKX), undefined)
+	DEFINES  += -DDISABLE_APPEND_V_DBX_TO_MOKX
+endif
+
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --output-target efi-app-$(ARCH)
