@@ -65,6 +65,10 @@ ifneq ($(origin FALLBACK_NONINTERACTIVE), undefined)
 	CFLAGS += -DFALLBACK_NONINTERACTIVE
 endif
 
+ifneq ($(origin FALLBACK_NEVER_REBOOT), undefined)
+	CFLAGS += -DFALLBACK_NEVER_REBOOT
+endif
+
 ifneq ($(origin FALLBACK_VERBOSE_WAIT), undefined)
 	CFLAGS += -DFALLBACK_VERBOSE_WAIT=$(FALLBACK_VERBOSE_WAIT)
 endif
