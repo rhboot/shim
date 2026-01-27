@@ -19,7 +19,7 @@ vdprint_(const CHAR16 *fmt, const char *file, int line, const char *func,
 	if (verbose) {
 		ms_va_copy(args2, args);
 		console_print(L"%a:%d:%a() ", file, line, func);
-		efi_status = VPrint(fmt, args2);
+		efi_status = MS_VPrint(fmt, args2);
 		ms_va_end(args2);
 	}
 	return efi_status;
@@ -35,8 +35,9 @@ VLogError(const char *file, int line, const char *func, const CHAR16 *fmt,
 	if (file == NULL || func == NULL || fmt == NULL)
 		return EFI_INVALID_PARAMETER;
 
-	newerrs = ReallocatePool(errs, (nerrs + 1) * sizeof(*errs),
-				       (nerrs + 3) * sizeof(*errs));
+	newerrs = ReallocatePool((nerrs + 1) * sizeof(*errs),
+					(nerrs + 3) * sizeof(*errs),
+					errs);
 	if (!newerrs)
 		return EFI_OUT_OF_RESOURCES;
 
@@ -44,7 +45,7 @@ VLogError(const char *file, int line, const char *func, const CHAR16 *fmt,
 	if (!newerrs[nerrs])
 		return EFI_OUT_OF_RESOURCES;
 	ms_va_copy(args2, args);
-	newerrs[nerrs+1] = VPoolPrint(fmt, args2);
+	newerrs[nerrs+1] = MS_VPoolPrint(fmt, args2);
 	if (!newerrs[nerrs+1])
 		return EFI_OUT_OF_RESOURCES;
 	ms_va_end(args2);
@@ -134,7 +135,7 @@ log_debug_print(const CHAR16 *fmt, ...)
 	UINTN ret = 0;
 
 	ms_va_start(args, fmt);
-	buf = VPoolPrint(fmt, args);
+	buf = MS_VPoolPrint(fmt, args);
 	if (!buf)
 		return 0;
 	ms_va_end(args);
@@ -148,7 +149,7 @@ log_debug_print(const CHAR16 *fmt, ...)
 		new_alloc_sz += buf_sz;
 		new_alloc_sz = ALIGN_UP(new_alloc_sz, EFI_PAGE_SIZE);
 
-		new_debug_log = ReallocatePool(debug_log, debug_log_alloc, new_alloc_sz);
+		new_debug_log = ReallocatePool(debug_log_alloc, new_alloc_sz, debug_log);
 		if (!new_debug_log)
 			return 0;
 		debug_log = (UINT8 *)new_debug_log;
@@ -260,7 +261,7 @@ save_logs(void)
 
 	entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
 	if (errlog_sz) {
-		strcpy(entry->name, "shim-err.txt");
+		strcpy((char *)entry->name, "shim-err.txt");
 		entry->data_size = errlog_sz;
 		format_error_log(&entry->data[0], errlog_sz);
 
@@ -268,7 +269,7 @@ save_logs(void)
 		entry = (struct mok_variable_config_entry *)((uintptr_t)new_table + pos);
 	}
 	if (dbglog_sz) {
-		strcpy(entry->name, "shim-dbg.txt");
+		strcpy((char *)entry->name, "shim-dbg.txt");
 		entry->data_size = dbglog_sz;
 		format_debug_log(&entry->data[0], dbglog_sz);
 

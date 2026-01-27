@@ -296,7 +296,7 @@ EFI_STATUS tpm_log_event(EFI_PHYSICAL_ADDRESS buf, UINTN size, UINT8 pcr,
 			 const CHAR8 *description)
 {
 	return tpm_log_event_raw(buf, size, pcr, description,
-				 strlen(description) + 1, EV_IPL, NULL);
+				 strlen((char *)description) + 1, EV_IPL, NULL);
 }
 
 EFI_STATUS tpm_log_pe(EFI_PHYSICAL_ADDRESS buf, UINTN size,
@@ -363,8 +363,9 @@ static EFI_STATUS tpm_record_data_measurement(CHAR16 *VarName, EFI_GUID VendorGu
 	if (measureddata == NULL) {
 		measureddata = AllocatePool(sizeof(*measureddata));
 	} else {
-		measureddata = ReallocatePool(measureddata, measuredcount * sizeof(*measureddata),
-					      (measuredcount + 1) * sizeof(*measureddata));
+		measureddata = ReallocatePool(measuredcount * sizeof(*measureddata),
+					      (measuredcount + 1) * sizeof(*measureddata),
+					      measureddata);
 	}
 
 	if (measureddata == NULL)
