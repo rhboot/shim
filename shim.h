@@ -31,10 +31,6 @@
 #pragma GCC diagnostic ignored "-Wpointer-bool-conversion"
 #endif
 
-#if !defined(GNU_EFI_USE_EXTERNAL_STDARG)
-#define GNU_EFI_USE_EXTERNAL_STDARG
-#endif
-
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI
 #endif
@@ -126,6 +122,21 @@
 #endif
 #ifndef DEBUGDIR
 #define DEBUGDIR L"/usr/lib/debug/usr/share/shim/arm/"
+#endif
+#endif
+
+#if defined(__riscv) && __riscv_xlen == 64
+#ifndef DEFAULT_LOADER
+#define DEFAULT_LOADER L"\\grubriscv64.efi"
+#endif
+#ifndef DEFAULT_LOADER_CHAR
+#define DEFAULT_LOADER_CHAR "\\grubriscv64.efi"
+#endif
+#ifndef EFI_ARCH
+#define EFI_ARCH L"riscv64"
+#endif
+#ifndef DEBUGDIR
+#define DEBUGDIR L"/usr/lib/debug/usr/share/shim/riscv64/"
 #endif
 #endif
 
