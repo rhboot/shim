@@ -76,7 +76,7 @@ readfile(const char *SbatLevel_Variable)
 		}
 	}
 
-	ret = 1;
+	ret = 0;
 err:
 	if (ret < 0 && revlisthead) {
 		sbat_revocation *rle = revlisthead;
@@ -167,7 +167,6 @@ main(int argc, char *argv[])
 		snprintf(SbatLevel_Variable, 2048, "SbatLevel_Variable.txt");
 
 	if (readfile(SbatLevel_Variable))
-		return writefile();
-	else
 		return -1;
+	return writefile();
 }
