@@ -825,6 +825,12 @@ find_boot_csv(EFI_FILE_HANDLE fh, CHAR16 *dirname,
 					      dirname, bootarchcsv, efi_status);
 		}
 	}
+
+	if (bootcsv)
+		FreePool(bootcsv);
+	if (bootarchcsv)
+		FreePool(bootarchcsv);
+
 	return EFI_SUCCESS;
 }
 
