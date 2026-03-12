@@ -338,6 +338,7 @@ EFI_STATUS read_image(EFI_HANDLE image_handle, CHAR16 *ImagePath,
 				       netbootname, efi_status);
 			return efi_status;
 		}
+		FreePool(netbootname);
 		*data = sourcebuffer;
 		*datasize = sourcesize;
 	} else {
