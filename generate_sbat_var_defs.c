@@ -22,7 +22,7 @@ struct sbat_revocation {
 static sbat_revocation *revlisthead;
 
 static int
-readfile(char *SbatLevel_Variable)
+readfile(const char *SbatLevel_Variable)
 {
 	FILE *varfilep;
 	char line[1024];
@@ -100,8 +100,8 @@ writefile()
 	int epochdate = 2021030218;
 	int latestdate = 0;
 
-	sbat_revocation *revlistentry;
-	sbat_revocation *latest_revlistentry = NULL;
+	const sbat_revocation *revlistentry;
+	const sbat_revocation *latest_revlistentry = NULL;
 
 	revlistentry = revlisthead;
 
