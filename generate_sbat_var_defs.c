@@ -21,7 +21,7 @@ struct sbat_revocation {
 
 static sbat_revocation *revlisthead;
 
-int
+static int
 readfile(char *SbatLevel_Variable)
 {
 	FILE *varfilep;
@@ -93,7 +93,7 @@ err:
 	return ret;
 }
 
-int
+static int
 writefile()
 {
 	int epochfound = 0;
