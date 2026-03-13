@@ -125,7 +125,7 @@ err:
 }
 
 static int
-writefile()
+writefile(void)
 {
 	bool epochfound = false;
 	unsigned int epochdate = 2021030218;
