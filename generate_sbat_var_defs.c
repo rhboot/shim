@@ -15,7 +15,7 @@
 typedef struct sbat_revocation sbat_revocation;
 
 struct sbat_revocation {
-	int date;
+	unsigned int date;
 	char *revocations;
 	sbat_revocation *next;
 };
@@ -40,7 +40,7 @@ readfile(const char *SbatLevel_Variable)
 {
 	FILE *varfilep;
 	char line[1024];
-	int date;
+	unsigned int date;
 	int ret = -1;
 
 	unsigned int revocationsp = 0;
@@ -55,7 +55,7 @@ readfile(const char *SbatLevel_Variable)
 		return -1;
 
 	while (fgets(line, sizeof(line), varfilep) != NULL) {
-		if (sscanf(line, "sbat,1,%d\n", &date) && strlen(line) == 18) {
+		if (sscanf(line, "sbat,1,%u\n", &date) && strlen(line) == 18) {
 			revlistentry = calloc(1, sizeof(sbat_revocation));
 			if (revlistentry == NULL)
 				goto err;
@@ -102,8 +102,8 @@ static int
 writefile()
 {
 	bool epochfound = false;
-	int epochdate = 2021030218;
-	int latestdate = 0;
+	unsigned int epochdate = 2021030218;
+	unsigned int latestdate = 0;
 
 	const sbat_revocation *revlistentry;
 	const sbat_revocation *latest_revlistentry = NULL;
@@ -118,12 +118,12 @@ writefile()
 			       "#ifndef SBAT_AUTOMATIC_DATE\n"
 			       "#define SBAT_AUTOMATIC_DATE 2024040900\n"
 			       "#endif /* SBAT_AUTOMATIC_DATE */\n"
-			       "#if SBAT_AUTOMATIC_DATE == %d\n"
+			       "#if SBAT_AUTOMATIC_DATE == %u\n"
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS\n",
 			       revlistentry->date);
 			epochfound = true;
 		} else if (epochfound) {
-			printf("#elif SBAT_AUTOMATIC_DATE == %d\n"
+			printf("#elif SBAT_AUTOMATIC_DATE == %u\n"
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS \"%s\"\n",
 			       revlistentry->date,
 			       revlistentry->revocations);
@@ -146,7 +146,7 @@ writefile()
 	       "	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_AUTOMATIC_DATE \"\\n\" \\\n"
 	       "	SBAT_VAR_AUTOMATIC_REVOCATIONS\n\n");
 
-	printf("#define SBAT_VAR_LATEST_DATE \"%d\"\n"
+	printf("#define SBAT_VAR_LATEST_DATE \"%u\"\n"
 	       "#define SBAT_VAR_LATEST_REVOCATIONS \"%s\"\n",
 	       latest_revlistentry->date,
 	       latest_revlistentry->revocations);
