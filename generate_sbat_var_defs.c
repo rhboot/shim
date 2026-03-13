@@ -48,8 +48,10 @@ readfile(const char *SbatLevel_Variable)
 	free_revocation_list();
 
 	varfilep = fopen(SbatLevel_Variable, "r");
-	if (varfilep == NULL)
+	if (varfilep == NULL) {
+		fprintf(stderr, "Error opening file %s\n", SbatLevel_Variable);
 		return -1;
+	}
 
 	while (fgets(line, sizeof(line), varfilep) != NULL) {
 		unsigned int date;
@@ -58,8 +60,10 @@ readfile(const char *SbatLevel_Variable)
 		if (!sscanf(line, "sbat,1,%u\n", &date) || strlen(line) != 18)
 			continue;
 		revlistentry = calloc(1, sizeof(sbat_revocation));
-		if (revlistentry == NULL)
+		if (revlistentry == NULL) {
+			fprintf(stderr, "Out of memory\n");
 			goto err;
+		}
 		if (revlisthead == NULL)
 			revlisthead = revlistentry;
 		else
@@ -74,7 +78,7 @@ readfile(const char *SbatLevel_Variable)
 			new = realloc(revlistentry->revocations,
 			              revocationsp + strlen(line) + 2);
 			if (new == NULL) {
-				ret = -1;
+				fprintf(stderr, "Out of memory\n");
 				goto err;
 			}
 			revlistentry->revocations = new;
@@ -135,8 +139,10 @@ writefile()
 		revlistentry = revlistentry->next;
 	}
 
-	if (!epochfound || !latest_revlistentry)
+	if (!epochfound || !latest_revlistentry) {
+		fprintf(stderr, "Epoch not found\n");
 		return -1;
+	}
 
 	printf("#else\n"
 	       "#error \"Unknown SBAT_AUTOMATIC_DATE\"\n"
