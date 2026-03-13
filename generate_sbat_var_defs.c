@@ -202,7 +202,7 @@ main(int argc, char *argv[])
 {
 	char SbatLevel_Variable[2048];
 
-	if (argc == 2)
+	if (argc >= 2)
 		snprintf(SbatLevel_Variable, 2048, "%s/SbatLevel_Variable.txt", argv[1]);
 	else
 		snprintf(SbatLevel_Variable, 2048, "SbatLevel_Variable.txt");
