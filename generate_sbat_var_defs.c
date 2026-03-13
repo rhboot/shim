@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 
 typedef struct sbat_revocation sbat_revocation;
@@ -100,7 +101,7 @@ err:
 static int
 writefile()
 {
-	int epochfound = 0;
+	bool epochfound = false;
 	int epochdate = 2021030218;
 	int latestdate = 0;
 
@@ -120,8 +121,8 @@ writefile()
 			       "#if SBAT_AUTOMATIC_DATE == %d\n"
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS\n",
 			       revlistentry->date);
-			epochfound = 1;
-		} else if (epochfound == 1) {
+			epochfound = true;
+		} else if (epochfound) {
 			printf("#elif SBAT_AUTOMATIC_DATE == %d\n"
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS \"%s\"\n",
 			       revlistentry->date,
@@ -134,7 +135,7 @@ writefile()
 		revlistentry = revlistentry->next;
 	}
 
-	if (epochfound == 0 || !latest_revlistentry)
+	if (!epochfound || !latest_revlistentry)
 		return -1;
 
 	printf("#else\n"
