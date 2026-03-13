@@ -116,6 +116,10 @@ writefile()
 
 	while (revlistentry != NULL) {
 		if (revlistentry->date == epochdate) {
+			if (epochfound) {
+				fprintf(stderr, "Only one epoch expected\n");
+				return -1;
+			}
 			printf("#ifndef GEN_SBAT_VAR_DEFS_H_\n"
 			       "#define GEN_SBAT_VAR_DEFS_H_\n"
 			       "#ifndef ENABLE_SHIM_DEVEL\n\n"
@@ -131,6 +135,9 @@ writefile()
 			       "#define SBAT_VAR_AUTOMATIC_REVOCATIONS \"%s\"\n",
 			       revlistentry->date,
 			       revlistentry->revocations);
+		} else {
+			fprintf(stderr, "Revocation not expected before epoch\n");
+			return -1;
 		}
 		if (revlistentry->date > latestdate) {
 			latest_revlistentry = revlistentry;
