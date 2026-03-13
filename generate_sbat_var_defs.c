@@ -21,6 +21,19 @@ struct sbat_revocation {
 
 static sbat_revocation *revlisthead;
 
+static void
+free_revocation_list(void)
+{
+	sbat_revocation *rle = revlisthead;
+	while (rle) {
+		sbat_revocation *next = rle->next;
+		free(rle->revocations);
+		free(rle);
+		rle = next;
+	}
+	revlisthead = NULL;
+}
+
 static int
 readfile(const char *SbatLevel_Variable)
 {
@@ -34,7 +47,7 @@ readfile(const char *SbatLevel_Variable)
 	sbat_revocation *revlistlast = NULL;
 	sbat_revocation *revlistentry = NULL;
 
-	revlisthead = NULL;
+	free_revocation_list();
 
 	varfilep = fopen(SbatLevel_Variable, "r");
 	if (varfilep == NULL)
@@ -78,17 +91,8 @@ readfile(const char *SbatLevel_Variable)
 
 	ret = 0;
 err:
-	if (ret < 0 && revlisthead) {
-		sbat_revocation *rle = revlisthead;
-		while (rle) {
-			sbat_revocation *next = rle->next;
-			if (rle->revocations)
-				free(rle->revocations);
-			free(rle);
-			rle = next;
-		}
-		revlisthead = NULL;
-	}
+	if (ret < 0)
+		free_revocation_list();
 	fclose(varfilep);
 	return ret;
 }
