@@ -90,7 +90,8 @@ readfile(const char *SbatLevel_Variable)
 		revocationsp = 0;
 	}
 
-	ret = 0;
+	if (!ferror(varfilep))
+		ret = 0;
 err:
 	if (ret < 0)
 		free_revocation_list();
