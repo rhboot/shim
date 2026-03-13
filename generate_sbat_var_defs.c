@@ -55,39 +55,39 @@ readfile(const char *SbatLevel_Variable)
 		return -1;
 
 	while (fgets(line, sizeof(line), varfilep) != NULL) {
-		if (sscanf(line, "sbat,1,%u\n", &date) && strlen(line) == 18) {
-			revlistentry = calloc(1, sizeof(sbat_revocation));
-			if (revlistentry == NULL)
+		if (!sscanf(line, "sbat,1,%u\n", &date) || strlen(line) != 18)
+			continue;
+		revlistentry = calloc(1, sizeof(sbat_revocation));
+		if (revlistentry == NULL)
+			goto err;
+		if (revlisthead == NULL)
+			revlisthead = revlistentry;
+		else
+			revlistlast->next = revlistentry;
+
+		revlistlast = revlistentry;
+
+		revlistentry->date = date;
+		while (line[0] != '\n' &&
+		       fgets(line, sizeof(line), varfilep) != NULL) {
+			char *new = NULL;
+			new = realloc(revlistentry->revocations,
+			              revocationsp + strlen(line) + 2);
+			if (new == NULL) {
+				ret = -1;
 				goto err;
-			if (revlisthead == NULL)
-				revlisthead = revlistentry;
-			else
-				revlistlast->next = revlistentry;
-
-			revlistlast = revlistentry;
-
-			revlistentry->date = date;
-			while (line[0] != '\n' &&
-			       fgets(line, sizeof(line), varfilep) != NULL) {
-				char *new = NULL;
-				new = realloc(revlistentry->revocations,
-				              revocationsp + strlen(line) + 2);
-				if (new == NULL) {
-					ret = -1;
-					goto err;
-				}
-				revlistentry->revocations = new;
-				if (strlen(line) > 1) {
-					line[strlen(line) - 1] = 0;
-					sprintf(revlistentry->revocations +
-					                revocationsp,
-					        "%s\\n", line);
-					revocationsp =
-						revocationsp + strlen(line) + 2;
-				}
 			}
-			revocationsp = 0;
+			revlistentry->revocations = new;
+			if (strlen(line) > 1) {
+				line[strlen(line) - 1] = 0;
+				sprintf(revlistentry->revocations +
+				                revocationsp,
+				        "%s\\n", line);
+				revocationsp =
+					revocationsp + strlen(line) + 2;
+			}
 		}
+		revocationsp = 0;
 	}
 
 	ret = 0;
