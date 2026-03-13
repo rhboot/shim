@@ -142,8 +142,8 @@ writefile()
 	       "#endif /* SBAT_AUTOMATIC_DATE == */\n\n"
 	       "#define SBAT_VAR_AUTOMATIC_DATE QUOTEVAL(SBAT_AUTOMATIC_DATE)\n"
 	       "#define SBAT_VAR_AUTOMATIC \\\n"
-               "	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_AUTOMATIC_DATE \"\\n\" \\\n"
-               "	SBAT_VAR_AUTOMATIC_REVOCATIONS\n\n");
+	       "	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_AUTOMATIC_DATE \"\\n\" \\\n"
+	       "	SBAT_VAR_AUTOMATIC_REVOCATIONS\n\n");
 
 	printf("#define SBAT_VAR_LATEST_DATE \"%d\"\n"
 	       "#define SBAT_VAR_LATEST_REVOCATIONS \"%s\"\n",
@@ -151,8 +151,8 @@ writefile()
 	       latest_revlistentry->revocations);
 
 	printf("#define SBAT_VAR_LATEST \\\n"
-               "	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE \"\\n\" \\\n"
-               "	SBAT_VAR_LATEST_REVOCATIONS\n\n"
+	       "	SBAT_VAR_SIG SBAT_VAR_VERSION SBAT_VAR_LATEST_DATE \"\\n\" \\\n"
+	       "	SBAT_VAR_LATEST_REVOCATIONS\n\n"
 	       "#endif /* !ENABLE_SHIM_DEVEL */\n"
 	       "#endif /* !GEN_SBAT_VAR_DEFS_H_ */\n");
 
