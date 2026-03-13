@@ -35,6 +35,18 @@ free_revocation_list(void)
 	revlisthead = NULL;
 }
 
+static int
+check_revocation_line(const char *line)
+{
+	int num = -1;
+	if (sscanf(line, "%*[^, \t],%*[0-9]%n", &num) < 0 ||
+	    num < 0 || line[num] != '\0') {
+		fprintf(stderr, "Invalid revocation line: %s\n", line);
+		return -1;
+	}
+	return 0;
+}
+
 static void
 chomp(char *str)
 {
@@ -95,6 +107,8 @@ readfile(const char *SbatLevel_Variable)
 			if (strlen(line) == 0)
 				break;
 
+			if (check_revocation_line(line))
+				goto err;
 			sprintf(revlistentry->revocations + revocationsp,
 			        "%s\\n", line);
 			revocationsp = strlen(revlistentry->revocations);
