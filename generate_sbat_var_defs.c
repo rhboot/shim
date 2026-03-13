@@ -81,6 +81,7 @@ readfile(const char *SbatLevel_Variable)
 				fprintf(stderr, "Out of memory\n");
 				goto err;
 			}
+			new[revocationsp] = '\0';
 			revlistentry->revocations = new;
 			if (strlen(line) > 1) {
 				line[strlen(line) - 1] = 0;
