@@ -35,6 +35,14 @@ free_revocation_list(void)
 	revlisthead = NULL;
 }
 
+static void
+chomp(char *str)
+{
+	size_t len = strlen(str);
+	if (len > 0 && str[--len] == '\n')
+		str[len] = '\0';
+}
+
 static int
 readfile(const char *SbatLevel_Variable)
 {
@@ -72,25 +80,24 @@ readfile(const char *SbatLevel_Variable)
 		revlistlast = revlistentry;
 
 		revlistentry->date = date;
-		while (line[0] != '\n' &&
-		       fgets(line, sizeof(line), varfilep) != NULL) {
+		while (fgets(line, sizeof(line), varfilep) != NULL) {
+			chomp(line);
+
 			char *new = NULL;
 			new = realloc(revlistentry->revocations,
-			              revocationsp + strlen(line) + 2);
+			              revocationsp + strlen(line) + 3);
 			if (new == NULL) {
 				fprintf(stderr, "Out of memory\n");
 				goto err;
 			}
 			new[revocationsp] = '\0';
 			revlistentry->revocations = new;
-			if (strlen(line) > 1) {
-				line[strlen(line) - 1] = 0;
-				sprintf(revlistentry->revocations +
-				                revocationsp,
-				        "%s\\n", line);
-				revocationsp =
-					revocationsp + strlen(line) + 2;
-			}
+			if (strlen(line) == 0)
+				break;
+
+			sprintf(revlistentry->revocations + revocationsp,
+			        "%s\\n", line);
+			revocationsp = strlen(revlistentry->revocations);
 		}
 	}
 
