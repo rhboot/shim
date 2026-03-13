@@ -40,10 +40,7 @@ readfile(const char *SbatLevel_Variable)
 {
 	FILE *varfilep;
 	char line[1024];
-	unsigned int date;
 	int ret = -1;
-
-	unsigned int revocationsp = 0;
 
 	sbat_revocation *revlistlast = NULL;
 	sbat_revocation *revlistentry = NULL;
@@ -55,6 +52,9 @@ readfile(const char *SbatLevel_Variable)
 		return -1;
 
 	while (fgets(line, sizeof(line), varfilep) != NULL) {
+		unsigned int date;
+		size_t revocationsp = 0;
+
 		if (!sscanf(line, "sbat,1,%u\n", &date) || strlen(line) != 18)
 			continue;
 		revlistentry = calloc(1, sizeof(sbat_revocation));
@@ -87,7 +87,6 @@ readfile(const char *SbatLevel_Variable)
 					revocationsp + strlen(line) + 2;
 			}
 		}
-		revocationsp = 0;
 	}
 
 	if (!ferror(varfilep))
