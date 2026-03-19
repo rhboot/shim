@@ -139,6 +139,10 @@ jobs:
           - arch: amd64
             efiarch: x64
             makearch: x86_64
+            distro: centos10
+          - arch: amd64
+            efiarch: x64
+            makearch: x86_64
             distro: centos9
           - arch: amd64
             efiarch: x64
