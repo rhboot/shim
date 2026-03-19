@@ -81,7 +81,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
           ref: ${{ github.event.pull_request.head.sha }}
@@ -168,7 +168,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
           ref: ${{ github.event.pull_request.head.sha }}
@@ -225,7 +225,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # otherwise we are testing target branch instead of the PR branch (see pull_request_target trigger)
           ref: ${{ github.event.pull_request.head.sha }}
