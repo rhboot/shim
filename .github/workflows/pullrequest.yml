@@ -122,6 +122,7 @@ jobs:
     name: ${{ matrix.distro }} ${{ matrix.efiarch }} build
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
@@ -206,6 +207,7 @@ jobs:
     name: ${{ matrix.distro }} ${{ matrix.efiarch }} build compile_commands.json
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
