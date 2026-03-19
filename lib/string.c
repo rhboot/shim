@@ -17,6 +17,9 @@
 #define strncmp shim_strncmp
 #define strncasecmp shim_strncasecmp
 #define strcasecmp shim_strcasecmp
+#ifdef strrchr
+#undef strrchr
+#endif
 #define strrchr shim_strrchr
 #define strlen shim_strlen
 #define strnlen shim_strnlen
