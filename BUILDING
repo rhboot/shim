@@ -43,6 +43,9 @@ Variables you could set to customize the build:
   by firmware. It breaks loading non-default second-stage loaders when invoked
   via that path, and requires using a binary named shim*.efi (or really anything
   else).
+- DISABLE_ALL_LOAD_OPTIONS
+  Disables load option parsing like DISABLE_REMOVABLE_LOAD_OPTIONS, but for all
+  devices, not just removable media.
 - REQUIRE_TPM
   if tpm logging or extends return an error code, treat that as a fatal error.
 - ARCH
