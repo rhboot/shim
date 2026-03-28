@@ -186,8 +186,6 @@ out:
 static void
 free_pages_alloc_image(SHIM_LOADED_IMAGE *image)
 {
-	char *buffer;
-
 	if (!image || !image->alloc_address || !image->alloc_pages)
 		return;
 
@@ -196,9 +194,8 @@ free_pages_alloc_image(SHIM_LOADED_IMAGE *image)
 	 * are set on a loaded image, this will cause a page fault when it
 	 * is freed. Ensure W+ X- are set instead before freeing. */
 
-	buffer = (void *)ALIGN_VALUE((unsigned long)image->alloc_address, image->alloc_alignment);
-	update_mem_attrs((uintptr_t)buffer, image->alloc_pages * PAGE_SIZE, MEM_ATTR_R|MEM_ATTR_W,
-			 MEM_ATTR_X);
+	update_mem_attrs((uintptr_t)image->alloc_address,
+			 image->alloc_pages * PAGE_SIZE, MEM_ATTR_R|MEM_ATTR_W, MEM_ATTR_X);
 
 	BS->FreePages(image->alloc_address, image->alloc_pages);
 	image->alloc_address = 0;
