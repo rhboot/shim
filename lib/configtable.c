@@ -14,7 +14,7 @@ configtable_get_table(EFI_GUID *guid)
 	for (i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_CONFIGURATION_TABLE *CT = &ST->ConfigurationTable[i];
 
-		if (CompareGuid(guid, &CT->VendorGuid) == 0) {
+		if (CompareGuid(guid, &CT->VendorGuid)) {
 			return CT->VendorTable;
 		}
 	}

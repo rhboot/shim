@@ -260,7 +260,7 @@ check_masked_boot_option(CHAR8 *candidate, unsigned int candidate_size,
 	    DevicePathType(dp) != HARDWARE_DEVICE_PATH ||
 	    DevicePathSubType(dp) != HW_VENDOR_DP ||
 	    node_size != sizeof(ami_masked_device_path_guid) ||
-	    CompareGuid((EFI_GUID *)(cursor + sizeof(EFI_DEVICE_PATH)),
+	    !CompareGuid((EFI_GUID *)(cursor + sizeof(EFI_DEVICE_PATH)),
 		        &ami_masked_device_path_guid))
 		return 1;
 

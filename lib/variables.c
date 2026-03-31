@@ -449,7 +449,7 @@ variable_enroll_hash(const CHAR16 * const var, EFI_GUID owner,
 	CopyMem(&d->SignatureData, hash, SHA256_DIGEST_SIZE);
 	d->SignatureOwner = SHIM_LOCK_GUID;
 
-	if (CompareGuid(&owner, &SIG_DB) == 0)
+	if (CompareGuid(&owner, &SIG_DB))
 		efi_status = SetSecureVariable(var, sig, sizeof(sig), owner,
 					       EFI_VARIABLE_APPEND_WRITE, 0);
 	else

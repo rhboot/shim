@@ -223,7 +223,7 @@ save_logs(void)
 		EFI_CONFIGURATION_TABLE *CT;
 		CT = &ST->ConfigurationTable[i];
 
-		if (CompareGuid(&MOK_VARIABLE_STORE, &CT->VendorGuid) == 0) {
+		if (CompareGuid(&MOK_VARIABLE_STORE, &CT->VendorGuid)) {
 			cfg_table = CT->VendorTable;
 			break;
 		}

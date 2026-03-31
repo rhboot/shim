@@ -89,13 +89,13 @@ done:
 
 static BOOLEAN is_sha2_hash(EFI_GUID Type)
 {
-	if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID) == 0)
+	if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID))
 		return TRUE;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID))
 		return TRUE;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID))
 		return TRUE;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID))
 		return TRUE;
 
 	return FALSE;
@@ -103,15 +103,15 @@ static BOOLEAN is_sha2_hash(EFI_GUID Type)
 
 static UINT32 sha_size(EFI_GUID Type)
 {
-	if (CompareGuid(&Type, &EFI_CERT_SHA1_GUID) == 0)
+	if (CompareGuid(&Type, &EFI_CERT_SHA1_GUID))
 		return SHA1_DIGEST_SIZE;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID))
 		return SHA224_DIGEST_LENGTH;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID))
 		return SHA256_DIGEST_SIZE;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID))
 		return SHA384_DIGEST_LENGTH;
-	else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID) == 0)
+	else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID))
 		return SHA512_DIGEST_LENGTH;
 
 	return 0;
@@ -121,7 +121,7 @@ static BOOLEAN is_valid_siglist(EFI_GUID Type, UINT32 SigSize)
 {
 	UINT32 hash_sig_size;
 
-	if (CompareGuid (&Type, &X509_GUID) == 0 && SigSize != 0)
+	if (CompareGuid (&Type, &X509_GUID) && SigSize != 0)
 		return TRUE;
 
 	if (!is_sha2_hash(Type))
@@ -206,7 +206,7 @@ static MokListNode *build_mok_list(UINT32 num, void *Data, UINTN DataSize)
 		}
 
 		list[count].Type = CertList->SignatureType;
-		if (CompareGuid (&CertList->SignatureType, &X509_GUID) == 0) {
+		if (CompareGuid (&CertList->SignatureType, &X509_GUID)) {
 			list[count].MokSize = CertList->SignatureSize -
 			    sizeof(EFI_GUID);
 			list[count].Mok = (void *)Cert->SignatureData;
@@ -463,19 +463,19 @@ static void show_sha_digest(EFI_GUID Type, UINT8 * hash)
 	int i;
 	int length;
 
-	if (CompareGuid(&Type, &EFI_CERT_SHA1_GUID) == 0) {
+	if (CompareGuid(&Type, &EFI_CERT_SHA1_GUID)) {
 		length = SHA1_DIGEST_SIZE;
 		text[0] = L"SHA1 hash";
-	} else if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA224_GUID)) {
 		length = SHA224_DIGEST_LENGTH;
 		text[0] = L"SHA224 hash";
-	} else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA256_GUID)) {
 		length = SHA256_DIGEST_SIZE;
 		text[0] = L"SHA256 hash";
-	} else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA384_GUID)) {
 		length = SHA384_DIGEST_LENGTH;
 		text[0] = L"SHA384 hash";
-	} else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID) == 0) {
+	} else if (CompareGuid(&Type, &EFI_CERT_SHA512_GUID)) {
 		length = SHA512_DIGEST_LENGTH;
 		text[0] = L"SHA512 hash";
 	} else {
@@ -564,7 +564,7 @@ static void show_mok_info(EFI_GUID Type, void *Mok, UINTN MokSize)
 	if (!Mok || MokSize == 0)
 		return;
 
-	if (CompareGuid (&Type, &X509_GUID) == 0) {
+	if (CompareGuid (&Type, &X509_GUID)) {
 		UINT8 hash[SHA1_DIGEST_SIZE];
 		X509 *X509Cert;
 
@@ -1062,7 +1062,7 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 
 		DataSize += sizeof(EFI_SIGNATURE_LIST);
 		type = list[i].Type; /* avoid -Werror=address-of-packed-member */
-		if (CompareGuid(&type, &X509_GUID) == 0)
+		if (CompareGuid(&type, &X509_GUID))
 			DataSize += sizeof(EFI_GUID);
 		DataSize += list[i].MokSize;
 	}
@@ -1093,7 +1093,7 @@ static EFI_STATUS write_back_mok_list(MokListNode * list, INTN key_num,
 		CertList->SignatureType = list[i].Type;
 		CertList->SignatureHeaderSize = 0;
 
-		if (CompareGuid(&(CertList->SignatureType), &X509_GUID) == 0) {
+		if (CompareGuid(&(CertList->SignatureType), &X509_GUID)) {
 			CertList->SignatureListSize = list[i].MokSize +
 			    sizeof(EFI_SIGNATURE_LIST) + sizeof(EFI_GUID);
 			CertList->SignatureSize =
@@ -1136,7 +1136,7 @@ static void delete_cert(void *key, UINT32 key_size,
 
 	for (i = 0; i < mok_num; i++) {
 		type = mok[i].Type; /* avoid -Werror=address-of-packed-member */
-		if (CompareGuid(&type, &X509_GUID) != 0)
+		if (!CompareGuid(&type, &X509_GUID))
 			continue;
 
 		if (mok[i].MokSize == key_size &&
@@ -1189,7 +1189,7 @@ static void delete_hash_in_list(EFI_GUID Type, UINT8 * hash, UINT32 hash_size,
 
 	for (i = 0; i < mok_num; i++) {
 		type = mok[i].Type; /* avoid -Werror=address-of-packed-member */
-		if ((CompareGuid(&type, &Type) != 0) ||
+		if ((!CompareGuid(&type, &Type)) ||
 		    (mok[i].MokSize < sig_size))
 			continue;
 
@@ -1360,7 +1360,7 @@ static EFI_STATUS delete_keys(void *MokDel, UINTN MokDelSize, BOOLEAN MokX)
 	dprint(L"deleting certs from %a\n", MokX ? "MokListX" : "MokList");
 	for (i = 0; i < del_num; i++) {
 		type = del_key[i].Type; /* avoid -Werror=address-of-packed-member */
-		if (CompareGuid(&type, &X509_GUID) == 0) {
+		if (CompareGuid(&type, &X509_GUID)) {
 			dprint(L"deleting key %d (total %d):\n", i, mok_num);
 			dhexdumpat(del_key[i].Mok, del_key[i].MokSize, 0);
 			delete_cert(del_key[i].Mok, del_key[i].MokSize,
