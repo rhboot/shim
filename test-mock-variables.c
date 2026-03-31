@@ -448,7 +448,7 @@ dump_config_table_if_wrong(const char * const func, int line, ...)
 		}
 
 		entry = &ST->ConfigurationTable[idx];
-		if (CompareGuid(guid, &entry->VendorGuid) != 0)
+		if (!CompareGuid(guid, &entry->VendorGuid))
 			okay = false;
 
 nexta:
@@ -479,7 +479,7 @@ nexta:
 			printf("\t[%d]: %p ", idx, entry);
 			printf("{.VendorGuid:" GUID_FMT ",", GUID_ARGS(entry->VendorGuid));
 			printf("&.VendorTable:%p}\n", entry->VendorTable);
-			if (CompareGuid(guid, &entry->VendorGuid) != 0)
+			if (!CompareGuid(guid, &entry->VendorGuid))
 				printf("\t\t\t  expected:" GUID_FMT "\n", GUID_ARGS(*guid));
 		}
 next:
@@ -549,8 +549,8 @@ test_install_config_table_0(void)
 	assert_equal_goto(ST->NumberOfTableEntries, 1, err, "%lu != %lu\n");
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[0].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[0].VendorGuid, &bguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, bstr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[0].VendorGuid, &bguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, bstr);
 	assert_equal_goto(ST->ConfigurationTable[0].VendorTable,
 			  bstrp, err, "%p != %p\n");
 
@@ -562,8 +562,8 @@ test_install_config_table_0(void)
 	assert_equal_goto(ST->NumberOfTableEntries, 1, err, "%lu != %lu\n");
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[0].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[0].VendorGuid, &bguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, bstr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[0].VendorGuid, &bguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, bstr);
 	assert_equal_goto(ST->ConfigurationTable[0].VendorTable,
 			  bstrp, err, "%p != %p\n");
 
@@ -602,14 +602,14 @@ test_install_config_table_0(void)
 				   -1, NULL);
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[aidx].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, astr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, astr);
 	assert_equal_goto(ST->ConfigurationTable[aidx].VendorTable, astrp,
 			  err, "%p != %p\n");
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[bidx].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, bstr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, bstr);
 	assert_equal_goto(ST->ConfigurationTable[bidx].VendorTable, bstrp,
 			  err, "%p != %p\n");
 
@@ -652,22 +652,22 @@ test_install_config_table_0(void)
 				   -1, NULL);
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[aidx].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, astr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, astr);
 	assert_equal_goto(ST->ConfigurationTable[aidx].VendorTable, astrp,
 			  err, "%p != %p\n");
 	memcpy(&guids[aidx], &aguid, sizeof(EFI_GUID));
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[bidx].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, bstr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, bstr);
 	assert_equal_goto(ST->ConfigurationTable[bidx].VendorTable, bstrp,
 			  err, "%p != %p\n");
 	memcpy(&guids[bidx], &bguid, sizeof(EFI_GUID));
 
 	sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[cidx].VendorGuid));
-	assert_zero_goto(CompareGuid(&ST->ConfigurationTable[cidx].VendorGuid, &cguid),
-			 err, "%d != 0 (%s != %s)\n", tmpstr, cstr);
+	assert_equal_goto(CompareGuid(&ST->ConfigurationTable[cidx].VendorGuid, &cguid),
+			 true, err, "%d != true (%s != %s)\n", tmpstr, cstr);
 	assert_equal_goto(ST->ConfigurationTable[cidx].VendorTable, cstrp,
 			  err, "%p != %p\n");
 	memcpy(&guids[cidx], &cguid, sizeof(EFI_GUID));
@@ -726,8 +726,8 @@ test_install_config_table_0(void)
 
 	if (aidx >= 0) {
 		sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[aidx].VendorGuid));
-		assert_zero_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
-				 err, "%d != 0 (%s != %s)\n", tmpstr, astr);
+		assert_equal_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
+				 true, err, "%d != true (%s != %s)\n", tmpstr, astr);
 		assert_equal_goto(ST->ConfigurationTable[aidx].VendorTable, astrp,
 				  err, "%p != %p\n");
 		memcpy(&guids[aidx], &aguid, sizeof(EFI_GUID));
@@ -735,8 +735,8 @@ test_install_config_table_0(void)
 
 	if (bidx >= 0) {
 		sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[bidx].VendorGuid));
-		assert_zero_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
-				 err, "%d != 0 (%s != %s)\n", tmpstr, bstr);
+		assert_equal_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
+				 true, err, "%d != true (%s != %s)\n", tmpstr, bstr);
 		assert_equal_goto(ST->ConfigurationTable[bidx].VendorTable, bstrp,
 				  err, "%p != %p\n");
 		memcpy(&guids[bidx], &bguid, sizeof(EFI_GUID));
@@ -744,8 +744,8 @@ test_install_config_table_0(void)
 
 	if (cidx >= 0) {
 		sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[cidx].VendorGuid));
-		assert_zero_goto(CompareGuid(&ST->ConfigurationTable[cidx].VendorGuid, &cguid),
-				 err, "%d != 0 (%s != %s)\n", tmpstr, cstr);
+		assert_equal_goto(CompareGuid(&ST->ConfigurationTable[cidx].VendorGuid, &cguid),
+				 true, err, "%d != true (%s != %s)\n", tmpstr, cstr);
 		assert_equal_goto(ST->ConfigurationTable[cidx].VendorTable, cstrp,
 				  err, "%p != %p\n");
 		memcpy(&guids[cidx], &cguid, sizeof(EFI_GUID));
@@ -791,8 +791,8 @@ test_install_config_table_0(void)
 
 	if (aidx >= 0) {
 		sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[aidx].VendorGuid));
-		assert_zero_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
-				 err, "%d != 0 (%s != %s)\n", tmpstr, astr);
+		assert_equal_goto(CompareGuid(&ST->ConfigurationTable[aidx].VendorGuid, &aguid),
+				 true, err, "%d != true (%s != %s)\n", tmpstr, astr);
 		assert_equal_goto(ST->ConfigurationTable[aidx].VendorTable, astrp,
 				  err, "%p != %p\n");
 		memcpy(&guids[aidx], &aguid, sizeof(EFI_GUID));
@@ -800,8 +800,8 @@ test_install_config_table_0(void)
 
 	if (bidx >= 0) {
 		sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[bidx].VendorGuid));
-		assert_zero_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
-				 err, "%d != 0 (%s != %s)\n", tmpstr, bstr);
+		assert_equal_goto(CompareGuid(&ST->ConfigurationTable[bidx].VendorGuid, &bguid),
+				 true, err, "%d != true (%s != %s)\n", tmpstr, bstr);
 		assert_equal_goto(ST->ConfigurationTable[bidx].VendorTable, bstrp,
 				  err, "%p != %p\n");
 		memcpy(&guids[bidx], &bguid, sizeof(EFI_GUID));
@@ -809,8 +809,8 @@ test_install_config_table_0(void)
 
 	if (cidx >= 0) {
 		sprintf(tmpstr, GUID_FMT, GUID_ARGS(ST->ConfigurationTable[cidx].VendorGuid));
-		assert_zero_goto(CompareGuid(&ST->ConfigurationTable[cidx].VendorGuid, &cguid),
-				 err, "%d != 0 (%s != %s)\n", tmpstr, cstr);
+		assert_equal_goto(CompareGuid(&ST->ConfigurationTable[cidx].VendorGuid, &cguid),
+				 true, err, "%d != true (%s != %s)\n", tmpstr, cstr);
 		assert_equal_goto(ST->ConfigurationTable[cidx].VendorTable, cstrp,
 				  err, "%p != %p\n");
 		memcpy(&guids[cidx], &cguid, sizeof(EFI_GUID));

@@ -82,7 +82,7 @@ setvar_post(CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
 	for (UINTN i = 0; test_vars[i].name != NULL; i++) {
 		struct test_var *tv = &test_vars[i];
 
-		if (CompareGuid(&tv->guid, guid) != 0 ||
+		if (!CompareGuid(&tv->guid, guid) ||
 		    StrCmp(tv->name, name) != 0)
 			continue;
 		tv->ops[tv->n_ops] = op;
@@ -116,7 +116,7 @@ getvar_post(CHAR16 *name, EFI_GUID *guid,
 	for (UINTN i = 0; test_vars[i].name != NULL; i++) {
 		struct test_var *tv = &test_vars[i];
 
-		if (CompareGuid(&tv->guid, guid) != 0 ||
+		if (!CompareGuid(&tv->guid, guid) ||
 		    StrCmp(tv->name, name) != 0)
 			continue;
 		tv->ops[tv->n_ops] = GET;
@@ -144,7 +144,7 @@ check_variables(struct test_var *vars)
 			int gets = 0;
 
 			var = list_entry(pos, struct mock_variable, list);
-			if (CompareGuid(&tv->guid, &var->guid) != 0 ||
+			if (!CompareGuid(&tv->guid, &var->guid) ||
 			    StrCmp(var->name, tv->name) != 0)
 				continue;
 			found = true;
@@ -292,7 +292,7 @@ test_mok_mirror(struct test_var *vars,
 	for (size_t i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_CONFIGURATION_TABLE *ct = &ST->ConfigurationTable[i];
 
-		if (CompareGuid(&ct->VendorGuid, &mok_config_guid) != 0)
+		if (!CompareGuid(&ct->VendorGuid, &mok_config_guid))
 			continue;
 
 		pos = (void *)ct->VendorTable;

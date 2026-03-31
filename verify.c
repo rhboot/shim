@@ -145,7 +145,7 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 	int i = 0;
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
-		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID) == 0) {
+		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID)) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
 			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
@@ -218,7 +218,7 @@ check_db_hash_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize, UINT8 *data,
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		CertCount = (CertList->SignatureListSize -sizeof (EFI_SIGNATURE_LIST) - CertList->SignatureHeaderSize) / CertList->SignatureSize;
 		Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
-		if (CompareGuid(&CertList->SignatureType, &CertType) == 0) {
+		if (CompareGuid(&CertList->SignatureType, &CertType)) {
 			for (Index = 0; Index < CertCount; Index++) {
 				if (CompareMem (Cert->SignatureData, data, SignatureSize) == 0) {
 					//

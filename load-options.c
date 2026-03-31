@@ -404,7 +404,7 @@ parse_load_options(EFI_LOADED_IMAGE *li)
 	if (li->LoadOptionsSize > 16) {
 		if (CompareGuid((EFI_GUID *)(li->LoadOptions
 					     + (li->LoadOptionsSize - 16)),
-				&BDS_GUID) == 0)
+				&BDS_GUID))
 			li->LoadOptionsSize -= 16;
 	}
 

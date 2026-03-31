@@ -161,7 +161,7 @@ variable_cmp(const struct mock_variable * const v0,
 	if (v0 == NULL || v1 == NULL)
 		return (uintptr_t)v0 - (uintptr_t)v1;
 
-	ret = CompareGuid(&v0->guid, &v1->guid);
+	ret = CompareGuidForSorting(&v0->guid, &v1->guid);
 	ret <<= 8ul;
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG > 3)
 	printf("%s:%d:%s():  "GUID_FMT" %s "GUID_FMT" (0x%011"PRIx64" %"PRId64")\n",
@@ -361,7 +361,7 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 # endif
 #endif
 		if (name[0] == 0) {
-			if (CompareGuid(&var->guid, guid) == 0) {
+			if (CompareGuid(&var->guid, guid)) {
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
 				printf("%s:%d:%s():  found guid in entry var:%p var->name:%p\n",
 				       __FILE__, __LINE__-1, __func__, var, var->name);
@@ -372,7 +372,7 @@ mock_get_next_variable_name(UINTN *size, CHAR16 *name, EFI_GUID *guid)
 			}
 		} else {
 			if (found) {
-				if (CompareGuid(&var->guid, guid) == 0) {
+				if (CompareGuid(&var->guid, guid)) {
 					result = var;
 					break;
 				}
@@ -1235,7 +1235,7 @@ mock_config_table_cmp(const void *p0, const void *p1)
 #if (defined(SHIM_DEBUG) && SHIM_DEBUG != 0)
 		printf("comparing %p to %p\n", p0, p1);
 #endif
-		cmp = CompareGuid(&entry0->VendorGuid, &entry1->VendorGuid);
+		cmp = CompareGuidForSorting(&entry0->VendorGuid, &entry1->VendorGuid);
 	}
 
 	if (mock_config_table_sort_policy == MOCK_SORT_DESCENDING) {
@@ -1259,7 +1259,7 @@ mock_install_configuration_table(EFI_GUID *guid, VOID *table)
 	for (UINTN i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_CONFIGURATION_TABLE *entry = &ST->ConfigurationTable[i];
 
-		if (CompareGuid(guid, &entry->VendorGuid) == 0) {
+		if (CompareGuid(guid, &entry->VendorGuid)) {
 			found = true;
 			if (table) {
 				// replace it
