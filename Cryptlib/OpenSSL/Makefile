@@ -27,7 +27,7 @@ WARNFLAGS	+= -Wno-empty-body \
 		   -Wno-implicit-fallthrough \
 		   $(if $(findstring gcc,$(CC)),-Wno-old-style-declaration) \
 		   -Wno-unused-but-set-variable \
-		   -Wno-unused-parameter
+		   -Wno-unused-parameter \
 
 WERRFLAGS	+= -Wno-error=unused-but-set-variable \
 		   -Wno-error=unused-parameter
@@ -39,7 +39,8 @@ CFLAGS		= $(FEATUREFLAGS) \
 		  $(INCLUDES) \
 		  $(DEFINES)
 
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
+CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,) \
+		  $(if $(findstring gcc,$(CC)),-Wno-error=stringop-overflow,)
 
 ifeq ($(ARCH),x86_64)
 FEATUREFLAGS	+= -m64 -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS)
