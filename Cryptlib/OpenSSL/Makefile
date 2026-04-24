@@ -24,7 +24,7 @@ WARNFLAGS	+= -Wno-empty-body \
 		   -Wno-implicit-fallthrough \
 		   $(if $(findstring gcc,$(CC)),-Wno-old-style-declaration) \
 		   -Wno-unused-but-set-variable \
-		   -Wno-unused-parameter
+		   -Wno-unused-parameter \
 
 WERRFLAGS	+= -Wno-error=unused-but-set-variable \
 		   -Wno-error=unused-parameter
@@ -36,22 +36,29 @@ CFLAGS		= $(FEATUREFLAGS) \
 		  $(INCLUDES) \
 		  $(DEFINES)
 
-CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 
 ifeq ($(ARCH),x86_64)
+ARCH_CLANG_BUGS += $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 FEATUREFLAGS	+= -m64 -mno-mmx -mno-sse -mno-red-zone $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_X64
 endif
 ifeq ($(ARCH),ia32)
+ARCH_CLANG_BUGS += $(if $(findstring gcc,$(CC)),-maccumulate-outgoing-args,)
 FEATUREFLAGS	+= -m32 -mno-mmx -mno-sse -mno-red-zone -nostdinc $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_IA32
 endif
 ifeq ($(ARCH),aarch64)
+ARCH_CLANG_BUGS +=
+FEATUREFLAGS	+= $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_AARCH64
 endif
 ifeq ($(ARCH),arm)
+ARCH_CLANG_BUGS +=
+FEATUREFLAGS	+= $(CLANG_BUGS)
 DEFINES		+= -DMDE_CPU_ARM
 endif
+
+CLANG_BUGS	= $(if $(findstring gcc,$(CC)),-Wno-error=stringop-overflow,) $(ARCH_CLANG_BUGS)
 
 LDFLAGS		= -nostdlib -znocombreloc
 
