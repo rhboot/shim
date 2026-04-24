@@ -2,20 +2,16 @@
   C Run-Time Libraries (CRT) Wrapper Implementation for OpenSSL-based
   Cryptographic Library.
 
-Copyright (c) 2009 - 2016, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2009 - 2017, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#include <OpenSslSupport.h>
+#include <CrtLibSupport.h>
+#include <ctype.h>
+#include <stddef.h>
 
-int errno = 0;
+int  errno = 0;
 
 FILE  *stderr = NULL;
 FILE  *stdin  = NULL;
@@ -41,15 +37,15 @@ QuickSortWorker (
   IN        VOID          *Buffer
   )
 {
-  VOID        *Pivot;
-  UINTN       LoopCount;
-  UINTN       NextSwapLocation;
+  VOID   *Pivot;
+  UINTN  LoopCount;
+  UINTN  NextSwapLocation;
 
-  ASSERT(BufferToSort    != NULL);
-  ASSERT(CompareFunction != NULL);
-  ASSERT(Buffer          != NULL);
+  ASSERT (BufferToSort    != NULL);
+  ASSERT (CompareFunction != NULL);
+  ASSERT (Buffer          != NULL);
 
-  if (Count < 2 || ElementSize  < 1) {
+  if ((Count < 2) || (ElementSize  < 1)) {
     return;
   }
 
@@ -64,8 +60,7 @@ QuickSortWorker (
   // Now get the pivot such that all on "left" are below it
   // and everything "right" are above it
   //
-  for (LoopCount = 0; LoopCount < Count - 1;  LoopCount++)
-  {
+  for (LoopCount = 0; LoopCount < Count - 1; LoopCount++) {
     //
     // If the element is less than the pivot
     //
@@ -83,15 +78,16 @@ QuickSortWorker (
       NextSwapLocation++;
     }
   }
+
   //
-  // Swap pivot to it's final position (NextSwapLocaiton)
+  // Swap pivot to its final position (NextSwapLocation)
   //
   CopyMem (Buffer, Pivot, ElementSize);
   CopyMem (Pivot, (UINT8 *)BufferToSort + (NextSwapLocation * ElementSize), ElementSize);
   CopyMem ((UINT8 *)BufferToSort + (NextSwapLocation * ElementSize), Buffer, ElementSize);
 
   //
-  // Now recurse on 2 paritial lists.  Neither of these will have the 'pivot' element.
+  // Now recurse on 2 partial lists.  Neither of these will have the 'pivot' element.
   // IE list is sorted left half, pivot element, sorted right half...
   //
   QuickSortWorker (
@@ -113,16 +109,21 @@ QuickSortWorker (
   return;
 }
 
-//---------------------------------------------------------
+// ---------------------------------------------------------
 // Standard C Run-time Library Interface Wrapper
-//---------------------------------------------------------
+// ---------------------------------------------------------
 
 //
 // -- String Manipulation Routines --
 //
 
 /* Read formatted data from a string */
-int sscanf (const char *buffer, const char *format, ...)
+int
+sscanf (
+  const char  *buffer,
+  const char  *format,
+  ...
+  )
 {
   //
   // Null sscanf() function implementation to satisfy the linker, since
@@ -136,7 +137,12 @@ int sscanf (const char *buffer, const char *format, ...)
 //
 
 /* Convert strings to a long-integer value */
-long strtol (const char *nptr, char **endptr, int base)
+long
+strtol (
+  const char  *nptr,
+  char        **endptr,
+  int         base
+  )
 {
   //
   // Null strtol() function implementation to satisfy the linker, since there is
@@ -146,7 +152,12 @@ long strtol (const char *nptr, char **endptr, int base)
 }
 
 /* Convert strings to an unsigned long-integer value */
-unsigned long strtoul (const char *nptr, char **endptr, int base)
+unsigned long
+strtoul (
+  const char  *nptr,
+  char        **endptr,
+  int         base
+  )
 {
   //
   // Null strtoul() function implementation to satisfy the linker, since there is
@@ -160,7 +171,13 @@ unsigned long strtoul (const char *nptr, char **endptr, int base)
 //
 
 /* Performs a quick sort */
-void qsort (void *base, size_t num, size_t width, int (*compare)(const void *, const void *))
+void
+qsort (
+  void *base,
+  size_t num,
+  size_t width,
+  int ( *compare )(const void *, const void *)
+  )
 {
   VOID  *Buffer;
 
@@ -171,7 +188,10 @@ void qsort (void *base, size_t num, size_t width, int (*compare)(const void *, c
   // Use CRT-style malloc to cover BS and RT memory allocation.
   //
   Buffer = malloc (width);
-  ASSERT (Buffer != NULL);
+  if (Buffer == NULL) {
+    ASSERT (Buffer != NULL);
+    return;
+  }
 
   //
   // Re-use PerformQuickSort() function Implementation in EDKII BaseSortLib.
@@ -187,11 +207,30 @@ void qsort (void *base, size_t num, size_t width, int (*compare)(const void *, c
 //
 
 /* Get a value from the current environment */
-char *getenv (const char *varname)
+char *
+getenv (
+  const char  *varname
+  )
 {
   //
   // Null getenv() function implementation to satisfy the linker, since there is
   // no direct functionality logic dependency in present UEFI cases.
+  //
+  return NULL;
+}
+
+/* Get a value from the current environment */
+char *
+secure_getenv (
+  const char  *varname
+  )
+{
+  //
+  // Null secure_getenv() function implementation to satisfy the linker, since
+  // there is no direct functionality logic dependency in present UEFI cases.
+  //
+  // From the secure_getenv() manual: 'just like getenv() except that it
+  // returns NULL in cases where "secure execution" is required'.
   //
   return NULL;
 }
@@ -207,7 +246,13 @@ int vfprintf (FILE *stream, const char *format, VA_LIST arg)
 }
 
 /* Write data to a stream */
-size_t fwrite (const void *buffer, size_t size, size_t count, FILE *stream)
+size_t
+fwrite (
+  const void  *buffer,
+  size_t      size,
+  size_t      count,
+  FILE        *stream
+  )
 {
   return 0;
 }
@@ -252,8 +297,7 @@ typedef
 VOID
 (EFIAPI *NoReturnFuncPtr)(
   VOID
-  ) __attribute__((__noreturn__));
-
+  ) __attribute__ ((__noreturn__));
 
 STATIC
 VOID
@@ -262,6 +306,18 @@ NopFunction (
   VOID
   )
 {
+}
+
+void
+abort (
+  void
+  )
+{
+  NoReturnFuncPtr  NoReturnFunc;
+
+  NoReturnFunc = (NoReturnFuncPtr)NopFunction;
+
+  NoReturnFunc ();
 }
 
 
@@ -276,23 +332,44 @@ void exit (int e)
 
 #else
 
+void
+abort (
+  void
+  )
+{
+  // Do nothing
+}
+
 void exit (int e)
 {
 }
 
 #endif
 
-int fclose (FILE *f)
+int
+fclose (
+  FILE  *f
+  )
 {
   return 0;
 }
 
-FILE *fopen (const char *c, const char *m)
+FILE *
+fopen (
+  const char  *c,
+  const char  *m
+  )
 {
   return NULL;
 }
 
-size_t fread (void *b, size_t c, size_t i, FILE *f)
+size_t
+fread (
+  void    *b,
+  size_t  c,
+  size_t  i,
+  FILE    *f
+  )
 {
   return 0;
 }
@@ -307,22 +384,34 @@ int fprintf (FILE *f, const char *s, ...)
   return 0;
 }
 
-uid_t getuid (void)
+uid_t
+getuid (
+  void
+  )
 {
   return 0;
 }
 
-uid_t geteuid (void)
+uid_t
+geteuid (
+  void
+  )
 {
   return 0;
 }
 
-gid_t getgid (void)
+gid_t
+getgid (
+  void
+  )
 {
   return 0;
 }
 
-gid_t getegid (void)
+gid_t
+getegid (
+  void
+  )
 {
   return 0;
 }
@@ -357,7 +446,11 @@ ssize_t write (int f, const void *b, size_t l)
   return 0;
 }
 
-int printf (char const *fmt, ...)
+int
+printf (
+  char const  *fmt,
+  ...
+  )
 {
   return 0;
 }

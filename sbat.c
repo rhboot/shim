@@ -144,8 +144,8 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 		 * atoi returns zero for failed conversion, so essentially
 		 * badly parsed component_generation will be treated as zero
 		 */
-		sbat_gen = atoi((const char *)entry->component_generation);
-		sbat_var_gen = atoi((const char *)sbat_var_entry->component_generation);
+		sbat_gen = atoi(entry->component_generation);
+		sbat_var_gen = atoi(sbat_var_entry->component_generation);
 
 		if (sbat_gen < sbat_var_gen) {
 			dprint(L"component %a, generation %d, was revoked by %s variable\n",

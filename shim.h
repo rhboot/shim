@@ -34,6 +34,9 @@
 #if !defined(GNU_EFI_USE_MS_ABI)
 #define GNU_EFI_USE_MS_ABI
 #endif
+#if !defined(GNU_EFI_USE_COPYMEM_ABI)
+#define GNU_EFI_USE_COPYMEM_ABI 0
+#endif
 
 #ifdef NO_BUILTIN_VA_FUNCS
 #undef NO_BUILTIN_VA_FUNCS
@@ -197,7 +200,7 @@
 #include "version.h"
 
 #ifndef SHIM_UNIT_TEST
-#include "Cryptlib/Include/OpenSslSupport.h"
+#include "Cryptlib/Include/CrtLibSupport.h"
 #endif
 
 #define MEM_ATTR_R	4

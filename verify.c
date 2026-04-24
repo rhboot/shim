@@ -12,6 +12,9 @@
 #include "shim.h"
 
 #include <openssl/err.h>
+#include <crypto/err.h>
+#include <crypto/comperr.h>
+#include <crypto/ocsperr.h>
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/ocsp.h>
@@ -22,8 +25,9 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/rsa.h>
-#include <openssl/dso.h>
 
+#include <internal/dso.h>
+#include <openssl/objects.h>
 #include <Library/BaseCryptLib.h>
 
 #define OID_EKU_MODSIGN "1.3.6.1.4.1.2312.16.1.2"
@@ -38,7 +42,8 @@ void
 init_openssl(void)
 {
 	OPENSSL_init();
-	ERR_load_ERR_strings();
+	//ERR_load_ERR_strings();
+	ossl_err_load_ERR_strings();
 	ERR_load_BN_strings();
 	ERR_load_RSA_strings();
 	ERR_load_DH_strings();
@@ -50,14 +55,14 @@ init_openssl(void)
 	ERR_load_ASN1_strings();
 	ERR_load_CONF_strings();
 	ERR_load_CRYPTO_strings();
-	ERR_load_COMP_strings();
+	//ERR_load_COMP_strings();
+	ossl_err_load_COMP_strings();
 	ERR_load_BIO_strings();
 	ERR_load_PKCS7_strings();
 	ERR_load_X509V3_strings();
 	ERR_load_PKCS12_strings();
 	ERR_load_RAND_strings();
-	ERR_load_DSO_strings();
-	ERR_load_OCSP_strings();
+	ossl_err_load_DSO_strings();
 }
 
 static void
@@ -128,8 +133,6 @@ verify_eku(UINT8 *Cert, UINTN CertSize)
 
 		X509_free(x509);
 	}
-
-	OBJ_cleanup();
 
 	return TRUE;
 }

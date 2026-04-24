@@ -1,56 +1,10 @@
-/* bio_ndef.c */
 /*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
- * project.
- */
-/* ====================================================================
- * Copyright (c) 2008 The OpenSSL Project.  All rights reserved.
+ * Copyright 2008-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <openssl/asn1.h>
@@ -65,7 +19,7 @@
 /*
  * The usage is quite simple, initialize an ASN1 structure, get a BIO from it
  * then any data written through the BIO will end up translated to
- * approptiate format on the fly. The data is streamed out and does *not*
+ * appropriate format on the fly. The data is streamed out and does *not*
  * need to be all held in memory at once. When the BIO is flushed the output
  * is finalized and any signatures etc written out. The BIO is a 'proper'
  * BIO and can handle non blocking I/O correctly. The usage is simple. The
@@ -95,58 +49,80 @@ static int ndef_suffix(BIO *b, unsigned char **pbuf, int *plen, void *parg);
 static int ndef_suffix_free(BIO *b, unsigned char **pbuf, int *plen,
                             void *parg);
 
+/*
+ * On success, the returned BIO owns the input BIO as part of its BIO chain.
+ * On failure, NULL is returned and the input BIO is owned by the caller.
+ *
+ * Unfortunately cannot constify this due to CMS_stream() and PKCS7_stream()
+ */
 BIO *BIO_new_NDEF(BIO *out, ASN1_VALUE *val, const ASN1_ITEM *it)
 {
     NDEF_SUPPORT *ndef_aux = NULL;
     BIO *asn_bio = NULL;
     const ASN1_AUX *aux = it->funcs;
     ASN1_STREAM_ARG sarg;
+    BIO *pop_bio = NULL;
 
     if (!aux || !aux->asn1_cb) {
-        ASN1err(ASN1_F_BIO_NEW_NDEF, ASN1_R_STREAMING_NOT_SUPPORTED);
+        ERR_raise(ERR_LIB_ASN1, ASN1_R_STREAMING_NOT_SUPPORTED);
         return NULL;
     }
-    ndef_aux = OPENSSL_malloc(sizeof(NDEF_SUPPORT));
+    ndef_aux = OPENSSL_zalloc(sizeof(*ndef_aux));
     asn_bio = BIO_new(BIO_f_asn1());
-
-    /* ASN1 bio needs to be next to output BIO */
-
-    out = BIO_push(asn_bio, out);
-
-    if (!ndef_aux || !asn_bio || !out)
+    if (ndef_aux == NULL || asn_bio == NULL)
         goto err;
 
-    BIO_asn1_set_prefix(asn_bio, ndef_prefix, ndef_prefix_free);
-    BIO_asn1_set_suffix(asn_bio, ndef_suffix, ndef_suffix_free);
+    /* ASN1 bio needs to be next to output BIO */
+    out = BIO_push(asn_bio, out);
+    if (out == NULL)
+        goto err;
+    pop_bio = asn_bio;
+
+    if (BIO_asn1_set_prefix(asn_bio, ndef_prefix, ndef_prefix_free) <= 0
+            || BIO_asn1_set_suffix(asn_bio, ndef_suffix, ndef_suffix_free) <= 0
+            || BIO_ctrl(asn_bio, BIO_C_SET_EX_ARG, 0, ndef_aux) <= 0)
+        goto err;
 
     /*
-     * Now let callback prepend any digest, cipher etc BIOs ASN1 structure
-     * needs.
+     * Now let the callback prepend any digest, cipher, etc., that the BIO's
+     * ASN1 structure needs.
      */
 
     sarg.out = out;
     sarg.ndef_bio = NULL;
     sarg.boundary = NULL;
 
-    if (aux->asn1_cb(ASN1_OP_STREAM_PRE, &val, it, &sarg) <= 0)
+    /*
+     * The asn1_cb(), must not have mutated asn_bio on error, leaving it in the
+     * middle of some partially built, but not returned BIO chain.
+     */
+    if (aux->asn1_cb(ASN1_OP_STREAM_PRE, &val, it, &sarg) <= 0) {
+        /*
+         * ndef_aux is now owned by asn_bio so we must not free it in the err
+         * clean up block
+         */
+        ndef_aux = NULL;
         goto err;
+    }
+
+    /*
+     * We must not fail now because the callback has prepended additional
+     * BIOs to the chain
+     */
 
     ndef_aux->val = val;
     ndef_aux->it = it;
     ndef_aux->ndef_bio = sarg.ndef_bio;
     ndef_aux->boundary = sarg.boundary;
     ndef_aux->out = out;
-    ndef_aux->derbuf = NULL;
-
-    BIO_ctrl(asn_bio, BIO_C_SET_EX_ARG, 0, ndef_aux);
 
     return sarg.ndef_bio;
 
  err:
-    if (asn_bio)
-        BIO_free(asn_bio);
-    if (ndef_aux)
-        OPENSSL_free(ndef_aux);
+    /* BIO_pop() is NULL safe */
+    (void)BIO_pop(pop_bio);
+    BIO_free(asn_bio);
+    OPENSSL_free(ndef_aux);
     return NULL;
 }
 
@@ -156,21 +132,22 @@ static int ndef_prefix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
     unsigned char *p;
     int derlen;
 
-    if (!parg)
+    if (parg == NULL)
         return 0;
 
     ndef_aux = *(NDEF_SUPPORT **)parg;
 
     derlen = ASN1_item_ndef_i2d(ndef_aux->val, NULL, ndef_aux->it);
-    p = OPENSSL_malloc(derlen);
-    if (!p)
+    if (derlen < 0)
+        return 0;
+    if ((p = OPENSSL_malloc(derlen)) == NULL)
         return 0;
 
     ndef_aux->derbuf = p;
     *pbuf = p;
-    derlen = ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it);
+    ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it);
 
-    if (!*ndef_aux->boundary)
+    if (*ndef_aux->boundary == NULL)
         return 0;
 
     *plen = *ndef_aux->boundary - *pbuf;
@@ -183,13 +160,15 @@ static int ndef_prefix_free(BIO *b, unsigned char **pbuf, int *plen,
 {
     NDEF_SUPPORT *ndef_aux;
 
-    if (!parg)
+    if (parg == NULL)
         return 0;
 
     ndef_aux = *(NDEF_SUPPORT **)parg;
 
-    if (ndef_aux->derbuf)
-        OPENSSL_free(ndef_aux->derbuf);
+    if (ndef_aux == NULL)
+        return 0;
+
+    OPENSSL_free(ndef_aux->derbuf);
 
     ndef_aux->derbuf = NULL;
     *pbuf = NULL;
@@ -216,7 +195,7 @@ static int ndef_suffix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
     const ASN1_AUX *aux;
     ASN1_STREAM_ARG sarg;
 
-    if (!parg)
+    if (parg == NULL)
         return 0;
 
     ndef_aux = *(NDEF_SUPPORT **)parg;
@@ -232,15 +211,16 @@ static int ndef_suffix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
         return 0;
 
     derlen = ASN1_item_ndef_i2d(ndef_aux->val, NULL, ndef_aux->it);
-    p = OPENSSL_malloc(derlen);
-    if (!p)
+    if (derlen < 0)
+        return 0;
+    if ((p = OPENSSL_malloc(derlen)) == NULL)
         return 0;
 
     ndef_aux->derbuf = p;
     *pbuf = p;
     derlen = ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it);
 
-    if (!*ndef_aux->boundary)
+    if (*ndef_aux->boundary == NULL)
         return 0;
     *pbuf = *ndef_aux->boundary;
     *plen = derlen - (*ndef_aux->boundary - ndef_aux->derbuf);

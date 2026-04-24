@@ -21,6 +21,8 @@
 #define HASH_STRING L"Select a file to trust:\n\n"
 
 #define CompareMemberGuid(x, y) CompareMem(x, y, sizeof(EFI_GUID))
+#  define X509_get_notBefore X509_getm_notBefore
+#  define X509_get_notAfter X509_getm_notAfter
 
 typedef struct {
 	UINT32 MokSize;

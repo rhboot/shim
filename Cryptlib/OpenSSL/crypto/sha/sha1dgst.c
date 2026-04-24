@@ -1,74 +1,80 @@
-/* crypto/sha/sha1dgst.c */
-/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
- * All rights reserved.
+/*
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
- * This package is an SSL implementation written
- * by Eric Young (eay@cryptsoft.com).
- * The implementation was written so as to conform with Netscapes SSL.
- *
- * This library is free for commercial and non-commercial use as long as
- * the following conditions are aheared to.  The following conditions
- * apply to all code found in this distribution, be it the RC4, RSA,
- * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
- * included with this distribution is covered by the same copyright terms
- * except that the holder is Tim Hudson (tjh@cryptsoft.com).
- *
- * Copyright remains Eric Young's, and as such any Copyright notices in
- * the code are not to be removed.
- * If this package is used in a product, Eric Young should be given attribution
- * as the author of the parts of the library used.
- * This can be in the form of a textual message at program startup or
- * in documentation (online or textual) provided with the package.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    "This product includes cryptographic software written by
- *     Eric Young (eay@cryptsoft.com)"
- *    The word 'cryptographic' can be left out if the rouines from the library
- *    being used are not cryptographic related :-).
- * 4. If you include any Windows specific code (or a derivative thereof) from
- *    the apps directory (application code) you must include an acknowledgement:
- *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
- *
- * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * The licence and distribution terms for any publically available version or
- * derivative of this code cannot be changed.  i.e. this code cannot simply be
- * copied and put under another distribution licence
- * [including the GNU Public Licence.]
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
+
+/*
+ * SHA-1 low level APIs are deprecated for public use, but still ok for
+ * internal use.
+ */
+#include "internal/deprecated.h"
 
 #include <openssl/crypto.h>
 #include <openssl/opensslconf.h>
-#if !defined(OPENSSL_NO_SHA1) && !defined(OPENSSL_NO_SHA)
 
-# undef  SHA_0
-# define SHA_1
+#include <openssl/opensslv.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 
-# include <openssl/opensslv.h>
+/* The implementation is in crypto/md32_common.h */
 
-const char SHA1_version[] = "SHA1" OPENSSL_VERSION_PTEXT;
+#include "sha_local.h"
+#include "crypto/sha.h"
 
-/* The implementation is in ../md32_common.h */
+int ossl_sha1_ctrl(SHA_CTX *sha1, int cmd, int mslen, void *ms)
+{
+    unsigned char padtmp[40];
+    unsigned char sha1tmp[SHA_DIGEST_LENGTH];
 
-# include "sha_locl.h"
+    if (cmd != EVP_CTRL_SSL3_MASTER_SECRET)
+        return -2;
 
-#endif
+    if (sha1 == NULL)
+        return 0;
+
+    /* SSLv3 client auth handling: see RFC-6101 5.6.8 */
+    if (mslen != 48)
+        return 0;
+
+    /* At this point hash contains all handshake messages, update
+     * with master secret and pad_1.
+     */
+
+    if (SHA1_Update(sha1, ms, mslen) <= 0)
+        return 0;
+
+    /* Set padtmp to pad_1 value */
+    memset(padtmp, 0x36, sizeof(padtmp));
+
+    if (!SHA1_Update(sha1, padtmp, sizeof(padtmp)))
+        return 0;
+
+    if (!SHA1_Final(sha1tmp, sha1))
+        return 0;
+
+    /* Reinitialise context */
+
+    if (!SHA1_Init(sha1))
+        return 0;
+
+    if (SHA1_Update(sha1, ms, mslen) <= 0)
+        return 0;
+
+    /* Set padtmp to pad_2 value */
+    memset(padtmp, 0x5c, sizeof(padtmp));
+
+    if (!SHA1_Update(sha1, padtmp, sizeof(padtmp)))
+        return 0;
+
+    if (!SHA1_Update(sha1, sha1tmp, sizeof(sha1tmp)))
+        return 0;
+
+    /* Now when ctx is finalised it will return the SSL v3 hash value */
+    OPENSSL_cleanse(sha1tmp, sizeof(sha1tmp));
+
+    return 1;
+}

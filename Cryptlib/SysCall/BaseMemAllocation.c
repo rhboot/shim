@@ -2,39 +2,35 @@
   Base Memory Allocation Routines Wrapper for Crypto library over OpenSSL
   during PEI & DXE phases.
 
-Copyright (c) 2009 - 2012, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2009 - 2017, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#include <OpenSslSupport.h>
+#include <CrtLibSupport.h>
+#include <Library/MemoryAllocationLib.h>
 
 //
 // Extra header to record the memory buffer size from malloc routine.
 //
-#define CRYPTMEM_HEAD_SIGNATURE    EFI_SIGNATURE_32('c','m','h','d')
+#define CRYPTMEM_HEAD_SIGNATURE  SIGNATURE_32('c','m','h','d')
 typedef struct {
   UINT32    Signature;
   UINT32    Reserved;
   UINTN     Size;
 } CRYPTMEM_HEAD;
 
-#define CRYPTMEM_OVERHEAD      sizeof(CRYPTMEM_HEAD)
-
-#define MIN(a, b) ({(a) < (b) ? (a) : (b);})
+#define CRYPTMEM_OVERHEAD  sizeof(CRYPTMEM_HEAD)
 
 //
 // -- Memory-Allocation Routines --
 //
 
 /* Allocates memory blocks */
-void *malloc (size_t size)
+void *
+malloc (
+  size_t  size
+  )
 {
   CRYPTMEM_HEAD  *PoolHdr;
   UINTN          NewSize;
@@ -45,7 +41,7 @@ void *malloc (size_t size)
   //
   NewSize = (UINTN)(size) + CRYPTMEM_OVERHEAD;
 
-  Data  = AllocatePool (NewSize);
+  Data = AllocatePool (NewSize);
   if (Data != NULL) {
     PoolHdr = (CRYPTMEM_HEAD *)Data;
     //
@@ -64,7 +60,11 @@ void *malloc (size_t size)
 }
 
 /* Reallocate memory blocks */
-void *realloc (void *ptr, size_t size)
+void *
+realloc (
+  void    *ptr,
+  size_t  size
+  )
 {
   CRYPTMEM_HEAD  *OldPoolHdr;
   CRYPTMEM_HEAD  *NewPoolHdr;
@@ -73,9 +73,9 @@ void *realloc (void *ptr, size_t size)
   VOID           *Data;
 
   NewSize = (UINTN)size + CRYPTMEM_OVERHEAD;
-  Data = AllocatePool (NewSize);
+  Data    = AllocatePool (NewSize);
   if (Data != NULL) {
-    NewPoolHdr = (CRYPTMEM_HEAD *)Data;
+    NewPoolHdr            = (CRYPTMEM_HEAD *)Data;
     NewPoolHdr->Signature = CRYPTMEM_HEAD_SIGNATURE;
     NewPoolHdr->Size      = size;
     if (ptr != NULL) {
@@ -103,7 +103,10 @@ void *realloc (void *ptr, size_t size)
 }
 
 /* De-allocates or frees a memory block */
-void free (void *ptr)
+void
+free (
+  void  *ptr
+  )
 {
   CRYPTMEM_HEAD  *PoolHdr;
 

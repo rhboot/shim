@@ -5,6 +5,10 @@
 #define GNU_EFI_USE_MS_ABI
 #endif
 
+#if !defined(GNU_EFI_USE_COPYMEM_ABI)
+#define GNU_EFI_USE_COPYMEM_ABI 0
+#endif
+
 #ifdef NO_BUILTIN_VA_FUNCS
 #undef NO_BUILTIN_VA_FUNCS
 #endif
