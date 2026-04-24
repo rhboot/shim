@@ -1,75 +1,40 @@
-/* crypto/bio/bss_sock.c */
-/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
- * All rights reserved.
+/*
+ * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
- * This package is an SSL implementation written
- * by Eric Young (eay@cryptsoft.com).
- * The implementation was written so as to conform with Netscapes SSL.
- *
- * This library is free for commercial and non-commercial use as long as
- * the following conditions are aheared to.  The following conditions
- * apply to all code found in this distribution, be it the RC4, RSA,
- * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
- * included with this distribution is covered by the same copyright terms
- * except that the holder is Tim Hudson (tjh@cryptsoft.com).
- *
- * Copyright remains Eric Young's, and as such any Copyright notices in
- * the code are not to be removed.
- * If this package is used in a product, Eric Young should be given attribution
- * as the author of the parts of the library used.
- * This can be in the form of a textual message at program startup or
- * in documentation (online or textual) provided with the package.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    "This product includes cryptographic software written by
- *     Eric Young (eay@cryptsoft.com)"
- *    The word 'cryptographic' can be left out if the rouines from the library
- *    being used are not cryptographic related :-).
- * 4. If you include any Windows specific code (or a derivative thereof) from
- *    the apps directory (application code) you must include an acknowledgement:
- *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
- *
- * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * The licence and distribution terms for any publically available version or
- * derivative of this code cannot be changed.  i.e. this code cannot simply be
- * copied and put under another distribution licence
- * [including the GNU Public Licence.]
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stdio.h>
 #include <errno.h>
-#define USE_SOCKETS
-#include "cryptlib.h"
+#include "bio_local.h"
+#include "internal/bio_tfo.h"
+#include "internal/cryptlib.h"
+#include "internal/ktls.h"
 
 #ifndef OPENSSL_NO_SOCK
 
 # include <openssl/bio.h>
 
 # ifdef WATT32
-#  define sock_write SockWrite  /* Watt-32 uses same names */
+/* Watt-32 uses same names */
+#  undef sock_write
+#  undef sock_read
+#  undef sock_puts
+#  define sock_write SockWrite
 #  define sock_read  SockRead
 #  define sock_puts  SockPuts
 # endif
+
+struct bss_sock_st {
+    BIO_ADDR tfo_peer;
+    int tfo_first;
+#ifndef OPENSSL_NO_KTLS
+    unsigned char ktls_record_type;
+#endif
+};
 
 static int sock_write(BIO *h, const char *buf, int num);
 static int sock_read(BIO *h, char *buf, int size);
@@ -79,22 +44,24 @@ static int sock_new(BIO *h);
 static int sock_free(BIO *data);
 int BIO_sock_should_retry(int s);
 
-static BIO_METHOD methods_sockp = {
+static const BIO_METHOD methods_sockp = {
     BIO_TYPE_SOCKET,
     "socket",
+    bwrite_conv,
     sock_write,
+    bread_conv,
     sock_read,
     sock_puts,
-    NULL,                       /* sock_gets, */
+    NULL,                       /* sock_gets,         */
     sock_ctrl,
     sock_new,
     sock_free,
-    NULL,
+    NULL,                       /* sock_callback_ctrl */
 };
 
-BIO_METHOD *BIO_s_socket(void)
+const BIO_METHOD *BIO_s_socket(void)
 {
-    return (&methods_sockp);
+    return &methods_sockp;
 }
 
 BIO *BIO_new_socket(int fd, int close_flag)
@@ -103,32 +70,47 @@ BIO *BIO_new_socket(int fd, int close_flag)
 
     ret = BIO_new(BIO_s_socket());
     if (ret == NULL)
-        return (NULL);
+        return NULL;
     BIO_set_fd(ret, fd, close_flag);
-    return (ret);
+# ifndef OPENSSL_NO_KTLS
+    {
+        /*
+         * The new socket is created successfully regardless of ktls_enable.
+         * ktls_enable doesn't change any functionality of the socket, except
+         * changing the setsockopt to enable the processing of ktls_start.
+         * Thus, it is not a problem to call it for non-TLS sockets.
+         */
+        ktls_enable(fd);
+    }
+# endif
+    return ret;
 }
 
 static int sock_new(BIO *bi)
 {
     bi->init = 0;
     bi->num = 0;
-    bi->ptr = NULL;
     bi->flags = 0;
-    return (1);
+    bi->ptr = OPENSSL_zalloc(sizeof(struct bss_sock_st));
+    if (bi->ptr == NULL)
+        return 0;
+    return 1;
 }
 
 static int sock_free(BIO *a)
 {
     if (a == NULL)
-        return (0);
+        return 0;
     if (a->shutdown) {
         if (a->init) {
-            SHUTDOWN2(a->num);
+            BIO_closesocket(a->num);
         }
         a->init = 0;
         a->flags = 0;
     }
-    return (1);
+    OPENSSL_free(a->ptr);
+    a->ptr = NULL;
+    return 1;
 }
 
 static int sock_read(BIO *b, char *out, int outl)
@@ -137,41 +119,82 @@ static int sock_read(BIO *b, char *out, int outl)
 
     if (out != NULL) {
         clear_socket_error();
-        ret = readsocket(b->num, out, outl);
+# ifndef OPENSSL_NO_KTLS
+        if (BIO_get_ktls_recv(b))
+            ret = ktls_read_record(b->num, out, outl);
+        else
+# endif
+            ret = readsocket(b->num, out, outl);
         BIO_clear_retry_flags(b);
         if (ret <= 0) {
             if (BIO_sock_should_retry(ret))
                 BIO_set_retry_read(b);
+            else if (ret == 0)
+                b->flags |= BIO_FLAGS_IN_EOF;
         }
     }
-    return (ret);
+    return ret;
 }
 
 static int sock_write(BIO *b, const char *in, int inl)
 {
-    int ret;
+    int ret = 0;
+# if !defined(OPENSSL_NO_KTLS) || defined(OSSL_TFO_SENDTO)
+    struct bss_sock_st *data = (struct bss_sock_st *)b->ptr;
+# endif
 
     clear_socket_error();
-    ret = writesocket(b->num, in, inl);
+# ifndef OPENSSL_NO_KTLS
+    if (BIO_should_ktls_ctrl_msg_flag(b)) {
+        unsigned char record_type = data->ktls_record_type;
+        ret = ktls_send_ctrl_message(b->num, record_type, in, inl);
+        if (ret >= 0) {
+            ret = inl;
+            BIO_clear_ktls_ctrl_msg_flag(b);
+        }
+    } else
+# endif
+# if defined(OSSL_TFO_SENDTO)
+    if (data->tfo_first) {
+        struct bss_sock_st *data = (struct bss_sock_st *)b->ptr;
+        socklen_t peerlen = BIO_ADDR_sockaddr_size(&data->tfo_peer);
+
+        ret = sendto(b->num, in, inl, OSSL_TFO_SENDTO,
+                     BIO_ADDR_sockaddr(&data->tfo_peer), peerlen);
+        data->tfo_first = 0;
+    } else
+# endif
+        ret = writesocket(b->num, in, inl);
     BIO_clear_retry_flags(b);
     if (ret <= 0) {
         if (BIO_sock_should_retry(ret))
             BIO_set_retry_write(b);
     }
-    return (ret);
+    return ret;
 }
 
 static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
 {
     long ret = 1;
     int *ip;
+    struct bss_sock_st *data = (struct bss_sock_st *)b->ptr;
+# ifndef OPENSSL_NO_KTLS
+    ktls_crypto_info_t *crypto_info;
+# endif
 
     switch (cmd) {
     case BIO_C_SET_FD:
-        sock_free(b);
+        /* minimal sock_free() */
+        if (b->shutdown) {
+            if (b->init)
+                BIO_closesocket(b->num);
+            b->flags = 0;
+        }
         b->num = *((int *)ptr);
         b->shutdown = (int)num;
         b->init = 1;
+        data->tfo_first = 0;
+        memset(&data->tfo_peer, 0, sizeof(data->tfo_peer));
         break;
     case BIO_C_GET_FD:
         if (b->init) {
@@ -192,11 +215,73 @@ static long sock_ctrl(BIO *b, int cmd, long num, void *ptr)
     case BIO_CTRL_FLUSH:
         ret = 1;
         break;
+    case BIO_CTRL_GET_RPOLL_DESCRIPTOR:
+    case BIO_CTRL_GET_WPOLL_DESCRIPTOR:
+        {
+            BIO_POLL_DESCRIPTOR *pd = ptr;
+
+            if (!b->init) {
+                ret = 0;
+                break;
+            }
+
+            pd->type        = BIO_POLL_DESCRIPTOR_TYPE_SOCK_FD;
+            pd->value.fd    = b->num;
+        }
+        break;
+# ifndef OPENSSL_NO_KTLS
+    case BIO_CTRL_SET_KTLS:
+        crypto_info = (ktls_crypto_info_t *)ptr;
+        ret = ktls_start(b->num, crypto_info, num);
+        if (ret)
+            BIO_set_ktls_flag(b, num);
+        break;
+    case BIO_CTRL_GET_KTLS_SEND:
+        return BIO_should_ktls_flag(b, 1) != 0;
+    case BIO_CTRL_GET_KTLS_RECV:
+        return BIO_should_ktls_flag(b, 0) != 0;
+    case BIO_CTRL_SET_KTLS_TX_SEND_CTRL_MSG:
+        BIO_set_ktls_ctrl_msg_flag(b);
+        data->ktls_record_type = (unsigned char)num;
+        ret = 0;
+        break;
+    case BIO_CTRL_CLEAR_KTLS_TX_CTRL_MSG:
+        BIO_clear_ktls_ctrl_msg_flag(b);
+        ret = 0;
+        break;
+    case BIO_CTRL_SET_KTLS_TX_ZEROCOPY_SENDFILE:
+        ret = ktls_enable_tx_zerocopy_sendfile(b->num);
+        if (ret)
+            BIO_set_ktls_zerocopy_sendfile_flag(b);
+        break;
+# endif
+    case BIO_CTRL_EOF:
+        ret = (b->flags & BIO_FLAGS_IN_EOF) != 0;
+        break;
+    case BIO_C_GET_CONNECT:
+        if (ptr != NULL && num == 2) {
+            const char **pptr = (const char **)ptr;
+
+            *pptr = (const char *)&data->tfo_peer;
+        } else {
+            ret = 0;
+        }
+        break;
+    case BIO_C_SET_CONNECT:
+        if (ptr != NULL && num == 2) {
+            ret = BIO_ADDR_make(&data->tfo_peer,
+                                BIO_ADDR_sockaddr((const BIO_ADDR *)ptr));
+            if (ret)
+                data->tfo_first = 1;
+        } else {
+            ret = 0;
+        }
+        break;
     default:
         ret = 0;
         break;
     }
-    return (ret);
+    return ret;
 }
 
 static int sock_puts(BIO *bp, const char *str)
@@ -205,7 +290,7 @@ static int sock_puts(BIO *bp, const char *str)
 
     n = strlen(str);
     ret = sock_write(bp, str, n);
-    return (ret);
+    return ret;
 }
 
 int BIO_sock_should_retry(int i)
@@ -215,29 +300,17 @@ int BIO_sock_should_retry(int i)
     if ((i == 0) || (i == -1)) {
         err = get_last_socket_error();
 
-# if defined(OPENSSL_SYS_WINDOWS) && 0/* more microsoft stupidity? perhaps
-                                       * not? Ben 4/1/99 */
-        if ((i == -1) && (err == 0))
-            return (1);
-# endif
-
-        return (BIO_sock_non_fatal_error(err));
+        return BIO_sock_non_fatal_error(err);
     }
-    return (0);
+    return 0;
 }
 
 int BIO_sock_non_fatal_error(int err)
 {
     switch (err) {
-# if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_NETWARE)
+# if defined(OPENSSL_SYS_WINDOWS)
 #  if defined(WSAEWOULDBLOCK)
     case WSAEWOULDBLOCK:
-#  endif
-
-#  if 0                         /* This appears to always be an error */
-#   if defined(WSAENOTCONN)
-    case WSAENOTCONN:
-#   endif
 #  endif
 # endif
 
@@ -276,12 +349,11 @@ int BIO_sock_non_fatal_error(int err)
 # ifdef EALREADY
     case EALREADY:
 # endif
-        return (1);
-        /* break; */
+        return 1;
     default:
         break;
     }
-    return (0);
+    return 0;
 }
 
 #endif                          /* #ifndef OPENSSL_NO_SOCK */

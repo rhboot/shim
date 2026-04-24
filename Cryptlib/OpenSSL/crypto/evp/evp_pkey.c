@@ -1,99 +1,59 @@
-/* evp_pkey.c */
 /*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
- * 1999.
- */
-/* ====================================================================
- * Copyright (c) 1999-2005 The OpenSSL Project.  All rights reserved.
+ * Copyright 1999-2023 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "cryptlib.h"
+#include "internal/cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/rand.h>
-#include "asn1_locl.h"
+#include <openssl/encoder.h>
+#include <openssl/decoder.h>
+#include "internal/provider.h"
+#include "internal/sizes.h"
+#include "crypto/asn1.h"
+#include "crypto/evp.h"
+#include "crypto/x509.h"
 
 /* Extract a private key from a PKCS8 structure */
 
-EVP_PKEY *EVP_PKCS82PKEY(PKCS8_PRIV_KEY_INFO *p8)
+EVP_PKEY *evp_pkcs82pkey_legacy(const PKCS8_PRIV_KEY_INFO *p8, OSSL_LIB_CTX *libctx,
+                                const char *propq)
 {
     EVP_PKEY *pkey = NULL;
-    ASN1_OBJECT *algoid;
+    const ASN1_OBJECT *algoid;
     char obj_tmp[80];
 
     if (!PKCS8_pkey_get0(&algoid, NULL, NULL, NULL, p8))
         return NULL;
 
-    if (!(pkey = EVP_PKEY_new())) {
-        EVPerr(EVP_F_EVP_PKCS82PKEY, ERR_R_MALLOC_FAILURE);
+    if ((pkey = EVP_PKEY_new()) == NULL) {
+        ERR_raise(ERR_LIB_EVP, ERR_R_EVP_LIB);
         return NULL;
     }
 
     if (!EVP_PKEY_set_type(pkey, OBJ_obj2nid(algoid))) {
-        EVPerr(EVP_F_EVP_PKCS82PKEY, EVP_R_UNSUPPORTED_PRIVATE_KEY_ALGORITHM);
         i2t_ASN1_OBJECT(obj_tmp, 80, algoid);
-        ERR_add_error_data(2, "TYPE=", obj_tmp);
+        ERR_raise_data(ERR_LIB_EVP, EVP_R_UNSUPPORTED_PRIVATE_KEY_ALGORITHM,
+                       "TYPE=%s", obj_tmp);
         goto error;
     }
 
-    if (pkey->ameth->priv_decode) {
+    if (pkey->ameth->priv_decode_ex != NULL) {
+        if (!pkey->ameth->priv_decode_ex(pkey, p8, libctx, propq))
+            goto error;
+    } else if (pkey->ameth->priv_decode != NULL) {
         if (!pkey->ameth->priv_decode(pkey, p8)) {
-            EVPerr(EVP_F_EVP_PKCS82PKEY, EVP_R_PRIVATE_KEY_DECODE_ERROR);
+            ERR_raise(ERR_LIB_EVP, EVP_R_PRIVATE_KEY_DECODE_ERROR);
             goto error;
         }
     } else {
-        EVPerr(EVP_F_EVP_PKCS82PKEY, EVP_R_METHOD_NOT_SUPPORTED);
+        ERR_raise(ERR_LIB_EVP, EVP_R_METHOD_NOT_SUPPORTED);
         goto error;
     }
 
@@ -104,66 +64,120 @@ EVP_PKEY *EVP_PKCS82PKEY(PKCS8_PRIV_KEY_INFO *p8)
     return NULL;
 }
 
-PKCS8_PRIV_KEY_INFO *EVP_PKEY2PKCS8(EVP_PKEY *pkey)
+EVP_PKEY *EVP_PKCS82PKEY_ex(const PKCS8_PRIV_KEY_INFO *p8, OSSL_LIB_CTX *libctx,
+                            const char *propq)
 {
-    return EVP_PKEY2PKCS8_broken(pkey, PKCS8_OK);
+    EVP_PKEY *pkey = NULL;
+    const unsigned char *p8_data = NULL;
+    unsigned char *encoded_data = NULL;
+    int encoded_len;
+    int selection;
+    size_t len;
+    OSSL_DECODER_CTX *dctx = NULL;
+    const ASN1_OBJECT *algoid = NULL;
+    char keytype[OSSL_MAX_NAME_SIZE];
+
+    if (p8 == NULL
+            || !PKCS8_pkey_get0(&algoid, NULL, NULL, NULL, p8)
+            || !OBJ_obj2txt(keytype, sizeof(keytype), algoid, 0))
+        return NULL;
+
+    if ((encoded_len = i2d_PKCS8_PRIV_KEY_INFO(p8, &encoded_data)) <= 0
+            || encoded_data == NULL)
+        return NULL;
+
+    p8_data = encoded_data;
+    len = encoded_len;
+    selection = EVP_PKEY_KEYPAIR | EVP_PKEY_KEY_PARAMETERS;
+    dctx = OSSL_DECODER_CTX_new_for_pkey(&pkey, "DER", "PrivateKeyInfo",
+                                         keytype, selection, libctx, propq);
+
+    if (dctx != NULL && OSSL_DECODER_CTX_get_num_decoders(dctx) == 0) {
+        OSSL_DECODER_CTX_free(dctx);
+
+        /*
+         * This could happen if OBJ_obj2txt() returned a text OID and the
+         * decoder has not got that OID as an alias. We fall back to a NULL
+         * keytype
+         */
+        dctx = OSSL_DECODER_CTX_new_for_pkey(&pkey, "DER", "PrivateKeyInfo",
+                                             NULL, selection, libctx, propq);
+    }
+
+    if (dctx == NULL
+        || !OSSL_DECODER_from_data(dctx, &p8_data, &len))
+        /* try legacy */
+        pkey = evp_pkcs82pkey_legacy(p8, libctx, propq);
+
+    OPENSSL_clear_free(encoded_data, encoded_len);
+    OSSL_DECODER_CTX_free(dctx);
+    return pkey;
+}
+
+EVP_PKEY *EVP_PKCS82PKEY(const PKCS8_PRIV_KEY_INFO *p8)
+{
+    return EVP_PKCS82PKEY_ex(p8, NULL, NULL);
 }
 
 /* Turn a private key into a PKCS8 structure */
 
-PKCS8_PRIV_KEY_INFO *EVP_PKEY2PKCS8_broken(EVP_PKEY *pkey, int broken)
+PKCS8_PRIV_KEY_INFO *EVP_PKEY2PKCS8(const EVP_PKEY *pkey)
 {
-    PKCS8_PRIV_KEY_INFO *p8;
+    PKCS8_PRIV_KEY_INFO *p8 = NULL;
+    OSSL_ENCODER_CTX *ctx = NULL;
 
-    if (!(p8 = PKCS8_PRIV_KEY_INFO_new())) {
-        EVPerr(EVP_F_EVP_PKEY2PKCS8_BROKEN, ERR_R_MALLOC_FAILURE);
-        return NULL;
-    }
-    p8->broken = broken;
+    /*
+     * The implementation for provider-native keys is to encode the
+     * key to a DER encoded PKCS#8 structure, then convert it to a
+     * PKCS8_PRIV_KEY_INFO with good old d2i functions.
+     */
+    if (evp_pkey_is_provided(pkey)) {
+        int selection = OSSL_KEYMGMT_SELECT_ALL;
+        unsigned char *der = NULL;
+        size_t derlen = 0;
+        const unsigned char *pp;
 
-    if (pkey->ameth) {
-        if (pkey->ameth->priv_encode) {
-            if (!pkey->ameth->priv_encode(p8, pkey)) {
-                EVPerr(EVP_F_EVP_PKEY2PKCS8_BROKEN,
-                       EVP_R_PRIVATE_KEY_ENCODE_ERROR);
+        if ((ctx = OSSL_ENCODER_CTX_new_for_pkey(pkey, selection,
+                                                 "DER", "PrivateKeyInfo",
+                                                 NULL)) == NULL
+            || !OSSL_ENCODER_to_data(ctx, &der, &derlen))
+            goto error;
+
+        pp = der;
+        p8 = d2i_PKCS8_PRIV_KEY_INFO(NULL, &pp, (long)derlen);
+        OPENSSL_free(der);
+        if (p8 == NULL)
+            goto error;
+    } else {
+        p8 = PKCS8_PRIV_KEY_INFO_new();
+        if (p8  == NULL) {
+            ERR_raise(ERR_LIB_EVP, ERR_R_ASN1_LIB);
+            return NULL;
+        }
+
+        if (pkey->ameth != NULL) {
+            if (pkey->ameth->priv_encode != NULL) {
+                if (!pkey->ameth->priv_encode(p8, pkey)) {
+                    ERR_raise(ERR_LIB_EVP, EVP_R_PRIVATE_KEY_ENCODE_ERROR);
+                    goto error;
+                }
+            } else {
+                ERR_raise(ERR_LIB_EVP, EVP_R_METHOD_NOT_SUPPORTED);
                 goto error;
             }
         } else {
-            EVPerr(EVP_F_EVP_PKEY2PKCS8_BROKEN, EVP_R_METHOD_NOT_SUPPORTED);
+            ERR_raise(ERR_LIB_EVP, EVP_R_UNSUPPORTED_PRIVATE_KEY_ALGORITHM);
             goto error;
         }
-    } else {
-        EVPerr(EVP_F_EVP_PKEY2PKCS8_BROKEN,
-               EVP_R_UNSUPPORTED_PRIVATE_KEY_ALGORITHM);
-        goto error;
     }
-    RAND_add(p8->pkey->value.octet_string->data,
-             p8->pkey->value.octet_string->length, 0.0);
-    return p8;
+    goto end;
  error:
     PKCS8_PRIV_KEY_INFO_free(p8);
-    return NULL;
-}
+    p8 = NULL;
+ end:
+    OSSL_ENCODER_CTX_free(ctx);
+    return p8;
 
-PKCS8_PRIV_KEY_INFO *PKCS8_set_broken(PKCS8_PRIV_KEY_INFO *p8, int broken)
-{
-    switch (broken) {
-
-    case PKCS8_OK:
-        p8->broken = PKCS8_OK;
-        return p8;
-        break;
-
-    case PKCS8_NO_OCTET:
-        p8->broken = PKCS8_NO_OCTET;
-        p8->pkey->type = V_ASN1_SEQUENCE;
-        return p8;
-        break;
-
-    default:
-        EVPerr(EVP_F_PKCS8_SET_BROKEN, EVP_R_PKCS8_UNKNOWN_BROKEN_TYPE);
-        return NULL;
-    }
 }
 
 /* EVP_PKEY attribute functions */
@@ -178,7 +192,7 @@ int EVP_PKEY_get_attr_by_NID(const EVP_PKEY *key, int nid, int lastpos)
     return X509at_get_attr_by_NID(key->attributes, nid, lastpos);
 }
 
-int EVP_PKEY_get_attr_by_OBJ(const EVP_PKEY *key, ASN1_OBJECT *obj,
+int EVP_PKEY_get_attr_by_OBJ(const EVP_PKEY *key, const ASN1_OBJECT *obj,
                              int lastpos)
 {
     return X509at_get_attr_by_OBJ(key->attributes, obj, lastpos);
@@ -226,4 +240,28 @@ int EVP_PKEY_add1_attr_by_txt(EVP_PKEY *key,
     if (X509at_add1_attr_by_txt(&key->attributes, attrname, type, bytes, len))
         return 1;
     return 0;
+}
+
+const char *EVP_PKEY_get0_type_name(const EVP_PKEY *key)
+{
+    const EVP_PKEY_ASN1_METHOD *ameth;
+    const char *name = NULL;
+
+    if (key->keymgmt != NULL)
+        return EVP_KEYMGMT_get0_name(key->keymgmt);
+
+    /* Otherwise fallback to legacy */
+    ameth = EVP_PKEY_get0_asn1(key);
+    if (ameth != NULL)
+        EVP_PKEY_asn1_get0_info(NULL, NULL,
+                                NULL, NULL, &name, ameth);
+
+    return name;
+}
+
+const OSSL_PROVIDER *EVP_PKEY_get0_provider(const EVP_PKEY *key)
+{
+    if (evp_pkey_is_provided(key))
+        return EVP_KEYMGMT_get0_provider(key->keymgmt);
+    return NULL;
 }

@@ -1,67 +1,19 @@
-/* p5_crpt.c */
 /*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
- * 1999.
- */
-/* ====================================================================
- * Copyright (c) 1999 The OpenSSL Project.  All rights reserved.
+ * Copyright 1999-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "cryptlib.h"
+#include "internal/cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/evp.h>
+#include <openssl/core_names.h>
+#include <openssl/kdf.h>
 
 /*
  * Doesn't do anything now: Builtin PBE algorithms in static table.
@@ -71,72 +23,81 @@ void PKCS5_PBE_add(void)
 {
 }
 
-int PKCS5_PBE_keyivgen(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
-                       ASN1_TYPE *param, const EVP_CIPHER *cipher,
-                       const EVP_MD *md, int en_de)
+int PKCS5_PBE_keyivgen_ex(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
+                          ASN1_TYPE *param, const EVP_CIPHER *cipher,
+                          const EVP_MD *md, int en_de, OSSL_LIB_CTX *libctx,
+                          const char *propq)
 {
-    EVP_MD_CTX ctx;
     unsigned char md_tmp[EVP_MAX_MD_SIZE];
     unsigned char key[EVP_MAX_KEY_LENGTH], iv[EVP_MAX_IV_LENGTH];
-    int i;
-    PBEPARAM *pbe;
+    int ivl, kl;
+    PBEPARAM *pbe = NULL;
     int saltlen, iter;
     unsigned char *salt;
-    const unsigned char *pbuf;
     int mdsize;
     int rv = 0;
-    EVP_MD_CTX_init(&ctx);
+    EVP_KDF *kdf;
+    EVP_KDF_CTX *kctx = NULL;
+    OSSL_PARAM params[5], *p = params;
+    const char *mdname = EVP_MD_name(md);
 
     /* Extract useful info from parameter */
     if (param == NULL || param->type != V_ASN1_SEQUENCE ||
         param->value.sequence == NULL) {
-        EVPerr(EVP_F_PKCS5_PBE_KEYIVGEN, EVP_R_DECODE_ERROR);
+        ERR_raise(ERR_LIB_EVP, EVP_R_DECODE_ERROR);
         return 0;
     }
 
-    pbuf = param->value.sequence->data;
-    if (!(pbe = d2i_PBEPARAM(NULL, &pbuf, param->value.sequence->length))) {
-        EVPerr(EVP_F_PKCS5_PBE_KEYIVGEN, EVP_R_DECODE_ERROR);
+    pbe = ASN1_TYPE_unpack_sequence(ASN1_ITEM_rptr(PBEPARAM), param);
+    if (pbe == NULL) {
+        ERR_raise(ERR_LIB_EVP, EVP_R_DECODE_ERROR);
         return 0;
     }
 
-    if (!pbe->iter)
+    ivl = EVP_CIPHER_get_iv_length(cipher);
+    if (ivl < 0 || ivl > 16) {
+        ERR_raise(ERR_LIB_EVP, EVP_R_INVALID_IV_LENGTH);
+        goto err;
+    }
+    kl = EVP_CIPHER_get_key_length(cipher);
+    if (kl < 0 || kl > (int)sizeof(md_tmp)) {
+        ERR_raise(ERR_LIB_EVP, EVP_R_INVALID_KEY_LENGTH);
+        goto err;
+    }
+
+    if (pbe->iter == NULL)
         iter = 1;
     else
         iter = ASN1_INTEGER_get(pbe->iter);
     salt = pbe->salt->data;
     saltlen = pbe->salt->length;
 
-    if (!pass)
+    if (pass == NULL)
         passlen = 0;
     else if (passlen == -1)
         passlen = strlen(pass);
 
-    if (!EVP_DigestInit_ex(&ctx, md, NULL))
+    mdsize = EVP_MD_get_size(md);
+    if (mdsize <= 0)
         goto err;
-    if (!EVP_DigestUpdate(&ctx, pass, passlen))
+
+    kdf = EVP_KDF_fetch(libctx, OSSL_KDF_NAME_PBKDF1, propq);
+    kctx = EVP_KDF_CTX_new(kdf);
+    EVP_KDF_free(kdf);
+    if (kctx == NULL)
         goto err;
-    if (!EVP_DigestUpdate(&ctx, salt, saltlen))
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_PASSWORD,
+                                             (char *)pass, (size_t)passlen);
+    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+                                             salt, saltlen);
+    *p++ = OSSL_PARAM_construct_int(OSSL_KDF_PARAM_ITER, &iter);
+    *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+                                            (char *)mdname, 0);
+    *p = OSSL_PARAM_construct_end();
+    if (EVP_KDF_derive(kctx, md_tmp, mdsize, params) != 1)
         goto err;
-    PBEPARAM_free(pbe);
-    if (!EVP_DigestFinal_ex(&ctx, md_tmp, NULL))
-        goto err;
-    mdsize = EVP_MD_size(md);
-    if (mdsize < 0)
-        return 0;
-    for (i = 1; i < iter; i++) {
-        if (!EVP_DigestInit_ex(&ctx, md, NULL))
-            goto err;
-        if (!EVP_DigestUpdate(&ctx, md_tmp, mdsize))
-            goto err;
-        if (!EVP_DigestFinal_ex(&ctx, md_tmp, NULL))
-            goto err;
-    }
-    OPENSSL_assert(EVP_CIPHER_key_length(cipher) <= (int)sizeof(md_tmp));
-    memcpy(key, md_tmp, EVP_CIPHER_key_length(cipher));
-    OPENSSL_assert(EVP_CIPHER_iv_length(cipher) <= 16);
-    memcpy(iv, md_tmp + (16 - EVP_CIPHER_iv_length(cipher)),
-           EVP_CIPHER_iv_length(cipher));
+    memcpy(key, md_tmp, kl);
+    memcpy(iv, md_tmp + (16 - ivl), ivl);
     if (!EVP_CipherInit_ex(cctx, cipher, NULL, key, iv, en_de))
         goto err;
     OPENSSL_cleanse(md_tmp, EVP_MAX_MD_SIZE);
@@ -144,6 +105,16 @@ int PKCS5_PBE_keyivgen(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
     OPENSSL_cleanse(iv, EVP_MAX_IV_LENGTH);
     rv = 1;
  err:
-    EVP_MD_CTX_cleanup(&ctx);
+    EVP_KDF_CTX_free(kctx);
+    PBEPARAM_free(pbe);
     return rv;
 }
+
+int PKCS5_PBE_keyivgen(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
+                       ASN1_TYPE *param, const EVP_CIPHER *cipher,
+                       const EVP_MD *md, int en_de)
+{
+    return PKCS5_PBE_keyivgen_ex(cctx, pass, passlen, param, cipher, md, en_de,
+                                 NULL, NULL);
+}
+

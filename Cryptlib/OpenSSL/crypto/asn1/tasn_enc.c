@@ -1,92 +1,46 @@
-/* tasn_enc.c */
 /*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
- * 2000.
- */
-/* ====================================================================
- * Copyright (c) 2000-2004 The OpenSSL Project.  All rights reserved.
+ * Copyright 2000-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stddef.h>
 #include <string.h>
-#include <limits.h>
-#include "cryptlib.h"
+#include "internal/cryptlib.h"
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/objects.h>
+#include "crypto/asn1.h"
+#include "asn1_local.h"
 
-static int asn1_i2d_ex_primitive(ASN1_VALUE **pval, unsigned char **out,
+static int asn1_i2d_ex_primitive(const ASN1_VALUE **pval, unsigned char **out,
                                  const ASN1_ITEM *it, int tag, int aclass);
-static int asn1_set_seq_out(STACK_OF(ASN1_VALUE) *sk, unsigned char **out,
+static int asn1_set_seq_out(STACK_OF(const_ASN1_VALUE) *sk,
+                            unsigned char **out,
                             int skcontlen, const ASN1_ITEM *item,
                             int do_sort, int iclass);
-static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
+static int asn1_template_ex_i2d(const ASN1_VALUE **pval, unsigned char **out,
                                 const ASN1_TEMPLATE *tt, int tag, int aclass);
-static int asn1_item_flags_i2d(ASN1_VALUE *val, unsigned char **out,
+static int asn1_item_flags_i2d(const ASN1_VALUE *val, unsigned char **out,
                                const ASN1_ITEM *it, int flags);
+static int asn1_ex_i2c(const ASN1_VALUE **pval, unsigned char *cout, int *putype,
+                       const ASN1_ITEM *it);
 
 /*
  * Top level i2d equivalents: the 'ndef' variant instructs the encoder to use
  * indefinite length constructed encoding, where appropriate
  */
 
-int ASN1_item_ndef_i2d(ASN1_VALUE *val, unsigned char **out,
+int ASN1_item_ndef_i2d(const ASN1_VALUE *val, unsigned char **out,
                        const ASN1_ITEM *it)
 {
     return asn1_item_flags_i2d(val, out, it, ASN1_TFLG_NDEF);
 }
 
-int ASN1_item_i2d(ASN1_VALUE *val, unsigned char **out, const ASN1_ITEM *it)
+int ASN1_item_i2d(const ASN1_VALUE *val, unsigned char **out, const ASN1_ITEM *it)
 {
     return asn1_item_flags_i2d(val, out, it, 0);
 }
@@ -98,17 +52,17 @@ int ASN1_item_i2d(ASN1_VALUE *val, unsigned char **out, const ASN1_ITEM *it)
  * allocated and populated with the encoding.
  */
 
-static int asn1_item_flags_i2d(ASN1_VALUE *val, unsigned char **out,
+static int asn1_item_flags_i2d(const ASN1_VALUE *val, unsigned char **out,
                                const ASN1_ITEM *it, int flags)
 {
-    if (out && !*out) {
+    if (out != NULL && *out == NULL) {
         unsigned char *p, *buf;
         int len;
+
         len = ASN1_item_ex_i2d(&val, NULL, it, -1, flags);
         if (len <= 0)
             return len;
-        buf = OPENSSL_malloc(len);
-        if (!buf)
+        if ((buf = OPENSSL_malloc(len)) == NULL)
             return -1;
         p = buf;
         ASN1_item_ex_i2d(&val, &p, it, -1, flags);
@@ -124,22 +78,22 @@ static int asn1_item_flags_i2d(ASN1_VALUE *val, unsigned char **out,
  * performs the normal item handling: it can be used in external types.
  */
 
-int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
+int ASN1_item_ex_i2d(const ASN1_VALUE **pval, unsigned char **out,
                      const ASN1_ITEM *it, int tag, int aclass)
 {
     const ASN1_TEMPLATE *tt = NULL;
-    unsigned char *p = NULL;
     int i, seqcontlen, seqlen, ndef = 1;
-    const ASN1_COMPAT_FUNCS *cf;
     const ASN1_EXTERN_FUNCS *ef;
     const ASN1_AUX *aux = it->funcs;
-    ASN1_aux_cb *asn1_cb = 0;
+    ASN1_aux_const_cb *asn1_cb = NULL;
 
-    if ((it->itype != ASN1_ITYPE_PRIMITIVE) && !*pval)
+    if ((it->itype != ASN1_ITYPE_PRIMITIVE) && *pval == NULL)
         return 0;
 
-    if (aux && aux->asn1_cb)
-        asn1_cb = aux->asn1_cb;
+    if (aux != NULL) {
+        asn1_cb = ((aux->flags & ASN1_AFLG_CONST_CB) != 0) ? aux->asn1_const_cb
+            : (ASN1_aux_const_cb *)aux->asn1_cb; /* backward compatibility */
+    }
 
     switch (it->itype) {
 
@@ -148,20 +102,35 @@ int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
             return asn1_template_ex_i2d(pval, out, it->templates,
                                         tag, aclass);
         return asn1_i2d_ex_primitive(pval, out, it, tag, aclass);
-        break;
 
     case ASN1_ITYPE_MSTRING:
+        /*
+         * It never makes sense for multi-strings to have implicit tagging, so
+         * if tag != -1, then this looks like an error in the template.
+         */
+        if (tag != -1) {
+            ERR_raise(ERR_LIB_ASN1, ASN1_R_BAD_TEMPLATE);
+            return -1;
+        }
         return asn1_i2d_ex_primitive(pval, out, it, -1, aclass);
 
     case ASN1_ITYPE_CHOICE:
+        /*
+         * It never makes sense for CHOICE types to have implicit tagging, so
+         * if tag != -1, then this looks like an error in the template.
+         */
+        if (tag != -1) {
+            ERR_raise(ERR_LIB_ASN1, ASN1_R_BAD_TEMPLATE);
+            return -1;
+        }
         if (asn1_cb && !asn1_cb(ASN1_OP_I2D_PRE, pval, it, NULL))
             return 0;
-        i = asn1_get_choice_selector(pval, it);
+        i = ossl_asn1_get_choice_selector_const(pval, it);
         if ((i >= 0) && (i < it->tcount)) {
-            ASN1_VALUE **pchval;
+            const ASN1_VALUE **pchval;
             const ASN1_TEMPLATE *chtt;
             chtt = it->templates + i;
-            pchval = asn1_get_field_ptr(pval, chtt);
+            pchval = ossl_asn1_get_const_field_ptr(pval, chtt);
             return asn1_template_ex_i2d(pchval, out, chtt, -1, aclass);
         }
         /* Fixme: error condition if selector out of range */
@@ -174,20 +143,6 @@ int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
         ef = it->funcs;
         return ef->asn1_ex_i2d(pval, out, it, tag, aclass);
 
-    case ASN1_ITYPE_COMPAT:
-        /* old style hackery... */
-        cf = it->funcs;
-        if (out)
-            p = *out;
-        i = cf->asn1_i2d(*pval, out);
-        /*
-         * Fixup for IMPLICIT tag: note this messes up for tags > 30, but so
-         * did the old code. Tags > 30 are very rare anyway.
-         */
-        if (out && (tag != -1))
-            *p = aclass | tag | (*p & V_ASN1_CONSTRUCTED);
-        return i;
-
     case ASN1_ITYPE_NDEF_SEQUENCE:
         /* Use indefinite length constructed if requested */
         if (aclass & ASN1_TFLG_NDEF)
@@ -195,7 +150,7 @@ int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
         /* fall through */
 
     case ASN1_ITYPE_SEQUENCE:
-        i = asn1_enc_restore(&seqcontlen, out, pval, it);
+        i = ossl_asn1_enc_restore(&seqcontlen, out, pval, it);
         /* An error occurred */
         if (i < 0)
             return 0;
@@ -216,12 +171,12 @@ int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
         /* First work out sequence content length */
         for (i = 0, tt = it->templates; i < it->tcount; tt++, i++) {
             const ASN1_TEMPLATE *seqtt;
-            ASN1_VALUE **pseqval;
+            const ASN1_VALUE **pseqval;
             int tmplen;
-            seqtt = asn1_do_adb(pval, tt, 1);
+            seqtt = ossl_asn1_do_adb(*pval, tt, 1);
             if (!seqtt)
                 return 0;
-            pseqval = asn1_get_field_ptr(pval, seqtt);
+            pseqval = ossl_asn1_get_const_field_ptr(pval, seqtt);
             tmplen = asn1_template_ex_i2d(pseqval, NULL, seqtt, -1, aclass);
             if (tmplen == -1 || (tmplen > INT_MAX - seqcontlen))
                 return -1;
@@ -235,11 +190,11 @@ int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
         ASN1_put_object(out, ndef, seqcontlen, tag, aclass);
         for (i = 0, tt = it->templates; i < it->tcount; tt++, i++) {
             const ASN1_TEMPLATE *seqtt;
-            ASN1_VALUE **pseqval;
-            seqtt = asn1_do_adb(pval, tt, 1);
+            const ASN1_VALUE **pseqval;
+            seqtt = ossl_asn1_do_adb(*pval, tt, 1);
             if (!seqtt)
                 return 0;
-            pseqval = asn1_get_field_ptr(pval, seqtt);
+            pseqval = ossl_asn1_get_const_field_ptr(pval, seqtt);
             /* FIXME: check for errors in enhanced version */
             asn1_template_ex_i2d(pseqval, out, seqtt, -1, aclass);
         }
@@ -256,17 +211,21 @@ int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
     return 0;
 }
 
-int ASN1_template_i2d(ASN1_VALUE **pval, unsigned char **out,
-                      const ASN1_TEMPLATE *tt)
-{
-    return asn1_template_ex_i2d(pval, out, tt, -1, 0);
-}
-
-static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
+static int asn1_template_ex_i2d(const ASN1_VALUE **pval, unsigned char **out,
                                 const ASN1_TEMPLATE *tt, int tag, int iclass)
 {
-    int i, ret, flags, ttag, tclass, ndef;
-    flags = tt->flags;
+    const int flags = tt->flags;
+    int i, ret, ttag, tclass, ndef, len;
+    const ASN1_VALUE *tval;
+
+    /*
+     * If field is embedded then val needs fixing so it is a pointer to
+     * a pointer to a field.
+     */
+    if (flags & ASN1_TFLG_EMBED) {
+        tval = (ASN1_VALUE *)pval;
+        pval = &tval;
+    }
     /*
      * Work out tag and class to use: tagging may come either from the
      * template or the arguments, not both because this would create
@@ -308,12 +267,12 @@ static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
 
     if (flags & ASN1_TFLG_SK_MASK) {
         /* SET OF, SEQUENCE OF */
-        STACK_OF(ASN1_VALUE) *sk = (STACK_OF(ASN1_VALUE) *)*pval;
+        STACK_OF(const_ASN1_VALUE) *sk = (STACK_OF(const_ASN1_VALUE) *)*pval;
         int isset, sktag, skaclass;
         int skcontlen, sklen;
-        ASN1_VALUE *skitem;
+        const ASN1_VALUE *skitem;
 
-        if (!*pval)
+        if (*pval == NULL)
             return 0;
 
         if (flags & ASN1_TFLG_SET_OF) {
@@ -341,14 +300,17 @@ static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
 
         /* Determine total length of items */
         skcontlen = 0;
-        for (i = 0; i < sk_ASN1_VALUE_num(sk); i++) {
-            int tmplen;
-            skitem = sk_ASN1_VALUE_value(sk, i);
-            tmplen = ASN1_item_ex_i2d(&skitem, NULL, ASN1_ITEM_ptr(tt->item),
-                                      -1, iclass);
-            if (tmplen == -1 || (skcontlen > INT_MAX - tmplen))
+        for (i = 0; i < sk_const_ASN1_VALUE_num(sk); i++) {
+            skitem = sk_const_ASN1_VALUE_value(sk, i);
+            len = ASN1_item_ex_i2d(&skitem, NULL, ASN1_ITEM_ptr(tt->item),
+                                   -1, iclass);
+            if (len == -1 || (skcontlen > INT_MAX - len))
                 return -1;
-            skcontlen += tmplen;
+            if (len == 0 && (tt->flags & ASN1_TFLG_OPTIONAL) == 0) {
+                ERR_raise(ERR_LIB_ASN1, ASN1_R_ILLEGAL_ZERO_CONTENT);
+                return -1;
+            }
+            skcontlen += len;
         }
         sklen = ASN1_object_size(ndef, skcontlen, sktag);
         if (sklen == -1)
@@ -384,8 +346,13 @@ static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
         /* EXPLICIT tagging */
         /* Find length of tagged item */
         i = ASN1_item_ex_i2d(pval, NULL, ASN1_ITEM_ptr(tt->item), -1, iclass);
-        if (!i)
+        if (i == 0) {
+            if ((tt->flags & ASN1_TFLG_OPTIONAL) == 0) {
+                ERR_raise(ERR_LIB_ASN1, ASN1_R_ILLEGAL_ZERO_CONTENT);
+                return -1;
+            }
             return 0;
+        }
         /* Find length of EXPLICIT tag */
         ret = ASN1_object_size(ndef, i, ttag);
         if (out && ret != -1) {
@@ -399,9 +366,13 @@ static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
     }
 
     /* Either normal or IMPLICIT tagging: combine class and flags */
-    return ASN1_item_ex_i2d(pval, out, ASN1_ITEM_ptr(tt->item),
-                            ttag, tclass | iclass);
-
+    len = ASN1_item_ex_i2d(pval, out, ASN1_ITEM_ptr(tt->item),
+                              ttag, tclass | iclass);
+    if (len == 0 && (tt->flags & ASN1_TFLG_OPTIONAL) == 0) {
+        ERR_raise(ERR_LIB_ASN1, ASN1_R_ILLEGAL_ZERO_CONTENT);
+        return -1;
+    }
+    return len;
 }
 
 /* Temporary structure used to hold DER encoding of items for SET OF */
@@ -409,7 +380,7 @@ static int asn1_template_ex_i2d(ASN1_VALUE **pval, unsigned char **out,
 typedef struct {
     unsigned char *data;
     int length;
-    ASN1_VALUE *field;
+    const ASN1_VALUE *field;
 } DER_ENC;
 
 static int der_cmp(const void *a, const void *b)
@@ -425,34 +396,34 @@ static int der_cmp(const void *a, const void *b)
 
 /* Output the content octets of SET OF or SEQUENCE OF */
 
-static int asn1_set_seq_out(STACK_OF(ASN1_VALUE) *sk, unsigned char **out,
+static int asn1_set_seq_out(STACK_OF(const_ASN1_VALUE) *sk,
+                            unsigned char **out,
                             int skcontlen, const ASN1_ITEM *item,
                             int do_sort, int iclass)
 {
-    int i;
-    ASN1_VALUE *skitem;
+    int i, ret = 0;
+    const ASN1_VALUE *skitem;
     unsigned char *tmpdat = NULL, *p = NULL;
     DER_ENC *derlst = NULL, *tder;
+
     if (do_sort) {
         /* Don't need to sort less than 2 items */
-        if (sk_ASN1_VALUE_num(sk) < 2)
+        if (sk_const_ASN1_VALUE_num(sk) < 2)
             do_sort = 0;
         else {
-            derlst = OPENSSL_malloc(sk_ASN1_VALUE_num(sk)
+            derlst = OPENSSL_malloc(sk_const_ASN1_VALUE_num(sk)
                                     * sizeof(*derlst));
-            if (!derlst)
+            if (derlst == NULL)
                 return 0;
             tmpdat = OPENSSL_malloc(skcontlen);
-            if (!tmpdat) {
-                OPENSSL_free(derlst);
-                return 0;
-            }
+            if (tmpdat == NULL)
+                goto err;
         }
     }
     /* If not sorting just output each item */
     if (!do_sort) {
-        for (i = 0; i < sk_ASN1_VALUE_num(sk); i++) {
-            skitem = sk_ASN1_VALUE_value(sk, i);
+        for (i = 0; i < sk_const_ASN1_VALUE_num(sk); i++) {
+            skitem = sk_const_ASN1_VALUE_value(sk, i);
             ASN1_item_ex_i2d(&skitem, out, item, -1, iclass);
         }
         return 1;
@@ -460,33 +431,35 @@ static int asn1_set_seq_out(STACK_OF(ASN1_VALUE) *sk, unsigned char **out,
     p = tmpdat;
 
     /* Doing sort: build up a list of each member's DER encoding */
-    for (i = 0, tder = derlst; i < sk_ASN1_VALUE_num(sk); i++, tder++) {
-        skitem = sk_ASN1_VALUE_value(sk, i);
+    for (i = 0, tder = derlst; i < sk_const_ASN1_VALUE_num(sk); i++, tder++) {
+        skitem = sk_const_ASN1_VALUE_value(sk, i);
         tder->data = p;
         tder->length = ASN1_item_ex_i2d(&skitem, &p, item, -1, iclass);
         tder->field = skitem;
     }
 
     /* Now sort them */
-    qsort(derlst, sk_ASN1_VALUE_num(sk), sizeof(*derlst), der_cmp);
+    qsort(derlst, sk_const_ASN1_VALUE_num(sk), sizeof(*derlst), der_cmp);
     /* Output sorted DER encoding */
     p = *out;
-    for (i = 0, tder = derlst; i < sk_ASN1_VALUE_num(sk); i++, tder++) {
+    for (i = 0, tder = derlst; i < sk_const_ASN1_VALUE_num(sk); i++, tder++) {
         memcpy(p, tder->data, tder->length);
         p += tder->length;
     }
     *out = p;
     /* If do_sort is 2 then reorder the STACK */
     if (do_sort == 2) {
-        for (i = 0, tder = derlst; i < sk_ASN1_VALUE_num(sk); i++, tder++)
-            (void)sk_ASN1_VALUE_set(sk, i, tder->field);
+        for (i = 0, tder = derlst; i < sk_const_ASN1_VALUE_num(sk); i++, tder++)
+            (void)sk_const_ASN1_VALUE_set(sk, i, tder->field);
     }
+    ret = 1;
+err:
     OPENSSL_free(derlst);
     OPENSSL_free(tmpdat);
-    return 1;
+    return ret;
 }
 
-static int asn1_i2d_ex_primitive(ASN1_VALUE **pval, unsigned char **out,
+static int asn1_i2d_ex_primitive(const ASN1_VALUE **pval, unsigned char **out,
                                  const ASN1_ITEM *it, int tag, int aclass)
 {
     int len;
@@ -546,8 +519,8 @@ static int asn1_i2d_ex_primitive(ASN1_VALUE **pval, unsigned char **out,
 
 /* Produce content octets from a structure */
 
-int asn1_ex_i2c(ASN1_VALUE **pval, unsigned char *cout, int *putype,
-                const ASN1_ITEM *it)
+static int asn1_ex_i2c(const ASN1_VALUE **pval, unsigned char *cout, int *putype,
+                       const ASN1_ITEM *it)
 {
     ASN1_BOOLEAN *tbool = NULL;
     ASN1_STRING *strtmp;
@@ -564,7 +537,7 @@ int asn1_ex_i2c(ASN1_VALUE **pval, unsigned char *cout, int *putype,
     /* Should type be omitted? */
     if ((it->itype != ASN1_ITYPE_PRIMITIVE)
         || (it->utype != V_ASN1_BOOLEAN)) {
-        if (!*pval)
+        if (*pval == NULL)
             return -1;
     }
 
@@ -579,7 +552,7 @@ int asn1_ex_i2c(ASN1_VALUE **pval, unsigned char *cout, int *putype,
         typ = (ASN1_TYPE *)*pval;
         utype = typ->type;
         *putype = utype;
-        pval = &typ->value.asn1_value;
+        pval = (const ASN1_VALUE **)&typ->value.asn1_value; /* actually is const */
     } else
         utype = *putype;
 
@@ -588,7 +561,12 @@ int asn1_ex_i2c(ASN1_VALUE **pval, unsigned char *cout, int *putype,
         otmp = (ASN1_OBJECT *)*pval;
         cont = otmp->data;
         len = otmp->length;
+        if (cont == NULL || len == 0)
+            return -1;
         break;
+
+    case V_ASN1_UNDEF:
+        return -2;
 
     case V_ASN1_NULL:
         cont = NULL;
@@ -614,17 +592,15 @@ int asn1_ex_i2c(ASN1_VALUE **pval, unsigned char *cout, int *putype,
         break;
 
     case V_ASN1_BIT_STRING:
-        return i2c_ASN1_BIT_STRING((ASN1_BIT_STRING *)*pval,
-                                   cout ? &cout : NULL);
-        break;
+        return ossl_i2c_ASN1_BIT_STRING((ASN1_BIT_STRING *)*pval,
+                                        cout ? &cout : NULL);
 
     case V_ASN1_INTEGER:
     case V_ASN1_ENUMERATED:
         /*
          * These are all have the same content format as ASN1_INTEGER
          */
-        return i2c_ASN1_INTEGER((ASN1_INTEGER *)*pval, cout ? &cout : NULL);
-        break;
+        return ossl_i2c_ASN1_INTEGER((ASN1_INTEGER *)*pval, cout ? &cout : NULL);
 
     case V_ASN1_OCTET_STRING:
     case V_ASN1_NUMERICSTRING:

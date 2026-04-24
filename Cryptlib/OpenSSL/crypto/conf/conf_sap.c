@@ -1,71 +1,23 @@
-/* conf_sap.c */
 /*
- * Written by Stephen Henson (steve@openssl.org) for the OpenSSL project
- * 2001.
- */
-/* ====================================================================
- * Copyright (c) 2001 The OpenSSL Project.  All rights reserved.
+ * Copyright 2002-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stdio.h>
 #include <openssl/crypto.h>
-#include "cryptlib.h"
-#include <openssl/conf.h>
-#include <openssl/dso.h>
+#include "internal/cryptlib.h"
+#include "internal/conf.h"
+#include "conf_local.h"
 #include <openssl/x509.h>
 #include <openssl/asn1.h>
-#ifndef OPENSSL_NO_ENGINE
-# include <openssl/engine.h>
+#include <openssl/engine.h>
+
+#if defined(_WIN32) && !defined(__BORLANDC__)
+# define strdup _strdup
 #endif
 
 /*
@@ -76,26 +28,55 @@
 
 static int openssl_configured = 0;
 
-void OPENSSL_config(const char *config_name)
+#ifndef OPENSSL_NO_DEPRECATED_1_1_0
+void OPENSSL_config(const char *appname)
 {
-    if (openssl_configured)
-        return;
+    OPENSSL_INIT_SETTINGS settings;
 
-    OPENSSL_load_builtin_modules();
-#ifndef OPENSSL_NO_ENGINE
-    /* Need to load ENGINEs */
-    ENGINE_load_builtin_engines();
+    memset(&settings, 0, sizeof(settings));
+    if (appname != NULL)
+        settings.appname = strdup(appname);
+    settings.flags = DEFAULT_CONF_MFLAGS;
+    OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, &settings);
+
+    free(settings.appname);
+}
 #endif
-    ERR_clear_error();
-#ifndef OPENSSL_NO_STDIO
-    CONF_modules_load_file(NULL, config_name,
-                               CONF_MFLAGS_DEFAULT_SECTION |
-                               CONF_MFLAGS_IGNORE_MISSING_FILE);
+
+int ossl_config_int(const OPENSSL_INIT_SETTINGS *settings)
+{
+    int ret = 0;
+#if defined(OPENSSL_INIT_DEBUG) || !defined(OPENSSL_SYS_UEFI)
+    const char *filename;
+    const char *appname;
+    unsigned long flags;
+#endif
+
+    if (openssl_configured)
+        return 1;
+
+#if defined(OPENSSL_INIT_DEBUG) || !defined(OPENSSL_SYS_UEFI)
+    filename = settings ? settings->filename : NULL;
+    appname = settings ? settings->appname : NULL;
+    flags = settings ? settings->flags : DEFAULT_CONF_MFLAGS;
+#endif
+
+#ifdef OPENSSL_INIT_DEBUG
+    fprintf(stderr, "OPENSSL_INIT: ossl_config_int(%s, %s, %lu)\n",
+            filename, appname, flags);
+#endif
+
+#ifndef OPENSSL_SYS_UEFI
+    ret = CONF_modules_load_file_ex(OSSL_LIB_CTX_get0_global_default(),
+                                    filename, appname, flags);
+#else
+    ret = 1;
 #endif
     openssl_configured = 1;
+    return ret;
 }
 
-void OPENSSL_no_config()
+void ossl_no_config_int(void)
 {
     openssl_configured = 1;
 }
