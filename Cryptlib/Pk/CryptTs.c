@@ -5,14 +5,8 @@
   the lifetime of the signature when a signing certificate expires or is later
   revoked.
 
-Copyright (c) 2014 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2014 - 2017, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -27,9 +21,9 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 //
 // OID ASN.1 Value for SPC_RFC3161_OBJID ("1.3.6.1.4.1.311.3.3.1")
 //
-UINT8 mSpcRFC3161OidValue[] = {
+GLOBAL_REMOVE_IF_UNREFERENCED const UINT8  mSpcRFC3161OidValue[] = {
   0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x03, 0x03, 0x01
-  };
+};
 
 ///
 /// The messageImprint field SHOULD contain the hash of the datum to be
@@ -42,18 +36,24 @@ UINT8 mSpcRFC3161OidValue[] = {
 ///   hashedMessage                OCTET STRING  }
 ///
 typedef struct {
-  X509_ALGOR         *HashAlgorithm;
-  ASN1_OCTET_STRING  *HashedMessage;
+  X509_ALGOR           *HashAlgorithm;
+  ASN1_OCTET_STRING    *HashedMessage;
 } TS_MESSAGE_IMPRINT;
 
 //
 // ASN.1 Functions for TS_MESSAGE_IMPRINT
 //
-DECLARE_ASN1_FUNCTIONS (TS_MESSAGE_IMPRINT)
-ASN1_SEQUENCE (TS_MESSAGE_IMPRINT) = {
+GLOBAL_REMOVE_IF_UNREFERENCED
+DECLARE_ASN1_FUNCTIONS (
+  TS_MESSAGE_IMPRINT
+  )
+ASN1_SEQUENCE (TS_MESSAGE_IMPRINT) =
+{
   ASN1_SIMPLE (TS_MESSAGE_IMPRINT, HashAlgorithm, X509_ALGOR),
   ASN1_SIMPLE (TS_MESSAGE_IMPRINT, HashedMessage, ASN1_OCTET_STRING)
-} ASN1_SEQUENCE_END (TS_MESSAGE_IMPRINT)
+}
+
+ASN1_SEQUENCE_END (TS_MESSAGE_IMPRINT)
 IMPLEMENT_ASN1_FUNCTIONS (TS_MESSAGE_IMPRINT)
 
 ///
@@ -66,20 +66,26 @@ IMPLEMENT_ASN1_FUNCTIONS (TS_MESSAGE_IMPRINT)
 ///       micros     [1] INTEGER  (1..999)    OPTIONAL  }
 ///
 typedef struct {
-  ASN1_INTEGER  *Seconds;
-  ASN1_INTEGER  *Millis;
-  ASN1_INTEGER  *Micros;
+  ASN1_INTEGER    *Seconds;
+  ASN1_INTEGER    *Millis;
+  ASN1_INTEGER    *Micros;
 } TS_ACCURACY;
 
 //
 // ASN.1 Functions for TS_ACCURACY
 //
-DECLARE_ASN1_FUNCTIONS (TS_ACCURACY)
-ASN1_SEQUENCE (TS_ACCURACY) = {
-  ASN1_OPT     (TS_ACCURACY, Seconds, ASN1_INTEGER),
+GLOBAL_REMOVE_IF_UNREFERENCED
+DECLARE_ASN1_FUNCTIONS (
+  TS_ACCURACY
+  )
+ASN1_SEQUENCE (TS_ACCURACY) =
+{
+  ASN1_OPT (TS_ACCURACY,     Seconds, ASN1_INTEGER),
   ASN1_IMP_OPT (TS_ACCURACY, Millis,  ASN1_INTEGER, 0),
   ASN1_IMP_OPT (TS_ACCURACY, Micros,  ASN1_INTEGER, 1)
-} ASN1_SEQUENCE_END (TS_ACCURACY)
+}
+
+ASN1_SEQUENCE_END (TS_ACCURACY)
 IMPLEMENT_ASN1_FUNCTIONS (TS_ACCURACY)
 
 ///
@@ -105,36 +111,41 @@ IMPLEMENT_ASN1_FUNCTIONS (TS_ACCURACY)
 ///     extensions                   [1] IMPLICIT Extensions   OPTIONAL  }
 ///
 typedef struct {
-  ASN1_INTEGER              *Version;
-  ASN1_OBJECT               *Policy;
-  TS_MESSAGE_IMPRINT        *MessageImprint;
-  ASN1_INTEGER              *SerialNumber;
-  ASN1_GENERALIZEDTIME      *GenTime;
-  TS_ACCURACY               *Accuracy;
-  ASN1_BOOLEAN              Ordering;
-  ASN1_INTEGER              *Nonce;
-  GENERAL_NAME              *Tsa;
-  STACK_OF(X509_EXTENSION)  *Extensions;
+  ASN1_INTEGER            *Version;
+  ASN1_OBJECT             *Policy;
+  TS_MESSAGE_IMPRINT      *MessageImprint;
+  ASN1_INTEGER            *SerialNumber;
+  ASN1_GENERALIZEDTIME    *GenTime;
+  TS_ACCURACY             *Accuracy;
+  ASN1_BOOLEAN            Ordering;
+  ASN1_INTEGER            *Nonce;
+  GENERAL_NAME            *Tsa;
+  STACK_OF (X509_EXTENSION)  *Extensions;
 } TS_TST_INFO;
 
 //
 // ASN.1 Functions for TS_TST_INFO
 //
-DECLARE_ASN1_FUNCTIONS (TS_TST_INFO)
-ASN1_SEQUENCE (TS_TST_INFO) = {
-  ASN1_SIMPLE (TS_TST_INFO, Version, ASN1_INTEGER),
-  ASN1_SIMPLE (TS_TST_INFO, Policy, ASN1_OBJECT),
-  ASN1_SIMPLE (TS_TST_INFO, MessageImprint, TS_MESSAGE_IMPRINT),
-  ASN1_SIMPLE (TS_TST_INFO, SerialNumber, ASN1_INTEGER),
-  ASN1_SIMPLE (TS_TST_INFO, GenTime, ASN1_GENERALIZEDTIME),
-  ASN1_OPT    (TS_TST_INFO, Accuracy, TS_ACCURACY),
-  ASN1_OPT    (TS_TST_INFO, Ordering, ASN1_FBOOLEAN),
-  ASN1_OPT    (TS_TST_INFO, Nonce, ASN1_INTEGER),
-  ASN1_EXP_OPT(TS_TST_INFO, Tsa, GENERAL_NAME, 0),
-  ASN1_IMP_SEQUENCE_OF_OPT (TS_TST_INFO, Extensions, X509_EXTENSION, 1)
-} ASN1_SEQUENCE_END (TS_TST_INFO)
-IMPLEMENT_ASN1_FUNCTIONS (TS_TST_INFO)
+GLOBAL_REMOVE_IF_UNREFERENCED
+DECLARE_ASN1_FUNCTIONS (
+  TS_TST_INFO
+  )
+ASN1_SEQUENCE (TS_TST_INFO) =
+{
+  ASN1_SIMPLE (TS_TST_INFO,              Version,        ASN1_INTEGER),
+  ASN1_SIMPLE (TS_TST_INFO,              Policy,         ASN1_OBJECT),
+  ASN1_SIMPLE (TS_TST_INFO,              MessageImprint, TS_MESSAGE_IMPRINT),
+  ASN1_SIMPLE (TS_TST_INFO,              SerialNumber,   ASN1_INTEGER),
+  ASN1_SIMPLE (TS_TST_INFO,              GenTime,        ASN1_GENERALIZEDTIME),
+  ASN1_OPT (TS_TST_INFO,                 Accuracy,       TS_ACCURACY),
+  ASN1_OPT (TS_TST_INFO,                 Ordering,       ASN1_FBOOLEAN),
+  ASN1_OPT (TS_TST_INFO,                 Nonce,          ASN1_INTEGER),
+  ASN1_EXP_OPT (TS_TST_INFO,             Tsa,            GENERAL_NAME,         0),
+  ASN1_IMP_SEQUENCE_OF_OPT (TS_TST_INFO, Extensions,     X509_EXTENSION,       1)
+}
 
+ASN1_SEQUENCE_END (TS_TST_INFO)
+IMPLEMENT_ASN1_FUNCTIONS (TS_TST_INFO)
 
 /**
   Convert ASN.1 GeneralizedTime to EFI Time.
@@ -142,12 +153,12 @@ IMPLEMENT_ASN1_FUNCTIONS (TS_TST_INFO)
   @param[in]  Asn1Time         Pointer to the ASN.1 GeneralizedTime to be converted.
   @param[out] SigningTime      Return the corresponding EFI Time.
 
-  @retval  TRUE   The time convertion succeeds.
+  @retval  TRUE   The time conversion succeeds.
   @retval  FALSE  Invalid parameters.
 
 **/
+STATIC
 BOOLEAN
-EFIAPI
 ConvertAsn1TimeToEfiTime (
   IN  ASN1_TIME  *Asn1Time,
   OUT EFI_TIME   *EfiTime
@@ -160,17 +171,19 @@ ConvertAsn1TimeToEfiTime (
     return FALSE;
   }
 
-  Str = (CONST CHAR8*)Asn1Time->data;
-  SetMem (EfiTime, 0, sizeof (EFI_TIME));
+  Str = (CONST CHAR8 *)Asn1Time->data;
+  SetMem (EfiTime, sizeof (EFI_TIME), 0);
 
   Index = 0;
-  if (Asn1Time->type == V_ASN1_UTCTIME) {               /* two digit year */
+  if (Asn1Time->type == V_ASN1_UTCTIME) {
+    /* two digit year */
     EfiTime->Year  = (Str[Index++] - '0') * 10;
     EfiTime->Year += (Str[Index++] - '0');
     if (EfiTime->Year < 70) {
       EfiTime->Year += 100;
     }
-  } else if (Asn1Time->type == V_ASN1_GENERALIZEDTIME) { /* four digit year */
+  } else if (Asn1Time->type == V_ASN1_GENERALIZEDTIME) {
+    /* four digit year */
     EfiTime->Year  = (Str[Index++] - '0') * 1000;
     EfiTime->Year += (Str[Index++] - '0') * 100;
     EfiTime->Year += (Str[Index++] - '0') * 10;
@@ -180,20 +193,20 @@ ConvertAsn1TimeToEfiTime (
     }
   }
 
-  EfiTime->Month   = (Str[Index++] - '0') * 10;
-  EfiTime->Month  += (Str[Index++] - '0');
+  EfiTime->Month  = (Str[Index++] - '0') * 10;
+  EfiTime->Month += (Str[Index++] - '0');
   if ((EfiTime->Month < 1) || (EfiTime->Month > 12)) {
     return FALSE;
   }
 
-  EfiTime->Day     = (Str[Index++] - '0') * 10;
-  EfiTime->Day    += (Str[Index++] - '0');
+  EfiTime->Day  = (Str[Index++] - '0') * 10;
+  EfiTime->Day += (Str[Index++] - '0');
   if ((EfiTime->Day < 1) || (EfiTime->Day > 31)) {
     return FALSE;
   }
 
-  EfiTime->Hour    = (Str[Index++] - '0') * 10;
-  EfiTime->Hour   += (Str[Index++] - '0');
+  EfiTime->Hour  = (Str[Index++] - '0') * 10;
+  EfiTime->Hour += (Str[Index++] - '0');
   if (EfiTime->Hour > 23) {
     return FALSE;
   }
@@ -227,8 +240,8 @@ ConvertAsn1TimeToEfiTime (
   @retval  FALSE  Invalid TimeStamp Token Information.
 
 **/
+STATIC
 BOOLEAN
-EFIAPI
 CheckTSTInfo (
   IN  CONST TS_TST_INFO  *TstInfo,
   IN  CONST UINT8        *TimestampedData,
@@ -239,7 +252,7 @@ CheckTSTInfo (
   TS_MESSAGE_IMPRINT  *Imprint;
   X509_ALGOR          *HashAlgo;
   CONST EVP_MD        *Md;
-  EVP_MD_CTX          MdCtx;
+  EVP_MD_CTX          *MdCtx;
   UINTN               MdSize;
   UINT8               *HashedMsg;
 
@@ -249,6 +262,7 @@ CheckTSTInfo (
   Status    = FALSE;
   HashAlgo  = NULL;
   HashedMsg = NULL;
+  MdCtx     = NULL;
 
   //
   // -- Check version number of Timestamp:
@@ -274,22 +288,36 @@ CheckTSTInfo (
   //
   Imprint  = TstInfo->MessageImprint;
   HashAlgo = X509_ALGOR_dup (Imprint->HashAlgorithm);
+  if ((HashAlgo == NULL) || (HashAlgo->algorithm == NULL)) {
+    goto _Exit;
+  }
 
   Md = EVP_get_digestbyobj (HashAlgo->algorithm);
   if (Md == NULL) {
     goto _Exit;
   }
 
-  MdSize = EVP_MD_size (Md);
+  MdSize    = EVP_MD_size (Md);
   HashedMsg = AllocateZeroPool (MdSize);
   if (HashedMsg == NULL) {
     goto _Exit;
   }
-  EVP_DigestInit (&MdCtx, Md);
-  EVP_DigestUpdate (&MdCtx, TimestampedData, DataSize);
-  EVP_DigestFinal (&MdCtx, HashedMsg, NULL);
+
+  MdCtx = EVP_MD_CTX_new ();
+  if (MdCtx == NULL) {
+    goto _Exit;
+  }
+
+  if ((EVP_DigestInit_ex (MdCtx, Md, NULL) != 1) ||
+      (EVP_DigestUpdate (MdCtx, TimestampedData, DataSize) != 1) ||
+      (EVP_DigestFinal (MdCtx, HashedMsg, NULL) != 1))
+  {
+    goto _Exit;
+  }
+
   if ((MdSize == (UINTN)ASN1_STRING_length (Imprint->HashedMessage)) &&
-      (CompareMem (HashedMsg, ASN1_STRING_data (Imprint->HashedMessage), MdSize) != 0)) {
+      (CompareMem (HashedMsg, ASN1_STRING_get0_data (Imprint->HashedMessage), MdSize) != 0))
+  {
     goto _Exit;
   }
 
@@ -315,6 +343,7 @@ CheckTSTInfo (
 
 _Exit:
   X509_ALGOR_free (HashAlgo);
+  EVP_MD_CTX_free (MdCtx);
   if (HashedMsg != NULL) {
     FreePool (HashedMsg);
   }
@@ -344,8 +373,8 @@ _Exit:
   @retval  FALSE  Invalid timestamp token.
 
 **/
+STATIC
 BOOLEAN
-EFIAPI
 TimestampTokenVerify (
   IN  CONST UINT8  *TSToken,
   IN  UINTN        TokenSize,
@@ -374,7 +403,8 @@ TimestampTokenVerify (
   // Check input parameters
   //
   if ((TSToken == NULL) || (TsaCert == NULL) || (TimestampedData == NULL) ||
-      (TokenSize > INT_MAX) || (CertSize > INT_MAX) || (DataSize > INT_MAX)) {
+      (TokenSize > INT_MAX) || (CertSize > INT_MAX) || (DataSize > INT_MAX))
+  {
     return FALSE;
   }
 
@@ -384,6 +414,7 @@ TimestampTokenVerify (
   if (SigningTime != NULL) {
     SetMem (SigningTime, sizeof (EFI_TIME), 0);
   }
+
   Pkcs7     = NULL;
   Cert      = NULL;
   CertStore = NULL;
@@ -395,7 +426,7 @@ TimestampTokenVerify (
   // TimeStamp Token should contain one valid DER-encoded ASN.1 PKCS#7 structure.
   //
   TokenTemp = TSToken;
-  Pkcs7     = d2i_PKCS7 (NULL, (const unsigned char **) &TokenTemp, (int) TokenSize);
+  Pkcs7     = d2i_PKCS7 (NULL, (const unsigned char **)&TokenTemp, (int)TokenSize);
   if (Pkcs7 == NULL) {
     goto _Exit;
   }
@@ -411,7 +442,7 @@ TimestampTokenVerify (
   // Read the trusted TSA certificate (DER-encoded), and Construct X509 Certificate.
   //
   CertTemp = TsaCert;
-  Cert = d2i_X509 (NULL, &CertTemp, (long) CertSize);
+  Cert     = d2i_X509 (NULL, &CertTemp, (long)CertSize);
   if (Cert == NULL) {
     goto _Exit;
   }
@@ -428,8 +459,10 @@ TimestampTokenVerify (
   // Allow partial certificate chains, terminated by a non-self-signed but
   // still trusted intermediate certificate. Also disable time checks.
   //
-  X509_STORE_set_flags (CertStore,
-                        X509_V_FLAG_PARTIAL_CHAIN | X509_V_FLAG_NO_CHECK_TIME);
+  X509_STORE_set_flags (
+    CertStore,
+    X509_V_FLAG_PARTIAL_CHAIN | X509_V_FLAG_NO_CHECK_TIME
+    );
 
   X509_STORE_set_purpose (CertStore, X509_PURPOSE_ANY);
 
@@ -440,6 +473,7 @@ TimestampTokenVerify (
   if (OutBio == NULL) {
     goto _Exit;
   }
+
   if (!PKCS7_verify (Pkcs7, NULL, CertStore, NULL, OutBio, PKCS7_BINARY)) {
     goto _Exit;
   }
@@ -451,14 +485,18 @@ TimestampTokenVerify (
   if (TstData == NULL) {
     goto _Exit;
   }
-  TstSize = BIO_read (OutBio, (void *) TstData, 2048);
+
+  TstSize = BIO_read (OutBio, (void *)TstData, 2048);
 
   //
   // Construct TS_TST_INFO structure from the signed contents.
   //
   TstTemp = TstData;
-  TstInfo = d2i_TS_TST_INFO (NULL, (const unsigned char **) &TstTemp,
-              (int)TstSize);
+  TstInfo = d2i_TS_TST_INFO (
+              NULL,
+              (const unsigned char **)&TstTemp,
+              (int)TstSize
+              );
   if (TstInfo == NULL) {
     goto _Exit;
   }
@@ -525,19 +563,21 @@ ImageTimestampVerify (
   OUT EFI_TIME     *SigningTime
   )
 {
-  BOOLEAN                      Status;
-  PKCS7                        *Pkcs7;
-  CONST UINT8                  *Temp;
-  STACK_OF(PKCS7_SIGNER_INFO)  *SignerInfos;
-  PKCS7_SIGNER_INFO            *SignInfo;
-  UINTN                        Index;
-  STACK_OF(X509_ATTRIBUTE)     *Sk;
-  X509_ATTRIBUTE               *Xa;
-  ASN1_OBJECT                  *XaObj;
-  ASN1_TYPE                    *Asn1Type;
-  ASN1_OCTET_STRING            *EncDigest;
-  UINT8                        *TSToken;
-  UINTN                        TokenSize;
+  BOOLEAN      Status;
+  PKCS7        *Pkcs7;
+  CONST UINT8  *Temp;
+
+  STACK_OF (PKCS7_SIGNER_INFO)  *SignerInfos;
+  PKCS7_SIGNER_INFO  *SignInfo;
+  UINTN              Index;
+
+  STACK_OF (X509_ATTRIBUTE)     *Sk;
+  X509_ATTRIBUTE     *Xa;
+  ASN1_OBJECT        *XaObj;
+  ASN1_TYPE          *Asn1Type;
+  ASN1_OCTET_STRING  *EncDigest;
+  UINT8              *TSToken;
+  UINTN              TokenSize;
 
   //
   // Input Parameters Checking.
@@ -554,22 +594,24 @@ ImageTimestampVerify (
   // Register & Initialize necessary digest algorithms for PKCS#7 Handling.
   //
   if ((EVP_add_digest (EVP_md5 ()) == 0) || (EVP_add_digest (EVP_sha1 ()) == 0) ||
-      (EVP_add_digest (EVP_sha256 ()) == 0) || (EVP_add_digest_alias (SN_sha1WithRSAEncryption, SN_sha1WithRSA)) == 0) {
+      (EVP_add_digest (EVP_sha256 ()) == 0) || (EVP_add_digest (EVP_sha384 ()) == 0) ||
+      (EVP_add_digest (EVP_sha512 ()) == 0) || ((EVP_add_digest_alias (SN_sha1WithRSAEncryption, SN_sha1WithRSA)) == 0))
+  {
     return FALSE;
   }
 
   //
   // Initialization.
   //
-  Status    = FALSE;
-  Pkcs7     = NULL;
-  SignInfo  = NULL;
+  Status   = FALSE;
+  Pkcs7    = NULL;
+  SignInfo = NULL;
 
   //
   // Decode ASN.1-encoded Authenticode data into PKCS7 structure.
   //
   Temp  = AuthData;
-  Pkcs7 = d2i_PKCS7 (NULL, (const unsigned char **) &Temp, (int) DataSize);
+  Pkcs7 = d2i_PKCS7 (NULL, (const unsigned char **)&Temp, (int)DataSize);
   if (Pkcs7 == NULL) {
     goto _Exit;
   }
@@ -603,12 +645,13 @@ ImageTimestampVerify (
   // of SignerInfo.
   //
   Sk = SignInfo->unauth_attr;
-  if (Sk == NULL) {             // No timestamp counterSignature.
+  if (Sk == NULL) {
+    // No timestamp counterSignature.
     goto _Exit;
   }
 
   Asn1Type = NULL;
-  for (Index = 0; Index < (UINTN) sk_X509_ATTRIBUTE_num (Sk); Index++) {
+  for (Index = 0; Index < (UINTN)sk_X509_ATTRIBUTE_num (Sk); Index++) {
     //
     // Search valid RFC3161 timestamp counterSignature based on OBJID.
     //
@@ -616,21 +659,26 @@ ImageTimestampVerify (
     if (Xa == NULL) {
       continue;
     }
-    XaObj = X509_ATTRIBUTE_get0_object(Xa);
+
+    XaObj = X509_ATTRIBUTE_get0_object (Xa);
     if (XaObj == NULL) {
       continue;
     }
-    if ((OBJ_length(XaObj) != sizeof (mSpcRFC3161OidValue)) ||
-        (CompareMem (OBJ_get0_data(XaObj), mSpcRFC3161OidValue, sizeof (mSpcRFC3161OidValue)) != 0)) {
+
+    if ((OBJ_length (XaObj) != sizeof (mSpcRFC3161OidValue)) ||
+        (CompareMem (OBJ_get0_data (XaObj), mSpcRFC3161OidValue, sizeof (mSpcRFC3161OidValue)) != 0))
+    {
       continue;
     }
-    Asn1Type = X509_ATTRIBUTE_get0_type(Xa, 0);
+
+    Asn1Type = X509_ATTRIBUTE_get0_type (Xa, 0);
   }
 
   if (Asn1Type == NULL) {
     Status = FALSE;
     goto _Exit;
   }
+
   TSToken   = Asn1Type->value.octet_string->data;
   TokenSize = Asn1Type->value.octet_string->length;
 

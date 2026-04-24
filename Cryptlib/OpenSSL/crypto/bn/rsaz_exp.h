@@ -1,47 +1,19 @@
-/*****************************************************************************
-*                                                                            *
-*  Copyright (c) 2012, Intel Corporation                                     *
-*                                                                            *
-*  All rights reserved.                                                      *
-*                                                                            *
-*  Redistribution and use in source and binary forms, with or without        *
-*  modification, are permitted provided that the following conditions are    *
-*  met:                                                                      *
-*                                                                            *
-*  *  Redistributions of source code must retain the above copyright         *
-*     notice, this list of conditions and the following disclaimer.          *
-*                                                                            *
-*  *  Redistributions in binary form must reproduce the above copyright      *
-*     notice, this list of conditions and the following disclaimer in the    *
-*     documentation and/or other materials provided with the                 *
-*     distribution.                                                          *
-*                                                                            *
-*  *  Neither the name of the Intel Corporation nor the names of its         *
-*     contributors may be used to endorse or promote products derived from   *
-*     this software without specific prior written permission.               *
-*                                                                            *
-*                                                                            *
-*  THIS SOFTWARE IS PROVIDED BY INTEL CORPORATION ""AS IS"" AND ANY          *
-*  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE         *
-*  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR        *
-*  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL INTEL CORPORATION OR            *
-*  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,     *
-*  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,       *
-*  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR        *
-*  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF    *
-*  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING      *
-*  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS        *
-*  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.              *
-*                                                                            *
-******************************************************************************
-* Developers and authors:                                                    *
-* Shay Gueron (1, 2), and Vlad Krasnov (1)                                   *
-* (1) Intel Corporation, Israel Development Center, Haifa, Israel            *
-* (2) University of Haifa, Israel                                            *
-*****************************************************************************/
+/*
+ * Copyright 2013-2025 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright (c) 2020, Intel Corporation. All Rights Reserved.
+ *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
+ *
+ * Originally written by Shay Gueron (1, 2), and Vlad Krasnov (1)
+ * (1) Intel Corporation, Israel Development Center, Haifa, Israel
+ * (2) University of Haifa, Israel
+ */
 
-#ifndef RSAZ_EXP_H
-# define RSAZ_EXP_H
+#ifndef OSSL_CRYPTO_BN_RSAZ_EXP_H
+# define OSSL_CRYPTO_BN_RSAZ_EXP_H
 
 # undef RSAZ_ENABLED
 # if defined(OPENSSL_BN_ASM_MONT) && \
@@ -50,18 +22,60 @@
 #  define RSAZ_ENABLED
 
 #  include <openssl/bn.h>
+#  include "internal/constant_time.h"
+#  include "bn_local.h"
 
 void RSAZ_1024_mod_exp_avx2(BN_ULONG result[16],
                             const BN_ULONG base_norm[16],
                             const BN_ULONG exponent[16],
                             const BN_ULONG m_norm[16], const BN_ULONG RR[16],
                             BN_ULONG k0);
-int rsaz_avx2_eligible();
+int rsaz_avx2_eligible(void);
 
 void RSAZ_512_mod_exp(BN_ULONG result[8],
                       const BN_ULONG base_norm[8], const BN_ULONG exponent[8],
                       const BN_ULONG m_norm[8], BN_ULONG k0,
                       const BN_ULONG RR[8]);
+
+
+int ossl_rsaz_avx512ifma_eligible(void);
+
+int ossl_rsaz_avxifma_eligible(void);
+
+int ossl_rsaz_mod_exp_avx512_x2(BN_ULONG *res1,
+                                const BN_ULONG *base1,
+                                const BN_ULONG *exponent1,
+                                const BN_ULONG *m1,
+                                const BN_ULONG *RR1,
+                                BN_ULONG k0_1,
+                                BN_ULONG *res2,
+                                const BN_ULONG *base2,
+                                const BN_ULONG *exponent2,
+                                const BN_ULONG *m2,
+                                const BN_ULONG *RR2,
+                                BN_ULONG k0_2,
+                                int factor_size);
+
+static ossl_inline void bn_select_words(BN_ULONG *r, BN_ULONG mask,
+                                        const BN_ULONG *a,
+                                        const BN_ULONG *b, size_t num)
+{
+    size_t i;
+
+    for (i = 0; i < num; i++) {
+        r[i] = constant_time_select_64(mask, a[i], b[i]);
+    }
+}
+
+static ossl_inline BN_ULONG bn_reduce_once_in_place(BN_ULONG *r,
+                                                    BN_ULONG carry,
+                                                    const BN_ULONG *m,
+                                                    BN_ULONG *tmp, size_t num)
+{
+    carry -= bn_sub_words(tmp, r, m, num);
+    bn_select_words(r, carry, r /* tmp < 0 */, tmp /* tmp >= 0 */, num);
+    return carry;
+}
 
 # endif
 

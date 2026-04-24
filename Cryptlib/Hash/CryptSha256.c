@@ -2,13 +2,7 @@
   SHA-256 Digest Wrapper Implementation over OpenSSL.
 
 Copyright (c) 2009 - 2016, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -30,7 +24,7 @@ Sha256GetContextSize (
   //
   // Retrieves OpenSSL SHA-256 Context Size
   //
-  return (UINTN) (sizeof (SHA256_CTX));
+  return (UINTN)(sizeof (SHA256_CTX));
 }
 
 /**
@@ -61,7 +55,7 @@ Sha256Init (
   //
   // OpenSSL SHA-256 Context Initialization
   //
-  return (BOOLEAN) (SHA256_Init ((SHA256_CTX *) Sha256Context));
+  return (BOOLEAN)(SHA256_Init ((SHA256_CTX *)Sha256Context));
 }
 
 /**
@@ -87,11 +81,11 @@ Sha256Duplicate (
   //
   // Check input parameters.
   //
-  if (Sha256Context == NULL || NewSha256Context == NULL) {
+  if ((Sha256Context == NULL) || (NewSha256Context == NULL)) {
     return FALSE;
   }
 
-  CopyMem (NewSha256Context, (void *)Sha256Context, sizeof (SHA256_CTX));
+  CopyMem (NewSha256Context, (IN VOID *) Sha256Context, sizeof (SHA256_CTX));
 
   return TRUE;
 }
@@ -132,14 +126,14 @@ Sha256Update (
   //
   // Check invalid parameters, in case that only DataLength was checked in OpenSSL
   //
-  if (Data == NULL && DataSize != 0) {
+  if ((Data == NULL) && (DataSize != 0)) {
     return FALSE;
   }
 
   //
   // OpenSSL SHA-256 Hash Update
   //
-  return (BOOLEAN) (SHA256_Update ((SHA256_CTX *) Sha256Context, Data, DataSize));
+  return (BOOLEAN)(SHA256_Update ((SHA256_CTX *)Sha256Context, Data, DataSize));
 }
 
 /**
@@ -172,14 +166,14 @@ Sha256Final (
   //
   // Check input parameters.
   //
-  if (Sha256Context == NULL || HashValue == NULL) {
+  if ((Sha256Context == NULL) || (HashValue == NULL)) {
     return FALSE;
   }
 
   //
   // OpenSSL SHA-256 Hash Finalization
   //
-  return (BOOLEAN) (SHA256_Final (HashValue, (SHA256_CTX *) Sha256Context));
+  return (BOOLEAN)(SHA256_Final (HashValue, (SHA256_CTX *)Sha256Context));
 }
 
 /**
@@ -208,22 +202,33 @@ Sha256HashAll (
   OUT  UINT8       *HashValue
   )
 {
+  SHA256_CTX  Context;
+
   //
   // Check input parameters.
   //
   if (HashValue == NULL) {
     return FALSE;
   }
-  if (Data == NULL && DataSize != 0) {
+
+  if ((Data == NULL) && (DataSize != 0)) {
     return FALSE;
   }
 
   //
   // OpenSSL SHA-256 Hash Computation.
   //
-  if (SHA256 (Data, DataSize, HashValue) == NULL) {
+  if (!SHA256_Init (&Context)) {
     return FALSE;
-  } else {
-    return TRUE;
   }
+
+  if (!SHA256_Update (&Context, Data, DataSize)) {
+    return FALSE;
+  }
+
+  if (!SHA256_Final (HashValue, &Context)) {
+    return FALSE;
+  }
+
+  return TRUE;
 }

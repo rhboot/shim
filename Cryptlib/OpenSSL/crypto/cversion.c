@@ -1,107 +1,140 @@
-/* crypto/cversion.c */
-/* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
- * All rights reserved.
+/*
+ * Copyright 1995-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
- * This package is an SSL implementation written
- * by Eric Young (eay@cryptsoft.com).
- * The implementation was written so as to conform with Netscapes SSL.
- *
- * This library is free for commercial and non-commercial use as long as
- * the following conditions are aheared to.  The following conditions
- * apply to all code found in this distribution, be it the RC4, RSA,
- * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
- * included with this distribution is covered by the same copyright terms
- * except that the holder is Tim Hudson (tjh@cryptsoft.com).
- *
- * Copyright remains Eric Young's, and as such any Copyright notices in
- * the code are not to be removed.
- * If this package is used in a product, Eric Young should be given attribution
- * as the author of the parts of the library used.
- * This can be in the form of a textual message at program startup or
- * in documentation (online or textual) provided with the package.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    "This product includes cryptographic software written by
- *     Eric Young (eay@cryptsoft.com)"
- *    The word 'cryptographic' can be left out if the rouines from the library
- *    being used are not cryptographic related :-).
- * 4. If you include any Windows specific code (or a derivative thereof) from
- *    the apps directory (application code) you must include an acknowledgement:
- *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
- *
- * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * The licence and distribution terms for any publically available version or
- * derivative of this code cannot be changed.  i.e. this code cannot simply be
- * copied and put under another distribution licence
- * [including the GNU Public Licence.]
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
-#include "cryptlib.h"
+#include <stdio.h>
+#include <openssl/bio.h>
+#include "internal/e_os.h"
+#include "internal/cryptlib.h"
+#include "internal/common.h"
+#include "internal/thread_once.h"
 
-#ifndef NO_WINDOWS_BRAINDEATH
-# include "buildinf.h"
-#endif
+#include "buildinf.h"
 
-const char *SSLeay_version(int t)
+unsigned long OpenSSL_version_num(void)
 {
-    if (t == SSLEAY_VERSION)
-        return OPENSSL_VERSION_TEXT;
-    if (t == SSLEAY_BUILT_ON) {
-#ifdef DATE
-# ifdef OPENSSL_USE_BUILD_DATE
-        return (DATE);
-# else
-        return ("built on: reproducible build, date unspecified");
-# endif
-#else
-        return ("built on: date not available");
-#endif
-    }
-    if (t == SSLEAY_CFLAGS) {
-#ifdef CFLAGS
-        return (CFLAGS);
-#else
-        return ("compiler: information not available");
-#endif
-    }
-    if (t == SSLEAY_PLATFORM) {
-#ifdef PLATFORM
-        return (PLATFORM);
-#else
-        return ("platform: information not available");
-#endif
-    }
-    if (t == SSLEAY_DIR) {
-#ifdef OPENSSLDIR
-        return "OPENSSLDIR: \"" OPENSSLDIR "\"";
-#else
-        return "OPENSSLDIR: N/A";
-#endif
-    }
-    return ("not available");
+    return OPENSSL_VERSION_NUMBER;
 }
 
-unsigned long SSLeay(void)
+unsigned int OPENSSL_version_major(void)
 {
-    return (SSLEAY_VERSION_NUMBER);
+    return OPENSSL_VERSION_MAJOR;
+}
+
+unsigned int OPENSSL_version_minor(void)
+{
+    return OPENSSL_VERSION_MINOR;
+}
+
+unsigned int OPENSSL_version_patch(void)
+{
+    return OPENSSL_VERSION_PATCH;
+}
+
+const char *OPENSSL_version_pre_release(void)
+{
+    return OPENSSL_VERSION_PRE_RELEASE;
+}
+
+const char *OPENSSL_version_build_metadata(void)
+{
+    return OPENSSL_VERSION_BUILD_METADATA;
+}
+
+extern char ossl_cpu_info_str[];
+
+#if defined(_WIN32) && defined(OSSL_WINCTX)
+/* size: MAX_PATH + sizeof("OPENSSLDIR: \"\"") */
+static char openssldir[MAX_PATH + 15];
+
+/* size: MAX_PATH + sizeof("ENGINESDIR: \"\"") */
+static char enginesdir[MAX_PATH + 15];
+
+/* size: MAX_PATH + sizeof("MODULESDIR: \"\"") */
+static char modulesdir[MAX_PATH + 15];
+
+static CRYPTO_ONCE version_strings_once = CRYPTO_ONCE_STATIC_INIT;
+
+DEFINE_RUN_ONCE_STATIC(version_strings_setup)
+{
+    BIO_snprintf(openssldir, sizeof(openssldir), "OPENSSLDIR: \"%s\"",
+                 ossl_get_openssldir());
+    BIO_snprintf(enginesdir, sizeof(enginesdir), "ENGINESDIR: \"%s\"",
+                 ossl_get_enginesdir());
+    BIO_snprintf(modulesdir, sizeof(modulesdir), "MODULESDIR: \"%s\"",
+                 ossl_get_modulesdir());
+    return 1;
+}
+
+# define TOSTR(x) #x
+# define OSSL_WINCTX_STRING "OSSL_WINCTX: \"" TOSTR(OSSL_WINCTX) "\""
+
+#endif
+
+const char *OpenSSL_version(int t)
+{
+#if defined(_WIN32) && defined(OSSL_WINCTX)
+    /* Cannot really fail but we would return empty strings anyway */
+    (void)RUN_ONCE(&version_strings_once, version_strings_setup);
+#endif
+// TODO
+/*
+    switch (t) {
+    case OPENSSL_VERSION:
+        return OPENSSL_VERSION_TEXT;
+    case OPENSSL_VERSION_STRING:
+        return OPENSSL_VERSION_STR;
+    case OPENSSL_FULL_VERSION_STRING:
+        return OPENSSL_FULL_VERSION_STR;
+    case OPENSSL_BUILT_ON:
+        return DATE;
+    case OPENSSL_CFLAGS:
+        return compiler_flags;
+    case OPENSSL_PLATFORM:
+        return PLATFORM;
+#if defined(_WIN32) && defined(OSSL_WINCTX)
+    case OPENSSL_DIR:
+        return openssldir;
+    case OPENSSL_ENGINES_DIR:
+        return enginesdir;
+    case OPENSSL_MODULES_DIR:
+        return modulesdir;
+#else
+    case OPENSSL_DIR:
+# ifdef OPENSSLDIR
+        return "OPENSSLDIR: \"" OPENSSLDIR "\"";
+# else
+        return "OPENSSLDIR: N/A";
+# endif
+    case OPENSSL_ENGINES_DIR:
+# ifdef ENGINESDIR
+        return "ENGINESDIR: \"" ENGINESDIR "\"";
+# else
+        return "ENGINESDIR: N/A";
+# endif
+    case OPENSSL_MODULES_DIR:
+# ifdef MODULESDIR
+        return "MODULESDIR: \"" MODULESDIR "\"";
+# else
+        return "MODULESDIR: N/A";
+# endif
+#endif
+    case OPENSSL_CPU_INFO:
+        if (OPENSSL_info(OPENSSL_INFO_CPU_SETTINGS) != NULL)
+            return ossl_cpu_info_str;
+        else
+            return "CPUINFO: N/A";
+    case OPENSSL_WINCTX:
+#if defined(_WIN32) && defined(OSSL_WINCTX)
+        return OSSL_WINCTX_STRING;
+#else
+        return "OSSL_WINCTX: Undefined";
+#endif
+    }*/
+    return "not available";
 }
