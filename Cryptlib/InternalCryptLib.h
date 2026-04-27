@@ -13,6 +13,9 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #undef _WIN64
 
 #include <stdarg.h>
+
+#include "CrtLibSupport.h"
+
 #include <efibind.h>
 #include "Base.h"
 #include <Library/BaseLib.h>
@@ -20,8 +23,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <Library/MemoryAllocationLib.h>
 #include <Library/DebugLib.h>
 #include <Library/BaseCryptLib.h>
-
-#include "CrtLibSupport.h"
 
 #define OPENSSL_NO_DEPRECATED  0
 
