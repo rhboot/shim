@@ -267,7 +267,7 @@ extern FILE  *stdout;
 #define localtime(timer)                  NULL
 #define assert(expression)
 #define atoi(nptr)                        AsciiStrDecimalToUintn((const CHAR8 *)nptr)
-#define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
+#define gettimeofday(tvp,tz)              ({ (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; 0;})
 #define gmtime_r(timer,result)            (result = NULL)
 
 #endif
