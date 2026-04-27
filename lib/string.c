@@ -45,6 +45,22 @@
 #undef strchr
 #endif
 #define strchr shim_strchr
+#ifdef strspn
+#undef strspn
+#endif
+#define strspn shim_strspn
+#ifdef strcspn
+#undef strcspn
+#endif
+#define strcspn shim_strcspn
+#ifdef strstr
+#undef strstr
+#endif
+#define strstr shim_strstr
+#ifdef strerror
+#undef strerror
+#endif
+#define strerror shim_strerror
 #endif
 
 size_t
@@ -282,6 +298,67 @@ translate_slashes(char *out, const char *str)
 	}
 	out[j] = '\0';
 	return out;
+}
+
+size_t
+strspn(const char *str, const char *accept)
+{
+	size_t ret = 0;
+	if (accept[0] == '\0')
+		return 0;
+
+	for (; str[ret] != 0; ret++) {
+		bool found = false;
+		for (size_t i = 0; accept[i] != 0; i++) {
+			if (str[ret] == accept[i])
+				found = true;
+		}
+		if (!found)
+			break;
+	}
+
+	return ret;
+}
+
+size_t
+strcspn(const char *str, const char *reject)
+{
+	size_t ret = 0;
+
+	for (; str[ret] != 0; ret++) {
+		bool found = false;
+		for (size_t i = 0; reject[i] != 0; i++) {
+			if (str[ret] == reject[i])
+				found = true;
+		}
+		if (found)
+			break;
+	}
+
+	return ret;
+}
+
+char *
+strstr(const char *haystack, const char *needle)
+{
+	const char *ret = NULL;
+	size_t len = strlen(needle);
+
+	for (size_t j = 0; haystack[j] != 0; j++) {
+		if (strncmp(&haystack[j], needle, len) == 0) {
+			ret = &haystack[j];
+			break;
+		}
+	}
+	return (char *)ret;
+}
+
+char *
+strerror(int errnum __attribute__((__unused__)))
+{
+	static char not_implemented[] = "not implemented";
+
+	return not_implemented;
 }
 
 // vim:fenc=utf-8:tw=75:noet
