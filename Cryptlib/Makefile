@@ -4,6 +4,8 @@ endif
 
 CRYPTDIR	= $(TOPDIR)/Cryptlib
 
+DEFINES		+= -DGNU_EFI_USE_MS_ABI
+
 FEATUREFLAGS	+= -nostdinc
 
 INCLUDES	= -I$(CRYPTDIR) -I$(CRYPTDIR)/Include \
