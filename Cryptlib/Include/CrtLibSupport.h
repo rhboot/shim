@@ -234,10 +234,11 @@ size_t         fread       (void *, size_t, size_t, FILE *);
 size_t         fwrite      (const void *, size_t, size_t, FILE *);
 int            fclose      (FILE *);
 int            fprintf     (FILE *, const char *, ...);
+time_t         time        (time_t *);
+struct tm      *localtime  (const time_t *);
 struct tm      *gmtime     (const time_t *);
 struct tm      *gmtime_r   (const time_t *, struct tm *);
 unsigned int   sleep       (unsigned int  seconds);
-int            gettimeofday(struct timeval   *tv, struct timezone  *tz);
 time_t         mktime      (struct tm  *t);
 uid_t          getuid      (void);
 uid_t          geteuid     (void);
@@ -271,7 +272,7 @@ void setbuf(FILE *, char *buffer);
 #define localtime(timer)                  NULL
 #define assert(expression)
 #define atoi(nptr)                        AsciiStrDecimalToUintn((const CHAR8 *)nptr)
-#define gettimeofday(tvp,tz)              do { (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; } while (0)
+#define gettimeofday(tvp,tz)              ({ (tvp)->tv_sec = time(NULL); (tvp)->tv_usec = 0; 0;})
 #define gmtime_r(timer,result)            (result = NULL)
 
 #endif
