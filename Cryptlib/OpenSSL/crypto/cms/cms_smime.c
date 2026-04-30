@@ -914,7 +914,7 @@ int CMS_final(CMS_ContentInfo *cms, BIO *data, BIO *dcont, unsigned int flags)
 
     (void)BIO_flush(cmsbio);
 
-    if (!CMS_dataFinal(cms, cmsbio)) {
+    if (!CMS_dataFinal_ex(cms, cmsbio, data)) {
         ERR_raise(ERR_LIB_CMS, CMS_R_CMS_DATAFINAL_ERROR);
         goto err;
     }
@@ -942,7 +942,7 @@ int CMS_final_digest(CMS_ContentInfo *cms,
 
     (void)BIO_flush(cmsbio);
 
-    if (!ossl_cms_DataFinal(cms, cmsbio, md, mdlen)) {
+    if (!ossl_cms_DataFinal(cms, cmsbio, NULL, md, mdlen)) {
         ERR_raise(ERR_LIB_CMS, CMS_R_CMS_DATAFINAL_ERROR);
         goto err;
     }
