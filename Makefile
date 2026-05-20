@@ -258,6 +258,7 @@ gnu-efi/gnuefi/libgnuefi.a gnu-efi/lib/libefi.a:
 		TOPDIR=$(TOPDIR)/gnu-efi \
 		VPATH=$(TOPDIR)/gnu-efi \
 		OBJDIR=. \
+		GNU_EFI_EXPORT_MS_ABI=1 \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)
 
