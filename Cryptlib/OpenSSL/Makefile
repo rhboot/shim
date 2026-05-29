@@ -776,10 +776,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/decode_pem2der.o \
 		  providers/implementations/encode_decode/decode_pvk2key.o \
 		  providers/implementations/encode_decode/decode_spki2typespki.o \
-		  providers/implementations/encode_decode/encode_key2any.o \
-		  providers/implementations/encode_decode/encode_key2blob.o \
-		  providers/implementations/encode_decode/encode_key2ms.o \
-		  providers/implementations/encode_decode/encode_key2text.o \
 		  providers/implementations/encode_decode/endecoder_common.o \
 		  providers/implementations/encode_decode/ml_common_codecs.o \
 		  providers/implementations/encode_decode/ml_dsa_codecs.o \
