@@ -97,7 +97,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/asn1/a_verify.o \
 		  crypto/asn1/ameth_lib.o \
 		  crypto/asn1/asn1_err.o \
-		  crypto/asn1/asn1_err.o \
 		  crypto/asn1/asn1_gen.o \
 		  crypto/asn1/asn1_item_list.o \
 		  crypto/asn1/asn1_lib.o \
@@ -158,7 +157,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/bio/bio_cb.o \
 		  crypto/bio/bio_dump.o \
 		  crypto/bio/bio_err.o \
-		  crypto/bio/bio_err.o \
 		  crypto/bio/bio_lib.o \
 		  crypto/bio/bio_meth.o \
 		  crypto/bio/bio_print.o \
@@ -185,9 +183,7 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/bn/bn_ctx.o \
 		  crypto/bn/bn_depr.o \
 		  crypto/bn/bn_dh.o \
-		  crypto/bn/bn_dh.o \
 		  crypto/bn/bn_div.o \
-		  crypto/bn/bn_err.o \
 		  crypto/bn/bn_err.o \
 		  crypto/bn/bn_exp.o \
 		  crypto/bn/bn_exp2.o \
@@ -219,7 +215,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/bn/rsaz_exp_x2.o \
 		  crypto/bsearch.o \
 		  crypto/buffer/buf_err.o \
-		  crypto/buffer/buf_err.o \
 		  crypto/buffer/buffer.o \
 		  crypto/cmac/cmac.o \
 		  crypto/cms/cms_asn1.o \
@@ -243,12 +238,10 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/comp/c_zlib.o \
 		  crypto/comp/c_zstd.o \
 		  crypto/comp/comp_err.o \
-		  crypto/comp/comp_err.o \
 		  crypto/comp/comp_lib.o \
 		  crypto/comp_methods.o \
 		  crypto/conf/conf_api.o \
 		  crypto/conf/conf_def.o \
-		  crypto/conf/conf_err.o \
 		  crypto/conf/conf_err.o \
 		  crypto/conf/conf_lib.o \
 		  crypto/conf/conf_mall.o \
@@ -259,7 +252,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/core_algorithm.o \
 		  crypto/core_fetch.o \
 		  crypto/core_namemap.o \
-		  crypto/cpt_err.o \
 		  crypto/cpt_err.o \
 		  crypto/cpuid.o \
 		  crypto/cryptlib.o \
@@ -274,7 +266,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/dh/dh_check.o \
 		  crypto/dh/dh_depr.o \
 		  crypto/dh/dh_err.o \
-		  crypto/dh/dh_err.o \
 		  crypto/dh/dh_gen.o \
 		  crypto/dh/dh_group_params.o \
 		  crypto/dh/dh_kdf.o \
@@ -286,7 +277,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/dh/dh_rfc5114.o \
 		  crypto/dso/dso_dl.o \
 		  crypto/dso/dso_dlfcn.o \
-		  crypto/dso/dso_err.o \
 		  crypto/dso/dso_err.o \
 		  crypto/dso/dso_lib.o \
 		  crypto/dso/dso_openssl.o \
@@ -367,8 +357,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/evp/cmeth_lib.o \
 		  crypto/evp/ctrl_params_translate.o \
 		  crypto/evp/dh_ctrl.o \
-		  crypto/evp/dh_ctrl.o \
-		  crypto/evp/dh_support.o \
 		  crypto/evp/dh_support.o \
 		  crypto/evp/digest.o \
 		  crypto/evp/dsa_ctrl.o \
@@ -653,7 +641,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/x509/v3_battcons.o \
 		  crypto/x509/v3_bcons.o \
 		  crypto/x509/v3_bitst.o \
-		  crypto/x509/v3_conf.o \
 		  crypto/x509/v3_conf.o \
 		  crypto/x509/v3_cpols.o \
 		  crypto/x509/v3_crld.o \
