@@ -61,120 +61,7 @@ endif
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libopenssl.a
-OBJS		= crypto/cryptlib.o \
-		  crypto/ctype.o \
-		  crypto/init.o \
-		  crypto/initthread.o \
-		  crypto/mem.o \
-		  crypto/cversion.o \
-		  crypto/ex_data.o \
-		  crypto/cpt_err.o \
-		  crypto/der_writer.o \
-		  crypto/ebcdic.o \
-		  crypto/uid.o \
-		  crypto/o_time.o \
-		  crypto/o_str.o \
-		  crypto/o_dir.o \
-		  crypto/o_init.o \
-		  crypto/threads_none.o \
-		  crypto/fips_ers.o \
-		  crypto/sleep.o \
-		  crypto/bsearch.o \
-		  crypto/core_namemap.o \
-		  crypto/params.o \
-		  crypto/params_dup.o \
-		  crypto/params_idx.o \
-		  crypto/array_alloc.o \
-		  crypto/core_algorithm.o \
-		  crypto/context.o \
-		  crypto/getenv.o \
-		  crypto/passphrase.o \
-		  crypto/core_fetch.o \
-		  crypto/sparse_array.o \
-		  crypto/param_build_set.o \
-		  crypto/cpuid.o \
-		  crypto/mem_sec.o \
-		  crypto/trace.o \
-		  crypto/time.o \
-		  crypto/mem_clr.o \
-		  crypto/defaults.o \
-		  crypto/indicator_core.o \
-		  crypto/self_test_core.o \
-		  crypto/packet.o \
-		  crypto/comp_methods.o \
-		  crypto/param_build.o \
-		  crypto/asn1_dsa.o \
-		  crypto/params_from_text.o \
-		  crypto/punycode.o \
-		  crypto/deterministic_nonce.o \
-		  crypto/provider/provider.o \
-		  crypto/provider/provider_core.o \
-		  crypto/provider/provider_conf.o \
-		  crypto/provider/provider_child.o \
-		  crypto/provider/provider_predefined.o \
-		  crypto/hpke/hpke.o \
-		  crypto/hpke/hpke_util.o \
-		  crypto/http/http_lib.o \
-		  crypto/ec/curve25519.o \
-		  crypto/ec/ec2_oct.o \
-		  crypto/ec/ec2_smpl.o \
-		  crypto/ec/ec_ameth.o \
-		  crypto/ec/ec_asn1.o \
-		  crypto/ec/ec_backend.o \
-		  crypto/ec/ec_check.o \
-		  crypto/ec/ec_curve.o \
-		  crypto/ec/ec_cvt.o \
-		  crypto/ec/ec_deprecated.o \
-		  crypto/ec/ecdh_kdf.o \
-		  crypto/ec/ecdh_ossl.o \
-		  crypto/ec/ecdsa_ossl.o \
-		  crypto/ec/ecdsa_sign.o \
-		  crypto/ec/ecdsa_vrf.o \
-		  crypto/ec/ec_err.o \
-		  crypto/ec/ec_key.o \
-		  crypto/ec/ec_kmeth.o \
-		  crypto/ec/eck_prn.o \
-		  crypto/ec/ec_lib.o \
-		  crypto/ec/ec_mult.o \
-		  crypto/ec/ec_oct.o \
-		  crypto/ec/ec_pmeth.o \
-		  crypto/ec/ecp_mont.o \
-		  crypto/ec/ecp_nist.o \
-		  crypto/ec/ecp_nistp224.o \
-		  crypto/ec/ecp_nistp256.o \
-		  crypto/ec/ecp_nistp384.o \
-		  crypto/ec/ecp_nistp521.o \
-		  crypto/ec/ecp_nistputil.o \
-		  crypto/ec/ecp_nistz256.o \
-		  crypto/ec/ecp_nistz256_table.o \
-		  crypto/ec/ecp_oct.o \
-		  crypto/ec/ecp_ppc.o \
-		  crypto/ec/ec_print.o \
-		  crypto/ec/ecp_s390x_nistp.o \
-		  crypto/ec/ecp_sm2p256.o \
-		  crypto/ec/ecp_sm2p256_table.o \
-		  crypto/ec/ecp_smpl.o \
-		  crypto/ec/ecx_backend.o \
-		  crypto/ec/ecx_key.o \
-		  crypto/ec/ecx_meth.o \
-		  crypto/ec/ecx_s390x.o \
-		  crypto/ec/curve448/curve448.o \
-		  crypto/ec/curve448/curve448_tables.o \
-		  crypto/ec/curve448/eddsa.o \
-		  crypto/ec/curve448/f_generic.o \
-		  crypto/ec/curve448/scalar.o \
-		  crypto/ec/curve448/arch_64/f_impl64.o \
-		  crypto/sha/sha1dgst.o \
-		  crypto/sha/sha1_one.o \
-		  crypto/sha/sha256.o \
-		  crypto/sha/sha512.o \
-		  crypto/sha/sha3.o \
-		  crypto/sha/keccak1600.o \
-		  crypto/hmac/hmac.o \
-		  crypto/hmac/hmac_s390x.o \
-		  crypto/rc4/rc4_enc.o \
-		  crypto/rc4/rc4_skey.o \
-		  crypto/aes/aes_cbc.o \
+OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/aes/aes_cfb.o \
 		  crypto/aes/aes_core.o \
 		  crypto/aes/aes_ecb.o \
@@ -183,17 +70,108 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/aes/aes_ofb.o \
 		  crypto/aes/aes_wrap.o \
 		  crypto/aes/aes_x86core.o \
-		  crypto/modes/cbc128.o \
-		  crypto/modes/ccm128.o \
-		  crypto/modes/cfb128.o \
-		  crypto/modes/ctr128.o \
-		  crypto/modes/cts128.o \
-		  crypto/modes/gcm128.o \
-		  crypto/modes/ofb128.o \
-		  crypto/modes/siv128.o \
-		  crypto/modes/wrap128.o \
-		  crypto/modes/xts128.o \
-		  crypto/modes/xts128gb.o \
+		  crypto/array_alloc.o \
+		  crypto/asn1/a_bitstr.o \
+		  crypto/asn1/a_d2i_fp.o \
+		  crypto/asn1/a_digest.o \
+		  crypto/asn1/a_dup.o \
+		  crypto/asn1/a_gentm.o \
+		  crypto/asn1/a_i2d_fp.o \
+		  crypto/asn1/a_int.o \
+		  crypto/asn1/a_mbstr.o \
+		  crypto/asn1/a_object.o \
+		  crypto/asn1/a_octet.o \
+		  crypto/asn1/a_print.o \
+		  crypto/asn1/a_sign.o \
+		  crypto/asn1/a_strex.o \
+		  crypto/asn1/a_strnid.o \
+		  crypto/asn1/a_time.o \
+		  crypto/asn1/a_type.o \
+		  crypto/asn1/a_utctm.o \
+		  crypto/asn1/a_utf8.o \
+		  crypto/asn1/a_verify.o \
+		  crypto/asn1/ameth_lib.o \
+		  crypto/asn1/asn1_err.o \
+		  crypto/asn1/asn1_err.o \
+		  crypto/asn1/asn1_gen.o \
+		  crypto/asn1/asn1_item_list.o \
+		  crypto/asn1/asn1_lib.o \
+		  crypto/asn1/asn1_parse.o \
+		  crypto/asn1/asn_mime.o \
+		  crypto/asn1/asn_moid.o \
+		  crypto/asn1/asn_mstbl.o \
+		  crypto/asn1/asn_pack.o \
+		  crypto/asn1/bio_asn1.o \
+		  crypto/asn1/bio_ndef.o \
+		  crypto/asn1/d2i_param.o \
+		  crypto/asn1/d2i_pr.o \
+		  crypto/asn1/d2i_pu.o \
+		  crypto/asn1/evp_asn1.o \
+		  crypto/asn1/f_int.o \
+		  crypto/asn1/f_string.o \
+		  crypto/asn1/i2d_evp.o \
+		  crypto/asn1/n_pkey.o \
+		  crypto/asn1/nsseq.o \
+		  crypto/asn1/p5_pbe.o \
+		  crypto/asn1/p5_pbev2.o \
+		  crypto/asn1/p5_scrypt.o \
+		  crypto/asn1/p8_pkey.o \
+		  crypto/asn1/t_bitst.o \
+		  crypto/asn1/t_pkey.o \
+		  crypto/asn1/t_spki.o \
+		  crypto/asn1/tasn_dec.o \
+		  crypto/asn1/tasn_enc.o \
+		  crypto/asn1/tasn_fre.o \
+		  crypto/asn1/tasn_new.o \
+		  crypto/asn1/tasn_prn.o \
+		  crypto/asn1/tasn_scn.o \
+		  crypto/asn1/tasn_typ.o \
+		  crypto/asn1/tasn_utl.o \
+		  crypto/asn1/x_algor.o \
+		  crypto/asn1/x_bignum.o \
+		  crypto/asn1/x_info.o \
+		  crypto/asn1/x_int64.o \
+		  crypto/asn1/x_long.o \
+		  crypto/asn1/x_pkey.o \
+		  crypto/asn1/x_sig.o \
+		  crypto/asn1/x_spki.o \
+		  crypto/asn1/x_val.o \
+		  crypto/asn1_dsa.o \
+		  crypto/async/arch/async_null.o \
+		  crypto/async/arch/async_posix.o \
+		  crypto/async/arch/async_win.o \
+		  crypto/async/async.o \
+		  crypto/async/async_err.o \
+		  crypto/async/async_wait.o \
+		  crypto/bio/bf_buff.o \
+		  crypto/bio/bf_lbuf.o \
+		  crypto/bio/bf_nbio.o \
+		  crypto/bio/bf_null.o \
+		  crypto/bio/bf_prefix.o \
+		  crypto/bio/bf_readbuff.o \
+		  crypto/bio/bio_addr.o \
+		  crypto/bio/bio_cb.o \
+		  crypto/bio/bio_dump.o \
+		  crypto/bio/bio_err.o \
+		  crypto/bio/bio_err.o \
+		  crypto/bio/bio_lib.o \
+		  crypto/bio/bio_meth.o \
+		  crypto/bio/bio_print.o \
+		  crypto/bio/bio_sock.o \
+		  crypto/bio/bio_sock2.o \
+		  crypto/bio/bss_acpt.o \
+		  crypto/bio/bss_bio.o \
+		  crypto/bio/bss_conn.o \
+		  crypto/bio/bss_core.o \
+		  crypto/bio/bss_dgram.o \
+		  crypto/bio/bss_dgram_pair.o \
+		  crypto/bio/bss_fd.o \
+		  crypto/bio/bss_file.o \
+		  crypto/bio/bss_log.o \
+		  crypto/bio/bss_mem.o \
+		  crypto/bio/bss_null.o \
+		  crypto/bio/bss_sock.o \
+		  crypto/bio/ossl_core_bio.o \
 		  crypto/bn/bn_add.o \
 		  crypto/bn/bn_asm.o \
 		  crypto/bn/bn_blind.o \
@@ -202,10 +180,12 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/bn/bn_ctx.o \
 		  crypto/bn/bn_depr.o \
 		  crypto/bn/bn_dh.o \
+		  crypto/bn/bn_dh.o \
 		  crypto/bn/bn_div.o \
 		  crypto/bn/bn_err.o \
-		  crypto/bn/bn_exp2.o \
+		  crypto/bn/bn_err.o \
 		  crypto/bn/bn_exp.o \
+		  crypto/bn/bn_exp2.o \
 		  crypto/bn/bn_gcd.o \
 		  crypto/bn/bn_gf2m.o \
 		  crypto/bn/bn_intern.o \
@@ -232,6 +212,11 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/bn/bn_x931p.o \
 		  crypto/bn/rsaz_exp.o \
 		  crypto/bn/rsaz_exp_x2.o \
+		  crypto/bsearch.o \
+		  crypto/buffer/buf_err.o \
+		  crypto/buffer/buf_err.o \
+		  crypto/buffer/buffer.o \
+		  crypto/cmac/cmac.o \
 		  crypto/cms/cms_asn1.o \
 		  crypto/cms/cms_att.o \
 		  crypto/cms/cms_cd.o \
@@ -249,6 +234,337 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/cms/cms_rsa.o \
 		  crypto/cms/cms_sd.o \
 		  crypto/cms/cms_smime.o \
+		  crypto/comp/c_brotli.o \
+		  crypto/comp/c_zlib.o \
+		  crypto/comp/c_zstd.o \
+		  crypto/comp/comp_err.o \
+		  crypto/comp/comp_err.o \
+		  crypto/comp/comp_lib.o \
+		  crypto/comp_methods.o \
+		  crypto/conf/conf_api.o \
+		  crypto/conf/conf_def.o \
+		  crypto/conf/conf_err.o \
+		  crypto/conf/conf_err.o \
+		  crypto/conf/conf_lib.o \
+		  crypto/conf/conf_mall.o \
+		  crypto/conf/conf_mod.o \
+		  crypto/conf/conf_sap.o \
+		  crypto/conf/conf_ssl.o \
+		  crypto/context.o \
+		  crypto/core_algorithm.o \
+		  crypto/core_fetch.o \
+		  crypto/core_namemap.o \
+		  crypto/cpt_err.o \
+		  crypto/cpt_err.o \
+		  crypto/cpuid.o \
+		  crypto/cryptlib.o \
+		  crypto/ctype.o \
+		  crypto/cversion.o \
+		  crypto/defaults.o \
+		  crypto/der_writer.o \
+		  crypto/deterministic_nonce.o \
+		  crypto/dh/dh_ameth.o \
+		  crypto/dh/dh_asn1.o \
+		  crypto/dh/dh_backend.o \
+		  crypto/dh/dh_check.o \
+		  crypto/dh/dh_depr.o \
+		  crypto/dh/dh_err.o \
+		  crypto/dh/dh_err.o \
+		  crypto/dh/dh_gen.o \
+		  crypto/dh/dh_group_params.o \
+		  crypto/dh/dh_kdf.o \
+		  crypto/dh/dh_key.o \
+		  crypto/dh/dh_lib.o \
+		  crypto/dh/dh_meth.o \
+		  crypto/dh/dh_pmeth.o \
+		  crypto/dh/dh_prn.o \
+		  crypto/dh/dh_rfc5114.o \
+		  crypto/dso/dso_dl.o \
+		  crypto/dso/dso_dlfcn.o \
+		  crypto/dso/dso_err.o \
+		  crypto/dso/dso_err.o \
+		  crypto/dso/dso_lib.o \
+		  crypto/dso/dso_openssl.o \
+		  crypto/dso/dso_vms.o \
+		  crypto/dso/dso_win32.o \
+		  crypto/ebcdic.o \
+		  crypto/ec/curve25519.o \
+		  crypto/ec/curve448/arch_64/f_impl64.o \
+		  crypto/ec/curve448/curve448.o \
+		  crypto/ec/curve448/curve448_tables.o \
+		  crypto/ec/curve448/eddsa.o \
+		  crypto/ec/curve448/f_generic.o \
+		  crypto/ec/curve448/scalar.o \
+		  crypto/ec/ec2_oct.o \
+		  crypto/ec/ec2_smpl.o \
+		  crypto/ec/ec_ameth.o \
+		  crypto/ec/ec_asn1.o \
+		  crypto/ec/ec_backend.o \
+		  crypto/ec/ec_check.o \
+		  crypto/ec/ec_curve.o \
+		  crypto/ec/ec_cvt.o \
+		  crypto/ec/ec_deprecated.o \
+		  crypto/ec/ec_err.o \
+		  crypto/ec/ec_key.o \
+		  crypto/ec/ec_kmeth.o \
+		  crypto/ec/ec_lib.o \
+		  crypto/ec/ec_mult.o \
+		  crypto/ec/ec_oct.o \
+		  crypto/ec/ec_pmeth.o \
+		  crypto/ec/ec_print.o \
+		  crypto/ec/ecdh_kdf.o \
+		  crypto/ec/ecdh_ossl.o \
+		  crypto/ec/ecdsa_ossl.o \
+		  crypto/ec/ecdsa_sign.o \
+		  crypto/ec/ecdsa_vrf.o \
+		  crypto/ec/eck_prn.o \
+		  crypto/ec/ecp_mont.o \
+		  crypto/ec/ecp_nist.o \
+		  crypto/ec/ecp_nistp224.o \
+		  crypto/ec/ecp_nistp256.o \
+		  crypto/ec/ecp_nistp384.o \
+		  crypto/ec/ecp_nistp521.o \
+		  crypto/ec/ecp_nistputil.o \
+		  crypto/ec/ecp_nistz256.o \
+		  crypto/ec/ecp_nistz256_table.o \
+		  crypto/ec/ecp_oct.o \
+		  crypto/ec/ecp_ppc.o \
+		  crypto/ec/ecp_s390x_nistp.o \
+		  crypto/ec/ecp_sm2p256.o \
+		  crypto/ec/ecp_sm2p256_table.o \
+		  crypto/ec/ecp_smpl.o \
+		  crypto/ec/ecx_backend.o \
+		  crypto/ec/ecx_key.o \
+		  crypto/ec/ecx_meth.o \
+		  crypto/ec/ecx_s390x.o \
+		  crypto/encode_decode/decoder_err.o \
+		  crypto/encode_decode/decoder_lib.o \
+		  crypto/encode_decode/decoder_meth.o \
+		  crypto/encode_decode/decoder_pkey.o \
+		  crypto/encode_decode/encoder_err.o \
+		  crypto/encode_decode/encoder_lib.o \
+		  crypto/encode_decode/encoder_meth.o \
+		  crypto/encode_decode/encoder_pkey.o \
+		  crypto/err/err.o \
+		  crypto/err/err_all.o \
+		  crypto/err/err_all_legacy.o \
+		  crypto/err/err_blocks.o \
+		  crypto/err/err_mark.o \
+		  crypto/err/err_prn.o \
+		  crypto/err/err_save.o \
+		  crypto/evp/asymcipher.o \
+		  crypto/evp/bio_b64.o \
+		  crypto/evp/bio_enc.o \
+		  crypto/evp/bio_md.o \
+		  crypto/evp/bio_ok.o \
+		  crypto/evp/c_allc.o \
+		  crypto/evp/c_alld.o \
+		  crypto/evp/cmeth_lib.o \
+		  crypto/evp/ctrl_params_translate.o \
+		  crypto/evp/dh_ctrl.o \
+		  crypto/evp/dh_ctrl.o \
+		  crypto/evp/dh_support.o \
+		  crypto/evp/dh_support.o \
+		  crypto/evp/digest.o \
+		  crypto/evp/dsa_ctrl.o \
+		  crypto/evp/e_aes.o \
+		  crypto/evp/e_aes_cbc_hmac_sha1.o \
+		  crypto/evp/e_aes_cbc_hmac_sha256.o \
+		  crypto/evp/e_aria.o \
+		  crypto/evp/e_bf.o \
+		  crypto/evp/e_camellia.o \
+		  crypto/evp/e_cast.o \
+		  crypto/evp/e_chacha20_poly1305.o \
+		  crypto/evp/e_des.o \
+		  crypto/evp/e_des3.o \
+		  crypto/evp/e_idea.o \
+		  crypto/evp/e_null.o \
+		  crypto/evp/e_old.o \
+		  crypto/evp/e_rc2.o \
+		  crypto/evp/e_rc4.o \
+		  crypto/evp/e_rc4_hmac_md5.o \
+		  crypto/evp/e_rc5.o \
+		  crypto/evp/e_seed.o \
+		  crypto/evp/e_sm4.o \
+		  crypto/evp/e_xcbc_d.o \
+		  crypto/evp/ec_ctrl.o \
+		  crypto/evp/ec_support.o \
+		  crypto/evp/encode.o \
+		  crypto/evp/evp_cnf.o \
+		  crypto/evp/evp_enc.o \
+		  crypto/evp/evp_err.o \
+		  crypto/evp/evp_fetch.o \
+		  crypto/evp/evp_key.o \
+		  crypto/evp/evp_lib.o \
+		  crypto/evp/evp_pbe.o \
+		  crypto/evp/evp_pkey.o \
+		  crypto/evp/evp_rand.o \
+		  crypto/evp/evp_utils.o \
+		  crypto/evp/exchange.o \
+		  crypto/evp/kdf_lib.o \
+		  crypto/evp/kdf_meth.o \
+		  crypto/evp/kem.o \
+		  crypto/evp/keymgmt_lib.o \
+		  crypto/evp/keymgmt_meth.o \
+		  crypto/evp/legacy_md5.o \
+		  crypto/evp/legacy_md5_sha1.o \
+		  crypto/evp/legacy_sha.o \
+		  crypto/evp/m_null.o \
+		  crypto/evp/m_sigver.o \
+		  crypto/evp/mac_lib.o \
+		  crypto/evp/mac_meth.o \
+		  crypto/evp/names.o \
+		  crypto/evp/p5_crpt.o \
+		  crypto/evp/p5_crpt2.o \
+		  crypto/evp/p_dec.o \
+		  crypto/evp/p_enc.o \
+		  crypto/evp/p_legacy.o \
+		  crypto/evp/p_lib.o \
+		  crypto/evp/p_open.o \
+		  crypto/evp/p_seal.o \
+		  crypto/evp/p_sign.o \
+		  crypto/evp/p_verify.o \
+		  crypto/evp/pbe_scrypt.o \
+		  crypto/evp/pmeth_check.o \
+		  crypto/evp/pmeth_gn.o \
+		  crypto/evp/pmeth_lib.o \
+		  crypto/evp/s_lib.o \
+		  crypto/evp/signature.o \
+		  crypto/evp/skeymgmt_meth.o \
+		  crypto/ex_data.o \
+		  crypto/ffc/ffc_backend.o \
+		  crypto/ffc/ffc_dh.o \
+		  crypto/ffc/ffc_key_generate.o \
+		  crypto/ffc/ffc_key_validate.o \
+		  crypto/ffc/ffc_params.o \
+		  crypto/ffc/ffc_params_generate.o \
+		  crypto/ffc/ffc_params_validate.o \
+		  crypto/fips_ers.o \
+		  crypto/getenv.o \
+		  crypto/hashtable/hashfunc.o \
+		  crypto/hashtable/hashtable.o \
+		  crypto/hmac/hmac.o \
+		  crypto/hmac/hmac_s390x.o \
+		  crypto/hpke/hpke.o \
+		  crypto/hpke/hpke_util.o \
+		  crypto/http/http_lib.o \
+		  crypto/indicator_core.o \
+		  crypto/init.o \
+		  crypto/initthread.o \
+		  crypto/kdf/kdf_err.o \
+		  crypto/lhash/lh_stats.o \
+		  crypto/lhash/lhash.o \
+		  crypto/md5/md5_dgst.o \
+		  crypto/md5/md5_one.o \
+		  crypto/md5/md5_sha1.o \
+		  crypto/mem.o \
+		  crypto/mem_clr.o \
+		  crypto/mem_sec.o \
+		  crypto/ml_dsa/ml_dsa_encoders.o \
+		  crypto/ml_dsa/ml_dsa_key.o \
+		  crypto/ml_dsa/ml_dsa_key_compress.o \
+		  crypto/ml_dsa/ml_dsa_matrix.o \
+		  crypto/ml_dsa/ml_dsa_ntt.o \
+		  crypto/ml_dsa/ml_dsa_params.o \
+		  crypto/ml_dsa/ml_dsa_sample.o \
+		  crypto/ml_dsa/ml_dsa_sign.o \
+		  crypto/ml_kem/ml_kem.o \
+		  crypto/modes/cbc128.o \
+		  crypto/modes/ccm128.o \
+		  crypto/modes/cfb128.o \
+		  crypto/modes/ctr128.o \
+		  crypto/modes/cts128.o \
+		  crypto/modes/gcm128.o \
+		  crypto/modes/ofb128.o \
+		  crypto/modes/siv128.o \
+		  crypto/modes/wrap128.o \
+		  crypto/modes/xts128.o \
+		  crypto/modes/xts128gb.o \
+		  crypto/o_dir.o \
+		  crypto/o_init.o \
+		  crypto/o_str.o \
+		  crypto/o_time.o \
+		  crypto/objects/o_names.o \
+		  crypto/objects/obj_dat.o \
+		  crypto/objects/obj_err.o \
+		  crypto/objects/obj_lib.o \
+		  crypto/objects/obj_xref.o \
+		  crypto/ocsp/ocsp_asn.o \
+		  crypto/ocsp/ocsp_cl.o \
+		  crypto/ocsp/ocsp_err.o \
+		  crypto/ocsp/ocsp_ext.o \
+		  crypto/ocsp/ocsp_lib.o \
+		  crypto/ocsp/ocsp_prn.o \
+		  crypto/ocsp/ocsp_srv.o \
+		  crypto/ocsp/ocsp_vfy.o \
+		  crypto/ocsp/v3_ocsp.o \
+		  crypto/packet.o \
+		  crypto/param_build.o \
+		  crypto/param_build_set.o \
+		  crypto/params.o \
+		  crypto/params_dup.o \
+		  crypto/params_from_text.o \
+		  crypto/params_idx.o \
+		  crypto/passphrase.o \
+		  crypto/pem/pem_all.o \
+		  crypto/pem/pem_err.o \
+		  crypto/pem/pem_info.o \
+		  crypto/pem/pem_lib.o \
+		  crypto/pem/pem_oth.o \
+		  crypto/pem/pem_pk8.o \
+		  crypto/pem/pem_pkey.o \
+		  crypto/pem/pem_sign.o \
+		  crypto/pem/pem_x509.o \
+		  crypto/pem/pem_xaux.o \
+		  crypto/pem/pvkfmt.o \
+		  crypto/pkcs12/p12_add.o \
+		  crypto/pkcs12/p12_asn.o \
+		  crypto/pkcs12/p12_attr.o \
+		  crypto/pkcs12/p12_crpt.o \
+		  crypto/pkcs12/p12_crt.o \
+		  crypto/pkcs12/p12_decr.o \
+		  crypto/pkcs12/p12_init.o \
+		  crypto/pkcs12/p12_key.o \
+		  crypto/pkcs12/p12_kiss.o \
+		  crypto/pkcs12/p12_mutl.o \
+		  crypto/pkcs12/p12_npas.o \
+		  crypto/pkcs12/p12_p8d.o \
+		  crypto/pkcs12/p12_p8e.o \
+		  crypto/pkcs12/p12_sbag.o \
+		  crypto/pkcs12/p12_utl.o \
+		  crypto/pkcs12/pk12err.o \
+		  crypto/pkcs7/bio_pk7.o \
+		  crypto/pkcs7/pk7_asn1.o \
+		  crypto/pkcs7/pk7_attr.o \
+		  crypto/pkcs7/pk7_doit.o \
+		  crypto/pkcs7/pk7_lib.o \
+		  crypto/pkcs7/pk7_mime.o \
+		  crypto/pkcs7/pk7_smime.o \
+		  crypto/pkcs7/pkcs7err.o \
+		  crypto/property/defn_cache.o \
+		  crypto/property/property.o \
+		  crypto/property/property_err.o \
+		  crypto/property/property_parse.o \
+		  crypto/property/property_query.o \
+		  crypto/property/property_string.o \
+		  crypto/provider/provider.o \
+		  crypto/provider/provider_child.o \
+		  crypto/provider/provider_conf.o \
+		  crypto/provider/provider_core.o \
+		  crypto/provider/provider_predefined.o \
+		  crypto/punycode.o \
+		  crypto/rand/drbg.o \
+		  crypto/rand/prov_seed.o \
+		  crypto/rand/rand_deprecated.o \
+		  crypto/rand/rand_egd.o \
+		  crypto/rand/rand_err.o \
+		  crypto/rand/rand_lib.o \
+		  crypto/rand/rand_meth.o \
+		  crypto/rand/rand_pool.o \
+		  crypto/rand/rand_uniform.o \
+		  crypto/rand/randfile.o \
+		  crypto/rc4/rc4_enc.o \
+		  crypto/rc4/rc4_skey.o \
 		  crypto/rsa/rsa_ameth.o \
 		  crypto/rsa/rsa_asn1.o \
 		  crypto/rsa/rsa_backend.o \
@@ -275,247 +591,36 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/rsa/rsa_sp800_56b_gen.o \
 		  crypto/rsa/rsa_x931.o \
 		  crypto/rsa/rsa_x931g.o \
-		  crypto/dso/dso_dl.o \
-		  crypto/dso/dso_dlfcn.o \
-		  crypto/dso/dso_err.o \
-		  crypto/dso/dso_lib.o \
-		  crypto/dso/dso_openssl.o \
-		  crypto/dso/dso_vms.o \
-		  crypto/dso/dso_win32.o \
-		  crypto/bn/bn_dh.o \
-		  crypto/dh/dh_ameth.o \
-		  crypto/dh/dh_asn1.o \
-		  crypto/dh/dh_backend.o \
-		  crypto/dh/dh_check.o \
-		  crypto/dh/dh_depr.o \
-		  crypto/dh/dh_err.o \
-		  crypto/dh/dh_gen.o \
-		  crypto/dh/dh_group_params.o \
-		  crypto/dh/dh_kdf.o \
-		  crypto/dh/dh_key.o \
-		  crypto/dh/dh_lib.o \
-		  crypto/dh/dh_meth.o \
-		  crypto/dh/dh_pmeth.o \
-		  crypto/dh/dh_prn.o \
-		  crypto/dh/dh_rfc5114.o \
-		  crypto/evp/dh_ctrl.o \
-		  crypto/evp/dh_support.o \
-		  crypto/buffer/buf_err.o \
-		  crypto/buffer/buffer.o \
-		  crypto/bio/bf_buff.o \
-		  crypto/bio/bf_lbuf.o \
-		  crypto/bio/bf_nbio.o \
-		  crypto/bio/bf_null.o \
-		  crypto/bio/bf_prefix.o \
-		  crypto/bio/bf_readbuff.o \
-		  crypto/bio/bio_addr.o \
-		  crypto/bio/bio_cb.o \
-		  crypto/bio/bio_dump.o \
-		  crypto/bio/bio_err.o \
-		  crypto/bio/bio_lib.o \
-		  crypto/bio/bio_meth.o \
-		  crypto/bio/bio_print.o \
-		  crypto/bio/bio_sock2.o \
-		  crypto/bio/bio_sock.o \
-		  crypto/bio/bss_acpt.o \
-		  crypto/bio/bss_bio.o \
-		  crypto/bio/bss_conn.o \
-		  crypto/bio/bss_core.o \
-		  crypto/bio/bss_dgram.o \
-		  crypto/bio/bss_dgram_pair.o \
-		  crypto/bio/bss_fd.o \
-		  crypto/bio/bss_file.o \
-		  crypto/bio/bss_log.o \
-		  crypto/bio/bss_mem.o \
-		  crypto/bio/bss_null.o \
-		  crypto/bio/bss_sock.o \
-		  crypto/bio/ossl_core_bio.o \
+		  crypto/self_test_core.o \
+		  crypto/sha/keccak1600.o \
+		  crypto/sha/sha1_one.o \
+		  crypto/sha/sha1dgst.o \
+		  crypto/sha/sha256.o \
+		  crypto/sha/sha3.o \
+		  crypto/sha/sha512.o \
+		  crypto/sleep.o \
+		  crypto/slh_dsa/slh_adrs.o \
+		  crypto/slh_dsa/slh_dsa.o \
+		  crypto/slh_dsa/slh_dsa_hash_ctx.o \
+		  crypto/slh_dsa/slh_dsa_key.o \
+		  crypto/slh_dsa/slh_fors.o \
+		  crypto/slh_dsa/slh_hash.o \
+		  crypto/slh_dsa/slh_hypertree.o \
+		  crypto/slh_dsa/slh_params.o \
+		  crypto/slh_dsa/slh_wots.o \
+		  crypto/slh_dsa/slh_xmss.o \
+		  crypto/sparse_array.o \
 		  crypto/stack/stack.o \
-		  crypto/lhash/lhash.o \
-		  crypto/lhash/lh_stats.o \
-		  crypto/rand/drbg.o \
-		  crypto/rand/prov_seed.o \
-		  crypto/rand/rand_deprecated.o \
-		  crypto/rand/rand_egd.o \
-		  crypto/rand/rand_err.o \
-		  crypto/rand/randfile.o \
-		  crypto/rand/rand_lib.o \
-		  crypto/rand/rand_meth.o \
-		  crypto/rand/rand_pool.o \
-		  crypto/rand/rand_uniform.o \
-		  crypto/asn1/asn1_err.o \
-		  crypto/bio/bio_err.o \
-		  crypto/bn/bn_err.o \
-		  crypto/buffer/buf_err.o \
-		  crypto/comp/comp_err.o \
-		  crypto/conf/conf_err.o \
-		  crypto/cpt_err.o \
-		  crypto/dh/dh_err.o \
-		  crypto/dso/dso_err.o \
-		  crypto/err/err_all.o \
-		  crypto/err/err_all_legacy.o \
-		  crypto/err/err_blocks.o \
-		  crypto/err/err.o \
-		  crypto/err/err_mark.o \
-		  crypto/err/err_prn.o \
-		  crypto/err/err_save.o \
-		  crypto/objects/obj_dat.o \
-		  crypto/objects/obj_err.o \
-		  crypto/objects/obj_lib.o \
-		  crypto/objects/obj_xref.o \
-		  crypto/objects/o_names.o \
-		  crypto/evp/asymcipher.o \
-		  crypto/evp/bio_b64.o \
-		  crypto/evp/bio_enc.o \
-		  crypto/evp/bio_md.o \
-		  crypto/evp/bio_ok.o \
-		  crypto/evp/c_allc.o \
-		  crypto/evp/c_alld.o \
-		  crypto/evp/cmeth_lib.o \
-		  crypto/evp/ctrl_params_translate.o \
-		  crypto/evp/dh_ctrl.o \
-		  crypto/evp/dh_support.o \
-		  crypto/evp/digest.o \
-		  crypto/evp/dsa_ctrl.o \
-		  crypto/evp/e_aes.o \
-		  crypto/evp/e_aes_cbc_hmac_sha1.o \
-		  crypto/evp/e_aes_cbc_hmac_sha256.o \
-		  crypto/evp/e_aria.o \
-		  crypto/evp/e_bf.o \
-		  crypto/evp/e_camellia.o \
-		  crypto/evp/e_cast.o \
-		  crypto/evp/ec_ctrl.o \
-		  crypto/evp/e_chacha20_poly1305.o \
-		  crypto/evp/ec_support.o \
-		  crypto/evp/e_des3.o \
-		  crypto/evp/e_des.o \
-		  crypto/evp/e_idea.o \
-		  crypto/evp/encode.o \
-		  crypto/evp/e_null.o \
-		  crypto/evp/e_old.o \
-		  crypto/evp/e_rc2.o \
-		  crypto/evp/e_rc4.o \
-		  crypto/evp/e_rc4_hmac_md5.o \
-		  crypto/evp/e_rc5.o \
-		  crypto/evp/e_seed.o \
-		  crypto/evp/e_sm4.o \
-		  crypto/evp/evp_cnf.o \
-		  crypto/evp/evp_enc.o \
-		  crypto/evp/evp_err.o \
-		  crypto/evp/evp_fetch.o \
-		  crypto/evp/evp_key.o \
-		  crypto/evp/evp_lib.o \
-		  crypto/evp/evp_pbe.o \
-		  crypto/evp/evp_pkey.o \
-		  crypto/evp/evp_rand.o \
-		  crypto/evp/evp_utils.o \
-		  crypto/evp/e_xcbc_d.o \
-		  crypto/evp/exchange.o \
-		  crypto/evp/kdf_lib.o \
-		  crypto/evp/kdf_meth.o \
-		  crypto/evp/kem.o \
-		  crypto/evp/keymgmt_lib.o \
-		  crypto/evp/keymgmt_meth.o \
-		  crypto/evp/legacy_md5.o \
-		  crypto/evp/legacy_md5_sha1.o \
-		  crypto/evp/legacy_sha.o \
-		  crypto/evp/mac_lib.o \
-		  crypto/evp/mac_meth.o \
-		  crypto/evp/m_null.o \
-		  crypto/evp/m_sigver.o \
-		  crypto/evp/names.o \
-		  crypto/evp/p5_crpt2.o \
-		  crypto/evp/p5_crpt.o \
-		  crypto/evp/pbe_scrypt.o \
-		  crypto/evp/p_dec.o \
-		  crypto/evp/p_enc.o \
-		  crypto/evp/p_legacy.o \
-		  crypto/evp/p_lib.o \
-		  crypto/evp/pmeth_check.o \
-		  crypto/evp/pmeth_gn.o \
-		  crypto/evp/pmeth_lib.o \
-		  crypto/evp/p_open.o \
-		  crypto/evp/p_seal.o \
-		  crypto/evp/p_sign.o \
-		  crypto/evp/p_verify.o \
-		  crypto/evp/signature.o \
-		  crypto/evp/skeymgmt_meth.o \
-		  crypto/evp/s_lib.o \
-		  crypto/asn1/a_bitstr.o \
-		  crypto/asn1/a_d2i_fp.o \
-		  crypto/asn1/a_digest.o \
-		  crypto/asn1/a_dup.o \
-		  crypto/asn1/a_gentm.o \
-		  crypto/asn1/a_i2d_fp.o \
-		  crypto/asn1/a_int.o \
-		  crypto/asn1/a_mbstr.o \
-		  crypto/asn1/ameth_lib.o \
-		  crypto/asn1/a_object.o \
-		  crypto/asn1/a_octet.o \
-		  crypto/asn1/a_print.o \
-		  crypto/asn1/a_sign.o \
-		  crypto/asn1/asn1_err.o \
-		  crypto/asn1/asn1_gen.o \
-		  crypto/asn1/asn1_item_list.o \
-		  crypto/asn1/asn1_lib.o \
-		  crypto/asn1/asn1_parse.o \
-		  crypto/asn1/asn_mime.o \
-		  crypto/asn1/asn_moid.o \
-		  crypto/asn1/asn_mstbl.o \
-		  crypto/asn1/asn_pack.o \
-		  crypto/asn1/a_strex.o \
-		  crypto/asn1/a_strnid.o \
-		  crypto/asn1/a_time.o \
-		  crypto/asn1/a_type.o \
-		  crypto/asn1/a_utctm.o \
-		  crypto/asn1/a_utf8.o \
-		  crypto/asn1/a_verify.o \
-		  crypto/asn1/bio_asn1.o \
-		  crypto/asn1/bio_ndef.o \
-		  crypto/asn1/d2i_param.o \
-		  crypto/asn1/d2i_pr.o \
-		  crypto/asn1/d2i_pu.o \
-		  crypto/asn1/evp_asn1.o \
-		  crypto/asn1/f_int.o \
-		  crypto/asn1/f_string.o \
-		  crypto/asn1/i2d_evp.o \
-		  crypto/asn1/n_pkey.o \
-		  crypto/asn1/nsseq.o \
-		  crypto/asn1/p5_pbe.o \
-		  crypto/asn1/p5_pbev2.o \
-		  crypto/asn1/p5_scrypt.o \
-		  crypto/asn1/p8_pkey.o \
-		  crypto/asn1/tasn_dec.o \
-		  crypto/asn1/tasn_enc.o \
-		  crypto/asn1/tasn_fre.o \
-		  crypto/asn1/tasn_new.o \
-		  crypto/asn1/tasn_prn.o \
-		  crypto/asn1/tasn_scn.o \
-		  crypto/asn1/tasn_typ.o \
-		  crypto/asn1/tasn_utl.o \
-		  crypto/asn1/t_bitst.o \
-		  crypto/asn1/t_pkey.o \
-		  crypto/asn1/t_spki.o \
-		  crypto/asn1/x_algor.o \
-		  crypto/asn1/x_bignum.o \
-		  crypto/asn1/x_info.o \
-		  crypto/asn1/x_int64.o \
-		  crypto/asn1/x_long.o \
-		  crypto/asn1/x_pkey.o \
-		  crypto/asn1/x_sig.o \
-		  crypto/asn1/x_spki.o \
-		  crypto/asn1/x_val.o \
-		  crypto/pem/pem_all.o \
-		  crypto/pem/pem_err.o \
-		  crypto/pem/pem_info.o \
-		  crypto/pem/pem_lib.o \
-		  crypto/pem/pem_oth.o \
-		  crypto/pem/pem_pk8.o \
-		  crypto/pem/pem_pkey.o \
-		  crypto/pem/pem_sign.o \
-		  crypto/pem/pem_x509.o \
-		  crypto/pem/pem_xaux.o \
-		  crypto/pem/pvkfmt.o \
+		  crypto/threads_none.o \
+		  crypto/time.o \
+		  crypto/trace.o \
+		  crypto/txt_db/txt_db.o \
+		  crypto/ui/ui_err.o \
+		  crypto/ui/ui_lib.o \
+		  crypto/ui/ui_null.o \
+		  crypto/ui/ui_openssl.o \
+		  crypto/ui/ui_util.o \
+		  crypto/uid.o \
 		  crypto/x509/by_dir.o \
 		  crypto/x509/by_file.o \
 		  crypto/x509/by_store.o \
@@ -544,10 +649,10 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/x509/v3_bcons.o \
 		  crypto/x509/v3_bitst.o \
 		  crypto/x509/v3_conf.o \
+		  crypto/x509/v3_conf.o \
 		  crypto/x509/v3_cpols.o \
 		  crypto/x509/v3_crld.o \
 		  crypto/x509/v3_enum.o \
-		  crypto/x509/v3err.o \
 		  crypto/x509/v3_extku.o \
 		  crypto/x509/v3_genn.o \
 		  crypto/x509/v3_group_ac.o \
@@ -561,8 +666,8 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/x509/v3_ncons.o \
 		  crypto/x509/v3_no_ass.o \
 		  crypto/x509/v3_no_rev_avail.o \
-		  crypto/x509/v3_pcia.o \
 		  crypto/x509/v3_pci.o \
+		  crypto/x509/v3_pcia.o \
 		  crypto/x509/v3_pcons.o \
 		  crypto/x509/v3_pku.o \
 		  crypto/x509/v3_pmaps.o \
@@ -580,30 +685,31 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/x509/v3_usernotice.o \
 		  crypto/x509/v3_utf8.o \
 		  crypto/x509/v3_utl.o \
+		  crypto/x509/v3err.o \
 		  crypto/x509/x509_acert.o \
-		  crypto/x509/x509aset.o \
 		  crypto/x509/x509_att.o \
 		  crypto/x509/x509_cmp.o \
-		  crypto/x509/x509cset.o \
 		  crypto/x509/x509_d2.o \
 		  crypto/x509/x509_def.o \
 		  crypto/x509/x509_err.o \
 		  crypto/x509/x509_ext.o \
 		  crypto/x509/x509_lu.o \
 		  crypto/x509/x509_meth.o \
-		  crypto/x509/x509name.o \
 		  crypto/x509/x509_obj.o \
 		  crypto/x509/x509_r2x.o \
 		  crypto/x509/x509_req.o \
-		  crypto/x509/x509rset.o \
 		  crypto/x509/x509_set.o \
-		  crypto/x509/x509spki.o \
 		  crypto/x509/x509_trust.o \
 		  crypto/x509/x509_txt.o \
-		  crypto/x509/x509type.o \
 		  crypto/x509/x509_v3.o \
 		  crypto/x509/x509_vfy.o \
 		  crypto/x509/x509_vpm.o \
+		  crypto/x509/x509aset.o \
+		  crypto/x509/x509cset.o \
+		  crypto/x509/x509name.o \
+		  crypto/x509/x509rset.o \
+		  crypto/x509/x509spki.o \
+		  crypto/x509/x509type.o \
 		  crypto/x509/x_all.o \
 		  crypto/x509/x_attrib.o \
 		  crypto/x509/x_crl.o \
@@ -612,130 +718,12 @@ OBJS		= crypto/cryptlib.o \
 		  crypto/x509/x_name.o \
 		  crypto/x509/x_pubkey.o \
 		  crypto/x509/x_req.o \
-		  crypto/x509/x_x509a.o \
 		  crypto/x509/x_x509.o \
-		  crypto/conf/conf_api.o \
-		  crypto/conf/conf_def.o \
-		  crypto/conf/conf_err.o \
-		  crypto/conf/conf_lib.o \
-		  crypto/conf/conf_mall.o \
-		  crypto/conf/conf_mod.o \
-		  crypto/conf/conf_sap.o \
-		  crypto/conf/conf_ssl.o \
-		  crypto/x509/v3_conf.o \
-		  crypto/txt_db/txt_db.o \
-		  crypto/pkcs7/bio_pk7.o \
-		  crypto/pkcs7/pk7_asn1.o \
-		  crypto/pkcs7/pk7_attr.o \
-		  crypto/pkcs7/pk7_doit.o \
-		  crypto/pkcs7/pk7_lib.o \
-		  crypto/pkcs7/pk7_mime.o \
-		  crypto/pkcs7/pk7_smime.o \
-		  crypto/pkcs7/pkcs7err.o \
-		  crypto/pkcs12/p12_add.o \
-		  crypto/pkcs12/p12_asn.o \
-		  crypto/pkcs12/p12_attr.o \
-		  crypto/pkcs12/p12_crpt.o \
-		  crypto/pkcs12/p12_crt.o \
-		  crypto/pkcs12/p12_decr.o \
-		  crypto/pkcs12/p12_init.o \
-		  crypto/pkcs12/p12_key.o \
-		  crypto/pkcs12/p12_kiss.o \
-		  crypto/pkcs12/p12_mutl.o \
-		  crypto/pkcs12/p12_npas.o \
-		  crypto/pkcs12/p12_p8d.o \
-		  crypto/pkcs12/p12_p8e.o \
-		  crypto/pkcs12/p12_sbag.o \
-		  crypto/pkcs12/p12_utl.o \
-		  crypto/pkcs12/pk12err.o \
-		  crypto/comp/c_brotli.o \
-		  crypto/comp/comp_err.o \
-		  crypto/comp/comp_lib.o \
-		  crypto/comp/c_zlib.o \
-		  crypto/comp/c_zstd.o \
-		  crypto/ocsp/ocsp_asn.o \
-		  crypto/ocsp/ocsp_cl.o \
-		  crypto/ocsp/ocsp_err.o \
-		  crypto/ocsp/ocsp_ext.o \
-		  crypto/ocsp/ocsp_lib.o \
-		  crypto/ocsp/ocsp_prn.o \
-		  crypto/ocsp/ocsp_srv.o \
-		  crypto/ocsp/ocsp_vfy.o \
-		  crypto/ocsp/v3_ocsp.o \
-		  crypto/cmac/cmac.o \
-		  crypto/kdf/kdf_err.o \
-		  crypto/ml_dsa/ml_dsa_encoders.o \
-		  crypto/ml_dsa/ml_dsa_key.o \
-		  crypto/ml_dsa/ml_dsa_key_compress.o \
-		  crypto/ml_dsa/ml_dsa_matrix.o \
-		  crypto/ml_dsa/ml_dsa_ntt.o \
-		  crypto/ml_dsa/ml_dsa_params.o \
-		  crypto/ml_dsa/ml_dsa_sample.o \
-		  crypto/ml_dsa/ml_dsa_sign.o \
-		  crypto/ml_kem/ml_kem.o \
-		  crypto/slh_dsa/slh_adrs.o \
-		  crypto/slh_dsa/slh_dsa.o \
-		  crypto/slh_dsa/slh_dsa_hash_ctx.o \
-		  crypto/slh_dsa/slh_dsa_key.o \
-		  crypto/slh_dsa/slh_fors.o \
-		  crypto/slh_dsa/slh_hash.o \
-		  crypto/slh_dsa/slh_hypertree.o \
-		  crypto/slh_dsa/slh_params.o \
-		  crypto/slh_dsa/slh_wots.o \
-		  crypto/slh_dsa/slh_xmss.o \
-		  crypto/encode_decode/decoder_err.o \
-		  crypto/encode_decode/decoder_lib.o \
-		  crypto/encode_decode/decoder_meth.o \
-		  crypto/encode_decode/decoder_pkey.o \
-		  crypto/encode_decode/encoder_err.o \
-		  crypto/encode_decode/encoder_lib.o \
-		  crypto/encode_decode/encoder_meth.o \
-		  crypto/encode_decode/encoder_pkey.o \
-		  crypto/property/defn_cache.o \
-		  crypto/property/property.o \
-		  crypto/property/property_err.o \
-		  crypto/property/property_parse.o \
-		  crypto/property/property_query.o \
-		  crypto/property/property_string.o \
-		  crypto/ffc/ffc_backend.o \
-		  crypto/ffc/ffc_dh.o \
-		  crypto/ffc/ffc_key_generate.o \
-		  crypto/ffc/ffc_key_validate.o \
-		  crypto/ffc/ffc_params.o \
-		  crypto/ffc/ffc_params_generate.o \
-		  crypto/ffc/ffc_params_validate.o \
-		  crypto/async/async.o \
-		  crypto/async/async_err.o \
-		  crypto/async/async_wait.o \
-		  crypto/async/arch/async_null.o \
-		  crypto/async/arch/async_posix.o \
-		  crypto/async/arch/async_win.o \
-		  crypto/hashtable/hashtable.o \
-		  crypto/hashtable/hashfunc.o \
-		  crypto/ui/ui_err.o \
-		  crypto/ui/ui_lib.o \
-		  crypto/ui/ui_null.o \
-		  crypto/ui/ui_openssl.o \
-		  crypto/ui/ui_util.o \
-		  crypto/md5/md5_dgst.o \
-		  crypto/md5/md5_one.o \
-		  crypto/md5/md5_sha1.o \
+		  crypto/x509/x_x509a.o \
 
-OBJSPROV	= providers/ossl_store.o \
-		  providers/baseprov.o \
-		  providers/defltprov.o \
-		  providers/legacyprov.o \
-		  providers/nullprov.o \
-		  providers/prov_running.o \
+OBJSPROV	= providers/baseprov.o \
 		  providers/common/bio_prov.o \
 		  providers/common/capabilities.o \
-		  providers/common/digest_to_nid.o \
-		  providers/common/provider_seeding.o \
-		  providers/common/provider_util.o \
-		  providers/common/provider_ctx.o \
-		  providers/common/provider_err.o \
-		  providers/common/securitycheck.o \
-		  providers/common/securitycheck_default.o \
 		  providers/common/der/der_digests_gen.o \
 		  providers/common/der/der_dsa_key.o \
 		  providers/common/der/der_dsa_sig.o \
@@ -752,11 +740,19 @@ OBJSPROV	= providers/ossl_store.o \
 		  providers/common/der/der_slh_dsa_gen.o \
 		  providers/common/der/der_slh_dsa_key.o \
 		  providers/common/der/der_wrap_gen.o \
+		  providers/common/digest_to_nid.o \
+		  providers/common/provider_ctx.o \
+		  providers/common/provider_err.o \
+		  providers/common/provider_seeding.o \
+		  providers/common/provider_util.o \
+		  providers/common/securitycheck.o \
+		  providers/common/securitycheck_default.o \
+		  providers/defltprov.o \
 		  providers/implementations/asymciphers/rsa_enc.o \
 		  providers/implementations/ciphers/cipher_aes.o \
+		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha.o \
 		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha1_hw.o \
 		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha256_hw.o \
-		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha.o \
 		  providers/implementations/ciphers/cipher_aes_ccm.o \
 		  providers/implementations/ciphers/cipher_aes_ccm_hw.o \
 		  providers/implementations/ciphers/cipher_aes_gcm.o \
@@ -764,21 +760,21 @@ OBJSPROV	= providers/ossl_store.o \
 		  providers/implementations/ciphers/cipher_aes_hw.o \
 		  providers/implementations/ciphers/cipher_aes_wrp.o \
 		  providers/implementations/ciphers/cipher_aes_xts.o \
-		  providers/implementations/ciphers/cipher_aes_xts_hw.o \
 		  providers/implementations/ciphers/cipher_aes_xts_fips.o \
-		  providers/implementations/ciphers/ciphercommon_block.o \
+		  providers/implementations/ciphers/cipher_aes_xts_hw.o \
+		  providers/implementations/ciphers/cipher_cts.o \
+		  providers/implementations/ciphers/cipher_null.o \
 		  providers/implementations/ciphers/ciphercommon.o \
+		  providers/implementations/ciphers/ciphercommon_block.o \
 		  providers/implementations/ciphers/ciphercommon_ccm.o \
 		  providers/implementations/ciphers/ciphercommon_ccm_hw.o \
 		  providers/implementations/ciphers/ciphercommon_gcm.o \
 		  providers/implementations/ciphers/ciphercommon_gcm_hw.o \
 		  providers/implementations/ciphers/ciphercommon_hw.o \
-		  providers/implementations/ciphers/cipher_cts.o \
-		  providers/implementations/ciphers/cipher_null.o \
 		  providers/implementations/digests/digestcommon.o \
-		  providers/implementations/digests/null_prov.o \
 		  providers/implementations/digests/md5_prov.o \
 		  providers/implementations/digests/md5_sha1_prov.o \
+		  providers/implementations/digests/null_prov.o \
 		  providers/implementations/digests/sha2_prov.o \
 		  providers/implementations/digests/sha3_prov.o \
 		  providers/implementations/encode_decode/decode_der2key.o \
@@ -839,12 +835,12 @@ OBJSPROV	= providers/ossl_store.o \
 		  providers/implementations/rands/drbg_hmac.o \
 		  providers/implementations/rands/seed_src.o \
 		  providers/implementations/rands/seed_src_jitter.o \
-		  providers/implementations/rands/test_rng.o \
+		  providers/implementations/rands/seeding/rand_cpu_arm64.o \
 		  providers/implementations/rands/seeding/rand_cpu_x86.o \
 		  providers/implementations/rands/seeding/rand_tsc.o \
 		  providers/implementations/rands/seeding/rand_unix.o \
-		  providers/implementations/rands/seeding/rand_cpu_arm64.o \
 		  providers/implementations/rands/seeding/rand_win.o \
+		  providers/implementations/rands/test_rng.o \
 		  providers/implementations/signature/ecdsa_sig.o \
 		  providers/implementations/signature/eddsa_sig.o \
 		  providers/implementations/signature/mac_legacy_sig.o \
@@ -854,6 +850,10 @@ OBJSPROV	= providers/ossl_store.o \
 		  providers/implementations/skeymgmt/aes_skmgmt.o \
 		  providers/implementations/skeymgmt/generic.o \
 		  providers/implementations/storemgmt/file_store_any2obj.o \
+		  providers/legacyprov.o \
+		  providers/nullprov.o \
+		  providers/ossl_store.o \
+		  providers/prov_running.o \
 
 OBJSSTUB	  = stub/rand_pool.o \
 		  stub/ossl_store.o \
