@@ -462,7 +462,6 @@ OBJS		= \
 		  crypto/stack/stack.o \
 		  crypto/threads_none.o \
 		  crypto/time.o \
-		  crypto/trace.o \
 		  crypto/txt_db/txt_db.o \
 		  crypto/ui/ui_err.o \
 		  crypto/ui/ui_lib.o \

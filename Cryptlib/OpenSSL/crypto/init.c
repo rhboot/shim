@@ -486,7 +486,9 @@ void OPENSSL_cleanup(void)
 #endif
 
     OSSL_TRACE(INIT, "OPENSSL_cleanup: ossl_trace_cleanup()\n");
+#ifndef OPENSSL_NO_TRACE
     ossl_trace_cleanup();
+#endif
 
     base_inited = 0;
 }
