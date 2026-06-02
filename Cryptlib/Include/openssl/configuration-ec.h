@@ -211,6 +211,9 @@ extern "C" {
 # ifndef OPENSSL_NO_JITTER
 #  define OPENSSL_NO_JITTER
 # endif
+# ifndef OPENSSL_NO_KDFS
+#  define OPENSSL_NO_KDFS
+# endif
 # ifndef OPENSSL_NO_KTLS
 #  define OPENSSL_NO_KTLS
 # endif

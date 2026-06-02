@@ -345,6 +345,7 @@ static const OSSL_ALGORITHM deflt_macs[] = {
 };
 
 static const OSSL_ALGORITHM deflt_kdfs[] = {
+#if OPENSSL_NO_KDFs
     { PROV_NAMES_HKDF, "provider=default", ossl_kdf_hkdf_functions },
     { PROV_NAMES_TLS1_3_KDF, "provider=default",
       ossl_kdf_tls1_3_kdf_functions },
@@ -356,17 +357,18 @@ static const OSSL_ALGORITHM deflt_kdfs[] = {
     { PROV_NAMES_TLS1_PRF, "provider=default", ossl_kdf_tls1_prf_functions },
     { PROV_NAMES_KBKDF, "provider=default", ossl_kdf_kbkdf_functions },
     { PROV_NAMES_X942KDF_ASN1, "provider=default", ossl_kdf_x942_kdf_functions },
-#ifndef OPENSSL_NO_SCRYPT
+# ifndef OPENSSL_NO_SCRYPT
     { PROV_NAMES_SCRYPT, "provider=default", ossl_kdf_scrypt_functions },
-#endif
+# endif /* OPENSSL_NO_SCRYPT */
     { PROV_NAMES_KRB5KDF, "provider=default", ossl_kdf_krb5kdf_functions },
     { PROV_NAMES_HMAC_DRBG_KDF, "provider=default",
       ossl_kdf_hmac_drbg_functions },
-#ifndef OPENSSL_NO_ARGON2
+# ifndef OPENSSL_NO_ARGON2
     { PROV_NAMES_ARGON2I, "provider=default", ossl_kdf_argon2i_functions },
     { PROV_NAMES_ARGON2D, "provider=default", ossl_kdf_argon2d_functions },
     { PROV_NAMES_ARGON2ID, "provider=default", ossl_kdf_argon2id_functions },
-#endif
+# endif /* OPENSSL_NO_ARGON2 */
+#endif /* OPENSSL_NO_KDFS */
     { NULL, NULL, NULL }
 };
 
@@ -381,10 +383,12 @@ static const OSSL_ALGORITHM deflt_keyexch[] = {
     { PROV_NAMES_X448, "provider=default", ossl_x448_keyexch_functions },
 # endif
 #endif
+#ifndef OPENSSL_NO_KDFS
     { PROV_NAMES_TLS1_PRF, "provider=default", ossl_kdf_tls1_prf_keyexch_functions },
     { PROV_NAMES_HKDF, "provider=default", ossl_kdf_hkdf_keyexch_functions },
     { PROV_NAMES_SCRYPT, "provider=default",
       ossl_kdf_scrypt_keyexch_functions },
+#endif
     { NULL, NULL, NULL }
 };
 
@@ -567,12 +571,14 @@ static const OSSL_ALGORITHM deflt_keymgmt[] = {
     { PROV_NAMES_ML_DSA_87, "provider=default", ossl_ml_dsa_87_keymgmt_functions,
       PROV_DESCS_ML_DSA_87 },
 #endif /* OPENSSL_NO_ML_DSA */
+#ifndef OPENSSL_NO_KDFS
     { PROV_NAMES_TLS1_PRF, "provider=default", ossl_kdf_keymgmt_functions,
       PROV_DESCS_TLS1_PRF_SIGN },
     { PROV_NAMES_HKDF, "provider=default", ossl_kdf_keymgmt_functions,
       PROV_DESCS_HKDF_SIGN },
     { PROV_NAMES_SCRYPT, "provider=default", ossl_kdf_keymgmt_functions,
       PROV_DESCS_SCRYPT_SIGN },
+#endif
     { PROV_NAMES_HMAC, "provider=default", ossl_mac_legacy_keymgmt_functions,
       PROV_DESCS_HMAC_SIGN },
     { PROV_NAMES_SIPHASH, "provider=default", ossl_mac_legacy_keymgmt_functions,

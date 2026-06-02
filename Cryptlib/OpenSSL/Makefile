@@ -601,20 +601,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/ml_kem_codecs.o \
 		  providers/implementations/exchange/ecdh_exch.o \
 		  providers/implementations/exchange/ecx_exch.o \
-		  providers/implementations/exchange/kdf_exch.o \
-		  providers/implementations/kdfs/hkdf.o \
-		  providers/implementations/kdfs/hmacdrbg_kdf.o \
-		  providers/implementations/kdfs/kbkdf.o \
-		  providers/implementations/kdfs/krb5kdf.o \
-		  providers/implementations/kdfs/pbkdf1.o \
-		  providers/implementations/kdfs/pbkdf2.o \
-		  providers/implementations/kdfs/pbkdf2_fips.o \
-		  providers/implementations/kdfs/pkcs12kdf.o \
-		  providers/implementations/kdfs/pvkkdf.o \
-		  providers/implementations/kdfs/sshkdf.o \
-		  providers/implementations/kdfs/sskdf.o \
-		  providers/implementations/kdfs/tls1_prf.o \
-		  providers/implementations/kdfs/x942kdf.o \
 		  providers/implementations/kem/ec_kem.o \
 		  providers/implementations/kem/ecx_kem.o \
 		  providers/implementations/kem/kem_util.o \
@@ -624,7 +610,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/kem/template_kem.o \
 		  providers/implementations/keymgmt/ec_kmgmt.o \
 		  providers/implementations/keymgmt/ecx_kmgmt.o \
-		  providers/implementations/keymgmt/kdf_legacy_kmgmt.o \
 		  providers/implementations/keymgmt/mac_legacy_kmgmt.o \
 		  providers/implementations/keymgmt/ml_dsa_kmgmt.o \
 		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
