@@ -91,9 +91,9 @@ extern "C" {
 # ifndef OPENSSL_NO_CIPHERS
 #  define OPENSSL_NO_CIPHERS
 # endif
-/*# ifndef OPENSSL_NO_CMAC
+# ifndef OPENSSL_NO_CMAC
 #  define OPENSSL_NO_CMAC
-# endif*/
+# endif
 # ifndef OPENSSL_NO_CMP
 #  define OPENSSL_NO_CMP
 # endif
