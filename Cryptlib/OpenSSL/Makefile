@@ -184,7 +184,6 @@ OBJS		= \
 		  crypto/bsearch.o \
 		  crypto/buffer/buf_err.o \
 		  crypto/buffer/buffer.o \
-		  crypto/cmac/cmac.o \
 		  crypto/cms/cms_asn1.o \
 		  crypto/cms/cms_att.o \
 		  crypto/cms/cms_cd.o \
