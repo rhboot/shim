@@ -248,10 +248,9 @@ extern "C" {
 # ifndef OPENSSL_NO_OCB
 #  define OPENSSL_NO_OCB
 # endif
-// TODO: Fix me
-//# ifndef OPENSSL_NO_OCSP
-//#  define OPENSSL_NO_OCSP
-//# endif
+# ifndef OPENSSL_NO_OCSP
+#  define OPENSSL_NO_OCSP
+# endif
 # ifndef OPENSSL_NO_PADLOCKENG
 #  define OPENSSL_NO_PADLOCKENG
 # endif

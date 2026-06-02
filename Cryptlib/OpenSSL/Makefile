@@ -408,15 +408,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/objects/obj_err.o \
 		  crypto/objects/obj_lib.o \
 		  crypto/objects/obj_xref.o \
-		  crypto/ocsp/ocsp_asn.o \
-		  crypto/ocsp/ocsp_cl.o \
-		  crypto/ocsp/ocsp_err.o \
-		  crypto/ocsp/ocsp_ext.o \
-		  crypto/ocsp/ocsp_lib.o \
-		  crypto/ocsp/ocsp_prn.o \
-		  crypto/ocsp/ocsp_srv.o \
-		  crypto/ocsp/ocsp_vfy.o \
-		  crypto/ocsp/v3_ocsp.o \
 		  crypto/packet.o \
 		  crypto/param_build.o \
 		  crypto/param_build_set.o \
