@@ -373,22 +373,24 @@ static const OSSL_ALGORITHM deflt_kdfs[] = {
 };
 
 static const OSSL_ALGORITHM deflt_keyexch[] = {
-#ifndef OPENSSL_NO_DH
+#ifndef OPENSSL_NO_KEYEXCH
+# ifndef OPENSSL_NO_DH
     { PROV_NAMES_DH, "provider=default", ossl_dh_keyexch_functions },
-#endif
-#ifndef OPENSSL_NO_EC
+# endif
+# ifndef OPENSSL_NO_EC
     { PROV_NAMES_ECDH, "provider=default", ossl_ecdh_keyexch_functions },
-# ifndef OPENSSL_NO_ECX
+#  ifndef OPENSSL_NO_ECX
     { PROV_NAMES_X25519, "provider=default", ossl_x25519_keyexch_functions },
     { PROV_NAMES_X448, "provider=default", ossl_x448_keyexch_functions },
+#  endif
 # endif
-#endif
-#ifndef OPENSSL_NO_KDFS
+# ifndef OPENSSL_NO_KDFS
     { PROV_NAMES_TLS1_PRF, "provider=default", ossl_kdf_tls1_prf_keyexch_functions },
     { PROV_NAMES_HKDF, "provider=default", ossl_kdf_hkdf_keyexch_functions },
     { PROV_NAMES_SCRYPT, "provider=default",
       ossl_kdf_scrypt_keyexch_functions },
-#endif
+# endif
+#endif /* OPENSSL_NO_KEYEXCH */
     { NULL, NULL, NULL }
 };
 
