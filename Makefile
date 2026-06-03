@@ -241,7 +241,6 @@ PROVIDERS_DIRS = common/der \
 		 implementations/ciphers \
 		 implementations/digests \
 		 implementations/encode_decode \
-		 implementations/exchange \
 		 implementations/kem \
 		 implementations/keymgmt \
 		 implementations/macs \

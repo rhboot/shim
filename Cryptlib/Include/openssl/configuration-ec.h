@@ -217,6 +217,9 @@ extern "C" {
 # ifndef OPENSSL_NO_KDFS
 #  define OPENSSL_NO_KDFS
 # endif
+# ifndef OPENSSL_NO_KEYEXCH
+#  define OPENSSL_NO_KEYEXCH
+# endif
 # ifndef OPENSSL_NO_KTLS
 #  define OPENSSL_NO_KTLS
 # endif
