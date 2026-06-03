@@ -599,8 +599,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/ml_common_codecs.o \
 		  providers/implementations/encode_decode/ml_dsa_codecs.o \
 		  providers/implementations/encode_decode/ml_kem_codecs.o \
-		  providers/implementations/exchange/ecdh_exch.o \
-		  providers/implementations/exchange/ecx_exch.o \
 		  providers/implementations/kem/ec_kem.o \
 		  providers/implementations/kem/ecx_kem.o \
 		  providers/implementations/kem/kem_util.o \
