@@ -224,13 +224,6 @@ OBJS		= \
 		  crypto/dso/dso_err.o \
 		  crypto/dso/dso_lib.o \
 		  crypto/dso/dso_openssl.o \
-		  crypto/ec/curve25519.o \
-		  crypto/ec/curve448/arch_64/f_impl64.o \
-		  crypto/ec/curve448/curve448.o \
-		  crypto/ec/curve448/curve448_tables.o \
-		  crypto/ec/curve448/eddsa.o \
-		  crypto/ec/curve448/f_generic.o \
-		  crypto/ec/curve448/scalar.o \
 		  crypto/ec/ec_ameth.o \
 		  crypto/ec/ec_asn1.o \
 		  crypto/ec/ec_backend.o \
@@ -264,9 +257,6 @@ OBJS		= \
 		  crypto/ec/ecp_oct.o \
 		  crypto/ec/ecp_ppc.o \
 		  crypto/ec/ecp_smpl.o \
-		  crypto/ec/ecx_backend.o \
-		  crypto/ec/ecx_key.o \
-		  crypto/ec/ecx_meth.o \
 		  crypto/encode_decode/decoder_err.o \
 		  crypto/encode_decode/decoder_lib.o \
 		  crypto/encode_decode/decoder_meth.o \
@@ -563,8 +553,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/common/der/der_ec_gen.o \
 		  providers/common/der/der_ec_key.o \
 		  providers/common/der/der_ec_sig.o \
-		  providers/common/der/der_ecx_gen.o \
-		  providers/common/der/der_ecx_key.o \
 		  providers/common/der/der_ml_dsa_gen.o \
 		  providers/common/der/der_ml_dsa_key.o \
 		  providers/common/der/der_rsa_gen.o \
@@ -593,14 +581,12 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/ml_dsa_codecs.o \
 		  providers/implementations/encode_decode/ml_kem_codecs.o \
 		  providers/implementations/kem/ec_kem.o \
-		  providers/implementations/kem/ecx_kem.o \
 		  providers/implementations/kem/kem_util.o \
 		  providers/implementations/kem/ml_kem_kem.o \
 		  providers/implementations/kem/mlx_kem.o \
 		  providers/implementations/kem/rsa_kem.o \
 		  providers/implementations/kem/template_kem.o \
 		  providers/implementations/keymgmt/ec_kmgmt.o \
-		  providers/implementations/keymgmt/ecx_kmgmt.o \
 		  providers/implementations/keymgmt/ml_dsa_kmgmt.o \
 		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
 		  providers/implementations/keymgmt/mlx_kmgmt.o \
@@ -615,7 +601,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/rands/seeding/rand_tsc.o \
 		  providers/implementations/rands/test_rng.o \
 		  providers/implementations/signature/ecdsa_sig.o \
-		  providers/implementations/signature/eddsa_sig.o \
 		  providers/implementations/signature/ml_dsa_sig.o \
 		  providers/implementations/signature/rsa_sig.o \
 		  providers/implementations/skeymgmt/generic.o \
