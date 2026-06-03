@@ -247,13 +247,9 @@ OBJS		= \
 		  crypto/ec/eck_prn.o \
 		  crypto/ec/ecp_mont.o \
 		  crypto/ec/ecp_nist.o \
-		  crypto/ec/ecp_nistp224.o \
-		  crypto/ec/ecp_nistp256.o \
 		  crypto/ec/ecp_nistp384.o \
 		  crypto/ec/ecp_nistp521.o \
 		  crypto/ec/ecp_nistputil.o \
-		  crypto/ec/ecp_nistz256.o \
-		  crypto/ec/ecp_nistz256_table.o \
 		  crypto/ec/ecp_oct.o \
 		  crypto/ec/ecp_ppc.o \
 		  crypto/ec/ecp_smpl.o \

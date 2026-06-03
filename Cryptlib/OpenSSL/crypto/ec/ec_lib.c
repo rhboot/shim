@@ -94,12 +94,19 @@ void EC_pre_comp_free(EC_GROUP *group)
 #endif
         break;
 #ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
+# ifndef OPENSSL_NO_WEAK_EC
     case PCT_nistp224:
         EC_nistp224_pre_comp_free(group->pre_comp.nistp224);
         break;
     case PCT_nistp256:
         EC_nistp256_pre_comp_free(group->pre_comp.nistp256);
         break;
+# else /* !OPENSSL_NO_WEAK_EC */
+    case PCT_nistp224:
+    case PCT_nistp256:
+	break;
+# endif /* OPENSSL_NO_WEAK_EC */
+
     case PCT_nistp384:
         ossl_ec_nistp384_pre_comp_free(group->pre_comp.nistp384);
         break;
@@ -187,12 +194,18 @@ int EC_GROUP_copy(EC_GROUP *dest, const EC_GROUP *src)
 #endif
         break;
 #ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
+# ifndef OPENSSL_NO_WEAK_EC
     case PCT_nistp224:
         dest->pre_comp.nistp224 = EC_nistp224_pre_comp_dup(src->pre_comp.nistp224);
         break;
     case PCT_nistp256:
         dest->pre_comp.nistp256 = EC_nistp256_pre_comp_dup(src->pre_comp.nistp256);
         break;
+# else /* !OPENSSL_NO_WEAK_EC */
+    case PCT_nistp224:
+    case PCT_nistp256:
+	break;
+# endif /* OPENSSL_NO_WEAK_EC */
     case PCT_nistp384:
         dest->pre_comp.nistp384 = ossl_ec_nistp384_pre_comp_dup(src->pre_comp.nistp384);
         break;
