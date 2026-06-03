@@ -2836,7 +2836,7 @@ static const ec_list_element curve_list[] = {
     /* prime field curves */
     /* secg curves */
     {NID_secp224r1, &_EC_NIST_PRIME_224.h,
-# if !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+# if !defined(OPENSSL_NO_EC_NISTP_64_GCC_128) && !defined(OPENSSL_NO_WEAK_EC)
      EC_GFp_nistp224_method,
 # else
      0,
@@ -2871,7 +2871,7 @@ static const ec_list_element curve_list[] = {
      EC_GFp_nistz256_method,
 # elif defined(S390X_EC_ASM)
      EC_GFp_s390x_nistp256_method,
-# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128) && !defined(OPENSSL_NO_WEAK_EC)
      EC_GFp_nistp256_method,
 # else
      0,
@@ -2928,7 +2928,7 @@ static const ec_list_element curve_list[] = {
      "SECG curve over a 192 bit prime field"},
     {NID_secp224k1, &_EC_SECG_PRIME_224K1.h, 0,
      "SECG curve over a 224 bit prime field"},
-# ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
+# if !defined(OPENSSL_NO_EC_NISTP_64_GCC_128) && !defined(OPENSSL_NO_WEAK_EC)
     {NID_secp224r1, &_EC_NIST_PRIME_224.h, EC_GFp_nistp224_method,
      "NIST/SECG curve over a 224 bit prime field"},
 # else
@@ -2974,7 +2974,7 @@ static const ec_list_element curve_list[] = {
      EC_GFp_nistz256_method,
 # elif defined(S390X_EC_ASM)
      EC_GFp_s390x_nistp256_method,
-# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128) && !defined(OPENSSL_NO_WEAK_EC)
      EC_GFp_nistp256_method,
 # else
      0,

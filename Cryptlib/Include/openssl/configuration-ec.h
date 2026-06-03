@@ -163,6 +163,9 @@ extern "C" {
 //# ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
 //#  define OPENSSL_NO_EC_NISTP_64_GCC_128
 //# endif
+# ifndef OPENSSL_NO_WEAK_EC
+#  define OPENSSL_NO_WEAK_EC
+# endif
 # ifndef OPENSSL_NO_ECX
 #  define OPENSSL_NO_ECX
 # endif
