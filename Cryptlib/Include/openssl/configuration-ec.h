@@ -325,6 +325,9 @@ extern "C" {
 # ifndef OPENSSL_NO_RMD160
 #  define OPENSSL_NO_RMD160
 # endif
+# ifndef OPENSSL_NO_RSA_ASYM_CIPHER
+#  define OPENSSL_NO_RSA_ASYM_CIPHER
+# endif
 # ifndef OPENSSL_NO_SCRYPT
 #  define OPENSSL_NO_SCRYPT
 # endif
