@@ -61,15 +61,7 @@ endif
 LDFLAGS		= -nostdlib -znocombreloc
 
 TARGET		= libopenssl.a
-OBJS		= crypto/aes/aes_cbc.o \
-		  crypto/aes/aes_cfb.o \
-		  crypto/aes/aes_core.o \
-		  crypto/aes/aes_ecb.o \
-		  crypto/aes/aes_ige.o \
-		  crypto/aes/aes_misc.o \
-		  crypto/aes/aes_ofb.o \
-		  crypto/aes/aes_wrap.o \
-		  crypto/aes/aes_x86core.o \
+OBJS		= \
 		  crypto/array_alloc.o \
 		  crypto/asn1/a_bitstr.o \
 		  crypto/asn1/a_d2i_fp.o \
@@ -304,9 +296,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/evp/dh_support.o \
 		  crypto/evp/digest.o \
 		  crypto/evp/dsa_ctrl.o \
-		  crypto/evp/e_aes.o \
-		  crypto/evp/e_aes_cbc_hmac_sha1.o \
-		  crypto/evp/e_aes_cbc_hmac_sha256.o \
 		  crypto/evp/e_null.o \
 		  crypto/evp/e_xcbc_d.o \
 		  crypto/evp/ec_ctrl.o \
@@ -388,17 +377,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/ml_dsa/ml_dsa_sample.o \
 		  crypto/ml_dsa/ml_dsa_sign.o \
 		  crypto/ml_kem/ml_kem.o \
-		  crypto/modes/cbc128.o \
-		  crypto/modes/ccm128.o \
-		  crypto/modes/cfb128.o \
-		  crypto/modes/ctr128.o \
-		  crypto/modes/cts128.o \
-		  crypto/modes/gcm128.o \
-		  crypto/modes/ofb128.o \
-		  crypto/modes/siv128.o \
-		  crypto/modes/wrap128.o \
-		  crypto/modes/xts128.o \
-		  crypto/modes/xts128gb.o \
 		  crypto/o_dir.o \
 		  crypto/o_init.o \
 		  crypto/o_str.o \
@@ -609,28 +587,10 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/common/securitycheck_default.o \
 		  providers/defltprov.o \
 		  providers/implementations/asymciphers/rsa_enc.o \
-		  providers/implementations/ciphers/cipher_aes.o \
-		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha.o \
-		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha1_hw.o \
-		  providers/implementations/ciphers/cipher_aes_cbc_hmac_sha256_hw.o \
-		  providers/implementations/ciphers/cipher_aes_ccm.o \
-		  providers/implementations/ciphers/cipher_aes_ccm_hw.o \
-		  providers/implementations/ciphers/cipher_aes_gcm.o \
-		  providers/implementations/ciphers/cipher_aes_gcm_hw.o \
-		  providers/implementations/ciphers/cipher_aes_hw.o \
-		  providers/implementations/ciphers/cipher_aes_wrp.o \
-		  providers/implementations/ciphers/cipher_aes_xts.o \
-		  providers/implementations/ciphers/cipher_aes_xts_fips.o \
-		  providers/implementations/ciphers/cipher_aes_xts_hw.o \
 		  providers/implementations/ciphers/cipher_cts.o \
 		  providers/implementations/ciphers/cipher_null.o \
 		  providers/implementations/ciphers/ciphercommon.o \
 		  providers/implementations/ciphers/ciphercommon_block.o \
-		  providers/implementations/ciphers/ciphercommon_ccm.o \
-		  providers/implementations/ciphers/ciphercommon_ccm_hw.o \
-		  providers/implementations/ciphers/ciphercommon_gcm.o \
-		  providers/implementations/ciphers/ciphercommon_gcm_hw.o \
-		  providers/implementations/ciphers/ciphercommon_hw.o \
 		  providers/implementations/digests/digestcommon.o \
 		  providers/implementations/digests/md5_prov.o \
 		  providers/implementations/digests/md5_sha1_prov.o \
@@ -690,7 +650,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/signature/mac_legacy_sig.o \
 		  providers/implementations/signature/ml_dsa_sig.o \
 		  providers/implementations/signature/rsa_sig.o \
-		  providers/implementations/skeymgmt/aes_skmgmt.o \
 		  providers/implementations/skeymgmt/generic.o \
 		  providers/legacyprov.o \
 		  providers/nullprov.o \

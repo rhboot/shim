@@ -164,6 +164,7 @@ static const OSSL_ALGORITHM deflt_digests[] = {
 
 static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_NULL, ossl_null_functions),
+#ifndef OPENSSL_NO_AES
     ALG(PROV_NAMES_AES_256_ECB, ossl_aes256ecb_functions),
     ALG(PROV_NAMES_AES_192_ECB, ossl_aes192ecb_functions),
     ALG(PROV_NAMES_AES_128_ECB, ossl_aes128ecb_functions),
@@ -190,19 +191,19 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_AES_128_CTR, ossl_aes128ctr_functions),
     ALG(PROV_NAMES_AES_256_XTS, ossl_aes256xts_functions),
     ALG(PROV_NAMES_AES_128_XTS, ossl_aes128xts_functions),
-#ifndef OPENSSL_NO_OCB
+# ifndef OPENSSL_NO_OCB
     ALG(PROV_NAMES_AES_256_OCB, ossl_aes256ocb_functions),
     ALG(PROV_NAMES_AES_192_OCB, ossl_aes192ocb_functions),
     ALG(PROV_NAMES_AES_128_OCB, ossl_aes128ocb_functions),
-#endif /* OPENSSL_NO_OCB */
-#ifndef OPENSSL_NO_SIV
+# endif /* OPENSSL_NO_OCB */
+# ifndef OPENSSL_NO_SIV
     ALG(PROV_NAMES_AES_128_SIV, ossl_aes128siv_functions),
     ALG(PROV_NAMES_AES_192_SIV, ossl_aes192siv_functions),
     ALG(PROV_NAMES_AES_256_SIV, ossl_aes256siv_functions),
     ALG(PROV_NAMES_AES_128_GCM_SIV, ossl_aes128gcm_siv_functions),
     ALG(PROV_NAMES_AES_192_GCM_SIV, ossl_aes192gcm_siv_functions),
     ALG(PROV_NAMES_AES_256_GCM_SIV, ossl_aes256gcm_siv_functions),
-#endif /* OPENSSL_NO_SIV */
+# endif /* OPENSSL_NO_SIV */
     ALG(PROV_NAMES_AES_256_GCM, ossl_aes256gcm_functions),
     ALG(PROV_NAMES_AES_192_GCM, ossl_aes192gcm_functions),
     ALG(PROV_NAMES_AES_128_GCM, ossl_aes128gcm_functions),
@@ -229,6 +230,7 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
         ossl_cipher_capable_aes_cbc_hmac_sha256),
     ALGC(PROV_NAMES_AES_256_CBC_HMAC_SHA256, ossl_aes256cbc_hmac_sha256_functions,
          ossl_cipher_capable_aes_cbc_hmac_sha256),
+#endif /* OPENSSL_NO_AES */
 #ifndef OPENSSL_NO_ARIA
     ALG(PROV_NAMES_ARIA_256_GCM, ossl_aria256gcm_functions),
     ALG(PROV_NAMES_ARIA_192_GCM, ossl_aria192gcm_functions),
@@ -635,8 +637,10 @@ static const OSSL_ALGORITHM deflt_keymgmt[] = {
 };
 
 static const OSSL_ALGORITHM deflt_skeymgmt[] = {
+#ifndef OPENSSL_NO_AES
     { PROV_NAMES_AES, "provider=default", ossl_aes_skeymgmt_functions,
       PROV_DESCS_AES },
+#endif /* OPENSSL_NO_AES */
     { PROV_NAMES_GENERIC, "provider=default", ossl_generic_skeymgmt_functions,
       PROV_DESCS_GENERIC },
     { NULL, NULL, NULL }
