@@ -418,7 +418,9 @@ static const OSSL_ALGORITHM deflt_rands[] = {
 #ifndef OPENSSL_NO_JITTER
     { PROV_NAMES_JITTER, "provider=default", ossl_jitter_functions },
 #endif
+#ifndef OPENSSL_NO_TEST_RNG
     { PROV_NAMES_TEST_RAND, "provider=default", ossl_test_rng_functions },
+#endif
     { NULL, NULL, NULL }
 };
 
