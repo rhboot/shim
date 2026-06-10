@@ -493,8 +493,10 @@ static const OSSL_ALGORITHM deflt_signature[] = {
 # endif
 #endif
 #ifndef OPENSSL_NO_ML_DSA
+# ifndef OPENSSL_NO_WEAK_ML_DSA
     { PROV_NAMES_ML_DSA_44, "provider=default", ossl_ml_dsa_44_signature_functions },
     { PROV_NAMES_ML_DSA_65, "provider=default", ossl_ml_dsa_65_signature_functions },
+# endif
     { PROV_NAMES_ML_DSA_87, "provider=default", ossl_ml_dsa_87_signature_functions },
 #endif
 #ifndef OPENSSL_NO_LEGACY_MAC
@@ -601,10 +603,12 @@ static const OSSL_ALGORITHM deflt_keymgmt[] = {
 # endif
 #endif
 #ifndef OPENSSL_NO_ML_DSA
+# ifndef OPENSSL_NO_WEAK_ML_DSA
     { PROV_NAMES_ML_DSA_44, "provider=default", ossl_ml_dsa_44_keymgmt_functions,
       PROV_DESCS_ML_DSA_44 },
     { PROV_NAMES_ML_DSA_65, "provider=default", ossl_ml_dsa_65_keymgmt_functions,
       PROV_DESCS_ML_DSA_65 },
+# endif
     { PROV_NAMES_ML_DSA_87, "provider=default", ossl_ml_dsa_87_keymgmt_functions,
       PROV_DESCS_ML_DSA_87 },
 #endif /* OPENSSL_NO_ML_DSA */
