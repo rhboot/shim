@@ -262,6 +262,9 @@ extern "C" {
 # ifndef OPENSSL_NO_MDC2
 #  define OPENSSL_NO_MDC2
 # endif
+# ifndef OPENSSL_NO_WEAK_ML_DSA
+#  define OPENSSL_NO_WEAK_ML_DSA
+# endif
 // TODO: PQC
 /*# ifndef OPENSSL_NO_ML_DSA
 #  define OPENSSL_NO_ML_DSA
