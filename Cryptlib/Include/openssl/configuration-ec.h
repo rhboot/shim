@@ -37,6 +37,9 @@ extern "C" {
 # ifndef OPENSSL_NO_ACVP_TESTS
 #  define OPENSSL_NO_ACVP_TESTS
 # endif
+# ifndef OPENSSL_NO_AES
+#  define OPENSSL_NO_AES
+# endif
 # ifndef OPENSSL_NO_AFALGENG
 #  define OPENSSL_NO_AFALGENG
 # endif
