@@ -585,10 +585,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
 		  providers/implementations/keymgmt/mlx_kmgmt.o \
 		  providers/implementations/keymgmt/rsa_kmgmt.o \
-		  providers/implementations/rands/drbg.o \
-		  providers/implementations/rands/drbg_ctr.o \
-		  providers/implementations/rands/drbg_hash.o \
-		  providers/implementations/rands/drbg_hmac.o \
 		  providers/implementations/rands/seed_src.o \
 		  providers/implementations/rands/seeding/rand_cpu_arm64.o \
 		  providers/implementations/rands/seeding/rand_cpu_x86.o \
