@@ -474,6 +474,7 @@ nonlegacy:
     return 1;
 }
 
+#ifndef OPENSSL_NO_SKEYMGMT
 /*
  * This function is basically evp_cipher_init_internal without ENGINE support.
  * They should be combined when engines are not supported any longer.
@@ -630,6 +631,7 @@ int EVP_CipherInit_SKEY(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
 {
     return evp_cipher_init_skey_internal(ctx, cipher, skey, iv, iv_len, enc, params);
 }
+#endif
 
 int EVP_CipherInit_ex2(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
                        const unsigned char *key, const unsigned char *iv,
@@ -1928,6 +1930,7 @@ static void *evp_cipher_from_algorithm(const int name_id,
             cipher->dinit = OSSL_FUNC_cipher_decrypt_init(fns);
             decinit = 1;
             break;
+#ifndef OPENSSL_NO_SKEYMGMT
         case OSSL_FUNC_CIPHER_ENCRYPT_SKEY_INIT:
             if (cipher->einit_skey != NULL)
                 break;
@@ -1940,6 +1943,7 @@ static void *evp_cipher_from_algorithm(const int name_id,
             cipher->dinit_skey = OSSL_FUNC_cipher_decrypt_skey_init(fns);
             decinit = 1;
             break;
+#endif
         case OSSL_FUNC_CIPHER_UPDATE:
             if (cipher->cupdate != NULL)
                 break;

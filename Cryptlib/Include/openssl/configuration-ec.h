@@ -259,6 +259,9 @@ extern "C" {
 # ifndef OPENSSL_NO_SHA3
 #  define OPENSSL_NO_SHA3
 # endif
+# ifndef OPENSSL_NO_SKEYMGMT
+#  define OPENSSL_NO_SKEYMGMT
+# endif
 # ifndef OPENSSL_NO_SM3
 #  define OPENSSL_NO_SM3
 # endif

@@ -320,9 +320,7 @@ OBJS		= \
 		  crypto/evp/pmeth_check.o \
 		  crypto/evp/pmeth_gn.o \
 		  crypto/evp/pmeth_lib.o \
-		  crypto/evp/s_lib.o \
 		  crypto/evp/signature.o \
-		  crypto/evp/skeymgmt_meth.o \
 		  crypto/ex_data.o \
 		  crypto/ffc/ffc_backend.o \
 		  crypto/ffc/ffc_dh.o \
@@ -583,7 +581,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/signature/ecdsa_sig.o \
 		  providers/implementations/signature/ml_dsa_sig.o \
 		  providers/implementations/signature/rsa_sig.o \
-		  providers/implementations/skeymgmt/generic.o \
 		  providers/legacyprov.o \
 		  providers/nullprov.o \
 		  providers/prov_running.o \

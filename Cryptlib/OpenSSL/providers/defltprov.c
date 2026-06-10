@@ -692,12 +692,14 @@ static const OSSL_ALGORITHM deflt_keymgmt[] = {
 };
 
 static const OSSL_ALGORITHM deflt_skeymgmt[] = {
-#ifndef OPENSSL_NO_AES
+#ifndef OPENSSL_NO_SKEYMGMT
+# ifndef OPENSSL_NO_AES
     { PROV_NAMES_AES, "provider=default", ossl_aes_skeymgmt_functions,
       PROV_DESCS_AES },
-#endif /* OPENSSL_NO_AES */
+# endif /* OPENSSL_NO_AES */
     { PROV_NAMES_GENERIC, "provider=default", ossl_generic_skeymgmt_functions,
       PROV_DESCS_GENERIC },
+#endif /* OPENSSL_NO_SKEYMGMT */
     { NULL, NULL, NULL }
 };
 
