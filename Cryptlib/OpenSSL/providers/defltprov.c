@@ -373,8 +373,10 @@ static const OSSL_ALGORITHM deflt_kdfs[] = {
     { PROV_NAMES_SCRYPT, "provider=default", ossl_kdf_scrypt_functions },
 # endif /* OPENSSL_NO_SCRYPT */
     { PROV_NAMES_KRB5KDF, "provider=default", ossl_kdf_krb5kdf_functions },
+# ifndef OPENSSL_NO_DRBG
     { PROV_NAMES_HMAC_DRBG_KDF, "provider=default",
       ossl_kdf_hmac_drbg_functions },
+# endif
 # ifndef OPENSSL_NO_ARGON2
     { PROV_NAMES_ARGON2I, "provider=default", ossl_kdf_argon2i_functions },
     { PROV_NAMES_ARGON2D, "provider=default", ossl_kdf_argon2d_functions },
@@ -407,9 +409,11 @@ static const OSSL_ALGORITHM deflt_keyexch[] = {
 };
 
 static const OSSL_ALGORITHM deflt_rands[] = {
+#ifndef OPENSSL_NO_DRBG
     { PROV_NAMES_CTR_DRBG, "provider=default", ossl_drbg_ctr_functions },
     { PROV_NAMES_HASH_DRBG, "provider=default", ossl_drbg_hash_functions },
     { PROV_NAMES_HMAC_DRBG, "provider=default", ossl_drbg_ossl_hmac_functions },
+#endif
     { PROV_NAMES_SEED_SRC, "provider=default", ossl_seed_src_functions },
 #ifndef OPENSSL_NO_JITTER
     { PROV_NAMES_JITTER, "provider=default", ossl_jitter_functions },
