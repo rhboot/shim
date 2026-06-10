@@ -55,6 +55,9 @@ extern "C" {
 # ifndef OPENSSL_NO_ASAN
 #  define OPENSSL_NO_ASAN
 # endif
+# ifndef OPENSSL_NO_ASYM_KEM
+#  define OPENSSL_NO_ASYM_KEM
+# endif
 # ifndef OPENSSL_NO_ASYNC
 #  define OPENSSL_NO_ASYNC
 # endif
