@@ -105,17 +105,23 @@ static const OSSL_ALGORITHM deflt_digests[] = {
     { PROV_NAMES_SHA2_224, "provider=default", ossl_sha224_functions },
 #endif
     { PROV_NAMES_SHA2_256, "provider=default", ossl_sha256_functions },
+#ifndef OPENSSL_NO_TRUNCATED_SHA
     { PROV_NAMES_SHA2_256_192, "provider=default", ossl_sha256_192_functions },
+#endif
     { PROV_NAMES_SHA2_384, "provider=default", ossl_sha384_functions },
     { PROV_NAMES_SHA2_512, "provider=default", ossl_sha512_functions },
+#ifndef OPENSSL_NO_TRUNCATED_SHA
     { PROV_NAMES_SHA2_512_224, "provider=default", ossl_sha512_224_functions },
     { PROV_NAMES_SHA2_512_256, "provider=default", ossl_sha512_256_functions },
+#endif
 
+#ifndef OPENSSL_NO_TRUNCATED_SHA
     /* We agree with NIST here, so one name only */
     { PROV_NAMES_SHA3_224, "provider=default", ossl_sha3_224_functions },
     { PROV_NAMES_SHA3_256, "provider=default", ossl_sha3_256_functions },
     { PROV_NAMES_SHA3_384, "provider=default", ossl_sha3_384_functions },
     { PROV_NAMES_SHA3_512, "provider=default", ossl_sha3_512_functions },
+#endif
 
     { PROV_NAMES_KECCAK_224, "provider=default", ossl_keccak_224_functions },
     { PROV_NAMES_KECCAK_256, "provider=default", ossl_keccak_256_functions },
@@ -420,10 +426,12 @@ static const OSSL_ALGORITHM deflt_signature[] = {
     { PROV_NAMES_DSA_SHA256, "provider=default", ossl_dsa_sha256_signature_functions },
     { PROV_NAMES_DSA_SHA384, "provider=default", ossl_dsa_sha384_signature_functions },
     { PROV_NAMES_DSA_SHA512, "provider=default", ossl_dsa_sha512_signature_functions },
+# ifndef OPENSSL_NO_TRUNCATED_SHA
     { PROV_NAMES_DSA_SHA3_224, "provider=default", ossl_dsa_sha3_224_signature_functions },
     { PROV_NAMES_DSA_SHA3_256, "provider=default", ossl_dsa_sha3_256_signature_functions },
     { PROV_NAMES_DSA_SHA3_384, "provider=default", ossl_dsa_sha3_384_signature_functions },
     { PROV_NAMES_DSA_SHA3_512, "provider=default", ossl_dsa_sha3_512_signature_functions },
+# endif
 #endif
     { PROV_NAMES_RSA, "provider=default", ossl_rsa_signature_functions },
 #if !defined(OPENSSL_NO_RMD160) && !defined(FIPS_MODULE)
@@ -436,8 +444,10 @@ static const OSSL_ALGORITHM deflt_signature[] = {
     { PROV_NAMES_RSA_SHA256, "provider=default", ossl_rsa_sha256_signature_functions },
     { PROV_NAMES_RSA_SHA384, "provider=default", ossl_rsa_sha384_signature_functions },
     { PROV_NAMES_RSA_SHA512, "provider=default", ossl_rsa_sha512_signature_functions },
+#ifndef OPENSSL_NO_TRUNCATED_SHA
     { PROV_NAMES_RSA_SHA512_224, "provider=default", ossl_rsa_sha512_224_signature_functions },
     { PROV_NAMES_RSA_SHA512_256, "provider=default", ossl_rsa_sha512_256_signature_functions },
+#endif
     { PROV_NAMES_RSA_SHA3_224, "provider=default", ossl_rsa_sha3_224_signature_functions },
     { PROV_NAMES_RSA_SHA3_256, "provider=default", ossl_rsa_sha3_256_signature_functions },
     { PROV_NAMES_RSA_SHA3_384, "provider=default", ossl_rsa_sha3_384_signature_functions },
