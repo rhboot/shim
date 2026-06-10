@@ -151,7 +151,7 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID)) {
 			Cert = (EFI_SIGNATURE_DATA *) ((UINT8 *) CertList + sizeof (EFI_SIGNATURE_LIST) + CertList->SignatureHeaderSize);
 			CertSize = CertList->SignatureSize - sizeof(EFI_GUID);
-			dprint(L"trying to verify cert %d (%s)\n", i++, dbname);
+			dprint(L"trying to verify cert %d (%s)\n", i, dbname);
 			if (verify_x509(Cert->SignatureData, CertSize)) {
 				if (verify_eku(Cert->SignatureData, CertSize)) {
 					drain_openssl_errors();
@@ -178,6 +178,7 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 
 		dbsize -= CertList->SignatureListSize;
 		CertList = (EFI_SIGNATURE_LIST *) ((UINT8 *) CertList + CertList->SignatureListSize);
+		i += 1;
 	}
 
 	return DATA_NOT_FOUND;
