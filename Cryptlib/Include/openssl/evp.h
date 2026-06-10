@@ -970,8 +970,10 @@ const EVP_MD *EVP_sha224(void);
 const EVP_MD *EVP_sha256(void);
 const EVP_MD *EVP_sha384(void);
 const EVP_MD *EVP_sha512(void);
+# ifndef OPENSSL_NO_TRUNCATED_SHA
 const EVP_MD *EVP_sha512_224(void);
 const EVP_MD *EVP_sha512_256(void);
+# endif
 const EVP_MD *EVP_sha3_224(void);
 const EVP_MD *EVP_sha3_256(void);
 const EVP_MD *EVP_sha3_384(void);

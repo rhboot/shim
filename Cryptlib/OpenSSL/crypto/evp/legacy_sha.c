@@ -61,8 +61,10 @@ IMPLEMENT_LEGACY_EVP_MD_METH(sha224, SHA224)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha256, SHA256)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha384, SHA384)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha512, SHA512)
+#ifndef OPENSSL_NO_TRUNCATED_SHA
 IMPLEMENT_LEGACY_EVP_MD_METH(sha512_224_int, sha512_224)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha512_256_int, sha512_256)
+#endif
 IMPLEMENT_LEGACY_EVP_MD_METH_SHA3(sha3_int, ossl_sha3, '\x06')
 IMPLEMENT_LEGACY_EVP_MD_METH_SHAKE(shake, ossl_sha3, '\x1f')
 
@@ -138,6 +140,7 @@ const EVP_MD *EVP_sha256(void)
     return &sha256_md;
 }
 
+#ifndef OPENSSL_NO_TRUNCATED_SHA
 static const EVP_MD sha512_224_md = {
     NID_sha512_224,
     NID_sha512_224WithRSAEncryption,
@@ -167,6 +170,7 @@ const EVP_MD *EVP_sha512_256(void)
 {
     return &sha512_256_md;
 }
+#endif
 
 static const EVP_MD sha384_md = {
     NID_sha384,

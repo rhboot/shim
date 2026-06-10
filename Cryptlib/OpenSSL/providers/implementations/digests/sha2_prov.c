@@ -73,7 +73,7 @@ IMPLEMENT_digest_functions(sha224, SHA256_CTX,
 IMPLEMENT_digest_functions(sha256, SHA256_CTX,
                            SHA256_CBLOCK, SHA256_DIGEST_LENGTH, SHA2_FLAGS,
                            SHA256_Init, SHA256_Update, SHA256_Final)
-#ifndef FIPS_MODULE
+#if !defined(FIPS_MODULE) && !defined(OPENSSL_NO_TRUNCATED_SHA)
 /* ossl_sha256_192_functions */
 IMPLEMENT_digest_functions(sha256_192, SHA256_CTX,
                            SHA256_CBLOCK, SHA256_192_DIGEST_LENGTH, SHA2_FLAGS,
@@ -89,6 +89,7 @@ IMPLEMENT_digest_functions(sha512, SHA512_CTX,
                            SHA512_CBLOCK, SHA512_DIGEST_LENGTH, SHA2_FLAGS,
                            SHA512_Init, SHA512_Update, SHA512_Final)
 
+#ifndef OPENSSL_NO_TRUNCATED_SHA
 /* ossl_sha512_224_functions */
 IMPLEMENT_digest_functions(sha512_224, SHA512_CTX,
                            SHA512_CBLOCK, SHA224_DIGEST_LENGTH, SHA2_FLAGS,
@@ -98,3 +99,4 @@ IMPLEMENT_digest_functions(sha512_224, SHA512_CTX,
 IMPLEMENT_digest_functions(sha512_256, SHA512_CTX,
                            SHA512_CBLOCK, SHA256_DIGEST_LENGTH, SHA2_FLAGS,
                            sha512_256_init, SHA512_Update, SHA512_Final)
+#endif
