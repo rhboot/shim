@@ -377,6 +377,9 @@ extern "C" {
 # ifndef OPENSSL_NO_TESTS
 #  define OPENSSL_NO_TESTS
 # endif
+# ifndef OPENSSL_NO_TEST_RNG
+#  define OPENSSL_NO_TEST_RNG
+# endif
 # ifndef OPENSSL_NO_TFO
 #  define OPENSSL_NO_TFO
 # endif
