@@ -573,9 +573,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/ml_dsa_codecs.o \
 		  providers/implementations/kem/ec_kem.o \
 		  providers/implementations/kem/kem_util.o \
-		  providers/implementations/kem/mlx_kem.o \
-		  providers/implementations/kem/rsa_kem.o \
-		  providers/implementations/kem/template_kem.o \
 		  providers/implementations/keymgmt/ec_kmgmt.o \
 		  providers/implementations/keymgmt/ml_dsa_kmgmt.o \
 		  providers/implementations/keymgmt/rsa_kmgmt.o \

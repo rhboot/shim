@@ -551,27 +551,29 @@ static const OSSL_ALGORITHM deflt_asym_cipher[] = {
 };
 
 static const OSSL_ALGORITHM deflt_asym_kem[] = {
+#ifndef OPENSSL_NO_ASYM_KEM
     { PROV_NAMES_RSA, "provider=default", ossl_rsa_asym_kem_functions },
-#ifndef OPENSSL_NO_EC
-# ifndef OPENSSL_NO_ECX
+# ifndef OPENSSL_NO_EC
+#  ifndef OPENSSL_NO_ECX
     { PROV_NAMES_X25519, "provider=default", ossl_ecx_asym_kem_functions },
     { PROV_NAMES_X448, "provider=default", ossl_ecx_asym_kem_functions },
-# endif
+#  endif
     { PROV_NAMES_EC, "provider=default", ossl_ec_asym_kem_functions },
-#endif
-#ifndef OPENSSL_NO_ML_KEM
+# endif /* OPENSSL_NO_EC */
+# ifndef OPENSSL_NO_ML_KEM
     { PROV_NAMES_ML_KEM_512, "provider=default", ossl_ml_kem_asym_kem_functions },
     { PROV_NAMES_ML_KEM_768, "provider=default", ossl_ml_kem_asym_kem_functions },
     { PROV_NAMES_ML_KEM_1024, "provider=default", ossl_ml_kem_asym_kem_functions },
-# if !defined(OPENSSL_NO_ECX)
+#  if !defined(OPENSSL_NO_ECX)
     { "X25519MLKEM768", "provider=default", ossl_mlx_kem_asym_kem_functions },
     { "X448MLKEM1024", "provider=default", ossl_mlx_kem_asym_kem_functions },
-# endif
-# if !defined(OPENSSL_NO_EC)
+#  endif
+#  if !defined(OPENSSL_NO_EC)
     { "SecP256r1MLKEM768", "provider=default", ossl_mlx_kem_asym_kem_functions },
     { "SecP384r1MLKEM1024", "provider=default", ossl_mlx_kem_asym_kem_functions },
-# endif
-#endif
+#  endif
+# endif /* OPENSSL_NO_ML_KEM */
+#endif /* OPENSSL_NO_ASYM_KEM */
     { NULL, NULL, NULL }
 };
 
