@@ -45,8 +45,10 @@ void openssl_add_all_digests_int(void)
     EVP_add_digest(EVP_sha256());
     EVP_add_digest(EVP_sha384());
     EVP_add_digest(EVP_sha512());
+#ifndef OPENSSL_NO_TRUNCATED_SHA
     EVP_add_digest(EVP_sha512_224());
     EVP_add_digest(EVP_sha512_256());
+#endif
 #ifndef OPENSSL_NO_WHIRLPOOL
     EVP_add_digest(EVP_whirlpool());
 #endif
