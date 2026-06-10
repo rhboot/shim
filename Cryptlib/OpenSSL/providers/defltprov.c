@@ -541,7 +541,9 @@ static const OSSL_ALGORITHM deflt_signature[] = {
 };
 
 static const OSSL_ALGORITHM deflt_asym_cipher[] = {
+#ifndef OPENSSL_NO_RSA_ASYM_CIPHER
     { PROV_NAMES_RSA, "provider=default", ossl_rsa_asym_cipher_functions },
+#endif
 #ifndef OPENSSL_NO_SM2
     { PROV_NAMES_SM2, "provider=default", ossl_sm2_asym_cipher_functions },
 #endif

@@ -561,7 +561,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/common/securitycheck.o \
 		  providers/common/securitycheck_default.o \
 		  providers/defltprov.o \
-		  providers/implementations/asymciphers/rsa_enc.o \
 		  providers/implementations/digests/digestcommon.o \
 		  providers/implementations/digests/null_prov.o \
 		  providers/implementations/digests/sha2_prov.o \
