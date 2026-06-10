@@ -42,6 +42,7 @@
 #define ML_DSA_87_SECURITY_CATEGORY 5
 
 static const ML_DSA_PARAMS ml_dsa_params[] = {
+#ifndef OPENSSL_NO_WEAK_ML_DSA
     { "ML-DSA-44",
       EVP_PKEY_ML_DSA_44,
       ML_DSA_44_TAU,
@@ -74,6 +75,7 @@ static const ML_DSA_PARAMS ml_dsa_params[] = {
       ML_DSA_65_PUB_LEN,
       ML_DSA_65_SIG_LEN
     },
+#endif
     { "ML-DSA-87",
       EVP_PKEY_ML_DSA_87,
       ML_DSA_87_TAU,
