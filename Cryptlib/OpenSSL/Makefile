@@ -589,7 +589,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/rands/seeding/rand_cpu_arm64.o \
 		  providers/implementations/rands/seeding/rand_cpu_x86.o \
 		  providers/implementations/rands/seeding/rand_tsc.o \
-		  providers/implementations/rands/test_rng.o \
 		  providers/implementations/signature/ecdsa_sig.o \
 		  providers/implementations/signature/ml_dsa_sig.o \
 		  providers/implementations/signature/rsa_sig.o \
