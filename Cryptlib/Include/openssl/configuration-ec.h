@@ -88,6 +88,9 @@ extern "C" {
 # ifndef OPENSSL_NO_CHACHA
 #  define OPENSSL_NO_CHACHA
 # endif
+# ifndef OPENSSL_NO_CIPHERS
+#  define OPENSSL_NO_CIPHERS
+# endif
 /*# ifndef OPENSSL_NO_CMAC
 #  define OPENSSL_NO_CMAC
 # endif*/

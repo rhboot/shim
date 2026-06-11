@@ -163,8 +163,9 @@ static const OSSL_ALGORITHM deflt_digests[] = {
 };
 
 static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
+#ifndef OPENSSL_NO_CIPHERS
     ALG(PROV_NAMES_NULL, ossl_null_functions),
-#ifndef OPENSSL_NO_AES
+# ifndef OPENSSL_NO_AES
     ALG(PROV_NAMES_AES_256_ECB, ossl_aes256ecb_functions),
     ALG(PROV_NAMES_AES_192_ECB, ossl_aes192ecb_functions),
     ALG(PROV_NAMES_AES_128_ECB, ossl_aes128ecb_functions),
@@ -191,19 +192,19 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_AES_128_CTR, ossl_aes128ctr_functions),
     ALG(PROV_NAMES_AES_256_XTS, ossl_aes256xts_functions),
     ALG(PROV_NAMES_AES_128_XTS, ossl_aes128xts_functions),
-# ifndef OPENSSL_NO_OCB
+#  ifndef OPENSSL_NO_OCB
     ALG(PROV_NAMES_AES_256_OCB, ossl_aes256ocb_functions),
     ALG(PROV_NAMES_AES_192_OCB, ossl_aes192ocb_functions),
     ALG(PROV_NAMES_AES_128_OCB, ossl_aes128ocb_functions),
-# endif /* OPENSSL_NO_OCB */
-# ifndef OPENSSL_NO_SIV
+#  endif /* OPENSSL_NO_OCB */
+#  ifndef OPENSSL_NO_SIV
     ALG(PROV_NAMES_AES_128_SIV, ossl_aes128siv_functions),
     ALG(PROV_NAMES_AES_192_SIV, ossl_aes192siv_functions),
     ALG(PROV_NAMES_AES_256_SIV, ossl_aes256siv_functions),
     ALG(PROV_NAMES_AES_128_GCM_SIV, ossl_aes128gcm_siv_functions),
     ALG(PROV_NAMES_AES_192_GCM_SIV, ossl_aes192gcm_siv_functions),
     ALG(PROV_NAMES_AES_256_GCM_SIV, ossl_aes256gcm_siv_functions),
-# endif /* OPENSSL_NO_SIV */
+#  endif /* OPENSSL_NO_SIV */
     ALG(PROV_NAMES_AES_256_GCM, ossl_aes256gcm_functions),
     ALG(PROV_NAMES_AES_192_GCM, ossl_aes192gcm_functions),
     ALG(PROV_NAMES_AES_128_GCM, ossl_aes128gcm_functions),
@@ -230,8 +231,8 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
         ossl_cipher_capable_aes_cbc_hmac_sha256),
     ALGC(PROV_NAMES_AES_256_CBC_HMAC_SHA256, ossl_aes256cbc_hmac_sha256_functions,
          ossl_cipher_capable_aes_cbc_hmac_sha256),
-#endif /* OPENSSL_NO_AES */
-#ifndef OPENSSL_NO_ARIA
+# endif /* OPENSSL_NO_AES */
+# ifndef OPENSSL_NO_ARIA
     ALG(PROV_NAMES_ARIA_256_GCM, ossl_aria256gcm_functions),
     ALG(PROV_NAMES_ARIA_192_GCM, ossl_aria192gcm_functions),
     ALG(PROV_NAMES_ARIA_128_GCM, ossl_aria128gcm_functions),
@@ -259,8 +260,8 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_ARIA_256_CTR, ossl_aria256ctr_functions),
     ALG(PROV_NAMES_ARIA_192_CTR, ossl_aria192ctr_functions),
     ALG(PROV_NAMES_ARIA_128_CTR, ossl_aria128ctr_functions),
-#endif /* OPENSSL_NO_ARIA */
-#ifndef OPENSSL_NO_CAMELLIA
+# endif /* OPENSSL_NO_ARIA */
+# ifndef OPENSSL_NO_CAMELLIA
     ALG(PROV_NAMES_CAMELLIA_256_ECB, ossl_camellia256ecb_functions),
     ALG(PROV_NAMES_CAMELLIA_192_ECB, ossl_camellia192ecb_functions),
     ALG(PROV_NAMES_CAMELLIA_128_ECB, ossl_camellia128ecb_functions),
@@ -285,8 +286,8 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_CAMELLIA_256_CTR, ossl_camellia256ctr_functions),
     ALG(PROV_NAMES_CAMELLIA_192_CTR, ossl_camellia192ctr_functions),
     ALG(PROV_NAMES_CAMELLIA_128_CTR, ossl_camellia128ctr_functions),
-#endif /* OPENSSL_NO_CAMELLIA */
-#ifndef OPENSSL_NO_DES
+# endif /* OPENSSL_NO_CAMELLIA */
+# ifndef OPENSSL_NO_DES
     ALG(PROV_NAMES_DES_EDE3_ECB, ossl_tdes_ede3_ecb_functions),
     ALG(PROV_NAMES_DES_EDE3_CBC, ossl_tdes_ede3_cbc_functions),
     ALG(PROV_NAMES_DES_EDE3_OFB, ossl_tdes_ede3_ofb_functions),
@@ -298,8 +299,8 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_DES_EDE_CBC, ossl_tdes_ede2_cbc_functions),
     ALG(PROV_NAMES_DES_EDE_OFB, ossl_tdes_ede2_ofb_functions),
     ALG(PROV_NAMES_DES_EDE_CFB, ossl_tdes_ede2_cfb_functions),
-#endif /* OPENSSL_NO_DES */
-#ifndef OPENSSL_NO_SM4
+# endif /* OPENSSL_NO_DES */
+# ifndef OPENSSL_NO_SM4
     ALG(PROV_NAMES_SM4_GCM, ossl_sm4128gcm_functions),
     ALG(PROV_NAMES_SM4_CCM, ossl_sm4128ccm_functions),
     ALG(PROV_NAMES_SM4_ECB, ossl_sm4128ecb_functions),
@@ -308,13 +309,14 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
     ALG(PROV_NAMES_SM4_OFB, ossl_sm4128ofb128_functions),
     ALG(PROV_NAMES_SM4_CFB, ossl_sm4128cfb128_functions),
     ALG(PROV_NAMES_SM4_XTS, ossl_sm4128xts_functions),
-#endif /* OPENSSL_NO_SM4 */
-#ifndef OPENSSL_NO_CHACHA
+# endif /* OPENSSL_NO_SM4 */
+# ifndef OPENSSL_NO_CHACHA
     ALG(PROV_NAMES_ChaCha20, ossl_chacha20_functions),
-# ifndef OPENSSL_NO_POLY1305
+#  ifndef OPENSSL_NO_POLY1305
     ALG(PROV_NAMES_ChaCha20_Poly1305, ossl_chacha20_ossl_poly1305_functions),
-# endif /* OPENSSL_NO_POLY1305 */
-#endif /* OPENSSL_NO_CHACHA */
+#  endif /* OPENSSL_NO_POLY1305 */
+# endif /* OPENSSL_NO_CHACHA */
+#endif /* OPENSSL_NO_CIPHERS */
     { { NULL, NULL, NULL }, NULL }
 };
 static OSSL_ALGORITHM exported_ciphers[OSSL_NELEM(deflt_ciphers)];
