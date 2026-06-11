@@ -316,7 +316,6 @@ OBJS		= \
 		  crypto/evp/keymgmt_lib.o \
 		  crypto/evp/keymgmt_meth.o \
 		  crypto/evp/legacy_md5.o \
-		  crypto/evp/legacy_md5_sha1.o \
 		  crypto/evp/legacy_sha.o \
 		  crypto/evp/m_null.o \
 		  crypto/evp/m_sigver.o \
@@ -363,7 +362,6 @@ OBJS		= \
 		  crypto/lhash/lhash.o \
 		  crypto/md5/md5_dgst.o \
 		  crypto/md5/md5_one.o \
-		  crypto/md5/md5_sha1.o \
 		  crypto/mem.o \
 		  crypto/mem_clr.o \
 		  crypto/mem_sec.o \
@@ -587,7 +585,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/asymciphers/rsa_enc.o \
 		  providers/implementations/digests/digestcommon.o \
 		  providers/implementations/digests/md5_prov.o \
-		  providers/implementations/digests/md5_sha1_prov.o \
 		  providers/implementations/digests/null_prov.o \
 		  providers/implementations/digests/sha2_prov.o \
 		  providers/implementations/digests/sha3_prov.o \

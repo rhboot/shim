@@ -55,7 +55,9 @@ static int nm##_init(EVP_MD_CTX *ctx)                                          \
 #define sha512_256_Final   SHA512_Final
 
 IMPLEMENT_LEGACY_EVP_MD_METH(sha1, SHA1)
+#ifndef OPENSSL_NO_WEAK_SHA
 IMPLEMENT_LEGACY_EVP_MD_METH(sha224, SHA224)
+#endif
 IMPLEMENT_LEGACY_EVP_MD_METH(sha256, SHA256)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha384, SHA384)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha512, SHA512)
@@ -104,6 +106,7 @@ const EVP_MD *EVP_sha1(void)
     return &sha1_md;
 }
 
+#ifndef OPENSSL_NO_WEAK_SHA
 static const EVP_MD sha224_md = {
     NID_sha224,
     NID_sha224WithRSAEncryption,
@@ -118,6 +121,7 @@ const EVP_MD *EVP_sha224(void)
 {
     return &sha224_md;
 }
+#endif
 
 static const EVP_MD sha256_md = {
     NID_sha256,

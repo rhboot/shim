@@ -238,6 +238,9 @@ extern "C" {
 /*# ifndef OPENSSL_NO_MD5
 #  define OPENSSL_NO_MD5
 # endif*/
+# ifndef OPENSSL_NO_WEAK_SHA
+#  define OPENSSL_NO_WEAK_SHA
+# endif
 # ifndef OPENSSL_NO_SM3
 #  define OPENSSL_NO_SM3
 # endif

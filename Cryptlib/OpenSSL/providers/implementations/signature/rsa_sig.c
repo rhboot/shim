@@ -2128,8 +2128,10 @@ static int rsa_sigalg_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
 #if !defined(OPENSSL_NO_RMD160) && !defined(FIPS_MODULE)
 IMPL_RSA_SIGALG(ripemd160, RIPEMD160);
 #endif
+#ifndef OPENSSL_NO_WEAK_SHA
 IMPL_RSA_SIGALG(sha1, SHA1);
 IMPL_RSA_SIGALG(sha224, SHA2-224);
+#endif
 IMPL_RSA_SIGALG(sha256, SHA2-256);
 IMPL_RSA_SIGALG(sha384, SHA2-384);
 IMPL_RSA_SIGALG(sha512, SHA2-512);

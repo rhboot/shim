@@ -25,6 +25,7 @@
 
 #define SHA2_FLAGS PROV_DIGEST_FLAG_ALGID_ABSENT
 
+#ifndef OPENSSL_NO_WEAK_SHA
 static OSSL_FUNC_digest_set_ctx_params_fn sha1_set_ctx_params;
 static OSSL_FUNC_digest_settable_ctx_params_fn sha1_settable_ctx_params;
 
@@ -66,6 +67,7 @@ IMPLEMENT_digest_functions_with_settable_ctx(
 IMPLEMENT_digest_functions(sha224, SHA256_CTX,
                            SHA256_CBLOCK, SHA224_DIGEST_LENGTH, SHA2_FLAGS,
                            SHA224_Init, SHA224_Update, SHA224_Final)
+#endif /* OPENSSL_NO_WEAK_SHA */
 
 /* ossl_sha256_functions */
 IMPLEMENT_digest_functions(sha256, SHA256_CTX,
