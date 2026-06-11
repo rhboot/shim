@@ -188,7 +188,9 @@ void evp_cleanup_int(void)
      */
     OBJ_NAME_cleanup(-1);
 
+# ifndef OPENSSL_NO_PBE
     EVP_PBE_cleanup();
+# endif
     OBJ_sigid_free();
 
     evp_app_cleanup_int();
