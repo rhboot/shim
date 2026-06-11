@@ -356,7 +356,6 @@ OBJS		= \
 		  crypto/ml_dsa/ml_dsa_params.o \
 		  crypto/ml_dsa/ml_dsa_sample.o \
 		  crypto/ml_dsa/ml_dsa_sign.o \
-		  crypto/ml_kem/ml_kem.o \
 		  crypto/o_dir.o \
 		  crypto/o_init.o \
 		  crypto/o_str.o \
@@ -573,17 +572,13 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/endecoder_common.o \
 		  providers/implementations/encode_decode/ml_common_codecs.o \
 		  providers/implementations/encode_decode/ml_dsa_codecs.o \
-		  providers/implementations/encode_decode/ml_kem_codecs.o \
 		  providers/implementations/kem/ec_kem.o \
 		  providers/implementations/kem/kem_util.o \
-		  providers/implementations/kem/ml_kem_kem.o \
 		  providers/implementations/kem/mlx_kem.o \
 		  providers/implementations/kem/rsa_kem.o \
 		  providers/implementations/kem/template_kem.o \
 		  providers/implementations/keymgmt/ec_kmgmt.o \
 		  providers/implementations/keymgmt/ml_dsa_kmgmt.o \
-		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
-		  providers/implementations/keymgmt/mlx_kmgmt.o \
 		  providers/implementations/keymgmt/rsa_kmgmt.o \
 		  providers/implementations/rands/seed_src.o \
 		  providers/implementations/rands/seeding/rand_cpu_arm64.o \
