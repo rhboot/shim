@@ -318,22 +318,24 @@ static const OSSL_ALGORITHM_CAPABLE deflt_ciphers[] = {
 static OSSL_ALGORITHM exported_ciphers[OSSL_NELEM(deflt_ciphers)];
 
 static const OSSL_ALGORITHM deflt_macs[] = {
-#ifndef OPENSSL_NO_BLAKE2
+#ifndef OPENSSL_NO_MACS
+# ifndef OPENSSL_NO_BLAKE2
     { PROV_NAMES_BLAKE2BMAC, "provider=default", ossl_blake2bmac_functions },
     { PROV_NAMES_BLAKE2SMAC, "provider=default", ossl_blake2smac_functions },
-#endif
-#ifndef OPENSSL_NO_CMAC
+# endif
+# ifndef OPENSSL_NO_CMAC
     { PROV_NAMES_CMAC, "provider=default", ossl_cmac_functions },
-#endif
+# endif
     { PROV_NAMES_GMAC, "provider=default", ossl_gmac_functions },
-//    { PROV_NAMES_HMAC, "provider=default", ossl_hmac_functions },
+    { PROV_NAMES_HMAC, "provider=default", ossl_hmac_functions },
     { PROV_NAMES_KMAC_128, "provider=default", ossl_kmac128_functions },
     { PROV_NAMES_KMAC_256, "provider=default", ossl_kmac256_functions },
-#ifndef OPENSSL_NO_SIPHASH
+# ifndef OPENSSL_NO_SIPHASH
     { PROV_NAMES_SIPHASH, "provider=default", ossl_siphash_functions },
-#endif
-#ifndef OPENSSL_NO_POLY1305
+# endif
+# ifndef OPENSSL_NO_POLY1305
     { PROV_NAMES_POLY1305, "provider=default", ossl_poly1305_functions },
+# endif
 #endif
     { NULL, NULL, NULL }
 };
