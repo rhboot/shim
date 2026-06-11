@@ -209,11 +209,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/cms/cms_rsa.o \
 		  crypto/cms/cms_sd.o \
 		  crypto/cms/cms_smime.o \
-		  crypto/comp/c_brotli.o \
-		  crypto/comp/c_zlib.o \
-		  crypto/comp/c_zstd.o \
-		  crypto/comp/comp_err.o \
-		  crypto/comp/comp_lib.o \
 		  crypto/comp_methods.o \
 		  crypto/conf/conf_api.o \
 		  crypto/conf/conf_def.o \
