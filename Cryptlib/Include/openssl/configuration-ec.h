@@ -282,9 +282,9 @@ extern "C" {
 # ifndef OPENSSL_NO_RC2
 #  define OPENSSL_NO_RC2
 # endif
-/*# ifndef OPENSSL_NO_RC4
+# ifndef OPENSSL_NO_RC4
 #  define OPENSSL_NO_RC4
-# endif*/
+# endif
 # ifndef OPENSSL_NO_RC5
 #  define OPENSSL_NO_RC5
 # endif

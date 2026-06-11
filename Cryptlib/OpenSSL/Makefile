@@ -308,8 +308,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/evp/e_aes_cbc_hmac_sha1.o \
 		  crypto/evp/e_aes_cbc_hmac_sha256.o \
 		  crypto/evp/e_null.o \
-		  crypto/evp/e_rc4.o \
-		  crypto/evp/e_rc4_hmac_md5.o \
 		  crypto/evp/e_xcbc_d.o \
 		  crypto/evp/ec_ctrl.o \
 		  crypto/evp/ec_support.o \
@@ -457,8 +455,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/rand/rand_meth.o \
 		  crypto/rand/rand_pool.o \
 		  crypto/rand/rand_uniform.o \
-		  crypto/rc4/rc4_enc.o \
-		  crypto/rc4/rc4_skey.o \
 		  crypto/rsa/rsa_ameth.o \
 		  crypto/rsa/rsa_asn1.o \
 		  crypto/rsa/rsa_backend.o \
