@@ -65,8 +65,10 @@ IMPLEMENT_LEGACY_EVP_MD_METH(sha512, SHA512)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha512_224_int, sha512_224)
 IMPLEMENT_LEGACY_EVP_MD_METH(sha512_256_int, sha512_256)
 #endif
+#ifndef OPENSSL_NO_SHA3
 IMPLEMENT_LEGACY_EVP_MD_METH_SHA3(sha3_int, ossl_sha3, '\x06')
 IMPLEMENT_LEGACY_EVP_MD_METH_SHAKE(shake, ossl_sha3, '\x1f')
+#endif
 
 static int sha1_int_ctrl(EVP_MD_CTX *ctx, int cmd, int p1, void *p2)
 {
@@ -74,6 +76,7 @@ static int sha1_int_ctrl(EVP_MD_CTX *ctx, int cmd, int p1, void *p2)
                           cmd, p1, p2);
 }
 
+#ifndef OPENSSL_NO_SHA3
 static int shake_ctrl(EVP_MD_CTX *evp_ctx, int cmd, int p1, void *p2)
 {
     KECCAK1600_CTX *ctx;
@@ -90,6 +93,7 @@ static int shake_ctrl(EVP_MD_CTX *evp_ctx, int cmd, int p1, void *p2)
         return 0;
     }
 }
+#endif
 
 
 
@@ -202,6 +206,7 @@ const EVP_MD *EVP_sha512(void)
     return &sha512_md;
 }
 
+#ifndef OPENSSL_NO_SHA3
 #define EVP_MD_SHA3(bitlen)                                                    \
 const EVP_MD *EVP_sha3_##bitlen(void)                                          \
 {                                                                              \
@@ -239,3 +244,4 @@ EVP_MD_SHA3(512)
 
 EVP_MD_SHAKE(128)
 EVP_MD_SHAKE(256)
+#endif
