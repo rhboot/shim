@@ -230,7 +230,6 @@ CRYPTO_DIRS = aes \
 	      rc4 \
 	      rsa \
 	      sha \
-	      slh_dsa \
 	      stack \
 	      txt_db \
 	      ui \
@@ -250,7 +249,6 @@ PROVIDERS_DIRS = common/der \
 		 implementations/rands/seeding \
 		 implementations/signature \
 		 implementations/skeymgmt \
-		 implementations/storemgmt \
 
 STUB_DIRS = / \
 
