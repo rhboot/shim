@@ -1097,8 +1097,10 @@ static int ecdsa_sigalg_set_ctx_params(void *vctx, const OSSL_PARAM params[])
         OSSL_DISPATCH_END                                               \
     }
 
+#ifndef OPENSSL_NO_WEAK_SHA
 IMPL_ECDSA_SIGALG(sha1, SHA1);
 IMPL_ECDSA_SIGALG(sha224, SHA2-224);
+#endif
 IMPL_ECDSA_SIGALG(sha256, SHA2-256);
 IMPL_ECDSA_SIGALG(sha384, SHA2-384);
 IMPL_ECDSA_SIGALG(sha512, SHA2-512);

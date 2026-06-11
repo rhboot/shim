@@ -100,8 +100,10 @@ static int deflt_get_params(void *provctx, OSSL_PARAM params[])
  */
 static const OSSL_ALGORITHM deflt_digests[] = {
     /* Our primary name:NIST name[:our older names] */
+#ifndef OPENSSL_NO_WEAK_SHA
     { PROV_NAMES_SHA1, "provider=default", ossl_sha1_functions },
     { PROV_NAMES_SHA2_224, "provider=default", ossl_sha224_functions },
+#endif
     { PROV_NAMES_SHA2_256, "provider=default", ossl_sha256_functions },
     { PROV_NAMES_SHA2_256_192, "provider=default", ossl_sha256_192_functions },
     { PROV_NAMES_SHA2_384, "provider=default", ossl_sha384_functions },
@@ -151,7 +153,9 @@ static const OSSL_ALGORITHM deflt_digests[] = {
 
 #ifndef OPENSSL_NO_MD5
     { PROV_NAMES_MD5, "provider=default", ossl_md5_functions },
+# ifndef OPENSSL_NO_WEAK_SHA
     { PROV_NAMES_MD5_SHA1, "provider=default", ossl_md5_sha1_functions },
+# endif /* OPENSSL_NO_WEAK_SHA */
 #endif /* OPENSSL_NO_MD5 */
 
 #ifndef OPENSSL_NO_RMD160
@@ -409,8 +413,10 @@ static const OSSL_ALGORITHM deflt_rands[] = {
 static const OSSL_ALGORITHM deflt_signature[] = {
 #ifndef OPENSSL_NO_DSA
     { PROV_NAMES_DSA, "provider=default", ossl_dsa_signature_functions },
+# ifndef OPENSSL_NO_WEAK_SHA
     { PROV_NAMES_DSA_SHA1, "provider=default", ossl_dsa_sha1_signature_functions },
     { PROV_NAMES_DSA_SHA224, "provider=default", ossl_dsa_sha224_signature_functions },
+# endif
     { PROV_NAMES_DSA_SHA256, "provider=default", ossl_dsa_sha256_signature_functions },
     { PROV_NAMES_DSA_SHA384, "provider=default", ossl_dsa_sha384_signature_functions },
     { PROV_NAMES_DSA_SHA512, "provider=default", ossl_dsa_sha512_signature_functions },
@@ -423,8 +429,10 @@ static const OSSL_ALGORITHM deflt_signature[] = {
 #if !defined(OPENSSL_NO_RMD160) && !defined(FIPS_MODULE)
     { PROV_NAMES_RSA_RIPEMD160, "provider=default", ossl_rsa_ripemd160_signature_functions },
 #endif
+#ifndef OPENSSL_NO_WEAK_SHA
     { PROV_NAMES_RSA_SHA1, "provider=default", ossl_rsa_sha1_signature_functions },
     { PROV_NAMES_RSA_SHA224, "provider=default", ossl_rsa_sha224_signature_functions },
+#endif
     { PROV_NAMES_RSA_SHA256, "provider=default", ossl_rsa_sha256_signature_functions },
     { PROV_NAMES_RSA_SHA384, "provider=default", ossl_rsa_sha384_signature_functions },
     { PROV_NAMES_RSA_SHA512, "provider=default", ossl_rsa_sha512_signature_functions },
@@ -446,8 +454,10 @@ static const OSSL_ALGORITHM deflt_signature[] = {
     { PROV_NAMES_ED448ph, "provider=default", ossl_ed448ph_signature_functions },
 # endif
     { PROV_NAMES_ECDSA, "provider=default", ossl_ecdsa_signature_functions },
+# ifndef OPENSSL_NO_WEAK_SHA
     { PROV_NAMES_ECDSA_SHA1, "provider=default", ossl_ecdsa_sha1_signature_functions },
     { PROV_NAMES_ECDSA_SHA224, "provider=default", ossl_ecdsa_sha224_signature_functions },
+# endif /* OPENSSL_NO_WEAK_SHA */
     { PROV_NAMES_ECDSA_SHA256, "provider=default", ossl_ecdsa_sha256_signature_functions },
     { PROV_NAMES_ECDSA_SHA384, "provider=default", ossl_ecdsa_sha384_signature_functions },
     { PROV_NAMES_ECDSA_SHA512, "provider=default", ossl_ecdsa_sha512_signature_functions },
