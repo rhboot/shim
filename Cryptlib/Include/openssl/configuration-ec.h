@@ -223,6 +223,9 @@ extern "C" {
 # ifndef OPENSSL_NO_KTLS
 #  define OPENSSL_NO_KTLS
 # endif
+# ifndef OPENSSL_NO_LEGACY_MAC
+#  define OPENSSL_NO_LEGACY_MAC
+# endif
 # ifndef OPENSSL_NO_LOADERENG
 #  define OPENSSL_NO_LOADERENG
 # endif

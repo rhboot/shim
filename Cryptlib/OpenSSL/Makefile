@@ -600,7 +600,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/kem/rsa_kem.o \
 		  providers/implementations/kem/template_kem.o \
 		  providers/implementations/keymgmt/ec_kmgmt.o \
-		  providers/implementations/keymgmt/mac_legacy_kmgmt.o \
 		  providers/implementations/keymgmt/ml_dsa_kmgmt.o \
 		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
 		  providers/implementations/keymgmt/mlx_kmgmt.o \
@@ -615,7 +614,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/rands/seeding/rand_tsc.o \
 		  providers/implementations/rands/test_rng.o \
 		  providers/implementations/signature/ecdsa_sig.o \
-		  providers/implementations/signature/mac_legacy_sig.o \
 		  providers/implementations/signature/ml_dsa_sig.o \
 		  providers/implementations/signature/rsa_sig.o \
 		  providers/implementations/skeymgmt/generic.o \
