@@ -78,7 +78,9 @@ int ossl_err_load_crypto_strings(void)
         || ossl_err_load_BIO_strings() == 0
         || ossl_err_load_PKCS7_strings() == 0
         || ossl_err_load_X509V3_strings() == 0
+# ifndef OPENSSL_NO_PBE
         || ossl_err_load_PKCS12_strings() == 0
+# endif
         || ossl_err_load_RAND_strings() == 0
         || ossl_err_load_DSO_strings() == 0
 # ifndef OPENSSL_NO_TS

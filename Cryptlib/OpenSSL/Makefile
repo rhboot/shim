@@ -336,7 +336,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/evp/evp_fetch.o \
 		  crypto/evp/evp_key.o \
 		  crypto/evp/evp_lib.o \
-		  crypto/evp/evp_pbe.o \
 		  crypto/evp/evp_pkey.o \
 		  crypto/evp/evp_rand.o \
 		  crypto/evp/evp_utils.o \
@@ -364,7 +363,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/evp/p_seal.o \
 		  crypto/evp/p_sign.o \
 		  crypto/evp/p_verify.o \
-		  crypto/evp/pbe_scrypt.o \
 		  crypto/evp/pmeth_check.o \
 		  crypto/evp/pmeth_gn.o \
 		  crypto/evp/pmeth_lib.o \
@@ -448,22 +446,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/pem/pem_lib.o \
 		  crypto/pem/pem_oth.o \
 		  crypto/pem/pvkfmt.o \
-		  crypto/pkcs12/p12_add.o \
-		  crypto/pkcs12/p12_asn.o \
-		  crypto/pkcs12/p12_attr.o \
-		  crypto/pkcs12/p12_crpt.o \
-		  crypto/pkcs12/p12_crt.o \
-		  crypto/pkcs12/p12_decr.o \
-		  crypto/pkcs12/p12_init.o \
-		  crypto/pkcs12/p12_key.o \
-		  crypto/pkcs12/p12_kiss.o \
-		  crypto/pkcs12/p12_mutl.o \
-		  crypto/pkcs12/p12_npas.o \
-		  crypto/pkcs12/p12_p8d.o \
-		  crypto/pkcs12/p12_p8e.o \
-		  crypto/pkcs12/p12_sbag.o \
-		  crypto/pkcs12/p12_utl.o \
-		  crypto/pkcs12/pk12err.o \
 		  crypto/pkcs7/bio_pk7.o \
 		  crypto/pkcs7/pk7_asn1.o \
 		  crypto/pkcs7/pk7_attr.o \
@@ -683,9 +665,7 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/digests/sha2_prov.o \
 		  providers/implementations/digests/sha3_prov.o \
 		  providers/implementations/encode_decode/decode_der2key.o \
-		  providers/implementations/encode_decode/decode_epki2pki.o \
 		  providers/implementations/encode_decode/decode_msblob2key.o \
-		  providers/implementations/encode_decode/decode_pem2der.o \
 		  providers/implementations/encode_decode/decode_pvk2key.o \
 		  providers/implementations/encode_decode/decode_spki2typespki.o \
 		  providers/implementations/encode_decode/endecoder_common.o \
