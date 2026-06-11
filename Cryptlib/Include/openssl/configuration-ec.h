@@ -94,6 +94,9 @@ extern "C" {
 /*# ifndef OPENSSL_NO_CMS
 #  define OPENSSL_NO_CMS
 # endif*/
+# ifndef OPENSSL_NO_COMP
+#  define OPENSSL_NO_COMP
+# endif
 # ifndef OPENSSL_NO_CRMF
 #  define OPENSSL_NO_CRMF
 # endif
