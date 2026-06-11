@@ -42,27 +42,7 @@ void
 init_openssl(void)
 {
 	OPENSSL_init();
-	//ERR_load_ERR_strings();
-	ossl_err_load_ERR_strings();
-	ERR_load_BN_strings();
-	ERR_load_RSA_strings();
-	ERR_load_DH_strings();
-	ERR_load_EVP_strings();
-	ERR_load_BUF_strings();
-	ERR_load_OBJ_strings();
-	ERR_load_PEM_strings();
-	ERR_load_X509_strings();
-	ERR_load_ASN1_strings();
-	ERR_load_CONF_strings();
-	ERR_load_CRYPTO_strings();
-	//ERR_load_COMP_strings();
-	ossl_err_load_COMP_strings();
-	ERR_load_BIO_strings();
-	ERR_load_PKCS7_strings();
-	ERR_load_X509V3_strings();
-	ERR_load_PKCS12_strings();
-	ERR_load_RAND_strings();
-	ossl_err_load_DSO_strings();
+	ossl_err_load_crypto_strings();
 }
 
 static void
