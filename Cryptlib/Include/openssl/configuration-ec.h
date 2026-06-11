@@ -235,9 +235,9 @@ extern "C" {
 # ifndef OPENSSL_NO_MD4
 #  define OPENSSL_NO_MD4
 # endif
-/*# ifndef OPENSSL_NO_MD5
+# ifndef OPENSSL_NO_MD5
 #  define OPENSSL_NO_MD5
-# endif*/
+# endif
 # ifndef OPENSSL_NO_WEAK_SHA
 #  define OPENSSL_NO_WEAK_SHA
 # endif
