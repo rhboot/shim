@@ -587,10 +587,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/common/securitycheck_default.o \
 		  providers/defltprov.o \
 		  providers/implementations/asymciphers/rsa_enc.o \
-		  providers/implementations/ciphers/cipher_cts.o \
-		  providers/implementations/ciphers/cipher_null.o \
-		  providers/implementations/ciphers/ciphercommon.o \
-		  providers/implementations/ciphers/ciphercommon_block.o \
 		  providers/implementations/digests/digestcommon.o \
 		  providers/implementations/digests/md5_prov.o \
 		  providers/implementations/digests/md5_sha1_prov.o \
