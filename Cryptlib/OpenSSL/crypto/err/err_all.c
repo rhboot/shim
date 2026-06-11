@@ -58,7 +58,9 @@ int ossl_err_load_crypto_strings(void)
         || ossl_err_load_EVP_strings() == 0
         || ossl_err_load_BUF_strings() == 0
         || ossl_err_load_OBJ_strings() == 0
+# ifndef OPENSSL_NO_PEM
         || ossl_err_load_PEM_strings() == 0
+# endif
 # ifndef OPENSSL_NO_DSA
         || ossl_err_load_DSA_strings() == 0
 # endif
