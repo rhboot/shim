@@ -2856,7 +2856,7 @@ static const ec_list_element curve_list[] = {
     {NID_secp521r1, &_EC_NIST_PRIME_521.h,
 # if defined(S390X_EC_ASM)
      EC_GFp_s390x_nistp521_method,
-# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128) && !defined(OPENSSL_NO_EC_NISTP521)
      EC_GFp_nistp521_method,
 # else
      0,
@@ -2950,7 +2950,7 @@ static const ec_list_element curve_list[] = {
     {NID_secp521r1, &_EC_NIST_PRIME_521.h,
 # if defined(S390X_EC_ASM)
      EC_GFp_s390x_nistp521_method,
-# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128)
+# elif !defined(OPENSSL_NO_EC_NISTP_64_GCC_128) && !defined(OPENSSL_NO_EC_NISTP521)
      EC_GFp_nistp521_method,
 # else
      0,
