@@ -205,6 +205,9 @@ extern "C" {
 # ifndef OPENSSL_NO_LOADERENG
 #  define OPENSSL_NO_LOADERENG
 # endif
+# ifndef OPENSSL_NO_MACS
+#  define OPENSSL_NO_MACS
+# endif
 # ifndef OPENSSL_NO_MD2
 #  define OPENSSL_NO_MD2
 # endif

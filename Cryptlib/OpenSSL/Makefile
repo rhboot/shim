@@ -739,9 +739,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
 		  providers/implementations/keymgmt/mlx_kmgmt.o \
 		  providers/implementations/keymgmt/rsa_kmgmt.o \
-		  providers/implementations/macs/cmac_prov.o \
-		  providers/implementations/macs/gmac_prov.o \
-		  providers/implementations/macs/kmac_prov.o \
 		  providers/implementations/rands/drbg.o \
 		  providers/implementations/rands/drbg_ctr.o \
 		  providers/implementations/rands/drbg_hash.o \
