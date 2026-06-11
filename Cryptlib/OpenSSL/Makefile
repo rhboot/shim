@@ -449,16 +449,8 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/params_from_text.o \
 		  crypto/params_idx.o \
 		  crypto/passphrase.o \
-		  crypto/pem/pem_all.o \
-		  crypto/pem/pem_err.o \
-		  crypto/pem/pem_info.o \
 		  crypto/pem/pem_lib.o \
 		  crypto/pem/pem_oth.o \
-		  crypto/pem/pem_pk8.o \
-		  crypto/pem/pem_pkey.o \
-		  crypto/pem/pem_sign.o \
-		  crypto/pem/pem_x509.o \
-		  crypto/pem/pem_xaux.o \
 		  crypto/pem/pvkfmt.o \
 		  crypto/pkcs12/p12_add.o \
 		  crypto/pkcs12/p12_asn.o \

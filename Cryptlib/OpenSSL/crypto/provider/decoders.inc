@@ -130,6 +130,8 @@ DECODER_w_structure("ML-DSA-87", der, SubjectPublicKeyInfo, ml_dsa_87, yes),
  * that it contains. The output is the same SubjectPublicKeyInfo.
  */
 DECODER_w_structure("DER", der, SubjectPublicKeyInfo, der, yes),
+
+#ifndef OPENSSL_NO_PEM
 /*
  * General-purpose PEM to DER decoder.  When the user-specified data structure
  * is a possibly encrypted PKCS#8 PrivateKeyInfo or a SubjectPublicKeyInfo
@@ -145,3 +147,4 @@ DECODER("DER", pem, der, yes),
  * unencrypted PrivateKeyInfo in DER form to the identified algorithm.
  */
 DECODER_w_structure("DER", der, EncryptedPrivateKeyInfo, der, yes),
+#endif
