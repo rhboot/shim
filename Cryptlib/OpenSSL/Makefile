@@ -248,7 +248,6 @@ OBJS		= \
 		  crypto/ec/ecp_mont.o \
 		  crypto/ec/ecp_nist.o \
 		  crypto/ec/ecp_nistp384.o \
-		  crypto/ec/ecp_nistp521.o \
 		  crypto/ec/ecp_nistputil.o \
 		  crypto/ec/ecp_oct.o \
 		  crypto/ec/ecp_ppc.o \
