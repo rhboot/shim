@@ -113,7 +113,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/asn1/nsseq.o \
 		  crypto/asn1/p5_pbe.o \
 		  crypto/asn1/p5_pbev2.o \
-		  crypto/asn1/p5_scrypt.o \
 		  crypto/asn1/p8_pkey.o \
 		  crypto/asn1/t_bitst.o \
 		  crypto/asn1/t_pkey.o \
@@ -137,38 +136,21 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/asn1/x_val.o \
 		  crypto/asn1_dsa.o \
 		  crypto/async/arch/async_null.o \
-		  crypto/async/arch/async_posix.o \
-		  crypto/async/arch/async_win.o \
 		  crypto/async/async.o \
-		  crypto/async/async_err.o \
-		  crypto/async/async_wait.o \
 		  crypto/bio/bf_buff.o \
-		  crypto/bio/bf_lbuf.o \
-		  crypto/bio/bf_nbio.o \
-		  crypto/bio/bf_null.o \
 		  crypto/bio/bf_prefix.o \
 		  crypto/bio/bf_readbuff.o \
-		  crypto/bio/bio_addr.o \
 		  crypto/bio/bio_cb.o \
 		  crypto/bio/bio_dump.o \
 		  crypto/bio/bio_err.o \
 		  crypto/bio/bio_lib.o \
 		  crypto/bio/bio_meth.o \
 		  crypto/bio/bio_print.o \
-		  crypto/bio/bio_sock.o \
-		  crypto/bio/bio_sock2.o \
-		  crypto/bio/bss_acpt.o \
 		  crypto/bio/bss_bio.o \
-		  crypto/bio/bss_conn.o \
 		  crypto/bio/bss_core.o \
-		  crypto/bio/bss_dgram.o \
-		  crypto/bio/bss_dgram_pair.o \
-		  crypto/bio/bss_fd.o \
 		  crypto/bio/bss_file.o \
-		  crypto/bio/bss_log.o \
 		  crypto/bio/bss_mem.o \
 		  crypto/bio/bss_null.o \
-		  crypto/bio/bss_sock.o \
 		  crypto/bio/ossl_core_bio.o \
 		  crypto/bn/bn_add.o \
 		  crypto/bn/bn_asm.o \
@@ -203,7 +185,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/bn/bn_sparc.o \
 		  crypto/bn/bn_sqr.o \
 		  crypto/bn/bn_sqrt.o \
-		  crypto/bn/bn_srp.o \
 		  crypto/bn/bn_word.o \
 		  crypto/bn/bn_x931p.o \
 		  crypto/bn/rsaz_exp.o \
@@ -221,7 +202,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/cms/cms_enc.o \
 		  crypto/cms/cms_env.o \
 		  crypto/cms/cms_err.o \
-		  crypto/cms/cms_ess.o \
 		  crypto/cms/cms_io.o \
 		  crypto/cms/cms_kari.o \
 		  crypto/cms/cms_lib.o \
@@ -270,14 +250,9 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/dh/dh_pmeth.o \
 		  crypto/dh/dh_prn.o \
 		  crypto/dh/dh_rfc5114.o \
-		  crypto/dso/dso_dl.o \
-		  crypto/dso/dso_dlfcn.o \
 		  crypto/dso/dso_err.o \
 		  crypto/dso/dso_lib.o \
 		  crypto/dso/dso_openssl.o \
-		  crypto/dso/dso_vms.o \
-		  crypto/dso/dso_win32.o \
-		  crypto/ebcdic.o \
 		  crypto/ec/curve25519.o \
 		  crypto/ec/curve448/arch_64/f_impl64.o \
 		  crypto/ec/curve448/curve448.o \
@@ -285,8 +260,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/ec/curve448/eddsa.o \
 		  crypto/ec/curve448/f_generic.o \
 		  crypto/ec/curve448/scalar.o \
-		  crypto/ec/ec2_oct.o \
-		  crypto/ec/ec2_smpl.o \
 		  crypto/ec/ec_ameth.o \
 		  crypto/ec/ec_asn1.o \
 		  crypto/ec/ec_backend.o \
@@ -319,14 +292,10 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/ec/ecp_nistz256_table.o \
 		  crypto/ec/ecp_oct.o \
 		  crypto/ec/ecp_ppc.o \
-		  crypto/ec/ecp_s390x_nistp.o \
-		  crypto/ec/ecp_sm2p256.o \
-		  crypto/ec/ecp_sm2p256_table.o \
 		  crypto/ec/ecp_smpl.o \
 		  crypto/ec/ecx_backend.o \
 		  crypto/ec/ecx_key.o \
 		  crypto/ec/ecx_meth.o \
-		  crypto/ec/ecx_s390x.o \
 		  crypto/encode_decode/decoder_err.o \
 		  crypto/encode_decode/decoder_lib.o \
 		  crypto/encode_decode/decoder_meth.o \
@@ -358,22 +327,9 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/evp/e_aes.o \
 		  crypto/evp/e_aes_cbc_hmac_sha1.o \
 		  crypto/evp/e_aes_cbc_hmac_sha256.o \
-		  crypto/evp/e_aria.o \
-		  crypto/evp/e_bf.o \
-		  crypto/evp/e_camellia.o \
-		  crypto/evp/e_cast.o \
-		  crypto/evp/e_chacha20_poly1305.o \
-		  crypto/evp/e_des.o \
-		  crypto/evp/e_des3.o \
-		  crypto/evp/e_idea.o \
 		  crypto/evp/e_null.o \
-		  crypto/evp/e_old.o \
-		  crypto/evp/e_rc2.o \
 		  crypto/evp/e_rc4.o \
 		  crypto/evp/e_rc4_hmac_md5.o \
-		  crypto/evp/e_rc5.o \
-		  crypto/evp/e_seed.o \
-		  crypto/evp/e_sm4.o \
 		  crypto/evp/e_xcbc_d.o \
 		  crypto/evp/ec_ctrl.o \
 		  crypto/evp/ec_support.o \
@@ -432,7 +388,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/hashtable/hashfunc.o \
 		  crypto/hashtable/hashtable.o \
 		  crypto/hmac/hmac.o \
-		  crypto/hmac/hmac_s390x.o \
 		  crypto/hpke/hpke.o \
 		  crypto/hpke/hpke_util.o \
 		  crypto/http/http_lib.o \
@@ -543,14 +498,11 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/punycode.o \
 		  crypto/rand/drbg.o \
 		  crypto/rand/prov_seed.o \
-		  crypto/rand/rand_deprecated.o \
-		  crypto/rand/rand_egd.o \
 		  crypto/rand/rand_err.o \
 		  crypto/rand/rand_lib.o \
 		  crypto/rand/rand_meth.o \
 		  crypto/rand/rand_pool.o \
 		  crypto/rand/rand_uniform.o \
-		  crypto/rand/randfile.o \
 		  crypto/rc4/rc4_enc.o \
 		  crypto/rc4/rc4_skey.o \
 		  crypto/rsa/rsa_ameth.o \
@@ -587,16 +539,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/sha/sha3.o \
 		  crypto/sha/sha512.o \
 		  crypto/sleep.o \
-		  crypto/slh_dsa/slh_adrs.o \
-		  crypto/slh_dsa/slh_dsa.o \
-		  crypto/slh_dsa/slh_dsa_hash_ctx.o \
-		  crypto/slh_dsa/slh_dsa_key.o \
-		  crypto/slh_dsa/slh_fors.o \
-		  crypto/slh_dsa/slh_hash.o \
-		  crypto/slh_dsa/slh_hypertree.o \
-		  crypto/slh_dsa/slh_params.o \
-		  crypto/slh_dsa/slh_wots.o \
-		  crypto/slh_dsa/slh_xmss.o \
 		  crypto/sparse_array.o \
 		  crypto/stack/stack.o \
 		  crypto/threads_none.o \
@@ -609,18 +551,12 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/ui/ui_openssl.o \
 		  crypto/ui/ui_util.o \
 		  crypto/uid.o \
-		  crypto/x509/by_dir.o \
-		  crypto/x509/by_file.o \
-		  crypto/x509/by_store.o \
 		  crypto/x509/pcy_cache.o \
 		  crypto/x509/pcy_data.o \
 		  crypto/x509/pcy_lib.o \
 		  crypto/x509/pcy_map.o \
 		  crypto/x509/pcy_node.o \
 		  crypto/x509/pcy_tree.o \
-		  crypto/x509/t_acert.o \
-		  crypto/x509/t_crl.o \
-		  crypto/x509/t_req.o \
 		  crypto/x509/t_x509.o \
 		  crypto/x509/v3_aaa.o \
 		  crypto/x509/v3_ac_tgt.o \
@@ -676,14 +612,12 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/x509/x509_acert.o \
 		  crypto/x509/x509_att.o \
 		  crypto/x509/x509_cmp.o \
-		  crypto/x509/x509_d2.o \
 		  crypto/x509/x509_def.o \
 		  crypto/x509/x509_err.o \
 		  crypto/x509/x509_ext.o \
 		  crypto/x509/x509_lu.o \
 		  crypto/x509/x509_meth.o \
 		  crypto/x509/x509_obj.o \
-		  crypto/x509/x509_r2x.o \
 		  crypto/x509/x509_req.o \
 		  crypto/x509/x509_set.o \
 		  crypto/x509/x509_trust.o \
@@ -724,8 +658,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/common/der/der_rsa_gen.o \
 		  providers/common/der/der_rsa_key.o \
 		  providers/common/der/der_rsa_sig.o \
-		  providers/common/der/der_slh_dsa_gen.o \
-		  providers/common/der/der_slh_dsa_key.o \
 		  providers/common/der/der_wrap_gen.o \
 		  providers/common/digest_to_nid.o \
 		  providers/common/provider_ctx.o \
@@ -778,7 +710,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/exchange/ecdh_exch.o \
 		  providers/implementations/exchange/ecx_exch.o \
 		  providers/implementations/exchange/kdf_exch.o \
-		  providers/implementations/kdfs/argon2.o \
 		  providers/implementations/kdfs/hkdf.o \
 		  providers/implementations/kdfs/hmacdrbg_kdf.o \
 		  providers/implementations/kdfs/kbkdf.o \
@@ -788,7 +719,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/kdfs/pbkdf2_fips.o \
 		  providers/implementations/kdfs/pkcs12kdf.o \
 		  providers/implementations/kdfs/pvkkdf.o \
-		  providers/implementations/kdfs/scrypt.o \
 		  providers/implementations/kdfs/sshkdf.o \
 		  providers/implementations/kdfs/sskdf.o \
 		  providers/implementations/kdfs/tls1_prf.o \
@@ -809,37 +739,27 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/keymgmt/ml_kem_kmgmt.o \
 		  providers/implementations/keymgmt/mlx_kmgmt.o \
 		  providers/implementations/keymgmt/rsa_kmgmt.o \
-		  providers/implementations/keymgmt/slh_dsa_kmgmt.o \
-		  providers/implementations/keymgmt/template_kmgmt.o \
 		  providers/implementations/macs/cmac_prov.o \
 		  providers/implementations/macs/gmac_prov.o \
 		  providers/implementations/macs/kmac_prov.o \
-		  providers/implementations/macs/poly1305_prov.o \
-		  providers/implementations/macs/siphash_prov.o \
 		  providers/implementations/rands/drbg.o \
 		  providers/implementations/rands/drbg_ctr.o \
 		  providers/implementations/rands/drbg_hash.o \
 		  providers/implementations/rands/drbg_hmac.o \
 		  providers/implementations/rands/seed_src.o \
-		  providers/implementations/rands/seed_src_jitter.o \
 		  providers/implementations/rands/seeding/rand_cpu_arm64.o \
 		  providers/implementations/rands/seeding/rand_cpu_x86.o \
 		  providers/implementations/rands/seeding/rand_tsc.o \
-		  providers/implementations/rands/seeding/rand_unix.o \
-		  providers/implementations/rands/seeding/rand_win.o \
 		  providers/implementations/rands/test_rng.o \
 		  providers/implementations/signature/ecdsa_sig.o \
 		  providers/implementations/signature/eddsa_sig.o \
 		  providers/implementations/signature/mac_legacy_sig.o \
 		  providers/implementations/signature/ml_dsa_sig.o \
 		  providers/implementations/signature/rsa_sig.o \
-		  providers/implementations/signature/slh_dsa_sig.o \
 		  providers/implementations/skeymgmt/aes_skmgmt.o \
 		  providers/implementations/skeymgmt/generic.o \
-		  providers/implementations/storemgmt/file_store_any2obj.o \
 		  providers/legacyprov.o \
 		  providers/nullprov.o \
-		  providers/ossl_store.o \
 		  providers/prov_running.o \
 
 OBJSSTUB	  = stub/rand_pool.o \
