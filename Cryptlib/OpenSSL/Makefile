@@ -236,21 +236,6 @@ OBJS		= crypto/aes/aes_cbc.o \
 		  crypto/defaults.o \
 		  crypto/der_writer.o \
 		  crypto/deterministic_nonce.o \
-		  crypto/dh/dh_ameth.o \
-		  crypto/dh/dh_asn1.o \
-		  crypto/dh/dh_backend.o \
-		  crypto/dh/dh_check.o \
-		  crypto/dh/dh_depr.o \
-		  crypto/dh/dh_err.o \
-		  crypto/dh/dh_gen.o \
-		  crypto/dh/dh_group_params.o \
-		  crypto/dh/dh_kdf.o \
-		  crypto/dh/dh_key.o \
-		  crypto/dh/dh_lib.o \
-		  crypto/dh/dh_meth.o \
-		  crypto/dh/dh_pmeth.o \
-		  crypto/dh/dh_prn.o \
-		  crypto/dh/dh_rfc5114.o \
 		  crypto/dso/dso_err.o \
 		  crypto/dso/dso_lib.o \
 		  crypto/dso/dso_openssl.o \
@@ -667,7 +652,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/encode_decode/ml_common_codecs.o \
 		  providers/implementations/encode_decode/ml_dsa_codecs.o \
 		  providers/implementations/encode_decode/ml_kem_codecs.o \
-		  providers/implementations/exchange/dh_exch.o \
 		  providers/implementations/exchange/ecdh_exch.o \
 		  providers/implementations/exchange/kdf_exch.o \
 		  providers/implementations/kdfs/hkdf.o \
@@ -689,7 +673,6 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/kem/mlx_kem.o \
 		  providers/implementations/kem/rsa_kem.o \
 		  providers/implementations/kem/template_kem.o \
-		  providers/implementations/keymgmt/dh_kmgmt.o \
 		  providers/implementations/keymgmt/ec_kmgmt.o \
 		  providers/implementations/keymgmt/kdf_legacy_kmgmt.o \
 		  providers/implementations/keymgmt/mac_legacy_kmgmt.o \
