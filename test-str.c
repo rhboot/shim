@@ -480,32 +480,6 @@ gnuefi_strncmp (
     return len ? *s1 - *s2 : 0;
 }
 
-/*
- * This is still broken, and fails the test case as written on arm.
- * We no longer use this, so we do not strictly need to run it.
- */
-#if !defined(__arm__) && !defined(__aarch64__)
-static inline INTN
-gnuefi_signed_strncmp (
-    IN CONST CHAR8    *s1,
-    IN CONST CHAR8    *s2,
-    IN UINTN    len
-    )
-{
-    while (*s1  &&  len) {
-        if (*s1 != *s2) {
-            break;
-        }
-
-        s1  += 1;
-        s2  += 1;
-        len -= 1;
-    }
-
-    return len ? *s1 - *s2 : 0;
-}
-#endif
-
 static inline INTN
 gnuefi_good_strncmp (
     IN CONST CHAR8    *s1p,
@@ -714,18 +688,6 @@ test_strncmp(void)
 	rc = test_strncmp_helper(gnuefi_strncmp, true, true, false);
 	status = MIN(rc, status);
 #pragma GCC diagnostic pop
-
-	/*
-	 * This is still broken, and fails the test case as written on arm.
-	 * We no longer use this, so we do not strictly need to run it.
-	 */
-#if !defined(__arm__) && !defined(__aarch64__)
-	/*
-	 * gnu-efi's broken strncmpa with the return type fixed
-	 */
-	rc = test_strncmp_helper(gnuefi_signed_strncmp, true, false, true);
-	status = MIN(rc, status);
-#endif
 
 	/*
 	 * gnu-efi's strncmpa with the return type fixed and unsigned
