@@ -1,0 +1,9 @@
+[Unit]
+Description=Record shim version used to boot
+DefaultDependencies=false
+Requires=sysinit.target
+After=sysinit.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/shimctl booted
