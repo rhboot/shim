@@ -14,7 +14,6 @@
 
 #include "shim.h"
 
-#include <execinfo.h>
 #include <stdio.h>
 #include <efivar/efivar.h>
 
