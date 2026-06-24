@@ -1,105 +1,100 @@
-/* p12_p8e.c */
 /*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
- * 2001.
- */
-/* ====================================================================
- * Copyright (c) 2001 The OpenSSL Project.  All rights reserved.
+ * Copyright 2001-2021 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stdio.h>
-#include "cryptlib.h"
+#include "internal/cryptlib.h"
+#include <openssl/core.h>
 #include <openssl/pkcs12.h>
+#include "crypto/x509.h"
+
+X509_SIG *PKCS8_encrypt_ex(int pbe_nid, const EVP_CIPHER *cipher,
+                           const char *pass, int passlen,
+                           unsigned char *salt, int saltlen, int iter,
+                           PKCS8_PRIV_KEY_INFO *p8inf,
+                           OSSL_LIB_CTX *libctx, const char *propq)
+{
+    X509_SIG *p8 = NULL;
+    X509_ALGOR *pbe;
+
+    if (pbe_nid == -1) {
+        if (cipher == NULL) {
+            ERR_raise(ERR_LIB_PKCS12, ERR_R_PASSED_NULL_PARAMETER);
+            return NULL;
+        }
+        pbe = PKCS5_pbe2_set_iv_ex(cipher, iter, salt, saltlen, NULL, -1,
+                                   libctx);
+    } else {
+        ERR_set_mark();
+        if (EVP_PBE_find(EVP_PBE_TYPE_PRF, pbe_nid, NULL, NULL, 0)) {
+            ERR_clear_last_mark();
+            if (cipher == NULL) {
+                ERR_raise(ERR_LIB_PKCS12, ERR_R_PASSED_NULL_PARAMETER);
+                return NULL;
+            }
+            pbe = PKCS5_pbe2_set_iv_ex(cipher, iter, salt, saltlen, NULL,
+                                       pbe_nid, libctx);
+        } else {
+            ERR_pop_to_mark();
+            pbe = PKCS5_pbe_set_ex(pbe_nid, iter, salt, saltlen, libctx);
+        }
+    }
+    if (pbe == NULL) {
+        ERR_raise(ERR_LIB_PKCS12, ERR_R_ASN1_LIB);
+        return NULL;
+    }
+    p8 = PKCS8_set0_pbe_ex(pass, passlen, p8inf, pbe, libctx, propq);
+    if (p8 == NULL) {
+        X509_ALGOR_free(pbe);
+        return NULL;
+    }
+
+    return p8;
+}
 
 X509_SIG *PKCS8_encrypt(int pbe_nid, const EVP_CIPHER *cipher,
                         const char *pass, int passlen,
                         unsigned char *salt, int saltlen, int iter,
                         PKCS8_PRIV_KEY_INFO *p8inf)
 {
-    X509_SIG *p8 = NULL;
-    X509_ALGOR *pbe;
+    return PKCS8_encrypt_ex(pbe_nid, cipher, pass, passlen, salt, saltlen, iter,
+                            p8inf, NULL, NULL);
+}
 
-    if (!(p8 = X509_SIG_new())) {
-        PKCS12err(PKCS12_F_PKCS8_ENCRYPT, ERR_R_MALLOC_FAILURE);
-        goto err;
+X509_SIG *PKCS8_set0_pbe_ex(const char *pass, int passlen,
+                            PKCS8_PRIV_KEY_INFO *p8inf, X509_ALGOR *pbe,
+                            OSSL_LIB_CTX *ctx, const char *propq)
+{
+    X509_SIG *p8;
+    ASN1_OCTET_STRING *enckey;
+
+    enckey =
+        PKCS12_item_i2d_encrypt_ex(pbe, ASN1_ITEM_rptr(PKCS8_PRIV_KEY_INFO),
+                                   pass, passlen, p8inf, 1, ctx, propq);
+    if (!enckey) {
+        ERR_raise(ERR_LIB_PKCS12, PKCS12_R_ENCRYPT_ERROR);
+        return NULL;
     }
 
-    if (pbe_nid == -1)
-        pbe = PKCS5_pbe2_set(cipher, iter, salt, saltlen);
-    else if (EVP_PBE_find(EVP_PBE_TYPE_PRF, pbe_nid, NULL, NULL, 0))
-        pbe = PKCS5_pbe2_set_iv(cipher, iter, salt, saltlen, NULL, pbe_nid);
-    else {
-        ERR_clear_error();
-        pbe = PKCS5_pbe_set(pbe_nid, iter, salt, saltlen);
+    p8 = OPENSSL_zalloc(sizeof(*p8));
+
+    if (p8 == NULL) {
+        ASN1_OCTET_STRING_free(enckey);
+        return NULL;
     }
-    if (!pbe) {
-        PKCS12err(PKCS12_F_PKCS8_ENCRYPT, ERR_R_ASN1_LIB);
-        goto err;
-    }
-    X509_ALGOR_free(p8->algor);
     p8->algor = pbe;
-    M_ASN1_OCTET_STRING_free(p8->digest);
-    p8->digest =
-        PKCS12_item_i2d_encrypt(pbe, ASN1_ITEM_rptr(PKCS8_PRIV_KEY_INFO),
-                                pass, passlen, p8inf, 1);
-    if (!p8->digest) {
-        PKCS12err(PKCS12_F_PKCS8_ENCRYPT, PKCS12_R_ENCRYPT_ERROR);
-        goto err;
-    }
+    p8->digest = enckey;
 
     return p8;
+}
 
- err:
-    X509_SIG_free(p8);
-    return NULL;
+X509_SIG *PKCS8_set0_pbe(const char *pass, int passlen,
+                         PKCS8_PRIV_KEY_INFO *p8inf, X509_ALGOR *pbe)
+{
+    return PKCS8_set0_pbe_ex(pass, passlen, p8inf, pbe, NULL, NULL);
 }

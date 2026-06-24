@@ -1,72 +1,22 @@
-/* x509_vpm.c */
 /*
- * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
- * 2004.
- */
-/* ====================================================================
- * Copyright (c) 2004 The OpenSSL Project.  All rights reserved.
+ * Copyright 2004-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    licensing@OpenSSL.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
 #include <stdio.h>
 
-#include "cryptlib.h"
+#include "internal/cryptlib.h"
 #include <openssl/crypto.h>
-#include <openssl/lhash.h>
 #include <openssl/buffer.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include "crypto/x509.h"
 
-#include "vpm_int.h"
+#include "x509_local.h"
 
 /* X509_VERIFY_PARAM functions */
 
@@ -83,9 +33,7 @@ static void str_free(char *s)
     OPENSSL_free(s);
 }
 
-#define string_stack_free(sk) sk_OPENSSL_STRING_pop_free(sk, str_free)
-
-static int int_x509_param_set_hosts(X509_VERIFY_PARAM_ID *id, int mode,
+static int int_x509_param_set_hosts(X509_VERIFY_PARAM *vpm, int mode,
                                     const char *name, size_t namelen)
 {
     char *copy;
@@ -96,33 +44,34 @@ static int int_x509_param_set_hosts(X509_VERIFY_PARAM_ID *id, int mode,
      */
     if (namelen == 0 || name == NULL)
         namelen = name ? strlen(name) : 0;
-    else if (name && memchr(name, '\0', namelen > 1 ? namelen - 1 : namelen))
+    else if (name != NULL
+             && memchr(name, '\0', namelen > 1 ? namelen - 1 : namelen) != NULL)
         return 0;
     if (namelen > 0 && name[namelen - 1] == '\0')
         --namelen;
 
-    if (mode == SET_HOST && id->hosts) {
-        string_stack_free(id->hosts);
-        id->hosts = NULL;
+    if (mode == SET_HOST) {
+        sk_OPENSSL_STRING_pop_free(vpm->hosts, str_free);
+        vpm->hosts = NULL;
     }
     if (name == NULL || namelen == 0)
         return 1;
 
-    copy = BUF_strndup(name, namelen);
+    copy = OPENSSL_strndup(name, namelen);
     if (copy == NULL)
         return 0;
 
-    if (id->hosts == NULL &&
-        (id->hosts = sk_OPENSSL_STRING_new_null()) == NULL) {
+    if (vpm->hosts == NULL &&
+        (vpm->hosts = sk_OPENSSL_STRING_new_null()) == NULL) {
         OPENSSL_free(copy);
         return 0;
     }
 
-    if (!sk_OPENSSL_STRING_push(id->hosts, copy)) {
+    if (!sk_OPENSSL_STRING_push(vpm->hosts, copy)) {
         OPENSSL_free(copy);
-        if (sk_OPENSSL_STRING_num(id->hosts) == 0) {
-            sk_OPENSSL_STRING_free(id->hosts);
-            id->hosts = NULL;
+        if (sk_OPENSSL_STRING_num(vpm->hosts) == 0) {
+            sk_OPENSSL_STRING_free(vpm->hosts);
+            vpm->hosts = NULL;
         }
         return 0;
     }
@@ -130,68 +79,17 @@ static int int_x509_param_set_hosts(X509_VERIFY_PARAM_ID *id, int mode,
     return 1;
 }
 
-static void x509_verify_param_zero(X509_VERIFY_PARAM *param)
-{
-    X509_VERIFY_PARAM_ID *paramid;
-    if (!param)
-        return;
-    param->name = NULL;
-    param->purpose = 0;
-    param->trust = 0;
-    /*
-     * param->inh_flags = X509_VP_FLAG_DEFAULT;
-     */
-    param->inh_flags = 0;
-    param->flags = 0;
-    param->depth = -1;
-    if (param->policies) {
-        sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
-        param->policies = NULL;
-    }
-    paramid = param->id;
-    if (paramid->hosts) {
-        string_stack_free(paramid->hosts);
-        paramid->hosts = NULL;
-    }
-    if (paramid->peername)
-        OPENSSL_free(paramid->peername);
-    paramid->peername = NULL;
-    if (paramid->email) {
-        OPENSSL_free(paramid->email);
-        paramid->email = NULL;
-        paramid->emaillen = 0;
-    }
-    if (paramid->ip) {
-        OPENSSL_free(paramid->ip);
-        paramid->ip = NULL;
-        paramid->iplen = 0;
-    }
-}
-
 X509_VERIFY_PARAM *X509_VERIFY_PARAM_new(void)
 {
     X509_VERIFY_PARAM *param;
-    X509_VERIFY_PARAM_ID *paramid;
 
-    param = OPENSSL_malloc(sizeof *param);
-    if (!param)
+    param = OPENSSL_zalloc(sizeof(*param));
+    if (param == NULL)
         return NULL;
-    memset(param, 0, sizeof(*param));
-
-    paramid = OPENSSL_malloc(sizeof(*paramid));
-    if (!paramid) {
-        OPENSSL_free(param);
-        return NULL;
-    }
-    memset(paramid, 0, sizeof(*paramid));
-    /* Exotic platforms may have non-zero bit representation of NULL */
-    paramid->hosts = NULL;
-    paramid->peername = NULL;
-    paramid->email = NULL;
-    paramid->ip = NULL;
-
-    param->id = paramid;
-    x509_verify_param_zero(param);
+    param->trust = X509_TRUST_DEFAULT;
+    /* param->inh_flags = X509_VP_FLAG_DEFAULT; */
+    param->depth = -1;
+    param->auth_level = -1; /* -1 means unset, 0 is explicit */
     return param;
 }
 
@@ -199,8 +97,11 @@ void X509_VERIFY_PARAM_free(X509_VERIFY_PARAM *param)
 {
     if (param == NULL)
         return;
-    x509_verify_param_zero(param);
-    OPENSSL_free(param->id);
+    sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
+    sk_OPENSSL_STRING_pop_free(param->hosts, str_free);
+    OPENSSL_free(param->peername);
+    OPENSSL_free(param->email);
+    OPENSSL_free(param->ip);
     OPENSSL_free(param);
 }
 
@@ -239,60 +140,47 @@ void X509_VERIFY_PARAM_free(X509_VERIFY_PARAM *param)
 /* Macro to test if a field should be copied from src to dest */
 
 #define test_x509_verify_param_copy(field, def) \
-        (to_overwrite || \
-                ((src->field != def) && (to_default || (dest->field == def))))
-
-/* As above but for ID fields */
-
-#define test_x509_verify_param_copy_id(idf, def) \
-        test_x509_verify_param_copy(id->idf, def)
+    (to_overwrite || (src->field != def && (to_default || dest->field == def)))
 
 /* Macro to test and copy a field if necessary */
 
 #define x509_verify_param_copy(field, def) \
-        if (test_x509_verify_param_copy(field, def)) \
-                dest->field = src->field
+    if (test_x509_verify_param_copy(field, def)) \
+        dest->field = src->field;
 
 int X509_VERIFY_PARAM_inherit(X509_VERIFY_PARAM *dest,
                               const X509_VERIFY_PARAM *src)
 {
     unsigned long inh_flags;
     int to_default, to_overwrite;
-    X509_VERIFY_PARAM_ID *id;
-    if (!src)
+
+    if (src == NULL)
         return 1;
-    id = src->id;
     inh_flags = dest->inh_flags | src->inh_flags;
 
-    if (inh_flags & X509_VP_FLAG_ONCE)
+    if ((inh_flags & X509_VP_FLAG_ONCE) != 0)
         dest->inh_flags = 0;
 
-    if (inh_flags & X509_VP_FLAG_LOCKED)
+    if ((inh_flags & X509_VP_FLAG_LOCKED) != 0)
         return 1;
 
-    if (inh_flags & X509_VP_FLAG_DEFAULT)
-        to_default = 1;
-    else
-        to_default = 0;
-
-    if (inh_flags & X509_VP_FLAG_OVERWRITE)
-        to_overwrite = 1;
-    else
-        to_overwrite = 0;
+    to_default = (inh_flags & X509_VP_FLAG_DEFAULT) != 0;
+    to_overwrite = (inh_flags & X509_VP_FLAG_OVERWRITE) != 0;
 
     x509_verify_param_copy(purpose, 0);
-    x509_verify_param_copy(trust, 0);
+    x509_verify_param_copy(trust, X509_TRUST_DEFAULT);
     x509_verify_param_copy(depth, -1);
+    x509_verify_param_copy(auth_level, -1);
 
     /* If overwrite or check time not set, copy across */
 
-    if (to_overwrite || !(dest->flags & X509_V_FLAG_USE_CHECK_TIME)) {
+    if (to_overwrite || (dest->flags & X509_V_FLAG_USE_CHECK_TIME) == 0) {
         dest->check_time = src->check_time;
         dest->flags &= ~X509_V_FLAG_USE_CHECK_TIME;
         /* Don't need to copy flag: that is done below */
     }
 
-    if (inh_flags & X509_VP_FLAG_RESET_FLAGS)
+    if ((inh_flags & X509_VP_FLAG_RESET_FLAGS) != 0)
         dest->flags = 0;
 
     dest->flags |= src->flags;
@@ -302,28 +190,26 @@ int X509_VERIFY_PARAM_inherit(X509_VERIFY_PARAM *dest,
             return 0;
     }
 
-    /* Copy the host flags if and only if we're copying the host list */
-    if (test_x509_verify_param_copy_id(hosts, NULL)) {
-        if (dest->id->hosts) {
-            string_stack_free(dest->id->hosts);
-            dest->id->hosts = NULL;
-        }
-        if (id->hosts) {
-            dest->id->hosts =
-                sk_OPENSSL_STRING_deep_copy(id->hosts, str_copy, str_free);
-            if (dest->id->hosts == NULL)
+    x509_verify_param_copy(hostflags, 0);
+
+    if (test_x509_verify_param_copy(hosts, NULL)) {
+        sk_OPENSSL_STRING_pop_free(dest->hosts, str_free);
+        dest->hosts = NULL;
+        if (src->hosts != NULL) {
+            dest->hosts =
+                sk_OPENSSL_STRING_deep_copy(src->hosts, str_copy, str_free);
+            if (dest->hosts == NULL)
                 return 0;
-            dest->id->hostflags = id->hostflags;
         }
     }
 
-    if (test_x509_verify_param_copy_id(email, NULL)) {
-        if (!X509_VERIFY_PARAM_set1_email(dest, id->email, id->emaillen))
+    if (test_x509_verify_param_copy(email, NULL)) {
+        if (!X509_VERIFY_PARAM_set1_email(dest, src->email, src->emaillen))
             return 0;
     }
 
-    if (test_x509_verify_param_copy_id(ip, NULL)) {
-        if (!X509_VERIFY_PARAM_set1_ip(dest, id->ip, id->iplen))
+    if (test_x509_verify_param_copy(ip, NULL)) {
+        if (!X509_VERIFY_PARAM_set1_ip(dest, src->ip, src->iplen))
             return 0;
     }
 
@@ -333,8 +219,14 @@ int X509_VERIFY_PARAM_inherit(X509_VERIFY_PARAM *dest,
 int X509_VERIFY_PARAM_set1(X509_VERIFY_PARAM *to,
                            const X509_VERIFY_PARAM *from)
 {
-    unsigned long save_flags = to->inh_flags;
+    unsigned long save_flags;
     int ret;
+
+    if (to == NULL) {
+        ERR_raise(ERR_LIB_X509, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    save_flags = to->inh_flags;
     to->inh_flags |= X509_VP_FLAG_DEFAULT;
     ret = X509_VERIFY_PARAM_inherit(to, from);
     to->inh_flags = save_flags;
@@ -344,41 +236,39 @@ int X509_VERIFY_PARAM_set1(X509_VERIFY_PARAM *to,
 static int int_x509_param_set1(char **pdest, size_t *pdestlen,
                                const char *src, size_t srclen)
 {
-    void *tmp;
-    if (src) {
-        if (srclen == 0) {
-            tmp = BUF_strdup(src);
+    char *tmp;
+
+    if (src != NULL) {
+        if (srclen == 0)
             srclen = strlen(src);
-        } else
-            tmp = BUF_memdup(src, srclen);
-        if (!tmp)
+
+        tmp = OPENSSL_malloc(srclen + 1);
+        if (tmp == NULL)
             return 0;
+        memcpy(tmp, src, srclen);
+        tmp[srclen] = '\0'; /* enforce NUL termination */
     } else {
         tmp = NULL;
         srclen = 0;
     }
-    if (*pdest)
-        OPENSSL_free(*pdest);
+    OPENSSL_free(*pdest);
     *pdest = tmp;
-    if (pdestlen)
+    if (pdestlen != NULL)
         *pdestlen = srclen;
     return 1;
 }
 
 int X509_VERIFY_PARAM_set1_name(X509_VERIFY_PARAM *param, const char *name)
 {
-    if (param->name)
-        OPENSSL_free(param->name);
-    param->name = BUF_strdup(name);
-    if (param->name)
-        return 1;
-    return 0;
+    OPENSSL_free(param->name);
+    param->name = OPENSSL_strdup(name);
+    return param->name != NULL;
 }
 
 int X509_VERIFY_PARAM_set_flags(X509_VERIFY_PARAM *param, unsigned long flags)
 {
     param->flags |= flags;
-    if (flags & X509_V_FLAG_POLICY_MASK)
+    if ((flags & X509_V_FLAG_POLICY_MASK) != 0)
         param->flags |= X509_V_FLAG_POLICY_CHECK;
     return 1;
 }
@@ -390,14 +280,31 @@ int X509_VERIFY_PARAM_clear_flags(X509_VERIFY_PARAM *param,
     return 1;
 }
 
-unsigned long X509_VERIFY_PARAM_get_flags(X509_VERIFY_PARAM *param)
+unsigned long X509_VERIFY_PARAM_get_flags(const X509_VERIFY_PARAM *param)
 {
     return param->flags;
 }
 
+uint32_t X509_VERIFY_PARAM_get_inh_flags(const X509_VERIFY_PARAM *param)
+{
+    return param->inh_flags;
+}
+
+int X509_VERIFY_PARAM_set_inh_flags(X509_VERIFY_PARAM *param, uint32_t flags)
+{
+    param->inh_flags = flags;
+    return 1;
+}
+
+/* resets to default (any) purpose if |purpose| == X509_PURPOSE_DEFAULT_ANY */
 int X509_VERIFY_PARAM_set_purpose(X509_VERIFY_PARAM *param, int purpose)
 {
     return X509_PURPOSE_set(&param->purpose, purpose);
+}
+
+int X509_VERIFY_PARAM_get_purpose(const X509_VERIFY_PARAM *param)
+{
+    return param->purpose;
 }
 
 int X509_VERIFY_PARAM_set_trust(X509_VERIFY_PARAM *param, int trust)
@@ -410,6 +317,16 @@ void X509_VERIFY_PARAM_set_depth(X509_VERIFY_PARAM *param, int depth)
     param->depth = depth;
 }
 
+void X509_VERIFY_PARAM_set_auth_level(X509_VERIFY_PARAM *param, int auth_level)
+{
+    param->auth_level = auth_level;
+}
+
+time_t X509_VERIFY_PARAM_get_time(const X509_VERIFY_PARAM *param)
+{
+    return param->check_time;
+}
+
 void X509_VERIFY_PARAM_set_time(X509_VERIFY_PARAM *param, time_t t)
 {
     param->check_time = t;
@@ -419,12 +336,13 @@ void X509_VERIFY_PARAM_set_time(X509_VERIFY_PARAM *param, time_t t)
 int X509_VERIFY_PARAM_add0_policy(X509_VERIFY_PARAM *param,
                                   ASN1_OBJECT *policy)
 {
-    if (!param->policies) {
+    if (param->policies == NULL) {
         param->policies = sk_ASN1_OBJECT_new_null();
-        if (!param->policies)
+        if (param->policies == NULL)
             return 0;
     }
-    if (!sk_ASN1_OBJECT_push(param->policies, policy))
+
+    if (sk_ASN1_OBJECT_push(param->policies, policy) <= 0)
         return 0;
     return 1;
 }
@@ -434,24 +352,26 @@ int X509_VERIFY_PARAM_set1_policies(X509_VERIFY_PARAM *param,
 {
     int i;
     ASN1_OBJECT *oid, *doid;
-    if (!param)
-        return 0;
-    if (param->policies)
-        sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
 
-    if (!policies) {
+    if (param == NULL) {
+        ERR_raise(ERR_LIB_X509, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+    sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
+
+    if (policies == NULL) {
         param->policies = NULL;
         return 1;
     }
 
     param->policies = sk_ASN1_OBJECT_new_null();
-    if (!param->policies)
+    if (param->policies == NULL)
         return 0;
 
     for (i = 0; i < sk_ASN1_OBJECT_num(policies); i++) {
         oid = sk_ASN1_OBJECT_value(policies, i);
         doid = OBJ_dup(oid);
-        if (!doid)
+        if (doid == NULL)
             return 0;
         if (!sk_ASN1_OBJECT_push(param->policies, doid)) {
             ASN1_OBJECT_free(doid);
@@ -462,51 +382,105 @@ int X509_VERIFY_PARAM_set1_policies(X509_VERIFY_PARAM *param,
     return 1;
 }
 
+char *X509_VERIFY_PARAM_get0_host(X509_VERIFY_PARAM *param, int idx)
+{
+    return sk_OPENSSL_STRING_value(param->hosts, idx);
+}
+
 int X509_VERIFY_PARAM_set1_host(X509_VERIFY_PARAM *param,
                                 const char *name, size_t namelen)
 {
-    return int_x509_param_set_hosts(param->id, SET_HOST, name, namelen);
+    return int_x509_param_set_hosts(param, SET_HOST, name, namelen);
 }
 
 int X509_VERIFY_PARAM_add1_host(X509_VERIFY_PARAM *param,
                                 const char *name, size_t namelen)
 {
-    return int_x509_param_set_hosts(param->id, ADD_HOST, name, namelen);
+    return int_x509_param_set_hosts(param, ADD_HOST, name, namelen);
 }
 
 void X509_VERIFY_PARAM_set_hostflags(X509_VERIFY_PARAM *param,
                                      unsigned int flags)
 {
-    param->id->hostflags = flags;
+    param->hostflags = flags;
 }
 
-char *X509_VERIFY_PARAM_get0_peername(X509_VERIFY_PARAM *param)
+unsigned int X509_VERIFY_PARAM_get_hostflags(const X509_VERIFY_PARAM *param)
 {
-    return param->id->peername;
+    return param->hostflags;
+}
+
+char *X509_VERIFY_PARAM_get0_peername(const X509_VERIFY_PARAM *param)
+{
+    return param->peername;
+}
+
+/*
+ * Move peername from one param structure to another, freeing any name present
+ * at the target.  If the source is a NULL parameter structure, free and zero
+ * the target peername.
+ */
+void X509_VERIFY_PARAM_move_peername(X509_VERIFY_PARAM *to,
+                                     X509_VERIFY_PARAM *from)
+{
+    char *peername = (from != NULL) ? from->peername : NULL;
+
+    if (to->peername != peername) {
+        OPENSSL_free(to->peername);
+        to->peername = peername;
+    }
+    if (from != NULL)
+        from->peername = NULL;
+}
+
+char *X509_VERIFY_PARAM_get0_email(X509_VERIFY_PARAM *param)
+{
+    return param->email;
 }
 
 int X509_VERIFY_PARAM_set1_email(X509_VERIFY_PARAM *param,
                                  const char *email, size_t emaillen)
 {
-    return int_x509_param_set1(&param->id->email, &param->id->emaillen,
+    return int_x509_param_set1(&param->email, &param->emaillen,
                                email, emaillen);
+}
+
+static unsigned char
+*int_X509_VERIFY_PARAM_get0_ip(X509_VERIFY_PARAM *param, size_t *plen)
+{
+    if (param == NULL || param->ip == NULL) {
+        ERR_raise(ERR_LIB_X509, ERR_R_PASSED_NULL_PARAMETER);
+        return NULL;
+    }
+    if (plen != NULL)
+        *plen = param->iplen;
+    return param->ip;
+}
+
+char *X509_VERIFY_PARAM_get1_ip_asc(X509_VERIFY_PARAM *param)
+{
+    size_t iplen;
+    unsigned char *ip = int_X509_VERIFY_PARAM_get0_ip(param, &iplen);
+
+    return ip == NULL ? NULL : ossl_ipaddr_to_asc(ip, iplen);
 }
 
 int X509_VERIFY_PARAM_set1_ip(X509_VERIFY_PARAM *param,
                               const unsigned char *ip, size_t iplen)
 {
-    if (iplen != 0 && iplen != 4 && iplen != 16)
+    if (iplen != 0 && iplen != 4 && iplen != 16) {
+        ERR_raise(ERR_LIB_X509, ERR_R_PASSED_INVALID_ARGUMENT);
         return 0;
-    return int_x509_param_set1((char **)&param->id->ip, &param->id->iplen,
+    }
+    return int_x509_param_set1((char **)&param->ip, &param->iplen,
                                (char *)ip, iplen);
 }
 
 int X509_VERIFY_PARAM_set1_ip_asc(X509_VERIFY_PARAM *param, const char *ipasc)
 {
     unsigned char ipout[16];
-    size_t iplen;
+    size_t iplen = (size_t)ossl_a2i_ipadd(ipout, ipasc);
 
-    iplen = (size_t)a2i_ipadd(ipout, ipasc);
     if (iplen == 0)
         return 0;
     return X509_VERIFY_PARAM_set1_ip(param, ipout, iplen);
@@ -517,14 +491,17 @@ int X509_VERIFY_PARAM_get_depth(const X509_VERIFY_PARAM *param)
     return param->depth;
 }
 
+int X509_VERIFY_PARAM_get_auth_level(const X509_VERIFY_PARAM *param)
+{
+    return param->auth_level;
+}
+
 const char *X509_VERIFY_PARAM_get0_name(const X509_VERIFY_PARAM *param)
 {
     return param->name;
 }
 
-static X509_VERIFY_PARAM_ID _empty_id = { NULL, 0U, NULL, NULL, 0, NULL, 0 };
-
-#define vpm_empty_id (X509_VERIFY_PARAM_ID *)&_empty_id
+#define vpm_empty_id NULL, 0U, NULL, NULL, 0, NULL, 0
 
 /*
  * Default verify parameters: these are used for various applications and can
@@ -534,55 +511,77 @@ static X509_VERIFY_PARAM_ID _empty_id = { NULL, 0U, NULL, NULL, 0, NULL, 0 };
 
 static const X509_VERIFY_PARAM default_table[] = {
     {
-     "default",                 /* X509 default parameters */
-     0,                         /* Check time */
-     0,                         /* internal flags */
+     "code_sign",               /* Code sign parameters */
+     0,                         /* check time to use */
+     0,                         /* inheritance flags */
      0,                         /* flags */
+     X509_PURPOSE_CODE_SIGN,    /* purpose */
+     X509_TRUST_OBJECT_SIGN,    /* trust */
+     -1,                        /* depth */
+     -1,                        /* auth_level */
+     NULL,                      /* policies */
+     vpm_empty_id
+    },
+    {
+     "default",                 /* X509 default parameters */
+     0,                         /* check time to use */
+     0,                         /* inheritance flags */
+     X509_V_FLAG_TRUSTED_FIRST, /* flags */
      0,                         /* purpose */
      0,                         /* trust */
      100,                       /* depth */
+     -1,                        /* auth_level */
      NULL,                      /* policies */
-     vpm_empty_id},
+     vpm_empty_id
+    },
     {
      "pkcs7",                   /* S/MIME sign parameters */
-     0,                         /* Check time */
-     0,                         /* internal flags */
+     0,                         /* check time to use */
+     0,                         /* inheritance flags */
      0,                         /* flags */
      X509_PURPOSE_SMIME_SIGN,   /* purpose */
      X509_TRUST_EMAIL,          /* trust */
      -1,                        /* depth */
+     -1,                        /* auth_level */
      NULL,                      /* policies */
-     vpm_empty_id},
+     vpm_empty_id
+    },
     {
      "smime_sign",              /* S/MIME sign parameters */
-     0,                         /* Check time */
-     0,                         /* internal flags */
+     0,                         /* check time to use */
+     0,                         /* inheritance flags */
      0,                         /* flags */
      X509_PURPOSE_SMIME_SIGN,   /* purpose */
      X509_TRUST_EMAIL,          /* trust */
      -1,                        /* depth */
+     -1,                        /* auth_level */
      NULL,                      /* policies */
-     vpm_empty_id},
+     vpm_empty_id
+    },
     {
      "ssl_client",              /* SSL/TLS client parameters */
-     0,                         /* Check time */
-     0,                         /* internal flags */
+     0,                         /* check time to use */
+     0,                         /* inheritance flags */
      0,                         /* flags */
      X509_PURPOSE_SSL_CLIENT,   /* purpose */
      X509_TRUST_SSL_CLIENT,     /* trust */
      -1,                        /* depth */
+     -1,                        /* auth_level */
      NULL,                      /* policies */
-     vpm_empty_id},
+     vpm_empty_id
+    },
     {
      "ssl_server",              /* SSL/TLS server parameters */
-     0,                         /* Check time */
-     0,                         /* internal flags */
+     0,                         /* check time to use */
+     0,                         /* inheritance flags */
      0,                         /* flags */
      X509_PURPOSE_SSL_SERVER,   /* purpose */
      X509_TRUST_SSL_SERVER,     /* trust */
      -1,                        /* depth */
+     -1,                        /* auth_level */
      NULL,                      /* policies */
-     vpm_empty_id}
+     vpm_empty_id
+    }
 };
 
 static STACK_OF(X509_VERIFY_PARAM) *param_table = NULL;
@@ -605,34 +604,37 @@ int X509_VERIFY_PARAM_add0_table(X509_VERIFY_PARAM *param)
 {
     int idx;
     X509_VERIFY_PARAM *ptmp;
-    if (!param_table) {
+
+    if (param_table == NULL) {
         param_table = sk_X509_VERIFY_PARAM_new(param_cmp);
-        if (!param_table)
+        if (param_table == NULL)
             return 0;
     } else {
         idx = sk_X509_VERIFY_PARAM_find(param_table, param);
-        if (idx != -1) {
-            ptmp = sk_X509_VERIFY_PARAM_value(param_table, idx);
+        if (idx >= 0) {
+            ptmp = sk_X509_VERIFY_PARAM_delete(param_table, idx);
             X509_VERIFY_PARAM_free(ptmp);
-            (void)sk_X509_VERIFY_PARAM_delete(param_table, idx);
         }
     }
-    if (!sk_X509_VERIFY_PARAM_push(param_table, param))
+
+    if (sk_X509_VERIFY_PARAM_push(param_table, param) <= 0)
         return 0;
     return 1;
 }
 
 int X509_VERIFY_PARAM_get_count(void)
 {
-    int num = sizeof(default_table) / sizeof(X509_VERIFY_PARAM);
-    if (param_table)
+    int num = OSSL_NELEM(default_table);
+
+    if (param_table != NULL)
         num += sk_X509_VERIFY_PARAM_num(param_table);
     return num;
 }
 
 const X509_VERIFY_PARAM *X509_VERIFY_PARAM_get0(int id)
 {
-    int num = sizeof(default_table) / sizeof(X509_VERIFY_PARAM);
+    int num = OSSL_NELEM(default_table);
+
     if (id < num)
         return default_table + id;
     return sk_X509_VERIFY_PARAM_value(param_table, id - num);
@@ -644,19 +646,18 @@ const X509_VERIFY_PARAM *X509_VERIFY_PARAM_lookup(const char *name)
     X509_VERIFY_PARAM pm;
 
     pm.name = (char *)name;
-    if (param_table) {
+    if (param_table != NULL) {
+        /* Ideally, this would be done under a lock */
+        sk_X509_VERIFY_PARAM_sort(param_table);
         idx = sk_X509_VERIFY_PARAM_find(param_table, &pm);
-        if (idx != -1)
+        if (idx >= 0)
             return sk_X509_VERIFY_PARAM_value(param_table, idx);
     }
-    return OBJ_bsearch_table(&pm, default_table,
-                             sizeof(default_table) /
-                             sizeof(X509_VERIFY_PARAM));
+    return OBJ_bsearch_table(&pm, default_table, OSSL_NELEM(default_table));
 }
 
 void X509_VERIFY_PARAM_table_cleanup(void)
 {
-    if (param_table)
-        sk_X509_VERIFY_PARAM_pop_free(param_table, X509_VERIFY_PARAM_free);
+    sk_X509_VERIFY_PARAM_pop_free(param_table, X509_VERIFY_PARAM_free);
     param_table = NULL;
 }

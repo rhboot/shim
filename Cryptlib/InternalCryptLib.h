@@ -1,38 +1,38 @@
-/** @file  
+/** @file
   Internal include file for BaseCryptLib.
 
-Copyright (c) 2010 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2010 - 2017, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __INTERNAL_CRYPT_LIB_H__
 #define __INTERNAL_CRYPT_LIB_H__
 
+#undef _WIN32
+#undef _WIN64
+
 #include <stdarg.h>
 
-#include "Library/BaseLib.h"
-#include "Library/BaseMemoryLib.h"
-#include "Library/MemoryAllocationLib.h"
-#include "Library/DebugLib.h"
-#include "Library/BaseCryptLib.h"
+#include "CrtLibSupport.h"
 
-#include "OpenSslSupport.h"
+#include <efibind.h>
+#include "Base.h"
+#include <Library/BaseLib.h>
+#include <Library/BaseMemoryLib.h>
+#include <Library/MemoryAllocationLib.h>
+#include <Library/DebugLib.h>
+#include <Library/BaseCryptLib.h>
+
+#define OPENSSL_NO_DEPRECATED  0
 
 #include <openssl/opensslv.h>
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-#define OBJ_get0_data(o) ((o)->data)
-#define OBJ_length(o) ((o)->length)
+#define OBJ_get0_data(o)  ((o)->data)
+#define OBJ_length(o)     ((o)->length)
 #endif
 
-#if defined(ENABLE_CODESIGN_EKU)
 /**
   Check input P7Data is a wrapped ContentInfo structure or not. If not construct
   a new structure to wrap P7Data.
@@ -65,5 +65,4 @@ WrapPkcs7Data (
   OUT UINTN        *WrapDataSize
   );
 
-#endif
 #endif

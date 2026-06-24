@@ -1,70 +1,21 @@
-/* crypto/bn/bn_sqrt.c */
 /*
- * Written by Lenka Fibikova <fibikova@exp-math.uni-essen.de> and Bodo
- * Moeller for the OpenSSL project.
- */
-/* ====================================================================
- * Copyright (c) 1998-2000 The OpenSSL Project.  All rights reserved.
+ * Copyright 2000-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *
- * 3. All advertising materials mentioning features or use of this
- *    software must display the following acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
- *
- * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
- *    endorse or promote products derived from this software without
- *    prior written permission. For written permission, please contact
- *    openssl-core@openssl.org.
- *
- * 5. Products derived from this software may not be called "OpenSSL"
- *    nor may "OpenSSL" appear in their names without prior written
- *    permission of the OpenSSL Project.
- *
- * 6. Redistributions of any form whatsoever must retain the following
- *    acknowledgment:
- *    "This product includes software developed by the OpenSSL Project
- *    for use in the OpenSSL Toolkit (http://www.openssl.org/)"
- *
- * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
- * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
- * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
- * OF THE POSSIBILITY OF SUCH DAMAGE.
- * ====================================================================
- *
- * This product includes cryptographic software written by Eric Young
- * (eay@cryptsoft.com).  This product includes software written by Tim
- * Hudson (tjh@cryptsoft.com).
- *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
  */
 
-#include "cryptlib.h"
-#include "bn_lcl.h"
+#include "internal/cryptlib.h"
+#include "bn_local.h"
 
 BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 /*
  * Returns 'ret' such that ret^2 == a (mod p), using the Tonelli/Shanks
  * algorithm (cf. Henri Cohen, "A Course in Algebraic Computational Number
- * Theory", algorithm 1.5.1). 'p' must be prime!
+ * Theory", algorithm 1.5.1). 'p' must be prime, otherwise an error or
+ * an incorrect "result" will be returned.
  */
 {
     BIGNUM *ret = in;
@@ -72,6 +23,7 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
     int r;
     BIGNUM *A, *b, *q, *t, *x, *y;
     int e, i, j;
+    int used_ctx = 0;
 
     if (!BN_is_odd(p) || BN_abs_is_word(p, 1)) {
         if (BN_abs_is_word(p, 2)) {
@@ -88,8 +40,8 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
             return ret;
         }
 
-        BNerr(BN_F_BN_MOD_SQRT, BN_R_P_IS_NOT_PRIME);
-        return (NULL);
+        ERR_raise(ERR_LIB_BN, BN_R_P_IS_NOT_PRIME);
+        return NULL;
     }
 
     if (BN_is_zero(a) || BN_is_one(a)) {
@@ -107,6 +59,7 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
     }
 
     BN_CTX_start(ctx);
+    used_ctx = 1;
     A = BN_CTX_get(ctx);
     b = BN_CTX_get(ctx);
     q = BN_CTX_get(ctx);
@@ -175,7 +128,8 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
          *         = a.
          *
          * (This is due to A.O.L. Atkin,
-         * <URL: http://listserv.nodak.edu/scripts/wa.exe?A2=ind9211&L=nmbrthry&O=T&P=562>,
+         * Subject: Square Roots and Cognate Matters modulo p=8n+5.
+         * URL: https://listserv.nodak.edu/cgi-bin/wa.exe?A2=ind9211&L=NMBRTHRY&P=4026
          * November 1992.)
          */
 
@@ -229,7 +183,7 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
             if (!BN_set_word(y, i))
                 goto end;
         } else {
-            if (!BN_pseudo_rand(y, BN_num_bits(p), 0, 0))
+            if (!BN_priv_rand_ex(y, BN_num_bits(p), 0, 0, 0, ctx))
                 goto end;
             if (BN_ucmp(y, p) >= 0) {
                 if (!(p->neg ? BN_add : BN_sub) (y, y, p))
@@ -246,7 +200,7 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
             goto end;
         if (r == 0) {
             /* m divides p */
-            BNerr(BN_F_BN_MOD_SQRT, BN_R_P_IS_NOT_PRIME);
+            ERR_raise(ERR_LIB_BN, BN_R_P_IS_NOT_PRIME);
             goto end;
         }
     }
@@ -258,7 +212,7 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
          * than just bad luck. Even if p is not prime, we should have found
          * some y such that r == -1.
          */
-        BNerr(BN_F_BN_MOD_SQRT, BN_R_TOO_MANY_ITERATIONS);
+        ERR_raise(ERR_LIB_BN, BN_R_TOO_MANY_ITERATIONS);
         goto end;
     }
 
@@ -273,7 +227,7 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
     if (!BN_mod_exp(y, y, q, p, ctx))
         goto end;
     if (BN_is_one(y)) {
-        BNerr(BN_F_BN_MOD_SQRT, BN_R_P_IS_NOT_PRIME);
+        ERR_raise(ERR_LIB_BN, BN_R_P_IS_NOT_PRIME);
         goto end;
     }
 
@@ -350,18 +304,23 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
             goto vrfy;
         }
 
-        /* find smallest  i  such that  b^(2^i) = 1 */
-        i = 1;
-        if (!BN_mod_sqr(t, b, p, ctx))
-            goto end;
-        while (!BN_is_one(t)) {
-            i++;
-            if (i == e) {
-                BNerr(BN_F_BN_MOD_SQRT, BN_R_NOT_A_SQUARE);
-                goto end;
+        /* Find the smallest i, 0 < i < e, such that b^(2^i) = 1. */
+        for (i = 1; i < e; i++) {
+            if (i == 1) {
+                if (!BN_mod_sqr(t, b, p, ctx))
+                    goto end;
+
+            } else {
+                if (!BN_mod_mul(t, t, t, p, ctx))
+                    goto end;
             }
-            if (!BN_mod_mul(t, t, t, p, ctx))
-                goto end;
+            if (BN_is_one(t))
+                break;
+        }
+        /* If not found, a is not a square or p is not prime. */
+        if (i >= e) {
+            ERR_raise(ERR_LIB_BN, BN_R_NOT_A_SQUARE);
+            goto end;
         }
 
         /* t := y^2^(e - i - 1) */
@@ -391,19 +350,19 @@ BIGNUM *BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
             err = 1;
 
         if (!err && 0 != BN_cmp(x, A)) {
-            BNerr(BN_F_BN_MOD_SQRT, BN_R_NOT_A_SQUARE);
+            ERR_raise(ERR_LIB_BN, BN_R_NOT_A_SQUARE);
             err = 1;
         }
     }
 
  end:
     if (err) {
-        if (ret != NULL && ret != in) {
+        if (ret != in)
             BN_clear_free(ret);
-        }
         ret = NULL;
     }
-    BN_CTX_end(ctx);
+    if (used_ctx)
+        BN_CTX_end(ctx);
     bn_check_top(ret);
     return ret;
 }

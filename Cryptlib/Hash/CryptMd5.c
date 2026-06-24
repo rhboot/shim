@@ -2,19 +2,14 @@
   MD5 Digest Wrapper Implementation over OpenSSL.
 
 Copyright (c) 2009 - 2016, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #include "InternalCryptLib.h"
 #include <openssl/md5.h>
 
+#ifdef ENABLE_MD5_DEPRECATED_INTERFACES
 
 /**
   Retrieves the size, in bytes, of the context buffer required for MD5 hash operations.
@@ -31,9 +26,8 @@ Md5GetContextSize (
   //
   // Retrieves the OpenSSL MD5 Context Size
   //
-  return (UINTN) (sizeof (MD5_CTX));
+  return (UINTN)(sizeof (MD5_CTX));
 }
-
 
 /**
   Initializes user-supplied memory pointed by Md5Context as MD5 hash context for
@@ -63,7 +57,7 @@ Md5Init (
   //
   // OpenSSL MD5 Context Initialization
   //
-  return (BOOLEAN) (MD5_Init ((MD5_CTX *) Md5Context));
+  return (BOOLEAN)(MD5_Init ((MD5_CTX *)Md5Context));
 }
 
 /**
@@ -89,11 +83,11 @@ Md5Duplicate (
   //
   // Check input parameters.
   //
-  if (Md5Context == NULL || NewMd5Context == NULL) {
+  if ((Md5Context == NULL) || (NewMd5Context == NULL)) {
     return FALSE;
   }
 
-  CopyMem (NewMd5Context, (void *)Md5Context, sizeof (MD5_CTX));
+  CopyMem (NewMd5Context, Md5Context, sizeof (MD5_CTX));
 
   return TRUE;
 }
@@ -134,14 +128,14 @@ Md5Update (
   //
   // Check invalid parameters, in case that only DataLength was checked in OpenSSL
   //
-  if (Data == NULL && (DataSize != 0)) {
+  if ((Data == NULL) && (DataSize != 0)) {
     return FALSE;
   }
 
   //
   // OpenSSL MD5 Hash Update
   //
-  return (BOOLEAN) (MD5_Update ((MD5_CTX *) Md5Context, Data, DataSize));
+  return (BOOLEAN)(MD5_Update ((MD5_CTX *)Md5Context, Data, DataSize));
 }
 
 /**
@@ -174,14 +168,14 @@ Md5Final (
   //
   // Check input parameters.
   //
-  if (Md5Context == NULL || HashValue == NULL) {
+  if ((Md5Context == NULL) || (HashValue == NULL)) {
     return FALSE;
   }
 
   //
   // OpenSSL MD5 Hash Finalization
   //
-  return (BOOLEAN) (MD5_Final (HashValue, (MD5_CTX *) Md5Context));
+  return (BOOLEAN)(MD5_Final (HashValue, (MD5_CTX *)Md5Context));
 }
 
 /**
@@ -216,7 +210,8 @@ Md5HashAll (
   if (HashValue == NULL) {
     return FALSE;
   }
-  if (Data == NULL && (DataSize != 0)) {
+
+  if ((Data == NULL) && (DataSize != 0)) {
     return FALSE;
   }
 
@@ -229,3 +224,5 @@ Md5HashAll (
     return TRUE;
   }
 }
+
+#endif
