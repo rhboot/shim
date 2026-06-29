@@ -124,7 +124,7 @@ override DEFAULT_FEATUREFLAGS = \
 		-ffreestanding \
 		-Wno-frame-address -fno-omit-frame-pointer \
 		$(shell $(CC) -fmacro-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)') \
-		-fno-stack-protector \
+		-fstack-protector-strong -mstack-protector-guard=global \
 		-fno-strict-aliasing \
 		-fpic \
 		-fshort-wchar
