@@ -2674,6 +2674,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE * systab)
 	EFI_STATUS efi_status;
 
 	InitializeLib(image_handle, systab);
+	update_stack_guard();
 
 	setup_verbosity();
 	setup_rand();
@@ -2683,5 +2684,6 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE * systab)
 	efi_status = check_mok_request(image_handle);
 
 	console_fini();
+	BS->Exit(image_handle, efi_status, 0, NULL);
 	return efi_status;
 }
