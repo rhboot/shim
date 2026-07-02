@@ -1185,6 +1185,7 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	InitializeLib(image_handle, systab);
 	setup_verbosity();
+	update_watchdog();
 
 	dprint(L"vendor_authorized:0x%08lx vendor_authorized_size:%lu\n",
 	       vendor_authorized, vendor_authorized_size);

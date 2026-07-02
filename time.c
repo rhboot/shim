@@ -116,4 +116,37 @@ efi_mktime(const EFI_TIME * const time)
 	return ret;
 }
 
+#define TIMEOUT_SLOP	60
+#define TIMEOUT		(TIMEOUT_SLOP * 5)
+
+void
+update_watchdog(void)
+{
+	EFI_STATUS efi_status;
+	EFI_TIME efi_time = { 0, };
+	EFI_TIME_CAPABILITIES efi_time_caps = { 0, };
+	time_t this_time = 0;
+	static time_t last_time = 0;
+
+	efi_status = RT->GetTime(&efi_time, &efi_time_caps);
+	if (EFI_ERROR(efi_status)) {
+		BS->SetWatchdogTimer(TIMEOUT, 0x31337, 0, NULL);
+		return;
+	}
+
+	this_time = efi_mktime(&efi_time);
+	if (this_time < last_time ||
+	    this_time < TIMEOUT_SLOP ||
+	    this_time - TIMEOUT_SLOP > last_time) {
+		if (verbose) {
+			log_debug_print(L"updating watchdog at %llu from %llu to %llu\n",
+					this_time, last_time+TIMEOUT, this_time+TIMEOUT);
+			console_print(L"updating watchdog at %llu from %llu to %llu\n",
+				      this_time, last_time+TIMEOUT, this_time+TIMEOUT);
+		}
+		last_time = this_time;
+		BS->SetWatchdogTimer(TIMEOUT, 0x31337, 0, NULL);
+	}
+}
+
 // vim:fenc=utf-8:tw=75:noet

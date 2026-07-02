@@ -99,8 +99,10 @@ extern UINT32 verbose;
 #define dprint_(fmt, ...) ({							\
 		UINTN __dprint_ret = 0;						\
 		log_debug_print((fmt), ##__VA_ARGS__);				\
-		if (verbose)							\
+		if (verbose) {							\
+			update_watchdog();					\
 			__dprint_ret = console_print((fmt), ##__VA_ARGS__);	\
+		}								\
 		__dprint_ret;							\
 	})
 #define dprint(fmt, ...)						\
