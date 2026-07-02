@@ -1004,6 +1004,9 @@ try_start_first_option(EFI_HANDLE parent_image_handle)
 static UINT32
 get_fallback_no_reboot(void)
 {
+#ifdef FALLBACK_NEVER_REBOOT
+	return 1;
+#else
 	EFI_STATUS efi_status;
 	UINT32 no_reboot;
 	UINTN size = sizeof(UINT32);
@@ -1014,6 +1017,7 @@ get_fallback_no_reboot(void)
 		return no_reboot;
 	}
 	return 0;
+#endif
 }
 
 #ifndef FALLBACK_NONINTERACTIVE
@@ -1129,7 +1133,13 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 		try_start_first_option(image);
 	} else {
 		if (get_fallback_no_reboot() == 1) {
-			VerbosePrint(L"NO_REBOOT is set, starting the first image\n");
+#ifdef FALLBACK_NEVER_REBOOT
+			const CHAR16 *reason = L"FALLBACK_NEVER_REBOOT";
+#else
+			const CHAR16 *reason = L"NO_REBOOT";
+#endif
+			VerbosePrint(L"%s is set, starting the first image\n",
+				     reason);
 			try_start_first_option(image);
 		}
 
