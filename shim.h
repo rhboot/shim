@@ -189,6 +189,7 @@
 #endif
 #include "include/simple_file.h"
 #include "include/str.h"
+#include "include/time.h"
 #include "include/tpm.h"
 #include "include/utils.h"
 #include "include/cc.h"
