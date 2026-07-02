@@ -115,7 +115,6 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 // Basic types mapping
 //
 typedef UINTN   off_t;
-typedef INT64   time_t;
 typedef UINT8   sa_family_t;
 typedef UINT32  uid_t;
 typedef UINT32  gid_t;
@@ -126,28 +125,11 @@ typedef UINT32  gid_t;
 //
 typedef VOID *FILE;
 
+#include "CrtLibTime.h"
+
 //
 // Structures Definitions
 //
-struct tm {
-  int     tm_sec;    /* seconds after the minute [0-60] */
-  int     tm_min;    /* minutes after the hour [0-59] */
-  int     tm_hour;   /* hours since midnight [0-23] */
-  int     tm_mday;   /* day of the month [1-31] */
-  int     tm_mon;    /* months since January [0-11] */
-  int     tm_year;   /* years since 1900 */
-  int     tm_wday;   /* days since Sunday [0-6] */
-  int     tm_yday;   /* days since January 1 [0-365] */
-  int     tm_isdst;  /* Daylight Savings Time flag */
-  long    tm_gmtoff; /* offset from CUT in seconds */
-  char    *tm_zone;  /* timezone abbreviation */
-};
-
-struct timeval {
-  long    tv_sec;   /* time value, in seconds */
-  long    tv_usec;  /* time value, in microseconds */
-};
-
 struct dirent {
   UINT32  d_fileno;         /* file number of entry */
   UINT16  d_reclen;         /* length of this record */
