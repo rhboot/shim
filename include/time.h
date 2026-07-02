@@ -20,4 +20,6 @@ extern EFI_TIME *efi_gmtime(const time_t *time);
 extern time_t efi_mktime(const EFI_TIME * const time);
 #endif
 
+extern void update_watchdog(void);
+
 // vim:fenc=utf-8:tw=75:noet
