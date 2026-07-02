@@ -162,8 +162,9 @@ mktime (
 // Convert a time value from type time_t to struct tm.
 //
 struct tm *
-gmtime (
-  const time_t  *timer
+gmtime_r (
+  const time_t * restrict timer,
+  struct tm * restrict result
   )
 {
   struct tm  *GmTime;
@@ -175,14 +176,11 @@ gmtime (
   UINT32     MonthNo;
   INT64      Remainder;
 
-  if (timer == NULL) {
+  if (timer == NULL || result == NULL) {
     return NULL;
   }
 
-  GmTime = malloc (sizeof (struct tm));
-  if (GmTime == NULL) {
-    return NULL;
-  }
+  GmTime = result;
 
   ZeroMem ((VOID *)GmTime, (UINTN)sizeof (struct tm));
 
@@ -223,6 +221,28 @@ gmtime (
   GmTime->tm_isdst  = 0;
   GmTime->tm_gmtoff = 0;
   GmTime->tm_zone   = NULL;
+
+  return GmTime;
+}
+
+struct tm *
+gmtime (
+  const time_t  *timer
+  )
+{
+  struct tm * GmTime;
+
+  if (!timer) {
+    errno = EINVAL;
+    return NULL;
+  }
+
+  GmTime = malloc (sizeof (struct tm));
+  if (GmTime == NULL) {
+    return NULL;
+  }
+
+  gmtime_r(timer, GmTime);
 
   return GmTime;
 }
