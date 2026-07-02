@@ -57,6 +57,7 @@ OBJS	= shim.o \
 	  sbat.o \
 	  sbat_data.o \
 	  sbat_var.o \
+	  time.o \
 	  tpm.o \
 	  utils.o \
 	  verify.o \
@@ -90,6 +91,7 @@ ORIG_SOURCES	= shim.c \
 		  sbat.c \
 		  sbat_var.S \
 		  shim.h \
+		  time.c \
 		  tpm.c \
 		  utils.c \
 		  verify.c \
@@ -104,6 +106,7 @@ MOK_OBJS = MokManager.o \
 	   hexdump.o \
 	   PasswordCrypt.o \
 	   sbat_data.o \
+	   time.o \
 	   utils.o \
 
 ORIG_MOK_SOURCES = MokManager.c \
@@ -117,6 +120,7 @@ FALLBACK_OBJS = fallback.o \
 		globals.o \
 		hexdump.o \
 		sbat_data.o \
+		time.o \
 		tpm.o \
 		utils.o
 
