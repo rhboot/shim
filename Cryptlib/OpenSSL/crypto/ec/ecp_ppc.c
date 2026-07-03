@@ -11,13 +11,13 @@
 #include "crypto/ppc_arch.h"
 #include "ec_local.h"
 
-void ecp_nistz256_mul_mont(unsigned long res[4], const unsigned long a[4],
-                           const unsigned long b[4]);
+void ecp_nistz256_mul_mont(uint64_t res[4], const uint64_t a[4],
+                           const uint64_t b[4]);
 
-void ecp_nistz256_to_mont(unsigned long res[4], const unsigned long in[4]);
-void ecp_nistz256_to_mont(unsigned long res[4], const unsigned long in[4])
+void ecp_nistz256_to_mont(uint64_t res[4], const uint64_t in[4]);
+void ecp_nistz256_to_mont(uint64_t res[4], const uint64_t in[4])
 {
-    static const unsigned long RR[] = { 0x0000000000000003U,
+    static const uint64_t RR[] = { 0x0000000000000003U,
                                         0xfffffffbffffffffU,
                                         0xfffffffffffffffeU,
                                         0x00000004fffffffdU };
@@ -25,10 +25,10 @@ void ecp_nistz256_to_mont(unsigned long res[4], const unsigned long in[4])
     ecp_nistz256_mul_mont(res, in, RR);
 }
 
-void ecp_nistz256_from_mont(unsigned long res[4], const unsigned long in[4]);
-void ecp_nistz256_from_mont(unsigned long res[4], const unsigned long in[4])
+void ecp_nistz256_from_mont(uint64_t res[4], const uint64_t in[4]);
+void ecp_nistz256_from_mont(uint64_t res[4], const uint64_t in[4])
 {
-    static const unsigned long one[] = { 1, 0, 0, 0 };
+    static const uint64_t one[] = { 1, 0, 0, 0 };
 
     ecp_nistz256_mul_mont(res, in, one);
 }
