@@ -198,33 +198,66 @@ CRYPTO_DIRS = aes \
 	      bn \
 	      buffer \
 	      cmac \
+	      cms \
 	      comp \
 	      conf \
 	      dh \
 	      dso \
+	      ec \
+	      ec/curve448/arch_64 \
+	      encode_decode \
 	      err \
 	      evp \
+	      ffc \
+	      hashtable \
 	      hmac \
+	      hpke \
+	      http \
 	      kdf \
 	      lhash \
 	      md5 \
+	      ml_dsa \
+	      ml_kem \
 	      modes \
 	      objects \
 	      ocsp \
 	      pem \
 	      pkcs12 \
 	      pkcs7 \
+	      property \
+	      provider \
 	      rand \
 	      rc4 \
 	      rsa \
 	      sha \
+	      slh_dsa \
 	      stack \
 	      txt_db \
+	      ui \
 	      x509 \
 	      x509v3 \
 
+PROVIDERS_DIRS = common/der \
+		 implementations/asymciphers \
+		 implementations/ciphers \
+		 implementations/digests \
+		 implementations/encode_decode \
+		 implementations/exchange \
+		 implementations/kdfs \
+		 implementations/kem \
+		 implementations/keymgmt \
+		 implementations/macs \
+		 implementations/rands/seeding \
+		 implementations/signature \
+		 implementations/skeymgmt \
+		 implementations/storemgmt \
+
+STUB_DIRS = / \
+
 Cryptlib/OpenSSL/libopenssl.a:
 	for i in $(CRYPTO_DIRS) ; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
+	for i in $(PROVIDERS_DIRS) ; do mkdir -p Cryptlib/OpenSSL/providers/$$i; done
+	for i in $(STUB_DIRS) ; do mkdir -p Cryptlib/OpenSSL/stub/$$i; done
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile $(IGNORE_COMPILER_ERRORS)
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
