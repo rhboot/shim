@@ -37,6 +37,8 @@
 
 #include "internal/numbers.h"
 
+#if defined(__SIZEOF_INT128__)
+
 #ifndef INT128_MAX
 # error "Your compiler doesn't appear to support 128-bit integer types"
 #endif
@@ -2019,3 +2021,5 @@ int ossl_ec_GFp_nistp384_have_precompute_mult(const EC_GROUP *group)
 {
     return HAVEPRECOMP(group, nistp384);
 }
+
+#endif /* __SIZEOF_INT128__ */

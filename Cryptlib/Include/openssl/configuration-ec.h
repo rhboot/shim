@@ -166,9 +166,11 @@ extern "C" {
 # ifndef OPENSSL_NO_EC2M
 #  define OPENSSL_NO_EC2M
 # endif
-//# ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
-//#  define OPENSSL_NO_EC_NISTP_64_GCC_128
-//# endif
+# if !defined(__SIZEOF_INT128__)
+#  ifndef OPENSSL_NO_EC_NISTP_64_GCC_128
+#   define OPENSSL_NO_EC_NISTP_64_GCC_128
+#  endif
+# endif /* __SIZEOF_INT128__ */
 # ifndef OPENSSL_NO_EC_NISTP521
 #  define OPENSSL_NO_EC_NISTP521
 # endif
