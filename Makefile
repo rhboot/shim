@@ -179,12 +179,52 @@ $(TOPDIR)/gnu-efi/$(ARCH_GNUEFI)/gnuefi/libgnuefi.a $(TOPDIR)/gnu-efi/$(ARCH_GNU
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)
 
+CRYPTLIB_DIRS = Hash \
+		Hmac \
+		Cipher \
+		Pem \
+		Pk \
+		Rand \
+		SysCall \
+
 Cryptlib/libcryptlib.a:
-	for i in Hash Hmac Cipher Rand Pk Pem SysCall; do mkdir -p Cryptlib/$$i; done
+	for i in $(CRYPTLIB_DIRS) ; do mkdir -p Cryptlib/$$i; done
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib -C Cryptlib -f $(TOPDIR)/Cryptlib/Makefile $(IGNORE_COMPILER_ERRORS)
 
+CRYPTO_DIRS = aes \
+	      asn1 \
+	      async/arch \
+	      bio \
+	      bn \
+	      buffer \
+	      cmac \
+	      comp \
+	      conf \
+	      dh \
+	      dso \
+	      err \
+	      evp \
+	      hmac \
+	      kdf \
+	      lhash \
+	      md5 \
+	      modes \
+	      objects \
+	      ocsp \
+	      pem \
+	      pkcs12 \
+	      pkcs7 \
+	      rand \
+	      rc4 \
+	      rsa \
+	      sha \
+	      stack \
+	      txt_db \
+	      x509 \
+	      x509v3 \
+
 Cryptlib/OpenSSL/libopenssl.a:
-	for i in x509v3 x509 txt_db stack sha rsa rc4 rand pkcs7 pkcs12 pem ocsp objects modes md5 lhash kdf hmac evp err dso dh conf comp cmac buffer bn bio async/arch asn1 aes; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
+	for i in $(CRYPTO_DIRS) ; do mkdir -p Cryptlib/OpenSSL/crypto/$$i; done
 	$(MAKE) TOPDIR=$(TOPDIR) VPATH=$(TOPDIR)/Cryptlib/OpenSSL -C Cryptlib/OpenSSL -f $(TOPDIR)/Cryptlib/OpenSSL/Makefile $(IGNORE_COMPILER_ERRORS)
 
 lib/lib.a: | $(TOPDIR)/lib/Makefile $(wildcard $(TOPDIR)/include/*.[ch])
