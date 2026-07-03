@@ -19,7 +19,8 @@ __pause(void)
 #elif defined(__aarch64__)
 	__asm__ __volatile__("wfi");
 #else
-#error unsupported arch
+	extern void usleep(unsigned long usecs);
+	usleep(1000);
 #endif
 }
 
