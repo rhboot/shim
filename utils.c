@@ -84,3 +84,11 @@ read_file(EFI_FILE_HANDLE fh, CHAR16 *fullpath, CHAR16 **buffer, UINT64 *bs)
 	fh2->Close(fh2);
 	return EFI_SUCCESS;
 }
+
+#if defined(__aarch64__)
+unsigned long
+__getauxval(unsigned long type UNUSED)
+{
+	return 0ul;
+}
+#endif /* __aarch64__ */
