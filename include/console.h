@@ -103,8 +103,8 @@ extern UINT32 verbose;
 			__dprint_ret = console_print((fmt), ##__VA_ARGS__);	\
 		__dprint_ret;							\
 	})
-#define dprint(fmt, ...)                                              \
-	dprint_(L"%a:%d:%a() " fmt, __FILE__, __LINE__ - 1, __func__, \
+#define dprint(fmt, ...)						\
+	dprint_(L"%a:%d:%a() " fmt, __FILE__, __LINE__, __func__,	\
 	        ##__VA_ARGS__)
 #else
 #define dprint_(...) ({ ; })
