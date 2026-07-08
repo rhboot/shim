@@ -44,6 +44,7 @@ OBJS	= shim.o \
 	  csv.o \
 	  dp.o \
 	  errlog.o \
+	  hexdump.o \
 	  httpboot.o \
 	  globals.o \
 	  load-options.o \
@@ -76,6 +77,7 @@ ORIG_SOURCES	= shim.c \
 		  csv.c \
 		  dp.c \
 		  errlog.c \
+		  hexdump.c \
 		  httpboot.c \
 		  globals.c \
 		  load-options.c \
@@ -99,6 +101,7 @@ MOK_OBJS = MokManager.o \
 	   dp.o \
 	   errlog.o \
 	   globals.o \
+	   hexdump.o \
 	   PasswordCrypt.o \
 	   sbat_data.o \
 	   utils.o \
@@ -112,6 +115,7 @@ ORIG_MOK_SOURCES = MokManager.c \
 FALLBACK_OBJS = fallback.o \
 		errlog.o \
 		globals.o \
+		hexdump.o \
 		sbat_data.o \
 		tpm.o \
 		utils.o
