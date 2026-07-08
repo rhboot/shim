@@ -85,15 +85,22 @@ CalculateTimeT (
   EFI_TIME  *Time
   )
 {
-  time_t  CalTime;
+  time_t  CalTime = 0;
   UINTN   Year;
 
   //
   // Years Handling
   // UTime should now be set to 00:00:00 on Jan 1 of the current year.
   //
-  for (Year = 1970, CalTime = 0; Year != Time->Year; Year++) {
-    CalTime = CalTime + (time_t)(CumulativeDays[IsLeap (Year)][13] * SECSPERDAY);
+  if (Time->Year < 1970) {
+    for (Year = 1970; Year > Time->Year; Year--) {
+      CalTime -= (time_t)(CumulativeDays[IsLeap (Year)][13] * SECSPERDAY);
+    }
+    CalTime -= 86400;
+  } else {
+    for (Year = 1970; Year < Time->Year; Year++) {
+      CalTime += (time_t)(CumulativeDays[IsLeap (Year)][13] * SECSPERDAY);
+    }
   }
 
   //
