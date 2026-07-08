@@ -174,6 +174,7 @@
 
 #include "include/asm.h"
 #include "include/compiler.h"
+#include "include/backtrace.h"
 #include "include/list.h"
 #include "include/configtable.h"
 #include "include/console.h"

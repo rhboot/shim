@@ -89,9 +89,13 @@ SECTIONS
   _sbat_size = . - _sbat;
 
   . = ALIGN(65536);
+  _dynsym = .;
   .dynsym   : { *(.dynsym) }
+  _dynsym_end = .;
   . = ALIGN(65536);
+  _dynstr = .;
   .dynstr   : { *(.dynstr) }
+  _dynstr_end = .;
   . = ALIGN(65536);
   .ignored.reloc :
   {

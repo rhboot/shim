@@ -102,8 +102,12 @@ SECTIONS
   . = ALIGN(4096);
   .dyn :
   {
+    _dynsym = .;
     *(.dynsym)
+    _dynsym_end = .;
+    _dynstr = .;
     *(.dynstr)
+    _dynstr_end = .;
     _evrodata = .;
     . = ALIGN(4096);
   }

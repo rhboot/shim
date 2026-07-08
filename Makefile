@@ -40,6 +40,7 @@ TARGETS += $(MMNAME) $(FBNAME)
 endif
 
 OBJS	= shim.o \
+	  backtrace.o \
 	  cert.o \
 	  csv.o \
 	  dp.o \
@@ -74,6 +75,7 @@ KEYS	= shim_cert.h \
 	  shim.cer \
 
 ORIG_SOURCES	= shim.c \
+		  backtrace.c \
 		  cert.S \
 		  csv.c \
 		  dp.c \
@@ -100,6 +102,7 @@ ORIG_SOURCES	= shim.c \
 
 MOK_OBJS = MokManager.o \
 	   crypt_blowfish.o \
+	   backtrace.o \
 	   dp.o \
 	   errlog.o \
 	   globals.o \
@@ -116,6 +119,7 @@ ORIG_MOK_SOURCES = MokManager.c \
 		   $(wildcard include/*.h) \
 
 FALLBACK_OBJS = fallback.o \
+		backtrace.o \
 		errlog.o \
 		globals.o \
 		hexdump.o \
@@ -431,7 +435,7 @@ ifneq ($(OBJCOPY_GTE224),1)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .rodata -j .rel* \
-		-j .rela* -j .dyn -j .reloc -j .eh_frame \
+		-j .rela* -j .dyn* -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat -j .sbatlevel \
 		--file-alignment 0x1000 \
 		--section-alignment $(ARCH_SECTION_ALIGNMENT) \
@@ -449,7 +453,7 @@ ifneq ($(OBJCOPY_GTE224),1)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data \
 		-j .dynamic -j .rodata -j .rel* \
-		-j .rela* -j .dyn -j .reloc -j .eh_frame -j .sbat \
+		-j .rela* -j .dyn* -j .reloc -j .eh_frame -j .sbat \
 		-j .sbatlevel \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
