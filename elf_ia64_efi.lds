@@ -94,9 +94,13 @@ SECTIONS
     *(.reloc)
   }
   . = ALIGN(4096);
+  _dynsym = .;
   .dynsym   : { *(.dynsym) }
+  _dynsym_end = .;
   . = ALIGN(4096);
+  _dynstr = .;
   .dynstr   : { *(.dynstr) }
+  _dynstr_end = .;
   /DISCARD/ :
   {
     *(.rela.plabel)

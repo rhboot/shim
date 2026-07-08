@@ -140,9 +140,13 @@ SECTIONS
   _sbat_vsize = _esbat - _sbat;
 
   . = ALIGN(4096);
+  _dynsym = .;
   .dynsym   : { *(.dynsym) }
+  _dynsym_end = .;
   . = ALIGN(4096);
+  _dynstr = .;
   .dynstr   : { *(.dynstr) }
+  _dynstr_end = .;
   . = ALIGN(4096);
   .ignored.reloc :
   {

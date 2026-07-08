@@ -122,6 +122,7 @@ override DEFAULT_FEATUREFLAGS = \
 		-std=gnu11 \
 		-ggdb -gdwarf-4 -gstrict-dwarf \
 		-ffreestanding \
+		-Wno-frame-address -fno-omit-frame-pointer \
 		$(shell $(CC) -fmacro-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)') \
 		-fno-stack-protector \
 		-fno-strict-aliasing \
@@ -141,8 +142,8 @@ override DEFAULT_WERRFLAGS = \
 		-Werror
 $(call update-variable,WERRFLAGS)
 
-CFLAGS		= $(FEATUREFLAGS) \
-		  $(OPTIMIZATIONS) \
+CFLAGS		= $(OPTIMIZATIONS) \
+		  $(FEATUREFLAGS) \
 		  $(WARNFLAGS) \
 		  $(if $(findstring clang,$(CC)),$(CLANG_WARNINGS)) \
 		  $(ARCH_CFLAGS) \
