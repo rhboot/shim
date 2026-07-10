@@ -75,7 +75,11 @@ libefi-test.a :
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
+generated_sbat_var_defs.h :
+	$(MAKE) generated_sbat_var_defs.h
+
 fuzz-sbat_FILES = csv.c lib/variables.c lib/guid.c sbat_var.S mock-variables.c
+fuzz-sbat :: | generated_sbat_var_defs.h
 fuzz-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
 
 fuzzers := $(patsubst %.c,%,$(wildcard fuzz-*.c))
