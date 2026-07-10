@@ -19,6 +19,8 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem /usr/include \
 	 -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
 	 $(ARCH_CFLAGS) \
+	 -fcoverage-mapping \
+	 -fprofile-instr-generate \
 	 -fsanitize=fuzzer,address \
 	 -fshort-wchar \
 	 -fno-builtin \
@@ -100,7 +102,7 @@ endif
 $(fuzzers) :: fuzz-% : test.c fuzz-%.c $(fuzz-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(fuzz-$*_FILES)) libefi-test.a -lefivar
 	mkdir -p $@-corpus
-	cd $@-corpus ; ../$@ \
+	cd $@-corpus ; LLVM_PROFILE_FILE="$@.profraw" ../$@ \
 		-jobs=24 \
 		-max_len=4096 \
 		$(MAX_TOTAL_TIME) \
