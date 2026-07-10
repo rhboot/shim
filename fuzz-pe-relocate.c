@@ -9,8 +9,6 @@
 #endif
 #include "shim.h"
 
-UINT8 mok_policy = 0;
-
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
 	uint8_t *data_copy;

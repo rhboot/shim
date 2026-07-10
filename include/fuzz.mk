@@ -75,6 +75,8 @@ libefi-test.a :
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
+fuzz-pe-relocate_FILES = globals.c
+
 generated_sbat_var_defs.h :
 	$(MAKE) generated_sbat_var_defs.h
 
