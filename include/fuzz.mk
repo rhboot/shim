@@ -76,7 +76,7 @@ libefi-test.a :
 		clean
 
 fuzz-netboot_FILES = lib/string.c
-fuzz-netboot :: FUZZ_ARGS+=-dict=$(TOPDIR)/data/netboot-fuzz-dict.txt
+fuzz-netboot :: private FUZZ_ARGS=-dict=$(TOPDIR)/data/$@-dict.txt
 
 fuzz-pe-relocate_FILES = globals.c
 
@@ -93,7 +93,12 @@ $(fuzzers) :: fuzz-% : | libefi-test.a
 
 $(fuzzers) :: fuzz-% : test.c fuzz-%.c $(fuzz-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(fuzz-$*_FILES)) libefi-test.a -lefivar
-	$(VALGRIND) ./$@ -max_len=4096 -jobs=24 $(FUZZ_ARGS)
+	mkdir -p $@-corpus
+	cd $@-corpus ; $(VALGRIND) ../$@ \
+		-jobs=24 \
+		-max_len=4096 \
+		$(FUZZ_ARGS) \
+		../$@-corpus
 
 fuzz : $(fuzzers)
 	$(MAKE) -f include/fuzz.mk fuzz-clean
