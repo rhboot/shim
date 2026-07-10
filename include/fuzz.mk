@@ -8,7 +8,6 @@
 include $(TOPDIR)/Make.defaults
 
 CC = clang
-VALGRIND ?=
 DEBUG_PRINTS ?= 0
 OPTIMIZATIONS ?= -Og -ggdb
 FUZZ_ARGS ?=
@@ -94,7 +93,7 @@ $(fuzzers) :: fuzz-% : | libefi-test.a
 $(fuzzers) :: fuzz-% : test.c fuzz-%.c $(fuzz-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(fuzz-$*_FILES)) libefi-test.a -lefivar
 	mkdir -p $@-corpus
-	cd $@-corpus ; $(VALGRIND) ../$@ \
+	cd $@-corpus ; ../$@ \
 		-jobs=24 \
 		-max_len=4096 \
 		$(FUZZ_ARGS) \
