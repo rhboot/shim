@@ -213,6 +213,7 @@ export VERBOSE
 endif
 
 export DEFINES
+export OPTIMIZATIONS
 export ARCH_CFLAGS
 
 # vim:filetype=make

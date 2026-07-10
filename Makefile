@@ -254,6 +254,8 @@ gnu-efi/gnuefi/libgnuefi.a gnu-efi/lib/libefi.a:
 		CCC_CC="$(COMPILER)" \
 		CC="$(CC)" \
 		ARCH=$(ARCH_GNUEFI) \
+		OPTIMIZATION_CFLAGS="$(OPTIMIZATIONS)" \
+		DEBUG_CFLAGS="-ggdb -gdwarf-4 -gstrict-dwarf" \
 		NO_GLIBC=1 \
 		TOPDIR=$(TOPDIR)/gnu-efi \
 		VPATH=$(TOPDIR)/gnu-efi \
