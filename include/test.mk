@@ -18,8 +18,8 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 $(EFI_INCLUDES) \
 	 -Iinclude -iquote . \
 	 -isystem /usr/include \
-	 -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include) \
-	 $(ARCH_CFLAGS) \
+	 -isystem $(shell $(CC) $(ARCH_TEST_CFLAGS) -print-file-name=include) \
+	 $(ARCH_TEST_CFLAGS) \
 	 $(CFLAGS_LTO) \
 	 $(CFLAGS_GCOV) \
 	 -fshort-wchar \
@@ -48,13 +48,13 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 
 # On some systems (e.g. Arch Linux), limits.h is in the "include-fixed" instead
 # of the "include" directory
-INCLUDE_FIXED = $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
+INCLUDE_FIXED = $(shell $(CC) $(ARCH_TEST_CFLAGS) -print-file-name=include-fixed)
 ifneq ($(strip $(INCLUDE_FIXED)),include-fixed)
 CFLAGS += -isystem $(INCLUDE_FIXED)
 endif
 
 # And on Debian also check the multi-arch include path
-MULTIARCH_ISYSTEM = $(if $(findstring gcc,$(CC)),$(shell $(CC) $(ARCH_CFLAGS) -print-multiarch))
+MULTIARCH_ISYSTEM = $(if $(findstring gcc,$(CC)),$(shell $(CC) $(ARCH_TEST_CFLAGS) -print-multiarch))
 ifneq ($(strip $(MULTIARCH_ISYSTEM)),)
 CFLAGS += -isystem /usr/include/$(MULTIARCH_ISYSTEM)
 endif
