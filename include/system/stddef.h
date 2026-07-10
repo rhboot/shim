@@ -13,4 +13,9 @@ typedef __INT16_TYPE__ ssize_t;
 #error unsupported architecture
 #endif
 
+#if defined(SHIM_UNIT_TEST) && defined(__WCHAR_TYPE__)
+typedef __WCHAR_TYPE__ wchar_t;
+#undef __need_wchar_t
+#endif
+
 // vim:fenc=utf-8:tw=75:noet
