@@ -160,8 +160,8 @@ endif
 LIB_GCC		= $(shell $(CC) $(ARCH_CFLAGS) -print-libgcc-file-name)
 EFI_LIBS	= -lefi -lgnuefi --start-group Cryptlib/libcryptlib.a Cryptlib/OpenSSL/libopenssl.a --end-group $(LIB_GCC)
 FORMAT		?= --output-target efi-app-$(ARCH)
-LOCAL_EFI_PATH	= gnu-efi/$(ARCH_GNUEFI)/gnuefi
-LIBDIR		= gnu-efi/$(ARCH_GNUEFI)/lib
+LOCAL_EFI_PATH	= gnu-efi/gnuefi
+LIBDIR		= gnu-efi/lib
 
 MMSTEM		?= mm$(ARCH_SUFFIX)
 MMNAME		= $(MMSTEM).efi
