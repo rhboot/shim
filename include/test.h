@@ -9,8 +9,12 @@
 #define TEST_H_
 
 #define _GNU_SOURCE
+#define GNU_EFI_USE_EXTERNAL_STDARG
 
 #include <stdarg.h>
+
+typedef va_list ms_va_list;
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
