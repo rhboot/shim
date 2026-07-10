@@ -11,6 +11,7 @@ CC = clang
 DEBUG_PRINTS ?= 0
 OPTIMIZATIONS ?= -Og -ggdb
 FUZZ_ARGS ?=
+MAX_FUZZ_TIME ?=
 CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
 	 $(EFI_INCLUDES) \
@@ -90,12 +91,19 @@ fuzzers := $(patsubst %.c,%,$(wildcard fuzz-*.c))
 
 $(fuzzers) :: fuzz-% : | libefi-test.a
 
+ifneq ($(strip $(MAX_FUZZ_TIME)),)
+MAX_TOTAL_TIME=-max_total_time=$(MAX_FUZZ_TIME)
+else
+MAX_TOTAL_TIME=
+endif
+
 $(fuzzers) :: fuzz-% : test.c fuzz-%.c $(fuzz-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(fuzz-$*_FILES)) libefi-test.a -lefivar
 	mkdir -p $@-corpus
 	cd $@-corpus ; ../$@ \
 		-jobs=24 \
 		-max_len=4096 \
+		$(MAX_TOTAL_TIME) \
 		$(FUZZ_ARGS) \
 		../$@-corpus
 
