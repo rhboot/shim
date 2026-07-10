@@ -26,8 +26,8 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -fno-builtin \
 	 -rdynamic \
 	 -fno-inline \
-	 -fno-eliminate-unused-debug-types \
-	 -fno-eliminate-unused-debug-symbols \
+	 $(if $(findstring gcc,$(CC)),-fno-eliminate-unused-debug-types) \
+	 $(if $(findstring gcc,$(CC)),-fno-eliminate-unused-debug-symbols) \
 	 -gpubnames \
 	 -grecord-gcc-switches \
 	 $(if $(findstring clang,$(CC)),-Wno-unknown-warning-option) \
@@ -48,10 +48,16 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 
 # On some systems (e.g. Arch Linux), limits.h is in the "include-fixed" instead
 # of the "include" directory
-CFLAGS += -isystem $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
+INCLUDE_FIXED = $(shell $(CC) $(ARCH_CFLAGS) -print-file-name=include-fixed)
+ifneq ($(strip $(INCLUDE_FIXED)),include-fixed)
+CFLAGS += -isystem $(INCLUDE_FIXED)
+endif
 
 # And on Debian also check the multi-arch include path
-CFLAGS += -isystem /usr/include/$(shell $(CC) $(ARCH_CFLAGS) -print-multiarch)
+MULTIARCH_ISYSTEM = $(if $(findstring gcc,$(CC)),$(shell $(CC) $(ARCH_CFLAGS) -print-multiarch))
+ifneq ($(strip $(MULTIARCH_ISYSTEM)),)
+CFLAGS += -isystem /usr/include/$(MULTIARCH_ISYSTEM)
+endif
 
 export CFLAGS_LTO CFLAGS_GCOV
 
