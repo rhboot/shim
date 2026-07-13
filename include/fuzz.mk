@@ -75,8 +75,8 @@ libefi-test.a :
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		clean
 
-fuzz-netboot_FILES = lib/string.c
-fuzz-netboot :: private FUZZ_ARGS=-dict=$(TOPDIR)/data/$@-dict.txt
+fuzz-tftpboot_FILES = lib/string.c
+fuzz-tftpboot :: private FUZZ_ARGS=-dict=$(TOPDIR)/data/$@-dict.txt
 
 fuzz-pe-relocate_FILES = globals.c
 
