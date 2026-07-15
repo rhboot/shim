@@ -5,7 +5,10 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  /* .hash and/or .gnu.hash MUST come first! */
+  /*
+   * we have to leave space for PE headers
+   */
+  . = 0x1000;
   .hash : { *(.hash) }
   . = ALIGN(4096);
   .text :
