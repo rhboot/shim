@@ -6,6 +6,7 @@
 
 #include "shim.h"
 
+#ifndef __arm__
 #include <elf.h>
 
 #define MAX_STACK_FRAME 102400
@@ -286,5 +287,12 @@ backtrace(unsigned int skip)
 		skip += 1;
 	} while (!done);
 }
+#else /* __arm__ */
+void
+backtrace(unsigned int skip UNUSED)
+{
+
+}
+#endif
 
 // vim:fenc=utf-8:tw=75:noet
