@@ -6,7 +6,10 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  /* this MUST come first! */
+  /*
+   * we have to leave space for PE headers
+   */
+  . = 0x1000;
   .hash : { *(.hash) }
   . = ALIGN(4096);
   .eh_frame :
