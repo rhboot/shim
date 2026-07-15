@@ -6,8 +6,6 @@
 
 #include "shim.h"
 
-#if defined(ENABLE_SHIM_DEVEL)
-
 #include <elf.h>
 
 #define MAX_STACK_FRAME 102400
@@ -288,6 +286,5 @@ backtrace(unsigned int skip)
 		skip += 1;
 	} while (!done);
 }
-#endif /* !defined(ENABLE_SHIM_DEVEL) */
 
 // vim:fenc=utf-8:tw=75:noet
