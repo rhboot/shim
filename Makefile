@@ -455,7 +455,7 @@ endif
 ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
-	$(OBJCOPY) -D -j .text -j .sdata -j .data \
+	$(OBJCOPY) -D -j .text -j .sdata -j .data* \
 		-j .dynamic -j .rodata -j .rel* \
 		-j .rela* -j .dyn* -j .reloc -j .eh_frame -j .sbat \
 		-j .sbatlevel \
