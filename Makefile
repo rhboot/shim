@@ -469,13 +469,14 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-fuzz fuzz-coverage fuzz-lto :
+fuzz:
 	@make -f $(TOPDIR)/include/fuzz.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
 		ARCH_DEFINES="$(ARCH_DEFINES)" \
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
+		MAX_FUZZ_TIME=$(MAX_FUZZ_TIME) \
 		$@
 
 test test-coverage test-lto : | clean-test-results
