@@ -78,7 +78,6 @@ ifeq ($(ARCH),ia32)
 	ARCH_SUFFIX		?= ia32
 	ARCH_SUFFIX_UPPER	?= IA32
 	ARCH_LDFLAGS		?=
-	ARCH_CFLAGS		?= -m32
 	ARCH_SECTION_ALIGNMENT	?= 0x1000
 endif
 ifeq ($(ARCH),aarch64)
@@ -87,7 +86,6 @@ ifeq ($(ARCH),aarch64)
 	ARCH_SUFFIX		?= aa64
 	ARCH_SUFFIX_UPPER	?= AA64
 	ARCH_LDFLAGS		?=
-	ARCH_CFLAGS		?=
 	ARCH_SECTION_ALIGNMENT	?= 0x10000
 endif
 ifeq ($(ARCH),arm)
