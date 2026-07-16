@@ -113,8 +113,7 @@ fuzz : $(fuzzers)
 	$(MAKE) -f include/fuzz.mk fuzz-clean
 
 fuzz-clean :
-	@rm -vf random.bin libefi-test.a
-	@rm -vf vgcore.* fuzz*.log
+	@rm -vf random.bin libefi-test.a $(wildcard *-corpus/fuzz*.log)
 
 clean : fuzz-clean
 
