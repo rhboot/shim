@@ -45,6 +45,7 @@ static int verbosity;
 
 static bool set_nx_compat = false;
 static bool require_nx_compat = false;
+static bool strip_coff_symbols = false;
 
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
@@ -165,6 +166,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 			PEHdr->Pe32Plus.OptionalHeader.SectionAlignment;
 		ctx->DllCharacteristics = PEHdr->Pe32Plus.OptionalHeader.DllCharacteristics;
 		ctx->FileAlignment = PEHdr->Pe32Plus.OptionalHeader.FileAlignment;
+		ctx->FileHdr = &PEHdr->Pe32Plus.FileHeader;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER64);
 	} else {
 		debug(NOISE, "image is 32bit\n");
@@ -176,6 +178,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 			PEHdr->Pe32.OptionalHeader.SectionAlignment;
 		ctx->DllCharacteristics = PEHdr->Pe32.OptionalHeader.DllCharacteristics;
 		ctx->FileAlignment = PEHdr->Pe32.OptionalHeader.FileAlignment;
+		ctx->FileHdr = &PEHdr->Pe32.FileHeader;
 		OptHeaderSize = sizeof(EFI_IMAGE_OPTIONAL_HEADER32);
 	}
 
@@ -475,6 +478,80 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 	return ret;
 }
 
+static int
+strip_coff_syms(PE_COFF_LOADER_IMAGE_CONTEXT *ctx, size_t *file_size)
+{
+	EFI_IMAGE_SECTION_HEADER *Section;
+	int i;
+
+	uint16_t pos = 0;
+	char *new_strtab = NULL;
+	uint32_t new_strtab_size = 0;
+
+	uint32_t old_symtab_size = ctx->NumberOfSymbols * EFI_IMAGE_SIZEOF_SYMBOL;
+	uint32_t old_strtab_size = 0;
+	uintptr_t old_strtab_location = 0;
+
+	/*
+	 * On arches where we don't have objcopy support for efi-app-$arch,
+	 * and are thus using -O binary with hacks galore to build our
+	 * binaries, there isn't a coff symbol table.
+	 *
+	 * We also don't have indirect symbol names for our sections, which
+	 * nobody has ever noticed because "objdump -h" doesn't work.
+	 *
+	 * Just call it done on those architectures.
+	 */
+	if (ctx->SymbolTable == 0) {
+		debug(INFO, "This binary has no COFF symbol or string table; skipping.\n");
+		return 0;
+	}
+
+	char *old_symtab = (void *)((uintptr_t)ctx->ImageAddress + ctx->SymbolTable);
+
+	Section = ctx->FirstSection;
+	for (i=0, Section = ctx->FirstSection; i < ctx->NumberOfSections; i++, Section++) {
+		char *section_name = "";
+		char *tmp;
+		size_t len;
+
+		get_section_name(ctx, Section, &section_name);
+
+		len = strlen(section_name);
+
+		if (len > 8 || section_name[0] == '/') {
+			char new_name[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+			snprintf(new_name, 9, "/%hu", pos+4);
+			new_strtab_size += len + 1;
+
+			tmp = realloc(new_strtab, new_strtab_size);
+			if (!tmp)
+				err(5, "Could not allocate new string table");
+			strcpy(&tmp[pos], section_name);
+			pos += len + 1;
+
+			new_strtab = tmp;
+			memcpy(Section->Name, new_name, 8);
+		}
+		free(section_name);
+	}
+
+	old_strtab_location = (uintptr_t)old_symtab + old_symtab_size;
+	old_strtab_size = *(uint32_t *)old_strtab_location;
+
+	debug(INFO, "Old COFF symtab:%"PRIu32" bytes strtab:%"PRIu32" bytes. New strtab:%"PRIu32" bytes.\n",
+	      old_symtab_size, old_strtab_size, new_strtab_size);
+	ctx->NumberOfSymbols = 0;
+	ctx->FileHdr->NumberOfSymbols = 0;
+	*(uint32_t *)old_symtab = new_strtab_size;
+	memcpy(&((char *)old_symtab)[4], new_strtab, new_strtab_size);
+	*file_size -= old_strtab_size + old_symtab_size;
+	*file_size += sizeof(new_strtab_size) + new_strtab_size;
+
+	return 0;
+}
+
 static void
 fix_timestamp(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 {
@@ -568,6 +645,12 @@ handle_one(char *f)
 	if (rc < 0)
 		err(2, "NX compatibility check failed\n");
 
+	if (strip_coff_symbols) {
+		rc = strip_coff_syms(&ctx, &sz);
+		if (rc < 0)
+			err(3, "Stripping COFF symbols failed\n");
+	}
+
 	fix_timestamp(&ctx);
 
 	fix_checksum(&ctx, map, sz);
@@ -582,6 +665,13 @@ handle_one(char *f)
 		warn("munmap(%p, %zu) failed", map, sz);
 		failed = 1;
 	}
+
+	rc = ftruncate(fd, sz);
+	if (rc < 0) {
+		warn("ftruncte(%d, %zu) failed", fd, sz);
+		failed = 1;
+	}
+
 	rc = close(fd);
 	if (rc < 0) {
 		warn("close(%d) failed", fd);
@@ -600,6 +690,8 @@ static void __attribute__((__noreturn__)) usage(int status)
 	fprintf(out, "Options:\n");
 	fprintf(out, "       -q    Be more quiet\n");
 	fprintf(out, "       -v    Be more verbose\n");
+	fprintf(out, "       -C    Disable stripping COFF symbols\n");
+	fprintf(out, "       -c    Enable stripping COFF symbols\n");
 	fprintf(out, "       -N    Disable the NX compatibility flag\n");
 	fprintf(out, "       -n    Enable the NX compatibility flag\n");
 	fprintf(out, "       -x    Error on NX incompatibility\n");
@@ -618,6 +710,12 @@ int main(int argc, char **argv)
 		{.name = "usage",
 		 .val = '?',
 		 },
+		{.name = "strip-coff",
+		 .val = 'C',
+		},
+		{.name = "no-strip-coff",
+		 .val = 'c',
+		},
 		{.name = "disable-nx-compat",
 		 .val = 'N',
 		},
@@ -637,11 +735,17 @@ int main(int argc, char **argv)
 	};
 	int longindex = -1;
 
-	while ((i = getopt_long(argc, argv, "hNnqvx", options, &longindex)) != -1) {
+	while ((i = getopt_long(argc, argv, "hCcNnqvx", options, &longindex)) != -1) {
 		switch (i) {
 		case 'h':
 		case '?':
 			usage(longindex == -1 ? 1 : 0);
+			break;
+		case 'C':
+			strip_coff_symbols = false;
+			break;
+		case 'c':
+			strip_coff_symbols = true;
 			break;
 		case 'N':
 			set_nx_compat = false;

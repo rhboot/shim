@@ -830,6 +830,7 @@ typedef struct {
 	UINT16 DllCharacteristics;
 	UINT64 SymbolTable;
 	UINT16 NumberOfSymbols;
+	EFI_IMAGE_FILE_HEADER *FileHdr;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
 } PE_COFF_LOADER_IMAGE_CONTEXT;
 
