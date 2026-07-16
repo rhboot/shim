@@ -6,6 +6,7 @@
 
 #define _GNU_SOURCE 1
 
+#include <ctype.h>
 #include <err.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -190,6 +191,9 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 
 	ctx->NumberOfSections = PEHdr->Pe32.FileHeader.NumberOfSections;
 
+	ctx->NumberOfSymbols = PEHdr->Pe32.FileHeader.NumberOfSymbols;
+	ctx->SymbolTable = PEHdr->Pe32.FileHeader.PointerToSymbolTable;
+
 	debug(NOISE,
 	      "Number of RVAs:%"PRIu64" EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES:%d\n",
 	      ctx->NumberOfRvaAndSizes, EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES);
@@ -292,7 +296,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		errx(1, "%s: Unsupported image - Relocations have been stripped", file);
 
 	if (image_is_64_bit(PEHdr)) {
-		ctx->ImageAddress = PEHdr->Pe32Plus.OptionalHeader.ImageBase;
+		ctx->ImageAddress = (uintptr_t)data + PEHdr->Pe32Plus.OptionalHeader.ImageBase;
 		ctx->EntryPoint =
 			PEHdr->Pe32Plus.OptionalHeader.AddressOfEntryPoint;
 		ctx->RelocDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory
@@ -300,7 +304,7 @@ load_pe(const char *const file, void *const data, const size_t datasize,
 		ctx->SecDir = &PEHdr->Pe32Plus.OptionalHeader.DataDirectory
 		                       [EFI_IMAGE_DIRECTORY_ENTRY_SECURITY];
 	} else {
-		ctx->ImageAddress = PEHdr->Pe32.OptionalHeader.ImageBase;
+		ctx->ImageAddress = (uintptr_t)data + PEHdr->Pe32.OptionalHeader.ImageBase;
 		ctx->EntryPoint =
 			PEHdr->Pe32.OptionalHeader.AddressOfEntryPoint;
 		ctx->RelocDir = &PEHdr->Pe32.OptionalHeader.DataDirectory
@@ -364,6 +368,48 @@ set_dll_characteristics(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 }
 
 static int
+get_section_name_offset(UINT8 section_name[8], uint32_t *section_name_offset)
+{
+	if (section_name[0] != '/')
+		return -1;
+	for (size_t i = 1; i < 8 && section_name[i] != '\0'; i++) {
+		if (!isdigit(section_name[i]))
+			return -1;
+	}
+
+	*section_name_offset = strtoull((char *)&section_name[1], NULL, 10);
+	return 0;
+}
+
+static void
+get_section_name(PE_COFF_LOADER_IMAGE_CONTEXT *ctx,
+		 EFI_IMAGE_SECTION_HEADER *Section,
+		 char **section_name)
+{
+	const uint32_t * const strtab_size = (uint32_t *)((uintptr_t)ctx->ImageAddress +
+							  (uintptr_t)ctx->SymbolTable +
+							  (ctx->NumberOfSymbols * EFI_IMAGE_SIZEOF_SYMBOL));
+	const char * const strtab = (char *)strtab_size;
+	uint32_t section_name_offset;
+	int rc;
+	char tmpname[9], *newname;
+
+	rc = get_section_name_offset(Section->Name, &section_name_offset);
+	if (rc < 0) {
+		memcpy(tmpname, (char *)&Section->Name[0], 8);
+		tmpname[8] = '\0';
+		newname = strdup(tmpname);
+		if (newname)
+			*section_name = newname;
+		return;
+	}
+
+	*section_name = strdup(&strtab[section_name_offset]);
+	if (!*section_name)
+		err(5, "Couldn't allocate section name");
+}
+
+static int
 validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 {
 	EFI_IMAGE_SECTION_HEADER *Section;
@@ -400,23 +446,30 @@ validate_nx_compat(PE_COFF_LOADER_IMAGE_CONTEXT *ctx)
 
 	Section = ctx->FirstSection;
 	for (i=0, Section = ctx->FirstSection; i < ctx->NumberOfSections; i++, Section++) {
-		debug(NOISE, "Section %d has WRITE=%d and EXECUTE=%d\n", i,
+		char *section_name = NULL;
+		get_section_name(ctx, Section, &section_name);
+		debug(NOISE, "Section %d is \"%s\"\n", i, section_name);
+		debug(NOISE, "Section %d (\"%s\") has WRITE=%d and EXECUTE=%d\n", i,
+		      section_name,
 		      (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) ? 1 : 0,
 		      (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) ? 1 : 0);
 
 		if ((Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) &&
 		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
-			debug(level, "Section %d is writable and executable\n", i);
+			debug(level, "Section %d (\"%s\") is writable and executable\n", i,
+			      section_name);
 			if (require_nx_compat)
 				ret = -1;
 		}
 
-		debug(NOISE, "Section %d has VA of 0x%08x\n", i, Section->VirtualAddress);
+		debug(NOISE, "Section %d (\"%s\") has VA of 0x%08x\n", i, section_name,
+		      Section->VirtualAddress);
 		if (Section->VirtualAddress != 0 &&
 		    ((Section->VirtualAddress) & (ctx->SectionAlignment - 1))) {
-			debug(level, "Section %d has Virtual Address 0x%08x that isn't section aligned (0x%08x)\n",
-			      i, Section->VirtualAddress, ctx->SectionAlignment);
+			debug(level, "Section %d (\"%s\") has Virtual Address 0x%08x that isn't section aligned (0x%08x)\n",
+			      i, section_name, Section->VirtualAddress, ctx->SectionAlignment);
 		}
+		free(section_name);
 	}
 
 	return ret;

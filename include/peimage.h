@@ -828,6 +828,8 @@ typedef struct {
 	EFI_IMAGE_DATA_DIRECTORY *SecDir;
 	UINT64 NumberOfRvaAndSizes;
 	UINT16 DllCharacteristics;
+	UINT64 SymbolTable;
+	UINT16 NumberOfSymbols;
 	EFI_IMAGE_OPTIONAL_HEADER_UNION *PEHdr;
 } PE_COFF_LOADER_IMAGE_CONTEXT;
 
