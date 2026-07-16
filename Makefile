@@ -477,23 +477,30 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-fuzz fuzz-clean fuzz-coverage fuzz-lto :
+fuzz fuzz-coverage fuzz-lto :
 	@make -f $(TOPDIR)/include/fuzz.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
 		ARCH_DEFINES="$(ARCH_DEFINES)" \
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
-		fuzz-clean $@
+		$@
 
-test test-clean test-coverage test-lto : generated_sbat_var_defs.h
+test test-coverage test-lto : generated_sbat_var_defs.h
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
 		ARCH_DEFINES="$(ARCH_DEFINES)" \
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
-		test-clean $@
+		$@
+
+fuzz-clean:
+	@rm -vf random.bin libefi-test.a $(wildcard *-corpus/fuzz*.log)
+
+test-clean:
+	@rm -vf test-random.h libefi-test.a
+	@rm -vf *.gcda *.gcno *.gcov vgcore.*
 
 $(patsubst %.c,%,$(wildcard fuzz-*.c)) :
 	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
@@ -502,10 +509,10 @@ $(patsubst %.c,%,$(wildcard test-*.c)) :
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
 
 clean-fuzz-objs:
-	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
+	@find . -type f -a -perm /111 -a -iname 'fuzz-*' -print -delete
 
 clean-test-objs:
-	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
+	@find . -type f -a -perm /111 -a -iname 'test-*' -print -delete
 
 .PHONY : $(patsubst %.c,%,$(wildcard fuzz-*.c)) fuzz
 .PHONY : $(patsubst %.c,%,$(wildcard test-*.c)) test
