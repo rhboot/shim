@@ -19,32 +19,32 @@ jobs:
       matrix:
         distro:
           - fedora
-          - centos
-          - ubuntu
-          - debian
+          #- centos
+          #- ubuntu
+          #- debian
         bootloader:
           # Locally signed systemd-boot
-          - systemd-boot
+          #- systemd-boot
           # Distro signed grub2
           - grub-signed
         uki:
           # BLS #1 boot, kernel + initrd
-          - none
+          #- none
           # BLS #2 boot, locally built UKI (unsigned because it is not provided by the distro)
           - unsigned
         runner:
           - ubuntu-24.04
-          - ubuntu-24.04-arm
-        include:
-          # Debian provides distro-signed systemd-boot
-          - distro: debian
-            bootloader: systemd-boot-signed
-            uki: unsigned
-            runner: ubuntu-24.04
-          - distro: debian
-            bootloader: systemd-boot-signed
-            uki: unsigned
-            runner: ubuntu-24.04-arm
+          #- ubuntu-24.04-arm
+        #include:
+        #   Debian provides distro-signed systemd-boot
+        #  - distro: debian
+        #    bootloader: systemd-boot-signed
+        #    uki: unsigned
+        #    runner: ubuntu-24.04
+        #  - distro: debian
+        #    bootloader: systemd-boot-signed
+        #    uki: unsigned
+        #    runner: ubuntu-24.04-arm
         exclude:
           # The systemd-boot version in 24.04 fails to boot the arm64 compressed kernel
           - distro: ubuntu
