@@ -5,7 +5,10 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  /* .hash and/or .gnu.hash MUST come first! */
+  /*
+   * we have to leave space for PE headers
+   */
+  . = 0x1000;
   .hash : { *(.hash) }
   . = ALIGN(4096);
   .text :
@@ -86,9 +89,13 @@ SECTIONS
   _sbat_size = . - _sbat;
 
   . = ALIGN(4096);
+  _dynsym = .;
   .dynsym   : { *(.dynsym) }
+  _dynsym_end = .;
   . = ALIGN(4096);
+  _dynstr = .;
   .dynstr   : { *(.dynstr) }
+  _dynstr_end = .;
   . = ALIGN(4096);
   /DISCARD/ :
   {

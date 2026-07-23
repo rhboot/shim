@@ -40,6 +40,7 @@ TARGETS += $(MMNAME) $(FBNAME)
 endif
 
 OBJS	= shim.o \
+	  backtrace.o \
 	  cert.o \
 	  csv.o \
 	  dp.o \
@@ -57,6 +58,7 @@ OBJS	= shim.o \
 	  sbat.o \
 	  sbat_data.o \
 	  sbat_var.o \
+	  stack-protector.o \
 	  time.o \
 	  tpm.o \
 	  utils.o \
@@ -74,6 +76,7 @@ KEYS	= shim_cert.h \
 	  shim.cer \
 
 ORIG_SOURCES	= shim.c \
+		  backtrace.c \
 		  cert.S \
 		  csv.c \
 		  dp.c \
@@ -90,6 +93,7 @@ ORIG_SOURCES	= shim.c \
 		  pe-relocate.c \
 		  sbat.c \
 		  sbat_var.S \
+		  stack-protector.c \
 		  shim.h \
 		  time.c \
 		  tpm.c \
@@ -100,12 +104,14 @@ ORIG_SOURCES	= shim.c \
 
 MOK_OBJS = MokManager.o \
 	   crypt_blowfish.o \
+	   backtrace.o \
 	   dp.o \
 	   errlog.o \
 	   globals.o \
 	   hexdump.o \
 	   PasswordCrypt.o \
 	   sbat_data.o \
+	   stack-protector.o \
 	   time.o \
 	   utils.o \
 
@@ -116,10 +122,12 @@ ORIG_MOK_SOURCES = MokManager.c \
 		   $(wildcard include/*.h) \
 
 FALLBACK_OBJS = fallback.o \
+		backtrace.o \
 		errlog.o \
 		globals.o \
 		hexdump.o \
 		sbat_data.o \
+		stack-protector.o \
 		time.o \
 		tpm.o \
 		utils.o
@@ -431,12 +439,12 @@ ifneq ($(OBJCOPY_GTE224),1)
 endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .rodata -j .rel* \
-		-j .rela* -j .dyn -j .reloc -j .eh_frame \
+		-j .rela* -j .dyn* -j .reloc -j .eh_frame \
 		-j .vendor_cert -j .sbat -j .sbatlevel \
 		--file-alignment 0x1000 \
 		--section-alignment $(ARCH_SECTION_ALIGNMENT) \
 		$(FORMAT) $< $@
-	./post-process-pe -vv $(POST_PROCESS_PE_FLAGS) $@
+	./post-process-pe $(POST_PROCESS_PE_FLAGS) $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
@@ -447,9 +455,9 @@ endif
 ifneq ($(OBJCOPY_GTE224),1)
 	$(error objcopy >= 2.24 is required)
 endif
-	$(OBJCOPY) -D -j .text -j .sdata -j .data \
+	$(OBJCOPY) -D -j .text -j .sdata -j .data* \
 		-j .dynamic -j .rodata -j .rel* \
-		-j .rela* -j .dyn -j .reloc -j .eh_frame -j .sbat \
+		-j .rela* -j .dyn* -j .reloc -j .eh_frame -j .sbat \
 		-j .sbatlevel \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
@@ -469,23 +477,31 @@ else
 	$(PESIGN) -n certdb -i $< -c "shim" -s -o $@ -f
 endif
 
-fuzz fuzz-clean fuzz-coverage fuzz-lto :
+fuzz:
 	@make -f $(TOPDIR)/include/fuzz.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
 		ARCH_DEFINES="$(ARCH_DEFINES)" \
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
-		fuzz-clean $@
+		MAX_FUZZ_TIME=60 \
+		$@
 
-test test-clean test-coverage test-lto : generated_sbat_var_defs.h
+test test-coverage test-lto : generated_sbat_var_defs.h
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CLANG_WARNINGS="$(CLANG_WARNINGS)" \
 		ARCH_DEFINES="$(ARCH_DEFINES)" \
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
-		test-clean $@
+		$@
+
+fuzz-clean:
+	@rm -vf random.bin libefi-test.a $(wildcard *-corpus/fuzz*.log)
+
+test-clean:
+	@rm -vf test-random.h libefi-test.a
+	@rm -vf *.gcda *.gcno *.gcov vgcore.*
 
 $(patsubst %.c,%,$(wildcard fuzz-*.c)) :
 	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
@@ -494,10 +510,10 @@ $(patsubst %.c,%,$(wildcard test-*.c)) :
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
 
 clean-fuzz-objs:
-	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
+	@find . -type f -a -perm /111 -a -iname 'fuzz-*' -print -delete
 
 clean-test-objs:
-	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" clean
+	@find . -type f -a -perm /111 -a -iname 'test-*' -print -delete
 
 .PHONY : $(patsubst %.c,%,$(wildcard fuzz-*.c)) fuzz
 .PHONY : $(patsubst %.c,%,$(wildcard test-*.c)) test

@@ -78,7 +78,6 @@ ifeq ($(ARCH),ia32)
 	ARCH_SUFFIX		?= ia32
 	ARCH_SUFFIX_UPPER	?= IA32
 	ARCH_LDFLAGS		?=
-	ARCH_CFLAGS		?= -m32
 	ARCH_SECTION_ALIGNMENT	?= 0x1000
 endif
 ifeq ($(ARCH),aarch64)
@@ -87,7 +86,6 @@ ifeq ($(ARCH),aarch64)
 	ARCH_SUFFIX		?= aa64
 	ARCH_SUFFIX_UPPER	?= AA64
 	ARCH_LDFLAGS		?=
-	ARCH_CFLAGS		?=
 	ARCH_SECTION_ALIGNMENT	?= 0x10000
 endif
 ifeq ($(ARCH),arm)
@@ -122,8 +120,9 @@ override DEFAULT_FEATUREFLAGS = \
 		-std=gnu11 \
 		-ggdb -gdwarf-4 -gstrict-dwarf \
 		-ffreestanding \
+		-Wno-frame-address -fno-omit-frame-pointer \
 		$(shell $(CC) -fmacro-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)') \
-		-fno-stack-protector \
+		-fstack-protector-strong -mstack-protector-guard=global \
 		-fno-strict-aliasing \
 		-fpic \
 		-fshort-wchar
@@ -141,8 +140,8 @@ override DEFAULT_WERRFLAGS = \
 		-Werror
 $(call update-variable,WERRFLAGS)
 
-CFLAGS		= $(FEATUREFLAGS) \
-		  $(OPTIMIZATIONS) \
+CFLAGS		= $(OPTIMIZATIONS) \
+		  $(FEATUREFLAGS) \
 		  $(WARNFLAGS) \
 		  $(if $(findstring clang,$(CC)),$(CLANG_WARNINGS)) \
 		  $(ARCH_CFLAGS) \
@@ -150,7 +149,7 @@ CFLAGS		= $(FEATUREFLAGS) \
 		  $(INCLUDES) \
 		  $(DEFINES)
 
-POST_PROCESS_PE_FLAGS =
+POST_PROCESS_PE_FLAGS ?= -c -vv
 
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	DEFINES	+= -DOVERRIDE_SECURITY_POLICY
