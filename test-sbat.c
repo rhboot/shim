@@ -1173,6 +1173,7 @@ main(void)
 
 	// parse_sbat_var tests
 	test(test_parse_sbat_var_null_list);
+	test(test_parse_sbat_var_data);
 	test(test_parse_sbat_var_data_null_list);
 	test(test_parse_sbat_var_data_null_data);
 	test(test_parse_sbat_var_data_zero_size);
