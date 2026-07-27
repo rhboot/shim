@@ -215,6 +215,10 @@ jobs:
           make ARCH=${{ matrix.makearch }} PREFIX=/usr DESTDIR=/destdir EFIDIR=test ENABLE_SHIM_HASH=true install
           echo 'results:'
           find /destdir -type f
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build-pull-request-intel-compile-commands-json:
     runs-on: ubuntu-24.04

@@ -478,6 +478,7 @@ fuzz fuzz-clean fuzz-coverage fuzz-lto :
 		EFI_INCLUDES="$(EFI_INCLUDES)" \
 		fuzz-clean $@
 
+test test-clean test-coverage test-lto : | clean-test-results
 test test-clean test-coverage test-lto : generated_sbat_var_defs.h
 	@make -f $(TOPDIR)/include/test.mk \
 		COMPILER="$(COMPILER)" \
@@ -491,6 +492,7 @@ $(patsubst %.c,%,$(wildcard fuzz-*.c)) :
 	@make -f $(TOPDIR)/include/fuzz.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
 
 $(patsubst %.c,%,$(wildcard test-*.c)) :
+	@make clean-test-results
 	@make -f $(TOPDIR)/include/test.mk EFI_INCLUDES="$(EFI_INCLUDES)" ARCH_DEFINES="$(ARCH_DEFINES)" $@
 
 clean-fuzz-objs:
@@ -539,6 +541,9 @@ clean-cryptlib-objs:
 	fi
 
 clean: clean-shim-objs clean-fuzz-objs clean-test-objs clean-gnu-efi clean-openssl-objs clean-cryptlib-objs clean-lib-objs
+
+clean-test-results:
+	@rm -vf *.gcda *.gcno *.gcov
 
 GITTAG = $(shell echo $(VERSION) | sed 's/~/-/g')
 
