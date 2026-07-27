@@ -153,5 +153,9 @@ extern UINTN hsi_status;
 /* This shim has the NX_COMPAT bit set */
 #define SHIM_HSI_STATUS_NX		0x00000100ULL
 
+#ifdef SHIM_UNIT_TEST
+UINTN format_hsi_status(UINT8 *buf, size_t sz, struct mok_state_variable *msv UNUSED);
+#endif /* SHIM_UNIT_TEST */
+
 #endif /* !SHIM_MOK_H_ */
 // vim:fenc=utf-8:tw=75:noet

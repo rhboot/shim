@@ -660,6 +660,28 @@ test_mok_mirror_setvar_out_of_resources(void)
 	return ret;
 }
 
+static int
+test_format_hsi_status_bounds(void)
+{
+	UINTN rc;
+	UINTN needed = 0;
+	UINT8 buf[8];
+	UINT8 *neededbuf = NULL;
+
+	rc = format_hsi_status(NULL, 4096, NULL);
+	assert_not_equal_return(rc, 0, -1, "got %lu expected not %lu\n", rc, 0);
+	needed = rc;
+
+	rc = format_hsi_status(buf, 8, NULL);
+	assert_equal_return(rc, needed, -1, "got %lu expected %lu\n");
+
+	neededbuf = alloca(needed+1);
+	rc = format_hsi_status(neededbuf, needed, NULL);
+	assert_equal_return(rc, needed, -1, "got %lu expected %lu\n");
+
+	return 0;
+}
+
 int
 main(void)
 {
@@ -713,6 +735,8 @@ main(void)
 				break;
 		} while (++j);
 	}
+
+	test(test_format_hsi_status_bounds);
 
 	return status;
 }

@@ -78,7 +78,7 @@ static BOOLEAN check_var(CHAR16 *varname)
 		efi_status_;                                                        \
 	})
 
-static UINTN
+STATIC UINTN
 format_hsi_status(UINT8 *buf, size_t sz,
 		  struct mok_state_variable *msv UNUSED)
 {
