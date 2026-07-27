@@ -26,6 +26,8 @@ CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -fno-builtin \
 	 -rdynamic \
 	 -fno-inline \
+	 $(if $(findstring gcc,$(CC)),-fprofile-arcs) \
+	 $(if $(findstring gcc,$(CC)),-ftest-coverage) \
 	 $(if $(findstring gcc,$(CC)),-fno-eliminate-unused-debug-types) \
 	 $(if $(findstring gcc,$(CC)),-fno-eliminate-unused-debug-symbols) \
 	 -gpubnames \
@@ -130,7 +132,7 @@ test-coverage : $(tests)
 
 test-clean :
 	@rm -vf test-random.h libefi-test.a
-	@rm -vf *.gcda *.gcno *.gcov vgcore.*
+	@rm -vf vgcore.*
 
 clean : test-clean
 
