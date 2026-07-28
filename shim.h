@@ -336,6 +336,13 @@ char *translate_slashes(char *out, const char *str);
 
 #include <efisetjmp_arch.h>
 
+/*
+ * gnu-efi leaks a STATIC define, remove it.
+ */
+#ifdef STATIC
+#undef STATIC
+#endif
+
 typedef struct {
 	EFI_LOADED_IMAGE	li;
 	EFI_IMAGE_ENTRY_POINT	entry_point;
@@ -349,5 +356,7 @@ typedef struct {
 	BOOLEAN			started;
 	EFI_DEVICE_PATH		*loaded_image_device_path;
 } SHIM_LOADED_IMAGE;
+
+#include "shim-unit-test.h"
 
 #endif /* SHIM_H_ */
