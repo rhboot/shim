@@ -254,10 +254,13 @@ gnu-efi/gnuefi/libgnuefi.a gnu-efi/lib/libefi.a:
 		CCC_CC="$(COMPILER)" \
 		CC="$(CC)" \
 		ARCH=$(ARCH_GNUEFI) \
+		OPTIMIZATION_CFLAGS="$(OPTIMIZATIONS)" \
+		DEBUG_CFLAGS="-ggdb -gdwarf-4 -gstrict-dwarf" \
 		NO_GLIBC=1 \
 		TOPDIR=$(TOPDIR)/gnu-efi \
 		VPATH=$(TOPDIR)/gnu-efi \
 		OBJDIR=. \
+		GNU_EFI_EXPORT_MS_ABI=1 \
 		-f $(TOPDIR)/gnu-efi/Makefile \
 		lib gnuefi inc $(IGNORE_COMPILER_ERRORS)
 
@@ -560,5 +563,6 @@ archive: tag
 .PHONY : install-deps shim.key
 
 export ARCH CC CROSS_COMPILE LD OBJCOPY EFI_INCLUDE EFI_INCLUDES OPTIMIZATIONS
+export ARCH_CFLAGS
 export FEATUREFLAGS WARNFLAGS WERRFLAGS
 unexport CFLAGS CPPFLAGS LDFLAGS
