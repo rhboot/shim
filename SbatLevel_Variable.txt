@@ -132,3 +132,10 @@ sbat,1,2025051000
 shim,4
 grub,5
 grub.proxmox,2
+
+Revocations for:
+ - November 2025 grub CVEs (CVE-2025-54770/54771, CVE-2025-61661/61662/61663/61664)
+
+sbat,1,2025112400
+shim,4
+grub,6
