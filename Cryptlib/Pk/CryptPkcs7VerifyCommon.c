@@ -21,8 +21,89 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/pkcs7.h>
+#include <openssl/evp.h>
 
 GLOBAL_REMOVE_IF_UNREFERENCED const UINT8  mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
+
+/**
+  ML-DSA is a pure signature scheme that performs its own internal
+  message processing.  It requires the one-shot EVP_DigestVerify API and is
+  incompatible with OpenSSL's PKCS7_signatureVerify, which uses the three-step
+  digest pipeline.
+
+  This function verifies that the content digest matches the messageDigest
+  authenticated attribute, DER-encodes the authenticated attributes, and
+  verifies the ML-DSA signature over that encoding.
+
+  @param[in]  Si          Pointer to the PKCS7_SIGNER_INFO.
+  @param[in]  Pkey        The signer's ML-DSA-87 public key.
+  @param[in]  InData      Pointer to the signed content.
+  @param[in]  DataLength  Length of InData in bytes.
+
+  @retval  TRUE   Signature is valid.
+  @retval  FALSE  Signature verification failed.
+
+**/
+STATIC
+BOOLEAN
+VerifyMlDsaPkcs7Signature (
+  IN  PKCS7_SIGNER_INFO  *Si,
+  IN  EVP_PKEY            *Pkey,
+  IN  CONST UINT8         *InData,
+  IN  UINTN               DataLength
+  )
+{
+  unsigned char      MdBuf[EVP_MAX_MD_SIZE];
+  unsigned int       MdLen;
+  const EVP_MD       *Md;
+  ASN1_OCTET_STRING  *MsgDigest;
+  unsigned char      *AttrBuf;
+  int                AttrLen;
+  EVP_MD_CTX         *MdCtx;
+  BOOLEAN            Status;
+
+  if (Si->auth_attr == NULL || sk_X509_ATTRIBUTE_num (Si->auth_attr) == 0 ||
+      Si->enc_digest == NULL) {
+    return FALSE;
+  }
+
+  Md = EVP_get_digestbyobj (Si->digest_alg->algorithm);
+  if (Md == NULL) {
+    return FALSE;
+  }
+
+  if (!EVP_Digest (InData, (size_t) DataLength, MdBuf, &MdLen, Md, NULL)) {
+    return FALSE;
+  }
+
+  MsgDigest = PKCS7_digest_from_attributes (Si->auth_attr);
+  if (MsgDigest == NULL ||
+      MsgDigest->length != (int) MdLen ||
+      CompareMem (MsgDigest->data, MdBuf, MdLen) != 0) {
+    return FALSE;
+  }
+
+  AttrBuf = NULL;
+  AttrLen = ASN1_item_i2d ((ASN1_VALUE *) Si->auth_attr, &AttrBuf,
+                            ASN1_ITEM_rptr (PKCS7_ATTR_VERIFY));
+  if (AttrLen <= 0 || AttrBuf == NULL) {
+    return FALSE;
+  }
+
+  Status = FALSE;
+  MdCtx = EVP_MD_CTX_new ();
+  if (MdCtx != NULL &&
+      EVP_DigestVerifyInit_ex (MdCtx, NULL, NULL, NULL, NULL, Pkey, NULL) > 0 &&
+      EVP_DigestVerify (MdCtx, Si->enc_digest->data, Si->enc_digest->length,
+                        AttrBuf, (size_t) AttrLen) > 0) {
+    Status = TRUE;
+  }
+
+  EVP_MD_CTX_free (MdCtx);
+  OPENSSL_free (AttrBuf);
+
+  return Status;
+}
 
 /**
   Check input P7Data is a wrapped ContentInfo structure or not. If not construct
@@ -897,6 +978,38 @@ Pkcs7Verify (
   // Bypass the certificate purpose checking by enabling any purposes setting.
   //
   X509_STORE_set_purpose (CertStore, X509_PURPOSE_ANY);
+
+  //
+  // Check if the signer uses ML-DSA-87.
+  //
+  {
+    STACK_OF(PKCS7_SIGNER_INFO) *Sinfos = PKCS7_get_signer_info (Pkcs7);
+    STACK_OF(X509)  *Signers = PKCS7_get0_signers (Pkcs7, NULL, PKCS7_BINARY);
+    PKCS7_SIGNER_INFO  *Si = NULL;
+    EVP_PKEY  *Pkey = NULL;
+
+    if (Sinfos != NULL && sk_PKCS7_SIGNER_INFO_num (Sinfos) > 0 &&
+        Signers != NULL && sk_X509_num (Signers) > 0) {
+      Si = sk_PKCS7_SIGNER_INFO_value (Sinfos, 0);
+      Pkey = X509_get0_pubkey (sk_X509_value (Signers, 0));
+    }
+
+    if (Pkey != NULL &&
+	(EVP_PKEY_is_a (Pkey, "ML-DSA-87") ||
+	EVP_PKEY_is_a (Pkey, "ML-DSA-65") ||
+	EVP_PKEY_is_a (Pkey, "ML-DSA-44"))) {
+      Status = (BOOLEAN) PKCS7_verify (Pkcs7, NULL, CertStore, DataBio, NULL,
+                                        PKCS7_BINARY | PKCS7_NOSIGS);
+      if (Status) {
+        Status = VerifyMlDsaPkcs7Signature (Si, Pkey, InData, DataLength);
+      }
+
+      sk_X509_free (Signers);
+      goto _Exit;
+    }
+
+    sk_X509_free (Signers);
+  }
 
   //
   // Verifies the PKCS#7 signedData structure
