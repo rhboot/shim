@@ -439,6 +439,7 @@ OBJS		= \
 		  crypto/rsa/rsa_x931g.o \
 		  crypto/self_test_core.o \
 		  crypto/sha/keccak1600.o \
+		  crypto/sha/sha3.o \
 		  crypto/sha/sha1_one.o \
 		  crypto/sha/sha1dgst.o \
 		  crypto/sha/sha256.o \
@@ -572,6 +573,7 @@ OBJSPROV	= providers/baseprov.o \
 		  providers/implementations/digests/digestcommon.o \
 		  providers/implementations/digests/null_prov.o \
 		  providers/implementations/digests/sha2_prov.o \
+		  providers/implementations/digests/sha3_prov.o \
 		  providers/implementations/encode_decode/decode_der2key.o \
 		  providers/implementations/encode_decode/decode_msblob2key.o \
 		  providers/implementations/encode_decode/decode_pvk2key.o \

@@ -261,9 +261,6 @@ extern "C" {
 # ifndef OPENSSL_NO_TRUNCATED_SHA
 #  define OPENSSL_NO_TRUNCATED_SHA
 # endif
-# ifndef OPENSSL_NO_SHA3
-#  define OPENSSL_NO_SHA3
-# endif
 # ifndef OPENSSL_NO_SKEYMGMT
 #  define OPENSSL_NO_SKEYMGMT
 # endif
