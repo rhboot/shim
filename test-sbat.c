@@ -512,6 +512,38 @@ err:
 }
 
 int
+test_verify_sbat_reject_max_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65535", EFI_SECURITY_VIOLATION);
+}
+
+int
+test_verify_sbat_accept_max_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	/* keep a generation of headroom to revoke the component with */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65534", EFI_SUCCESS);
+}
+
+int
+test_verify_sbat_reject_max_var_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,65535\n";
+
+	/* the policy may use the maximum to disallow the component */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65534", EFI_SECURITY_VIOLATION);
+}
+
+int
 test_verify_sbat_reject_huge_generation(void)
 {
 	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
@@ -1256,6 +1288,9 @@ main(void)
 
 	// verify_sbat tests
 	test(test_verify_sbat_null_sbat_section);
+	test(test_verify_sbat_reject_max_generation);
+	test(test_verify_sbat_accept_max_generation);
+	test(test_verify_sbat_reject_max_var_generation);
 	test(test_verify_sbat_reject_huge_generation);
 	test(test_verify_sbat_reject_over_uint16_generation);
 	test(test_verify_sbat_reject_negative_generation);

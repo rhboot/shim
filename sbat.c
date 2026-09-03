@@ -183,6 +183,19 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 				      &sbat_var_gen))
 			sbat_var_gen = 0;
 
+		/*
+		 * An image using the maximum generation could never be
+		 * revoked, as revocation requires a higher policy
+		 * generation.  The policy itself may use it to disallow
+		 * the component entirely.
+		 */
+		if (sbat_gen > SBAT_GENERATION_MAX) {
+			dprint(L"component %a, generation %u, is above the maximum allowed generation\n",
+			       entry->component_name, (unsigned)sbat_gen);
+			LogError(L"image did not pass SBAT verification\n");
+			return EFI_SECURITY_VIOLATION;
+		}
+
 		if (sbat_gen < sbat_var_gen) {
 			dprint(L"component %a, generation %u, was revoked by %s variable\n",
 			       entry->component_name, (unsigned)sbat_gen, SBAT_VAR_NAME);
