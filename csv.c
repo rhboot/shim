@@ -50,7 +50,7 @@ free_csv_list(list_t *list)
 EFI_STATUS
 parse_csv_data(char *data, char *data_end, size_t n_columns, list_t *list)
 {
-	EFI_STATUS efi_status = EFI_OUT_OF_RESOURCES;
+	EFI_STATUS efi_status;
 	char delims[] = "\r\n";
 	char *line = data;
 	size_t max = 0;
