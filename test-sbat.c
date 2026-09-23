@@ -478,6 +478,115 @@ err:
 	return rc;
 }
 
+static int
+test_verify_sbat_generation(char *sbat_var_data, size_t sbat_var_size,
+			    const char *image_generation,
+			    EFI_STATUS expected_status)
+{
+	EFI_STATUS status;
+	list_t test_sbat_var;
+	struct sbat_section_entry entry = {
+		.component_name = "test1",
+		.component_generation = image_generation,
+		.vendor_name = "SBAT test1",
+		.vendor_package_name = "acme",
+		.vendor_version = "1",
+		.vendor_url = "testURL",
+	};
+	struct sbat_section_entry *entries[] = { &entry };
+	int rc = -1;
+
+	INIT_LIST_HEAD(&test_sbat_var);
+	status = parse_sbat_var_data(&test_sbat_var, sbat_var_data,
+				     sbat_var_size);
+	assert_equal_goto(status, EFI_SUCCESS, err, "got %#x expected %#x\n");
+
+	status = verify_sbat_helper(&test_sbat_var, 1, entries);
+	assert_equal_goto(status, expected_status, err,
+			  "got %#x expected %#x\n");
+	rc = 0;
+err:
+	cleanup_sbat_var(&test_sbat_var);
+
+	return rc;
+}
+
+int
+test_verify_sbat_reject_max_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65535", EFI_SECURITY_VIOLATION);
+}
+
+int
+test_verify_sbat_accept_max_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	/* keep a generation of headroom to revoke the component with */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65534", EFI_SUCCESS);
+}
+
+int
+test_verify_sbat_reject_max_var_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,65535\n";
+
+	/* the policy may use the maximum to disallow the component */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65534", EFI_SECURITY_VIOLATION);
+}
+
+int
+test_verify_sbat_reject_huge_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	/* larger than UINT16_MAX, previously truncated to 1 */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65537", EFI_SECURITY_VIOLATION);
+}
+
+int
+test_verify_sbat_reject_over_uint16_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	/* UINT16_MAX + 1: unparseable, so treated as 0 and revoked */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "65536", EFI_SECURITY_VIOLATION);
+}
+
+int
+test_verify_sbat_reject_negative_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,1\n";
+
+	/* previously cast to 65535 and accepted */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "-1", EFI_SECURITY_VIOLATION);
+}
+
+int
+test_verify_sbat_unparseable_var_generation(void)
+{
+	char sbat_var_data[] = "sbat,1,2021030218\ntest1,garbage\n";
+
+	/* unparseable policy generations are treated as zero */
+	return test_verify_sbat_generation(sbat_var_data,
+					   sizeof(sbat_var_data),
+					   "1", EFI_SUCCESS);
+}
+
 #if 0
 int
 test_verify_sbat_null_sbat_entries(void)
@@ -1179,6 +1288,13 @@ main(void)
 
 	// verify_sbat tests
 	test(test_verify_sbat_null_sbat_section);
+	test(test_verify_sbat_reject_max_generation);
+	test(test_verify_sbat_accept_max_generation);
+	test(test_verify_sbat_reject_max_var_generation);
+	test(test_verify_sbat_reject_huge_generation);
+	test(test_verify_sbat_reject_over_uint16_generation);
+	test(test_verify_sbat_reject_negative_generation);
+	test(test_verify_sbat_unparseable_var_generation);
 #if 0
 	test(test_verify_sbat_null_sbat_entries);
 	test(test_verify_sbat_match_one_exact);

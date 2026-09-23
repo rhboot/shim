@@ -130,6 +130,42 @@ cleanup_sbat_section_entries(size_t n, struct sbat_section_entry **entries)
 	FreePool(entries);
 }
 
+/*
+ * Parse a component generation as a non-negative decimal number of at
+ * most 16 bits.  Returns false on negatives, values above UINT16_MAX,
+ * trailing garbage, and (like atoi()) non-numbers, leaving *gen
+ * untouched.
+ *
+ * strtol() is unimplemented in our EFI environment, and atoi() differs
+ * between EFI (AsciiStrDecimalToUintn()) and unit test (libc) builds.
+ */
+static bool
+parse_generation(const CHAR8 *str, UINT16 *gen)
+{
+	const CHAR8 *ptr = str;
+	UINTN val = 0;
+
+	if (*ptr == '-')
+		return false;
+
+	while (*ptr >= '0' && *ptr <= '9') {
+		unsigned int digit = *ptr - '0';
+
+		/* bail out once the running value could exceed 16 bits */
+		if (val > (UINT16_MAX - digit) / 10)
+			return false;
+
+		val = val * 10 + digit;
+		ptr++;
+	}
+
+	if (*ptr != '\0')
+		return false;
+
+	*gen = val;
+	return true;
+}
+
 EFI_STATUS
 verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sbat_var_entry, bool *found)
 {
@@ -140,16 +176,29 @@ verify_single_entry(struct sbat_section_entry *entry, struct sbat_var_entry *sba
 			entry->component_name);
 		*found = true;
 
+		/* failed parses are treated as zero */
+		if (!parse_generation(entry->component_generation, &sbat_gen))
+			sbat_gen = 0;
+		if (!parse_generation(sbat_var_entry->component_generation,
+				      &sbat_var_gen))
+			sbat_var_gen = 0;
+
 		/*
-		 * atoi returns zero for failed conversion, so essentially
-		 * badly parsed component_generation will be treated as zero
+		 * An image using the maximum generation could never be
+		 * revoked, as revocation requires a higher policy
+		 * generation.  The policy itself may use it to disallow
+		 * the component entirely.
 		 */
-		sbat_gen = atoi(entry->component_generation);
-		sbat_var_gen = atoi(sbat_var_entry->component_generation);
+		if (sbat_gen > SBAT_GENERATION_MAX) {
+			dprint(L"component %a, generation %u, is above the maximum allowed generation\n",
+			       entry->component_name, (unsigned)sbat_gen);
+			LogError(L"image did not pass SBAT verification\n");
+			return EFI_SECURITY_VIOLATION;
+		}
 
 		if (sbat_gen < sbat_var_gen) {
-			dprint(L"component %a, generation %d, was revoked by %s variable\n",
-			       entry->component_name, sbat_gen, SBAT_VAR_NAME);
+			dprint(L"component %a, generation %u, was revoked by %s variable\n",
+			       entry->component_name, (unsigned)sbat_gen, SBAT_VAR_NAME);
 			LogError(L"image did not pass SBAT verification\n");
 			return EFI_SECURITY_VIOLATION;
 		}
