@@ -1104,6 +1104,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	EFI_STATUS efi_status;
 
 	InitializeLib(image, systab);
+	update_stack_guard();
 
 	/*
 	 * if SHIM_DEBUG is set, wait for a debugger to attach.
@@ -1115,6 +1116,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Error: could not find loaded image: %r\n",
 			      efi_status);
+		BS->Exit(image, efi_status, 0, NULL);
 		return efi_status;
 	}
 
@@ -1126,6 +1128,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"Error: could not find boot options: %r\n",
 			      efi_status);
+		BS->Exit(image, efi_status, 0, NULL);
 		return efi_status;
 	}
 
@@ -1174,5 +1177,6 @@ reset:
 
 	RT->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
 
+	BS->Exit(image, efi_status, 0, NULL);
 	return EFI_SUCCESS;
 }

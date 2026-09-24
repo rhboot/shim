@@ -7,7 +7,10 @@ SECTIONS
 {
   . = 0;
   ImageBase = .;
-  /* .hash and/or .gnu.hash MUST come first! */
+  /*
+   * we have to leave space for PE headers
+   */
+  . = 0x1000;
   .hash : { *(.hash) }
   .gnu.hash : { *(.gnu.hash) }
   . = ALIGN(4096);
@@ -137,9 +140,13 @@ SECTIONS
   _sbat_vsize = _esbat - _sbat;
 
   . = ALIGN(4096);
+  _dynsym = .;
   .dynsym   : { *(.dynsym) }
+  _dynsym_end = .;
   . = ALIGN(4096);
+  _dynstr = .;
   .dynstr   : { *(.dynstr) }
+  _dynstr_end = .;
   . = ALIGN(4096);
   .ignored.reloc :
   {

@@ -1185,6 +1185,8 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 * Ensure that gnu-efi functions are available
 	 */
 	InitializeLib(image_handle, systab);
+	update_stack_guard();
+
 	setup_verbosity();
 	update_watchdog();
 
@@ -1308,5 +1310,6 @@ die:
 
 	shim_fini();
 	devel_egress(EFI_ERROR(efi_status) ? EXIT_FAILURE : EXIT_SUCCESS);
+	BS->Exit(passed_image_handle, efi_status, 0, NULL);
 	return efi_status;
 }
