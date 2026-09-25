@@ -22,6 +22,7 @@ WERRFLAGS	+= -Wno-error=unused-but-set-variable \
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
 		  $(WARNFLAGS) \
+		  $(ARCH_CFLAGS) \
 		  $(WERRFLAGS) \
 		  $(INCLUDES) \
 		  $(DEFINES)
