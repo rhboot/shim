@@ -43,6 +43,7 @@ export OPTIMIZATIONS
 ifneq ($(CCACHE_DISABLE),)
 export CCACHE_DISABLE
 endif
+MAX_FUZZ_TIME	?= 60
 
 SUBDIRS		= $(TOPDIR)/Cryptlib $(TOPDIR)/lib
 
