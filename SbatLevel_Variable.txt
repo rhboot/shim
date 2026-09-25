@@ -139,3 +139,11 @@ Revocations for:
 sbat,1,2025112400
 shim,4
 grub,6
+
+Revocations for:
+ - September 2026 grub CVE (CVE-2026-97876)
+
+sbat,1,2026092500
+shim,4
+grub,7
+
