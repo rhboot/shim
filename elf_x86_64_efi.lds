@@ -40,7 +40,6 @@ SECTIONS
   .data :
   {
    _data = .;
-   *(.rodata*)
    *(.got.plt)
    *(.got)
    *(.data*)
@@ -58,6 +57,13 @@ SECTIONS
   .reloc :
   {
    *(.reloc)
+  }
+
+  . = ALIGN(4096);
+  .rodata :
+  {
+   _rodata = .;
+   *(.rodata*)
   }
 
   . = ALIGN(4096);
