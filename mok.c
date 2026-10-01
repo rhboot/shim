@@ -245,6 +245,10 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 		efi_status = start_image(image_handle, MOK_MANAGER);
 
 		if (EFI_ERROR(efi_status)) {
+#ifdef IGNORE_MM_MISSING
+			perror(L"Failed to start MokManager: %r\n", efi_status);
+			return efi_status == EFI_NOT_FOUND ? EFI_SUCCESS : efi_status;
+#else
 			/*
 			 * We don't do this in the unit tests because we
 			 * don't have simulation for console_countdown()
@@ -273,6 +277,7 @@ static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 #endif
 			perror(L"Failed to start MokManager: %r\n", efi_status);
 			return efi_status;
+#endif
 		}
 	}
 
