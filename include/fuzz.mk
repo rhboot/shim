@@ -11,6 +11,7 @@ CC = clang
 DEBUG_PRINTS ?= 0
 OPTIMIZATIONS ?= -Og -ggdb
 FUZZ_ARGS ?=
+LLVM_PROFDATA ?= $(shell $(CC) -print-prog-name=llvm-profdata)
 MAX_FUZZ_TIME ?=
 CFLAGS = $(OPTIMIZATIONS) -std=gnu11 \
 	 -isystem $(TOPDIR)/include/system \
@@ -102,12 +103,15 @@ endif
 $(fuzzers) :: fuzz-% : test.c fuzz-%.c $(fuzz-%_FILES)
 	$(CC) $(CFLAGS) -o $@ $(sort $^ $(wildcard $*.c) $(fuzz-$*_FILES)) libefi-test.a -lefivar
 	mkdir -p $@-corpus
-	cd $@-corpus ; LLVM_PROFILE_FILE="$@.profraw" ../$@ \
+	rm -f $@-corpus/$@.profdata $@-corpus/$@*.profraw
+	cd $@-corpus ; LLVM_PROFILE_FILE="$@.%p.profraw" ../$@ \
 		-jobs=24 \
 		-max_len=4096 \
 		$(MAX_TOTAL_TIME) \
 		$(FUZZ_ARGS) \
 		../$@-corpus
+	cd $@-corpus ; $(LLVM_PROFDATA) merge -sparse $@.*.profraw -o $@.profdata
+	rm -f $@-corpus/$@.*.profraw
 
 fuzz : $(fuzzers)
 	$(MAKE) -f include/fuzz.mk fuzz-clean
