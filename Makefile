@@ -62,6 +62,7 @@ OBJS	= shim.o \
 	  utils.o \
 	  verify.o \
 	  version.o \
+	  default_loader.o \
 
 KEYS	= shim_cert.h \
 	  ocsp.* \
@@ -432,7 +433,7 @@ endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data -j .data.ident \
 		-j .dynamic -j .rodata -j .rel* \
 		-j .rela* -j .dyn -j .reloc -j .eh_frame \
-		-j .vendor_cert -j .sbat -j .sbatlevel \
+		-j .vendor_cert -j .sbat -j .sbatlevel -j .loader \
 		--file-alignment 0x1000 \
 		--section-alignment $(ARCH_SECTION_ALIGNMENT) \
 		$(FORMAT) $< $@
@@ -450,7 +451,7 @@ endif
 	$(OBJCOPY) -D -j .text -j .sdata -j .data \
 		-j .dynamic -j .rodata -j .rel* \
 		-j .rela* -j .dyn -j .reloc -j .eh_frame -j .sbat \
-		-j .sbatlevel \
+		-j .sbatlevel -j .loader \
 		-j .debug_info -j .debug_abbrev -j .debug_aranges \
 		-j .debug_line -j .debug_str -j .debug_ranges \
 		-j .note.gnu.build-id \

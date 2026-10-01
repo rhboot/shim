@@ -88,6 +88,7 @@ SECTIONS
     . = ALIGN(4096);
     *(.vendor_cert)
     *(.data.ident)
+    *(.loader)
     . = ALIGN(4096);
   }
   . = ALIGN(4096);
