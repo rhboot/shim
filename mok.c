@@ -333,8 +333,10 @@ struct mok_state_variable mok_state_variable_data[] = {
 		     EFI_VARIABLE_NON_VOLATILE,
 	 .no_attr = EFI_VARIABLE_RUNTIME_ACCESS,
 	 .categorize_addend = categorize_deauthorized,
+#if !defined(DISABLE_APPEND_V_DBX_TO_MOKX)
 	 .addend = &vendor_deauthorized,
 	 .addend_size = &vendor_deauthorized_size,
+#endif	/* !defined(DISABLE_APPEND_V_DBX_TO_MOKX) */
 	 .flags = MOK_MIRROR_KEYDB |
 		  MOK_MIRROR_DELETE_FIRST |
 		  MOK_VARIABLE_LOG,
@@ -566,6 +568,19 @@ struct mok_state_variable mok_state_variable_data[] = {
 	 .guid = &SECUREBOOT_EFI_NAMESPACE_GUID,
 	 .flags = MOK_VARIABLE_CONFIG_ONLY,
 	},
+#if defined(DISABLE_APPEND_V_DBX_TO_MOKX)
+	{.name = L"VendorDBX",
+	 .name8 = "VendorDBX",
+	 .rtname = L"VendorDBX",
+	 .rtname8 = "VendorDBX",
+	 .guid = &SHIM_LOCK_GUID,
+	 .categorize_addend = categorize_deauthorized,
+	 .addend = &vendor_deauthorized,
+	 .addend_size = &vendor_deauthorized_size,
+	 .flags = MOK_MIRROR_KEYDB |
+		  MOK_VARIABLE_CONFIG_ONLY,
+	},
+#endif	/* defined(DISABLE_APPEND_V_DBX_TO_MOKX) */
 	/*
 	 * Keep this entry last, or it'll be wrong.
 	 */
