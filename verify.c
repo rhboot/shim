@@ -98,6 +98,7 @@ verify_eku(UINT8 *Cert, UINTN CertSize)
 
 	x509 = d2i_X509 (NULL, &Temp, (long) CertSize);
 	if (x509 != NULL) {
+		bool found = false;
 		eku = X509_get_ext_d2i(x509, NID_ext_key_usage, NULL, NULL);
 
 		if (eku) {
@@ -106,12 +107,14 @@ verify_eku(UINT8 *Cert, UINTN CertSize)
 				ASN1_OBJECT *key_usage = sk_ASN1_OBJECT_value(eku, i);
 
 				if (OBJ_cmp(module_signing, key_usage) == 0)
-					return FALSE;
+					found = true;
 			}
 			EXTENDED_KEY_USAGE_free(eku);
 		}
 
 		X509_free(x509);
+		if (found)
+			return FALSE;
 	}
 
 	return TRUE;
