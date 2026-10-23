@@ -147,3 +147,10 @@ sbat,1,2026092500
 shim,4
 grub,7
 
+Revocations for:
+ - October 2026 fwupd-efi issue (GHSA-6w3p-4pq7-j3mp)
+
+sbat,1,2026102600
+shim,4
+grub,7
+fwupd-efi,2
