@@ -24,6 +24,10 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include <openssl/evp.h>
 
 GLOBAL_REMOVE_IF_UNREFERENCED const UINT8  mOidValue[9] = { 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02 };
+#if defined(ENABLE_CODESIGN_EKU)
+/* EKU CodeSign */
+CHAR8 mOidCodeSign[] = "1.3.6.1.5.5.7.3.3";
+#endif
 
 /**
   ML-DSA is a pure signature scheme that performs its own internal
@@ -872,6 +876,10 @@ Pkcs7Verify (
   CONST UINT8  *Temp;
   UINTN        SignedDataSize;
   BOOLEAN      Wrapped;
+#if defined(ENABLE_CODESIGN_EKU)
+  CONST CHAR8 *Ekus[1];
+  EFI_STATUS  EFI_Status;
+#endif
 
   //
   // Check input parameters.
@@ -886,6 +894,9 @@ Pkcs7Verify (
   DataBio   = NULL;
   Cert      = NULL;
   CertStore = NULL;
+#if defined(ENABLE_CODESIGN_EKU)
+  Ekus[0]   = mOidCodeSign;
+#endif
 
   //
   // Register & Initialize necessary digest algorithms for PKCS#7 Handling
@@ -978,6 +989,13 @@ Pkcs7Verify (
   // Bypass the certificate purpose checking by enabling any purposes setting.
   //
   X509_STORE_set_purpose (CertStore, X509_PURPOSE_ANY);
+
+#if defined(ENABLE_CODESIGN_EKU)
+  EFI_Status = VerifyEKUsInPkcs7Signature(P7Data, P7Length, Ekus, 1, TRUE);
+  if (EFI_Status != EFI_SUCCESS) {
+         goto _Exit;
+  }
+#endif
 
   //
   // Check if the signer uses ML-DSA-87.

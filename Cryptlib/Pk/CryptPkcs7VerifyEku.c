@@ -9,6 +9,7 @@
 
 **/
 
+#include <efi.h>
 #include <Base.h>
 #include "InternalCryptLib.h"
 #include <openssl/x509v3.h>
@@ -289,7 +290,7 @@ CheckEKUs (
       Asn1ToFind = NULL;
     }
 
-    Asn1ToFind = OBJ_txt2obj (RequiredEKUs[Index], 0);
+    Asn1ToFind = OBJ_txt2obj ((const char *)RequiredEKUs[Index], 0);
     if (Asn1ToFind == NULL) {
       //
       // Fail to convert required EKU to ASN1.
