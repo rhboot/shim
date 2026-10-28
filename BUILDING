@@ -75,6 +75,10 @@ Variables you could set to customize the build:
 - ENABLE_CODESIGN_EKU
   This changes the certificate validation logic to require Extended Key
   Usage 1.3.6.1.5.5.7.3.3 ("Code Signing").
+- IGNORE_MM_MISSING
+  By default, Shim will stop the boot if there is a MoK request but
+  MokManager is missing. This allows ignoring the error and continuing to
+  boot.
 
 Vendor SBAT data:
 It will sometimes be requested by reviewers that a build includes extra
