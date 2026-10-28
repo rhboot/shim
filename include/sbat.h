@@ -41,6 +41,13 @@
 #define SBATREVOCATIONFILE L"revocations_sbat.efi"
 #define SKUSIREVOCATIONFILE L"revocations_sku.efi"
 
+/*
+ * Maximum generation an image may use; UINT16_MAX itself could never
+ * be revoked, so keep one generation of headroom.  The policy may use
+ * UINT16_MAX to disallow a component entirely.
+ */
+#define SBAT_GENERATION_MAX (UINT16_MAX - 1)
+
 extern UINTN _sbat, _esbat;
 
 struct sbat_var_entry {
