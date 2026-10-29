@@ -2549,6 +2549,7 @@ Pkcs7Verify (
   IN  UINTN        DataLength
   );
 
+#if defined(ENABLE_CODESIGN_EKU)
 /**
   This function receives a PKCS7 formatted signature, and then verifies that
   the specified Enhanced or Extended Key Usages (EKU's) are present in the end-entity
@@ -2590,6 +2591,7 @@ VerifyEKUsInPkcs7Signature (
   IN  CONST UINT32  RequiredEKUsSize,
   IN  BOOLEAN       RequireAllPresent
   );
+#endif
 
 /**
   Extracts the attached content from a PKCS#7 signed data if existed. The input signed
