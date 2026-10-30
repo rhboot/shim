@@ -36,6 +36,11 @@ SECTIONS
   }
 
   . = ALIGN(65536);
+  .loader : {
+    *(.loader)
+  }
+
+  . = ALIGN(65536);
   .data :
   {
    _data = .;

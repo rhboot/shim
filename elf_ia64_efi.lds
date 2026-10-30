@@ -40,6 +40,11 @@ SECTIONS
   }
 
   . = ALIGN(4096);
+  .loader : {
+    *(.loader)
+  }
+
+  . = ALIGN(4096);
   .data :
   {
    *(.rodata*)
