@@ -78,9 +78,16 @@ Variables you could set to customize the build:
 - EXTRA_DEFINES
   This allows you to append additional C preprocessor macros to CFLAGS
   without overriding the internal DEFINES set by the build system.
-  For example, to customize the embedded debug directory path:
+  For example, to customize the embedded debug directory path and
+  debug symbol filenames...so on:
 
-    make EXTRA_DEFINES='-UDEBUGDIR -DDEBUGDIR=L\"/usr/lib/debug/usr/share/efi/$(ARCH)/\"'
+    extra_defines=(
+        '-UDEBUGDIR'
+        '-DDEBUGDIR=L\"/usr/lib/debug/usr/share/efi/$(ARCH)/\"'
+        '-DFB_DEBUG_FILE=L\"fallback.debug\"'
+        '-DSHIM_DEBUG_FILE=L\"shim.debug\"'
+    )
+    make EXTRA_DEFINES="${extra_defines[*]}" shim.efi.debug shim.efi
 
 Vendor SBAT data:
 It will sometimes be requested by reviewers that a build includes extra
