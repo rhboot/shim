@@ -80,7 +80,7 @@ Variables you could set to customize the build:
   without overriding the internal DEFINES set by the build system.
   For example, to customize the embedded debug directory path:
 
-    make EXTRA_DEFINES='-UDEBUGDIR -DDEBUGDIR=L\"/usr/lib/debug/usr/share/efi/$(ARCH)/\"'
+    make EXTRA_DEFINES='-UDEBUGDIR -DDEBUGDIR=L\"/usr/lib/debug/usr/share/efi/$(ARCH)/\" -DSHIM_DEBUG_FILE=L\"shim.debug\"'
 
 Vendor SBAT data:
 It will sometimes be requested by reviewers that a build includes extra

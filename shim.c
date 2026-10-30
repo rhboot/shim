@@ -18,6 +18,10 @@
 
 #include <stdint.h>
 
+#ifndef SHIM_DEBUG_FILE
+#define SHIM_DEBUG_FILE L"shim" EFI_ARCH L".efi.debug"
+#endif
+
 static EFI_SYSTEM_TABLE *systab;
 static EFI_HANDLE global_image_handle;
 static EFI_LOADED_IMAGE *shim_li;
@@ -1081,9 +1085,8 @@ debug_hook(void)
 
 	FreePool(data);
 
-	console_print(L"add-symbol-file "DEBUGDIR
-		      L"shim" EFI_ARCH L".efi.debug 0x%08x -s .data 0x%08x\n",
-		      &_text, &_data);
+	console_print(L"add-symbol-file "DEBUGDIR SHIM_DEBUG_FILE
+		      L" 0x%08x -s .data 0x%08x\n", &_text, &_data);
 
 	console_print(L"Pausing for debugger attachment.\n");
 	console_print(L"To disable this, remove the EFI variable %s-%g .\n",
