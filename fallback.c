@@ -7,6 +7,10 @@
 
 #define NO_REBOOT L"FB_NO_REBOOT"
 
+#ifndef FB_DEBUG_FILE
+#define FB_DEBUG_FILE L"fb" EFI_ARCH L".efi.debug"
+#endif
+
 EFI_LOADED_IMAGE *this_image = NULL;
 
 int
@@ -1093,9 +1097,8 @@ debug_hook(void)
 		return;
 
 	x = 1;
-	console_print(L"add-symbol-file "DEBUGDIR
-		      L"fb" EFI_ARCH L".efi.debug %p -s .data %p\n",
-		      &_etext, &_edata);
+	console_print(L"add-symbol-file " DEBUGDIR FB_DEBUG_FILE
+		      L" %p -s .data %p\n", &_etext, &_edata);
 }
 
 EFI_STATUS
