@@ -124,6 +124,7 @@ override DEFAULT_FEATUREFLAGS = \
 		-ggdb -gdwarf-4 -gstrict-dwarf \
 		-ffreestanding \
 		$(shell $(CC) -fmacro-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fmacro-prefix-map='$(TOPDIR)/=$(DEBUGSRC)') \
+		$(shell $(CC) -fdebug-prefix-map=./=./ -E -x c /dev/null >/dev/null 2>&1 && echo -fdebug-prefix-map='$(TOPDIR)=.') \
 		-fno-stack-protector \
 		-fno-strict-aliasing \
 		-fpic \
