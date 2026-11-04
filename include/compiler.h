@@ -255,5 +255,11 @@
                 _ret;                                           \
         })
 
+#if defined(__x86_64__)
+#define SYSVAPI __attribute__((sysv_abi))
+#else
+#define SYSVAPI
+#endif
+
 #endif /* !COMPILER_H_ */
 // vim:fenc=utf-8:tw=75:et

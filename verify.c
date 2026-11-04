@@ -736,7 +736,7 @@ verify_buffer (char *data, int datasize,
  * Protocol entry point. If secure boot is enabled, verify that the provided
  * buffer is signed with a trusted key.
  */
-EFI_STATUS
+SYSVAPI EFI_STATUS
 shim_verify(void *buffer, UINT32 size)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
@@ -782,7 +782,7 @@ done:
 	return efi_status;
 }
 
-EFI_STATUS
+SYSVAPI EFI_STATUS
 shim_hash(char *data, int datasize, PE_COFF_LOADER_IMAGE_CONTEXT *context,
           UINT8 *sha256hash, UINT8 *sha1hash)
 {
@@ -799,7 +799,7 @@ shim_hash(char *data, int datasize, PE_COFF_LOADER_IMAGE_CONTEXT *context,
 	return efi_status;
 }
 
-EFI_STATUS
+SYSVAPI EFI_STATUS
 shim_read_header(void *data, unsigned int datasize,
                  PE_COFF_LOADER_IMAGE_CONTEXT *context)
 {

@@ -856,6 +856,13 @@ handle_image (void *data, unsigned int datasize,
 			if (size < Section->Misc.VirtualSize)
 				ZeroMem(base + size, Section->Misc.VirtualSize - size);
 		}
+		char name[9];
+		memcpy(name, Section->Name, 8);
+		name[8] = '\0';
+
+		dprint(L"Loading section %d \"%c%c%c%c%c%c%c%c\" at 0x%lx\n", i,
+		       name[0], name[1], name[2], name[3], name[4], name[5], name[6], name[7],
+		       base);
 	}
 
 	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {

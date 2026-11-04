@@ -1057,9 +1057,6 @@ shim_fini(void)
 	console_fini();
 }
 
-extern EFI_STATUS
-efi_main(EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab);
-
 static void
 __attribute__((__optimize__("0")))
 debug_hook(void)

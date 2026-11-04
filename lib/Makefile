@@ -41,6 +41,8 @@ LDFLAGS		= -nostdlib -znocombreloc
 CFLAGS		= $(FEATUREFLAGS) \
 		  $(OPTIMIZATIONS) \
 		  $(WARNFLAGS) \
+		  $(if $(findstring clang,$(CC)),$(CLANG_WARNINGS)) \
+		  $(ARCH_CFLAGS) \
 		  $(WERRFLAGS) \
 		  $(INCLUDES) \
 		  $(DEFINES)
