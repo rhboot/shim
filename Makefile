@@ -249,6 +249,7 @@ $(MMSONAME): $(MOK_OBJS) $(LIBS)
 
 gnu-efi/gnuefi/libgnuefi.a gnu-efi/lib/libefi.a:
 	mkdir -p gnu-efi/lib gnu-efi/gnuefi
+	CFLAGS="-fdebug-prefix-map=$(TOPDIR)/=." \
 	$(MAKE) -C gnu-efi \
 		COMPILER="$(COMPILER)" \
 		CCC_CC="$(COMPILER)" \
