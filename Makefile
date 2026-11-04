@@ -436,7 +436,7 @@ endif
 		--file-alignment 0x1000 \
 		--section-alignment $(ARCH_SECTION_ALIGNMENT) \
 		$(FORMAT) $< $@
-	./post-process-pe -vv $(POST_PROCESS_PE_FLAGS) $@
+	./post-process-pe $(POST_PROCESS_PE_FLAGS) $@
 
 ifneq ($(origin ENABLE_SHIM_HASH),undefined)
 %.hash : %.efi
