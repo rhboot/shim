@@ -84,6 +84,8 @@ Variables you could set to customize the build:
     extra_defines=(
         '-UDEBUGDIR'
         '-DDEBUGDIR=L\"/usr/lib/debug/usr/share/efi/$(ARCH)/\"'
+        '-DFALLBACK=L\"\\\\fallback.efi\"'
+        '-DMOK_MANAGER=L\"\\\\MokManager.efi\"'
         '-DFB_DEBUG_FILE=L\"fallback.debug\"'
         '-DSHIM_DEBUG_FILE=L\"shim.debug\"'
     )

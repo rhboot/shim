@@ -147,8 +147,12 @@
 #define DEBUGSRC L"/usr/src/debug/shim-" VERSIONSTR "." EFI_ARCH
 #endif
 
+#ifndef FALLBACK
 #define FALLBACK L"\\fb" EFI_ARCH L".efi"
+#endif
+#ifndef MOK_MANAGER
 #define MOK_MANAGER L"\\mm" EFI_ARCH L".efi"
+#endif
 
 #if defined(VENDOR_DB_FILE)
 # define vendor_authorized vendor_db
