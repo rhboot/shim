@@ -149,7 +149,8 @@ CFLAGS		= $(FEATUREFLAGS) \
 		  $(ARCH_CFLAGS) \
 		  $(WERRFLAGS) \
 		  $(INCLUDES) \
-		  $(DEFINES)
+		  $(DEFINES) \
+		  $(EXTRA_DEFINES)
 
 POST_PROCESS_PE_FLAGS =
 
