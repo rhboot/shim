@@ -29,6 +29,8 @@ typedef va_list ms_va_list;
 #include <ia32/efibind.h>
 #elif defined(__x86_64__)
 #include <x86_64/efibind.h>
+#elif defined(__loongarch_lp64)
+#include <loongarch64/efibind.h>
 #else
 #error what arch is this
 #endif

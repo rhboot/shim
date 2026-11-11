@@ -34,6 +34,9 @@ ifeq ($(ARCH),riscv64)
 DEFINES		+= -DMDE_CPU_RISCV64
 LIBFILES		+= riscv64_cache.o
 endif
+ifeq ($(ARCH),loongarch64)
+DEFINES		+= -DMDE_CPU_LOONGARCH64
+endif
 
 LDFLAGS		= -nostdlib -znocombreloc
 

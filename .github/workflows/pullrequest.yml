@@ -93,6 +93,11 @@ jobs:
             gccarch: riscv64
             makearch: riscv64
             distro: f43
+          - arch: amd64
+            efiarch: loongarch64
+            gccarch: loongarch64
+            makearch: loongarch64
+            distro: f45
 
     steps:
       - name: Checkout
