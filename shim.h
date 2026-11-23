@@ -350,4 +350,11 @@ typedef struct {
 	EFI_DEVICE_PATH		*loaded_image_device_path;
 } SHIM_LOADED_IMAGE;
 
+typedef struct SHALIST {
+	UINT8	*sha1hash;
+	UINT8	*sha256hash;
+	UINT8	*sha384hash;
+	UINT8	*sha512hash;
+} SHALIST;
+
 #endif /* SHIM_H_ */

@@ -53,6 +53,135 @@ drain_openssl_errors(void)
 		err = ERR_get_error();
 }
 
+/*
+ * Read the PE image digest algorithm from the unauthenticated CMS envelope.
+ * The result is ONLY a selection hint. AuthenticodeVerify() must still
+ * authenticate the CMS and compare the actual PE image digest.
+ *
+ * SpcIndirectDataContent ::= SEQUENCE {
+ *     data          SpcAttributeTypeAndOptionalValue,
+ *     messageDigest DigestInfo
+ * }
+ */
+static EFI_STATUS
+get_authenticode_pe_digest_algorithm(const UINT8 *der, UINTN der_size,
+				     int *digest_nid, UINTN *digest_size)
+{
+	const unsigned char *p;
+	const unsigned char *end;
+	PKCS7 *p7 = NULL;
+	ASN1_OBJECT *spc_oid = NULL;
+	ASN1_TYPE *content;
+	STACK_OF(ASN1_TYPE) *fields = NULL;
+	ASN1_TYPE *digest_field;
+	unsigned char *digest_der = NULL;
+	unsigned char *write_ptr;
+	int digest_der_len;
+	X509_SIG *digest_info = NULL;
+	const X509_ALGOR *alg = NULL;
+	const ASN1_OCTET_STRING *digest = NULL;
+	const ASN1_OBJECT *oid = NULL;
+	UINTN expected_size;
+	int nid;
+	EFI_STATUS status = EFI_INVALID_PARAMETER;
+
+	if (!der || !digest_nid || !digest_size || der_size > LONG_MAX)
+		return EFI_INVALID_PARAMETER;
+
+	*digest_nid = NID_undef;
+	*digest_size = 0;
+
+	p = der;
+	p7 = d2i_PKCS7(NULL, &p, (long)der_size);
+	if (!p7 || p != der + der_size || !PKCS7_type_is_signed(p7) ||
+	    !p7->d.sign || !p7->d.sign->contents)
+		goto out;
+
+	/* The encapsulated content must be SpcIndirectDataContent. */
+	spc_oid = OBJ_txt2obj("1.3.6.1.4.1.311.2.1.4", 1);
+	if (!spc_oid || !p7->d.sign->contents->type ||
+	    OBJ_cmp(p7->d.sign->contents->type, spc_oid) != 0)
+		goto out;
+
+	content = p7->d.sign->contents->d.other;
+	if (!content || content->type != V_ASN1_SEQUENCE ||
+	    !content->value.sequence || content->value.sequence->length <= 0)
+		goto out;
+
+	p = content->value.sequence->data;
+	end = p + content->value.sequence->length;
+	fields = d2i_ASN1_SEQUENCE_ANY(NULL, &p,
+				       content->value.sequence->length);
+	if (!fields || p != end || sk_ASN1_TYPE_num(fields) != 2)
+		goto out;
+
+	digest_field = sk_ASN1_TYPE_value(fields, 1);
+	if (!digest_field || digest_field->type != V_ASN1_SEQUENCE ||
+	    !digest_field->value.sequence)
+		goto out;
+
+	/*
+	 * ASN1_TYPE stores a parsed SEQUENCE in an ASN1_STRING. Do not
+	 * assume its data pointer is a complete DER TLV: serialize it
+	 * explicitly before passing it to the DigestInfo decoder.
+	 */
+	digest_der_len = i2d_ASN1_TYPE(digest_field, NULL);
+	if (digest_der_len <= 0)
+		goto out;
+	digest_der = OPENSSL_malloc((size_t)digest_der_len);
+	if (!digest_der) {
+		status = EFI_OUT_OF_RESOURCES;
+		goto out;
+	}
+	write_ptr = digest_der;
+	if (i2d_ASN1_TYPE(digest_field, &write_ptr) != digest_der_len ||
+	    write_ptr != digest_der + digest_der_len)
+		goto out;
+
+	p = digest_der;
+	digest_info = d2i_X509_SIG(NULL, &p, digest_der_len);
+	if (!digest_info || p != digest_der + digest_der_len)
+		goto out;
+
+	X509_SIG_get0(digest_info, &alg, &digest);
+	if (!alg || !digest)
+		goto out;
+	X509_ALGOR_get0(&oid, NULL, NULL, alg);
+	if (!oid)
+		goto out;
+	nid = OBJ_obj2nid(oid);
+	switch (nid) {
+	case NID_sha1:
+		expected_size = SHA1_DIGEST_SIZE;
+		break;
+	case NID_sha256:
+		expected_size = SHA256_DIGEST_SIZE;
+		break;
+	case NID_sha384:
+		expected_size = SHA384_DIGEST_SIZE;
+		break;
+	case NID_sha512:
+		expected_size = SHA512_DIGEST_SIZE;
+		break;
+	default:
+		status = EFI_UNSUPPORTED;
+		goto out;
+	}
+	if (digest->length != (int)expected_size)
+		goto out;
+
+	*digest_nid = nid;
+	*digest_size = expected_size;
+	status = EFI_SUCCESS;
+out:
+	X509_SIG_free(digest_info);
+	OPENSSL_free(digest_der);
+	sk_ASN1_TYPE_pop_free(fields, ASN1_TYPE_free);
+	ASN1_OBJECT_free(spc_oid);
+	PKCS7_free(p7);
+	return status;
+}
+
 static BOOLEAN
 verify_x509(UINT8 *Cert, UINTN CertSize)
 {
@@ -119,13 +248,69 @@ verify_eku(UINT8 *Cert, UINTN CertSize)
 
 static CHECK_STATUS
 check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
-                     WIN_CERTIFICATE_EFI_PKCS *data, UINT8 *hash,
+                     WIN_CERTIFICATE_EFI_PKCS *data, SHALIST *sha_list,
                      CHAR16 *dbname, EFI_GUID guid)
 {
 	EFI_SIGNATURE_DATA *Cert;
 	UINTN CertSize;
 	BOOLEAN IsFound = FALSE;
+	EFI_STATUS efi_status;
+	int pe_digest_nid;
+	UINTN pe_digest_size;
+	const UINT8 *pe_hash = NULL;
 	int i = 0;
+
+	/*
+	 * Determine the PE digest algorithm from
+	 * SpcIndirectDataContent, once per signature.
+	 */
+
+	if (!data || !sha_list ||
+		data->Hdr.dwLength < sizeof(data->Hdr))
+		return DATA_NOT_FOUND;
+
+	efi_status = get_authenticode_pe_digest_algorithm(
+		data->CertData,
+		data->Hdr.dwLength - sizeof(data->Hdr),
+		&pe_digest_nid,
+		&pe_digest_size
+	);
+
+	if (EFI_ERROR(efi_status)) {
+		dprint(L"Cannot determine Authenticode PE digest\n");
+		return DATA_NOT_FOUND;
+	}
+
+	switch (pe_digest_nid) {
+	case NID_sha1:
+		pe_hash = sha_list->sha1hash;
+		if (pe_digest_size != SHA1_DIGEST_SIZE)
+			return DATA_NOT_FOUND;
+		break;
+
+	case NID_sha256:
+		pe_hash = sha_list->sha256hash;
+		if (pe_digest_size != SHA256_DIGEST_SIZE)
+			return DATA_NOT_FOUND;
+		break;
+
+	case NID_sha384:
+		pe_hash = sha_list->sha384hash;
+		if (pe_digest_size != SHA384_DIGEST_SIZE)
+			return DATA_NOT_FOUND;
+		break;
+
+	case NID_sha512:
+		pe_hash = sha_list->sha512hash;
+		if (pe_digest_size != SHA512_DIGEST_SIZE)
+			return DATA_NOT_FOUND;
+		break;
+
+	default:
+		dprint(L"Unsupported Authenticode PE digest: %d\n",
+			pe_digest_nid);
+		return DATA_NOT_FOUND;
+	}
 
 	while ((dbsize > 0) && (dbsize >= CertList->SignatureListSize)) {
 		if (CompareGuid (&CertList->SignatureType, &EFI_CERT_TYPE_X509_GUID)) {
@@ -139,7 +324,7 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 								      data->Hdr.dwLength - sizeof(data->Hdr),
 								      Cert->SignatureData,
 								      CertSize,
-								      hash, SHA256_DIGEST_SIZE);
+								      pe_hash, pe_digest_size);
 					if (IsFound) {
 						dprint(L"AuthenticodeVerify() succeeded: %d\n", IsFound);
 						tpm_measure_variable(dbname, guid, CertList->SignatureSize, Cert);
@@ -166,7 +351,7 @@ check_db_cert_in_ram(EFI_SIGNATURE_LIST *CertList, UINTN dbsize,
 
 static CHECK_STATUS
 check_db_cert(CHAR16 *dbname, EFI_GUID guid, WIN_CERTIFICATE_EFI_PKCS *data,
-              UINT8 *hash)
+              SHALIST *sha_list)
 {
 	CHECK_STATUS rc;
 	EFI_STATUS efi_status;
@@ -180,7 +365,7 @@ check_db_cert(CHAR16 *dbname, EFI_GUID guid, WIN_CERTIFICATE_EFI_PKCS *data,
 
 	CertList = (EFI_SIGNATURE_LIST *)db;
 
-	rc = check_db_cert_in_ram(CertList, dbsize, data, hash, dbname, guid);
+	rc = check_db_cert_in_ram(CertList, dbsize, data, sha_list, dbname, guid);
 
 	FreePool(db);
 
@@ -261,54 +446,85 @@ check_db_hash(CHAR16 *dbname, EFI_GUID guid, UINT8 *data, int SignatureSize,
  * built-in denylist
  */
 static EFI_STATUS
-check_denylist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
-               UINT8 *sha1hash)
+check_denylist(WIN_CERTIFICATE_EFI_PKCS *cert, SHALIST *sha_list)
 {
 	EFI_SIGNATURE_LIST *dbx = (EFI_SIGNATURE_LIST *)vendor_deauthorized;
 
-	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha256hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha_list->sha512hash,
+			SHA512_DIGEST_SIZE, EFI_CERT_SHA512_GUID, L"dbx",
+			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		LogError(L"binary sha512hash found in vendor dbx\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha_list->sha384hash,
+			SHA384_DIGEST_SIZE, EFI_CERT_SHA384_GUID, L"dbx",
+			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		LogError(L"binary sha384hash found in vendor dbx\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha_list->sha256hash,
 			SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID, L"dbx",
 			EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha1hash,
+	if (check_db_hash_in_ram(dbx, vendor_deauthorized_size, sha_list->sha1hash,
 				 SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
-	    check_db_cert_in_ram(dbx, vendor_deauthorized_size, cert, sha256hash, L"dbx",
+	    check_db_cert_in_ram(dbx, vendor_deauthorized_size, cert, sha_list, L"dbx",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in vendor dbx\n");
+		LogError(L"cert shahash found in vendor dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha256hash,
+	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha_list->sha512hash,
+			  SHA512_DIGEST_SIZE, EFI_CERT_SHA512_GUID) == DATA_FOUND) {
+		LogError(L"binary sha512hash found in system dbx\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha_list->sha384hash,
+			  SHA384_DIGEST_SIZE, EFI_CERT_SHA384_GUID) == DATA_FOUND) {
+		LogError(L"binary sha384hash found in system dbx\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha_list->sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha1hash,
+	if (check_db_hash(L"dbx", EFI_SECURE_BOOT_DB_GUID, sha_list->sha1hash,
 			  SHA1_DIGEST_SIZE, EFI_CERT_SHA1_GUID) == DATA_FOUND) {
 		LogError(L"binary sha1hash found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
 	    check_db_cert(L"dbx", EFI_SECURE_BOOT_DB_GUID,
-			  cert, sha256hash) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in system dbx\n");
+			  cert, sha_list) == DATA_FOUND) {
+		LogError(L"cert found in system dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
-	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha256hash,
+	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha_list->sha512hash,
+			  SHA512_DIGEST_SIZE, EFI_CERT_SHA512_GUID) == DATA_FOUND) {
+		LogError(L"binary sha512hash found in Mok dbx\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha_list->sha384hash,
+			  SHA384_DIGEST_SIZE, EFI_CERT_SHA384_GUID) == DATA_FOUND) {
+		LogError(L"binary sha384hash found in Mok dbx\n");
+		return EFI_SECURITY_VIOLATION;
+	}
+	if (check_db_hash(L"MokListX", SHIM_LOCK_GUID, sha_list->sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 		LogError(L"binary sha256hash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 	if (cert &&
 	    check_db_cert(L"MokListX", SHIM_LOCK_GUID,
-			  cert, sha256hash) == DATA_FOUND) {
-		LogError(L"cert sha256hash found in Mok dbx\n");
+			  cert, sha_list) == DATA_FOUND) {
+		LogError(L"cert shahash found in Mok dbx\n");
 		return EFI_SECURITY_VIOLATION;
 	}
 
@@ -327,18 +543,31 @@ update_verification_method(verification_method_t method)
  * Check whether the binary signature or hash are present in db or MokList
  */
 static EFI_STATUS
-check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
-                UINT8 *sha1hash)
+check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, SHALIST *sha_list)
 {
 	if (!ignore_db) {
-		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha256hash, SHA256_DIGEST_SIZE,
+		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha_list->sha512hash, SHA512_DIGEST_SIZE,
+					EFI_CERT_SHA512_GUID) == DATA_FOUND) {
+			update_verification_method(VERIFIED_BY_HASH);
+			return EFI_SUCCESS;
+		} else {
+			LogError(L"check_db_hash(db, sha512hash) != DATA_FOUND\n");
+		}
+		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha_list->sha384hash, SHA384_DIGEST_SIZE,
+					EFI_CERT_SHA384_GUID) == DATA_FOUND) {
+			update_verification_method(VERIFIED_BY_HASH);
+			return EFI_SUCCESS;
+		} else {
+			LogError(L"check_db_hash(db, sha384hash) != DATA_FOUND\n");
+		}
+		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha_list->sha256hash, SHA256_DIGEST_SIZE,
 					EFI_CERT_SHA256_GUID) == DATA_FOUND) {
 			update_verification_method(VERIFIED_BY_HASH);
 			return EFI_SUCCESS;
 		} else {
 			LogError(L"check_db_hash(db, sha256hash) != DATA_FOUND\n");
 		}
-		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha1hash, SHA1_DIGEST_SIZE,
+		if (check_db_hash(L"db", EFI_SECURE_BOOT_DB_GUID, sha_list->sha1hash, SHA1_DIGEST_SIZE,
 					EFI_CERT_SHA1_GUID) == DATA_FOUND) {
 			verification_method = VERIFIED_BY_HASH;
 			update_verification_method(VERIFIED_BY_HASH);
@@ -346,13 +575,13 @@ check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
 		} else {
 			LogError(L"check_db_hash(db, sha1hash) != DATA_FOUND\n");
 		}
-		if (cert && check_db_cert(L"db", EFI_SECURE_BOOT_DB_GUID, cert, sha256hash)
+		if (cert && check_db_cert(L"db", EFI_SECURE_BOOT_DB_GUID, cert, sha_list)
 					== DATA_FOUND) {
 			verification_method = VERIFIED_BY_CERT;
 			update_verification_method(VERIFIED_BY_CERT);
 			return EFI_SUCCESS;
 		} else if (cert) {
-			LogError(L"check_db_cert(db, sha256hash) != DATA_FOUND\n");
+			LogError(L"check_db_cert(db, shahash) != DATA_FOUND\n");
 		}
 	}
 
@@ -360,7 +589,29 @@ check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
 	EFI_SIGNATURE_LIST *db = (EFI_SIGNATURE_LIST *)vendor_db;
 
 	if (check_db_hash_in_ram(db, vendor_db_size,
-				 sha256hash, SHA256_DIGEST_SIZE,
+				 sha_list->sha512hash, SHA512_DIGEST_SIZE,
+				 EFI_CERT_SHA512_GUID, L"vendor_db",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(vendor_db, sha512hash) != DATA_FOUND\n");
+	}
+
+	if (check_db_hash_in_ram(db, vendor_db_size,
+				 sha_list->sha384hash, SHA384_DIGEST_SIZE,
+				 EFI_CERT_SHA384_GUID, L"vendor_db",
+				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(vendor_db, sha384hash) != DATA_FOUND\n");
+	}
+
+	if (check_db_hash_in_ram(db, vendor_db_size,
+				 sha_list->sha256hash, SHA256_DIGEST_SIZE,
 				 EFI_CERT_SHA256_GUID, L"vendor_db",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
@@ -371,17 +622,37 @@ check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
 	}
 	if (cert &&
 	    check_db_cert_in_ram(db, vendor_db_size,
-				 cert, sha256hash, L"vendor_db",
+				 cert, sha_list, L"vendor_db",
 				 EFI_SECURE_BOOT_DB_GUID) == DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
 	} else if (cert) {
-		LogError(L"check_db_cert(vendor_db, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_db_cert(vendor_db, shahash) != DATA_FOUND\n");
 	}
 #endif
 
-	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha256hash,
+	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha_list->sha512hash,
+			  SHA512_DIGEST_SIZE, EFI_CERT_SHA512_GUID)
+				== DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(MokListRT, sha512hash) != DATA_FOUND\n");
+	}
+
+	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha_list->sha384hash,
+			  SHA384_DIGEST_SIZE, EFI_CERT_SHA384_GUID)
+				== DATA_FOUND) {
+		verification_method = VERIFIED_BY_HASH;
+		update_verification_method(VERIFIED_BY_HASH);
+		return EFI_SUCCESS;
+	} else {
+		LogError(L"check_db_hash(MokListRT, sha384hash) != DATA_FOUND\n");
+	}
+
+	if (check_db_hash(L"MokListRT", SHIM_LOCK_GUID, sha_list->sha256hash,
 			  SHA256_DIGEST_SIZE, EFI_CERT_SHA256_GUID)
 				== DATA_FOUND) {
 		verification_method = VERIFIED_BY_HASH;
@@ -390,13 +661,13 @@ check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
 	} else {
 		LogError(L"check_db_hash(MokListRT, sha256hash) != DATA_FOUND\n");
 	}
-	if (cert && check_db_cert(L"MokListRT", SHIM_LOCK_GUID, cert, sha256hash)
+	if (cert && check_db_cert(L"MokListRT", SHIM_LOCK_GUID, cert, sha_list)
 			== DATA_FOUND) {
 		verification_method = VERIFIED_BY_CERT;
 		update_verification_method(VERIFIED_BY_CERT);
 		return EFI_SUCCESS;
 	} else if (cert) {
-		LogError(L"check_db_cert(MokListRT, sha256hash) != DATA_FOUND\n");
+		LogError(L"check_db_cert(MokListRT, shahash) != DATA_FOUND\n");
 	}
 
 	update_verification_method(VERIFIED_BY_NOTHING);
@@ -404,16 +675,17 @@ check_allowlist(WIN_CERTIFICATE_EFI_PKCS *cert, UINT8 *sha256hash,
 }
 
 static EFI_STATUS
-verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
-                     UINT8 *sha1hash)
+verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, SHALIST *sha_list,
+		     int pe_digest_nid UNUSED,
+		     UINTN pe_digest_size UNUSED)
 {
 	EFI_STATUS efi_status;
-
+	UINT8 *hash_buffer UNUSED = NULL;
 	/*
 	 * Ensure that the binary isn't forbidden
 	 */
 	drain_openssl_errors();
-	efi_status = check_denylist(sig, sha256hash, sha1hash);
+	efi_status = check_denylist(sig, sha_list);
 	if (EFI_ERROR(efi_status)) {
 		perror(L"Binary is forbidden: %r\n", efi_status);
 		PrintErrors();
@@ -427,7 +699,7 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
 	 * databases
 	 */
 	drain_openssl_errors();
-	efi_status = check_allowlist(sig, sha256hash, sha1hash);
+	efi_status = check_allowlist(sig, sha_list);
 	if (EFI_ERROR(efi_status)) {
 		if (efi_status != EFI_NOT_FOUND) {
 			dprint(L"check_allowlist(): %r\n", efi_status);
@@ -441,6 +713,26 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
 	}
 
 	efi_status = EFI_NOT_FOUND;
+
+#if defined(ENABLE_SHIM_CERT) || defined(VENDOR_CERT_FILE)
+	switch (pe_digest_nid) {
+		case NID_sha1:
+			hash_buffer = sha_list->sha1hash;
+			break;
+		case NID_sha256:
+			hash_buffer = sha_list->sha256hash;
+			break;
+		case NID_sha384:
+			hash_buffer = sha_list->sha384hash;
+			break;
+		case NID_sha512:
+			hash_buffer = sha_list->sha512hash;
+			break;
+		default:
+			return EFI_UNSUPPORTED;
+	}
+#endif
+
 #if defined(ENABLE_SHIM_CERT)
 	/*
 	 * Check against the shim build key
@@ -449,11 +741,12 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
 	if (build_cert && build_cert_size) {
 		dprint("verifying against shim cert\n");
 	}
+
 	if (build_cert && build_cert_size &&
 	    AuthenticodeVerify(sig->CertData,
 		       sig->Hdr.dwLength - sizeof(sig->Hdr),
-		       build_cert, build_cert_size, sha256hash,
-		       SHA256_DIGEST_SIZE)) {
+		       build_cert, build_cert_size, hash_buffer,
+		       pe_digest_size)) {
 		dprint(L"AuthenticodeVerify(shim_cert) succeeded\n");
 		update_verification_method(VERIFIED_BY_CERT);
 		tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
@@ -481,7 +774,7 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
 	    AuthenticodeVerify(sig->CertData,
 			       sig->Hdr.dwLength - sizeof(sig->Hdr),
 			       vendor_cert, vendor_cert_size,
-			       sha256hash, SHA256_DIGEST_SIZE)) {
+			       hash_buffer, pe_digest_size)) {
 		dprint(L"AuthenticodeVerify(vendor_cert) succeeded\n");
 		update_verification_method(VERIFIED_BY_CERT);
 		tpm_measure_variable(L"Shim", SHIM_LOCK_GUID,
@@ -506,8 +799,7 @@ verify_one_signature(WIN_CERTIFICATE_EFI_PKCS *sig, UINT8 *sha256hash,
 static EFI_STATUS
 verify_buffer_authenticode (char *data, int datasize,
 			    PE_COFF_LOADER_IMAGE_CONTEXT *context,
-			    UINT8 *sha256hash, UINT8 *sha1hash,
-			    bool parent_verified)
+			    SHALIST *sha_list, bool parent_verified)
 {
 	EFI_STATUS ret_efi_status;
 	size_t size = datasize;
@@ -524,7 +816,7 @@ verify_buffer_authenticode (char *data, int datasize,
 	 */
 	drain_openssl_errors();
 
-	ret_efi_status = generate_hash(data, datasize, context, sha256hash, sha1hash);
+	ret_efi_status = generate_hash(data, datasize, context, sha_list);
 	if (EFI_ERROR(ret_efi_status)) {
 		dprint(L"generate_hash: %r\n", ret_efi_status);
 		PrintErrors();
@@ -537,7 +829,7 @@ verify_buffer_authenticode (char *data, int datasize,
 	 * Ensure that the binary isn't forbidden by hash
 	 */
 	drain_openssl_errors();
-	ret_efi_status = check_denylist(NULL, sha256hash, sha1hash);
+	ret_efi_status = check_denylist(NULL, sha_list);
 	if (EFI_ERROR(ret_efi_status)) {
 //		perror(L"Binary is forbidden\n");
 //		dprint(L"Binary is forbidden: %r\n", ret_efi_status);
@@ -555,7 +847,7 @@ verify_buffer_authenticode (char *data, int datasize,
 	 * firmware databases
 	 */
 	drain_openssl_errors();
-	ret_efi_status = check_allowlist(NULL, sha256hash, sha1hash);
+	ret_efi_status = check_allowlist(NULL, sha_list);
 	if (EFI_ERROR(ret_efi_status)) {
 		LogError(L"check_allowlist(): %r\n", ret_efi_status);
 		dprint(L"check_allowlist: %r\n", ret_efi_status);
@@ -619,10 +911,26 @@ verify_buffer_authenticode (char *data, int datasize,
 
 		if (sig->Hdr.wCertificateType == WIN_CERT_TYPE_PKCS_SIGNED_DATA) {
 			EFI_STATUS efi_status;
+			int pe_digest_nid = NID_undef;
+			UINTN pe_digest_size = 0;
 
 			dprint(L"Attempting to verify signature %d:\n", i++);
+			efi_status = get_authenticode_pe_digest_algorithm(
+				sig->CertData,
+				sig->Hdr.dwLength - sizeof(sig->Hdr),
+				&pe_digest_nid, &pe_digest_size);
+			if (EFI_ERROR(efi_status)) {
+				dprint(L"Cannot determine PE digest: %r\n",
+				       efi_status);
+				if (ret_efi_status != EFI_SUCCESS)
+					ret_efi_status = efi_status;
+				offset = ALIGN_VALUE(offset + sz, 8);
+				continue;
+			}
+			dprint(L"Authenticode PE digest: NID=%d, size=%lu\n",
+			       pe_digest_nid, (unsigned long)pe_digest_size);
 
-			efi_status = verify_one_signature(sig, sha256hash, sha1hash);
+			efi_status = verify_one_signature(sig, sha_list, pe_digest_nid, pe_digest_size);
 
 			/*
 			 * If we didn't get EFI_SECURITY_VIOLATION from
@@ -718,14 +1026,12 @@ verify_buffer_sbat (char *data, int datasize,
 EFI_STATUS
 verify_buffer (char *data, int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	       UINT8 *sha256hash, UINT8 *sha1hash,
-	       bool parent_verified)
+	       SHALIST *sha_list, bool parent_verified)
 {
 	EFI_STATUS efi_status;
 
 	efi_status = verify_buffer_authenticode(data, datasize, context,
-						sha256hash, sha1hash,
-						parent_verified);
+						sha_list, parent_verified);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
@@ -741,11 +1047,19 @@ shim_verify(void *buffer, UINT32 size)
 {
 	EFI_STATUS efi_status = EFI_SUCCESS;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
+	SHALIST sha_list;
 	UINT8 sha1hash[SHA1_DIGEST_SIZE];
 	UINT8 sha256hash[SHA256_DIGEST_SIZE];
+	UINT8 sha384hash[SHA384_DIGEST_SIZE];
+	UINT8 sha512hash[SHA512_DIGEST_SIZE];
 
 	if ((INT32)size < 0)
 		return EFI_INVALID_PARAMETER;
+
+	sha_list.sha1hash = sha1hash;
+	sha_list.sha256hash = sha256hash;
+	sha_list.sha384hash = sha384hash;
+	sha_list.sha512hash = sha512hash;
 
 	in_protocol = 1;
 
@@ -754,7 +1068,7 @@ shim_verify(void *buffer, UINT32 size)
 		goto done;
 
 	efi_status = generate_hash(buffer, size, &context,
-				   sha256hash, sha1hash);
+				   &sha_list);
 	if (EFI_ERROR(efi_status))
 		goto done;
 
@@ -763,7 +1077,7 @@ shim_verify(void *buffer, UINT32 size)
 	efi_status =
 #endif
 	tpm_log_pe((EFI_PHYSICAL_ADDRESS)(UINTN)buffer, size, 0, NULL,
-		   sha1hash, 4);
+		   sha_list.sha1hash, 4);
 #ifdef REQUIRE_TPM
 	if (EFI_ERROR(efi_status))
 		goto done;
@@ -775,8 +1089,7 @@ shim_verify(void *buffer, UINT32 size)
 	}
 
 	efi_status = verify_buffer(buffer, size,
-				   &context, sha256hash, sha1hash,
-				   false);
+				   &context, &sha_list, false);
 done:
 	in_protocol = 0;
 	return efi_status;
@@ -787,13 +1100,22 @@ shim_hash(char *data, int datasize, PE_COFF_LOADER_IMAGE_CONTEXT *context,
           UINT8 *sha256hash, UINT8 *sha1hash)
 {
 	EFI_STATUS efi_status;
+	UINT8 sha384hash[SHA384_DIGEST_SIZE];
+	UINT8 sha512hash[SHA512_DIGEST_SIZE];
+
+	SHALIST hashes = {
+		.sha1hash = sha1hash,
+		.sha256hash = sha256hash,
+		.sha384hash = sha384hash,
+		.sha512hash = sha512hash,
+	};
 
 	if (datasize < 0)
 		return EFI_INVALID_PARAMETER;
 
 	in_protocol = 1;
-	efi_status = generate_hash(data, datasize, context,
-				   sha256hash, sha1hash);
+	efi_status = generate_hash(data, datasize, context, &hashes);
+
 	in_protocol = 0;
 
 	return efi_status;

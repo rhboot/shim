@@ -50,10 +50,12 @@ validate_cached_section(EFI_HANDLE parent_image_handle,
 void
 flush_cached_sections(EFI_HANDLE parent_image_handle);
 
+typedef struct SHALIST SHALIST;
+
 EFI_STATUS
 generate_hash (char *data, unsigned int datasize,
 	       PE_COFF_LOADER_IMAGE_CONTEXT *context,
-	       UINT8 *sha256hash, UINT8 *sha1hash);
+	       SHALIST *sha_list);
 
 EFI_STATUS
 relocate_coff (PE_COFF_LOADER_IMAGE_CONTEXT *context,
