@@ -106,16 +106,21 @@ test-load-options_FILES = lib/guid.c
 test-load-options : CFLAGS+=-DHAVE_SHIM_LOCK_GUID
 
 test-mock-variables_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c mock-variables.c
-test-mock-variables: CFLAGS+=-DHAVE_SHIM_LOCK_GUID
+test-mock-variables: CFLAGS+=-DHAVE_SHIM_LOCK_GUID -DSHIM_NX_COMPAT=$(SHIM_NX_COMPAT)
 
 test-mok-mirror_FILES = mok.c globals.c tpm.c lib/guid.c lib/variables.c mock-variables.c
-test-mok-mirror: CFLAGS+=-DHAVE_START_IMAGE -DHAVE_SHIM_LOCK_GUID
+test-mok-mirror: CFLAGS+=-DHAVE_START_IMAGE -DHAVE_SHIM_LOCK_GUID -DSHIM_NX_COMPAT=$(SHIM_NX_COMPAT)
 
 test-sbat_FILES = csv.c lib/variables.c lib/guid.c sbat_var.S mock-variables.c
 test-sbat :: CFLAGS+=-DHAVE_GET_VARIABLE -DHAVE_GET_VARIABLE_ATTR -DHAVE_SHIM_LOCK_GUID
 
 test-pe-relocate_FILES = globals.c
-test-pe-relocate :: CFLAGS+=-DHAVE_SHIM_LOCK_GUID
+test-pe-relocate :: CFLAGS+=-DHAVE_SHIM_LOCK_GUID -DSHIM_NX_COMPAT=$(SHIM_NX_COMPAT)
+
+.PHONY: test-nx-policy
+test-nx-policy:
+	$(MAKE) -f $(TOPDIR)/include/test.mk POST_PROCESS_PE_FLAGS=-n test-pe-relocate
+	$(MAKE) -f $(TOPDIR)/include/test.mk POST_PROCESS_PE_FLAGS=-N test-pe-relocate
 
 test-str_FILES = lib/string.c
 

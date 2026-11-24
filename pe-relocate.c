@@ -577,11 +577,12 @@ read_header(void *data, unsigned int datasize,
 	/*
 	 * If NX_COMPAT is required, check that it's set.
 	 */
-	if ((mok_policy & MOK_POLICY_REQUIRE_NX) &&
-	    !(context->DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
+#if SHIM_NX_COMPAT
+	if (!(context->DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
 		perror(L"Policy requires NX, but image does not support NX\n");
 		return EFI_UNSUPPORTED;
-        }
+	}
+#endif
 
 	/*
 	 * Check that the file header fits within the image.
@@ -664,34 +665,6 @@ get_shim_nx_capability(EFI_HANDLE image_handle)
 		       decode_hsi_bits(hsi_status),
 		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_NX));
 		hsi_status |= SHIM_HSI_STATUS_NX;
-	}
-}
-
-static inline bool
-hsi_nx_is_enforced(void)
-{
-	return !((hsi_status & SHIM_HSI_STATUS_HEAPX) ||
-		 (hsi_status & SHIM_HSI_STATUS_STACKX) ||
-		 (hsi_status & SHIM_HSI_STATUS_ROW));
-}
-
-static inline bool
-hsi_api_is_present(void)
-{
-	return (hsi_status & SHIM_HSI_STATUS_HASMAP) ||
-		((hsi_status & SHIM_HSI_STATUS_HASDSTGMSD &&
-		  hsi_status & SHIM_HSI_STATUS_HASDSTSMSA));
-}
-
-void
-set_shim_nx_policy(void)
-{
-	if ((hsi_status & SHIM_HSI_STATUS_NX) &&
-	    hsi_nx_is_enforced() &&
-	    hsi_api_is_present())
-	{
-		mok_policy |= MOK_POLICY_REQUIRE_NX;
-		dprint("Enforcing NX policy for all images\n");
 	}
 }
 

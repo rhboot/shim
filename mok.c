@@ -1333,6 +1333,23 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 		v->data_size = 0;
 	}
 
+	if (v->state == &mok_policy) {
+		UINT8 policy = v->data && v->data_size == sizeof(UINT8)
+			     ? v->data[0] : 0;
+		policy &= ~MOK_POLICY_REQUIRE_NX;
+#if SHIM_NX_COMPAT
+		policy |= MOK_POLICY_REQUIRE_NX;
+#endif
+		if (!v->data || v->data_size != sizeof(UINT8)) {
+			FreePool(v->data);
+			v->data = AllocatePool(sizeof(UINT8));
+			v->data_size = v->data ? sizeof(UINT8) : 0;
+			if (!v->data)
+				return EFI_OUT_OF_RESOURCES;
+		}
+		v->data[0] = policy;
+	}
+
 	dprint(L"maybe mirroring \"%s\".  original data:\n", v->name);
 	if (v->data && v->data_size) {
 		dhexdumpat(v->data, v->data_size, 0);

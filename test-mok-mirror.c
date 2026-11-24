@@ -54,6 +54,8 @@ struct test_var {
 
 static struct test_var *test_vars;
 
+static const UINT8 expected_mok_policy = SHIM_NX_COMPAT ? MOK_POLICY_REQUIRE_NX : 0;
+
 struct mock_mok_variable_config_entry {
 	/*
 	 * The name of an entry we expect to see in the MokVars
@@ -429,6 +431,10 @@ test_mok_mirror_with_enough_space(void)
 		 .data_size = sizeof(test_data_efivars_1_MokListTrustedRT),
 		 .data = test_data_efivars_1_MokListTrustedRT
 		},
+		{.name = "MokPolicyRT",
+		 .data_size = sizeof(expected_mok_policy),
+		 .data = &expected_mok_policy
+		},
 		{.name = "HSIStatus",
 		 .data_size = sizeof(test_data_efivars_1_HSIStatus),
 		 .data = test_data_efivars_1_HSIStatus
@@ -622,6 +628,10 @@ test_mok_mirror_setvar_out_of_resources(void)
 		{.name = "MokListTrustedRT",
 		 .data_size = sizeof(test_data_efivars_1_MokListTrustedRT),
 		 .data = test_data_efivars_1_MokListTrustedRT
+		},
+		{.name = "MokPolicyRT",
+		 .data_size = sizeof(expected_mok_policy),
+		 .data = &expected_mok_policy
 		},
 		{.name = "HSIStatus",
 		 .data_size = sizeof(test_data_efivars_1_HSIStatus),

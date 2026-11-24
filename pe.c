@@ -764,14 +764,15 @@ handle_image (void *data, unsigned int datasize,
 		if (!(Section->Characteristics & EFI_IMAGE_SCN_MEM_READ))
 			continue;
 
+#if SHIM_NX_COMPAT
 		if (!(Section->Characteristics & EFI_IMAGE_SCN_MEM_DISCARDABLE) &&
 		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_WRITE) &&
-		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE) &&
-		    (mok_policy & MOK_POLICY_REQUIRE_NX)) {
+		    (Section->Characteristics & EFI_IMAGE_SCN_MEM_EXECUTE)) {
 			perror(L"Section %d is writable and executable\n", i);
 			BS->FreePages(*alloc_address, *alloc_pages);
 			return EFI_UNSUPPORTED;
 		}
+#endif
 
 		base = ImageAddress (buffer, context.ImageSize,
 				     Section->VirtualAddress);
