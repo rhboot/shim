@@ -153,6 +153,10 @@ CFLAGS		= $(FEATUREFLAGS) \
 
 POST_PROCESS_PE_FLAGS =
 
+nx-options = $(foreach option,$(POST_PROCESS_PE_FLAGS),$(if $(filter --%,$(option)),$(option),$(subst N, -N ,$(subst n, -n ,$(option)))))
+override SHIM_NX_COMPAT := $(if $(filter -N --disable-nx-compat,$(lastword $(filter -n -N --enable-nx-compat --disable-nx-compat,$(nx-options)))),0,1)
+DEFINES += -DSHIM_NX_COMPAT=$(SHIM_NX_COMPAT)
+
 ifneq ($(origin OVERRIDE_SECURITY_POLICY), undefined)
 	DEFINES	+= -DOVERRIDE_SECURITY_POLICY
 endif

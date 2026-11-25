@@ -135,23 +135,5 @@ extern UINTN mok_config_table_pages;
  */
 #define MOK_POLICY_REQUIRE_NX	1
 
-extern UINTN hsi_status;
-/* heap is executable */
-#define SHIM_HSI_STATUS_HEAPX		0x00000001ULL
-/* stack is executable */
-#define SHIM_HSI_STATUS_STACKX		0x00000002ULL
-/* read-only sections are writable */
-#define SHIM_HSI_STATUS_ROW		0x00000004ULL
-/* platform provides the EFI Memory Attribute Protocol */
-#define SHIM_HSI_STATUS_HASMAP		0x00000008ULL
-/* platform provides DXE Services Table */
-#define SHIM_HSI_STATUS_HASDST		0x00000010ULL
-/* platform has DST->GetMemorySpaceDescriptor */
-#define SHIM_HSI_STATUS_HASDSTGMSD	0x00000020ULL
-/* platform has DST->SetMemorySpaceAttributes */
-#define SHIM_HSI_STATUS_HASDSTSMSA	0x00000040ULL
-/* This shim has the NX_COMPAT bit set */
-#define SHIM_HSI_STATUS_NX		0x00000100ULL
-
 #endif /* !SHIM_MOK_H_ */
 // vim:fenc=utf-8:tw=75:noet

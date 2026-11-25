@@ -577,11 +577,12 @@ read_header(void *data, unsigned int datasize,
 	/*
 	 * If NX_COMPAT is required, check that it's set.
 	 */
-	if ((mok_policy & MOK_POLICY_REQUIRE_NX) &&
-	    !(context->DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
+#if SHIM_NX_COMPAT
+	if (!(context->DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT)) {
 		perror(L"Policy requires NX, but image does not support NX\n");
 		return EFI_UNSUPPORTED;
-        }
+	}
+#endif
 
 	/*
 	 * Check that the file header fits within the image.
@@ -636,63 +637,6 @@ read_header(void *data, unsigned int datasize,
 		return EFI_INVALID_PARAMETER;
 	}
 	return EFI_SUCCESS;
-}
-
-void
-get_shim_nx_capability(EFI_HANDLE image_handle)
-{
-	EFI_LOADED_IMAGE_PROTOCOL*li = NULL;
-	EFI_STATUS efi_status;
-	PE_COFF_LOADER_IMAGE_CONTEXT context;
-
-	efi_status = BS->HandleProtocol(image_handle, &gEfiLoadedImageProtocolGuid, (void **)&li);
-	if (EFI_ERROR(efi_status) || !li) {
-		dprint(L"Could not get loaded image protocol: %r\n", efi_status);
-		return;
-	}
-
-	ZeroMem(&context, sizeof(context));
-	efi_status = read_header(li->ImageBase, li->ImageSize, &context, false);
-	if (EFI_ERROR(efi_status)) {
-		dprint(L"Couldn't parse image header: %r\n", efi_status);
-		return;
-	}
-
-	dprint(L"DllCharacteristics:0x%lx\n", context.DllCharacteristics);
-	if (context.DllCharacteristics & EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT) {
-		dprint(L"Setting HSI from %a to %a\n",
-		       decode_hsi_bits(hsi_status),
-		       decode_hsi_bits(hsi_status | SHIM_HSI_STATUS_NX));
-		hsi_status |= SHIM_HSI_STATUS_NX;
-	}
-}
-
-static inline bool
-hsi_nx_is_enforced(void)
-{
-	return !((hsi_status & SHIM_HSI_STATUS_HEAPX) ||
-		 (hsi_status & SHIM_HSI_STATUS_STACKX) ||
-		 (hsi_status & SHIM_HSI_STATUS_ROW));
-}
-
-static inline bool
-hsi_api_is_present(void)
-{
-	return (hsi_status & SHIM_HSI_STATUS_HASMAP) ||
-		((hsi_status & SHIM_HSI_STATUS_HASDSTGMSD &&
-		  hsi_status & SHIM_HSI_STATUS_HASDSTSMSA));
-}
-
-void
-set_shim_nx_policy(void)
-{
-	if ((hsi_status & SHIM_HSI_STATUS_NX) &&
-	    hsi_nx_is_enforced() &&
-	    hsi_api_is_present())
-	{
-		mok_policy |= MOK_POLICY_REQUIRE_NX;
-		dprint("Enforcing NX policy for all images\n");
-	}
 }
 
 // vim:fenc=utf-8:tw=75:noet

@@ -1198,8 +1198,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	 */
 	debug_hook();
 
-	get_shim_nx_capability(image_handle);
-
 	efi_status = set_sbat_uefi_variable_internal();
 	if (EFI_ERROR(efi_status) && secure_mode()) {
 		perror(L"%s variable initialization failed\n", SBAT_VAR_NAME);
@@ -1240,8 +1238,6 @@ efi_main (EFI_HANDLE passed_image_handle, EFI_SYSTEM_TABLE *passed_systab)
 	}
 
 	init_openssl();
-	get_hsi_mem_info();
-	set_shim_nx_policy();
 
 	efi_status = load_unbundled_trust(global_image_handle);
 	if (EFI_ERROR(efi_status)) {

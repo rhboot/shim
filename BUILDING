@@ -70,8 +70,21 @@ Variables you could set to customize the build:
   This is the label that will be put in BOOT$(EFI_ARCH).CSV for your OS.
   By default this is the same value as EFIDIR .
 - POST_PROCESS_PE_FLAGS
-  This allows you to add flags to the invocation of "post-process-pe", for
-  example to disable the NX compatibility flag.
+  This allows you to add flags to the invocation of "post-process-pe".
+  Set -n or --enable-nx-compat to set the PE NX compatibility flag and
+  compile strict NX enforcement into shim. This requires the entire boot chain to
+  be NX_COMPAT or shim will not load it.
+  Set -N or --disable-nx-compat to clear the flag and omit those checks.
+  The default is enabled to catch scenarios that need updating. If a consumer requires
+  shipping non-NX_COMPAT binaries, they must disable the flag.
+  When NX_COMPAT is enabled, post-processing fails the build if an output
+  EFI image has incompatible file/section alignment or writable/executable
+  sections. With NX_COMPAT disabled these checks produce warnings instead.
+  These build checks inspect the generated EFI images, not downstream images
+  that shim will load later; downstream NX policy is enforced at runtime.
+  If the NX_COMPAT flag is changed, a clean should be run first to ensure all required
+  files are rebuilt with the changes.
+
 - ENABLE_CODESIGN_EKU
   This changes the certificate validation logic to require Extended Key
   Usage 1.3.6.1.5.5.7.3.3 ("Code Signing").
