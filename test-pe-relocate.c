@@ -39,7 +39,6 @@ test_nx_header_policy(void)
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 	EFI_STATUS status, expected;
 	UINT16 *characteristics;
-	UINTN hsi_states[] = {0, (UINTN)-1};
 
 	image.dos.e_magic = EFI_IMAGE_DOS_SIGNATURE;
 	image.dos.e_lfanew = offsetof(typeof(image), header);
@@ -74,21 +73,17 @@ test_nx_header_policy(void)
 		characteristics = &image.header.Pe32.OptionalHeader.DllCharacteristics;
 	}
 
-	for (size_t hsi_index = 0; hsi_index < sizeof(hsi_states) / sizeof(hsi_states[0]); hsi_index++) {
-		hsi_status = hsi_states[hsi_index];
-		for (unsigned int policy = 0; policy <= 1; policy++) {
-			mok_policy = policy;
-			for (unsigned int nx = 0; nx <= 1; nx++) {
-				*characteristics = nx ? EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT : 0;
-				memset(&context, 0, sizeof(context));
-				expected = SHIM_NX_COMPAT && !nx ? EFI_UNSUPPORTED : EFI_SUCCESS;
-				status = read_header(&image, sizeof(image), &context, true);
-				assert_equal_return(status, expected, -1, "got %lx expected %lx\n");
-			}
+	for (unsigned int policy = 0; policy <= 1; policy++) {
+		mok_policy = policy;
+		for (unsigned int nx = 0; nx <= 1; nx++) {
+			*characteristics = nx ? EFI_IMAGE_DLLCHARACTERISTICS_NX_COMPAT : 0;
+			memset(&context, 0, sizeof(context));
+			expected = SHIM_NX_COMPAT && !nx ? EFI_UNSUPPORTED : EFI_SUCCESS;
+			status = read_header(&image, sizeof(image), &context, true);
+			assert_equal_return(status, expected, -1, "got %lx expected %lx\n");
 		}
 	}
 	mok_policy = 0;
-	hsi_status = 0;
 	return 0;
 }
 

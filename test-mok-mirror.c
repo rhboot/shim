@@ -400,11 +400,6 @@ test_mok_mirror_with_enough_space(void)
 			  EFI_VARIABLE_RUNTIME_ACCESS,
 		 .ops = { NONE, },
 		},
-		{.guid = SHIM_LOCK_GUID,
-		 .name = L"HSIStatus",
-		 .attrs = 0,
-		 .ops = { NONE, },
-		},
 		{.guid = { 0, },
 		 .name = NULL,
 		}
@@ -434,10 +429,6 @@ test_mok_mirror_with_enough_space(void)
 		{.name = "MokPolicyRT",
 		 .data_size = sizeof(expected_mok_policy),
 		 .data = &expected_mok_policy
-		},
-		{.name = "HSIStatus",
-		 .data_size = sizeof(test_data_efivars_1_HSIStatus),
-		 .data = test_data_efivars_1_HSIStatus
 		},
 		{.name = { 0, },
 		 .data_size = 0,
@@ -632,10 +623,6 @@ test_mok_mirror_setvar_out_of_resources(void)
 		{.name = "MokPolicyRT",
 		 .data_size = sizeof(expected_mok_policy),
 		 .data = &expected_mok_policy
-		},
-		{.name = "HSIStatus",
-		 .data_size = sizeof(test_data_efivars_1_HSIStatus),
-		 .data = test_data_efivars_1_HSIStatus
 		},
 		{.name = { 0, },
 		 .data_size = 0,

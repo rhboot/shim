@@ -15,7 +15,6 @@ extern EFI_PXE_BASE_CODE *pxe;
 extern CHAR8 *full_path;
 
 UINT8 mok_policy = 0;
-UINTN hsi_status = 0;
 
 /* A struct to track fuzzing input bytes */
 typedef struct {
